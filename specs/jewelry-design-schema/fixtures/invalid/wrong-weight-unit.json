@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0.0",
+  "design_id": "11111111-1111-4111-8111-111111111111",
+  "revision_id": "22222222-2222-4222-8222-222222222222",
+  "revision": 1,
+  "created_at": "2026-09-20T12:00:00Z",
+  "event": {
+    "action": "create",
+    "source": {
+      "kind": "message",
+      "message_id": "example-request",
+      "recorded_at": "2026-09-20T12:00:00Z"
+    },
+    "reason": "Synthetic contract example"
+  },
+  "design": {
+    "jewelry_type": {
+      "origin": "explicit",
+      "availability": "value",
+      "value": "ring",
+      "source": {
+        "kind": "message",
+        "message_id": "example-request",
+        "recorded_at": "2026-09-20T12:00:00Z"
+      },
+      "confirmed": true,
+      "locked": false
+    },
+    "metal": {
+      "material": {
+        "origin": "explicit",
+        "availability": "value",
+        "value": "gold",
+        "source": {
+          "kind": "message",
+          "message_id": "example-request",
+          "recorded_at": "2026-09-20T12:00:00Z"
+        },
+        "confirmed": true,
+        "locked": false
+      },
+      "color": {
+        "origin": "explicit",
+        "availability": "value",
+        "value": "white",
+        "source": {
+          "kind": "message",
+          "message_id": "example-request",
+          "recorded_at": "2026-09-20T12:00:00Z"
+        },
+        "confirmed": true,
+        "locked": true
+      },
+      "purity": {
+        "origin": "explicit",
+        "availability": "value",
+        "value": {
+          "value": 18,
+          "unit": "karat"
+        },
+        "source": {
+          "kind": "message",
+          "message_id": "example-request",
+          "recorded_at": "2026-09-20T12:00:00Z"
+        },
+        "confirmed": true,
+        "locked": false
+      }
+    },
+    "center_stone": {
+      "material": {
+        "origin": "explicit",
+        "availability": "value",
+        "value": "emerald",
+        "source": {
+          "kind": "message",
+          "message_id": "example-request",
+          "recorded_at": "2026-09-20T12:00:00Z"
+        },
+        "confirmed": true,
+        "locked": false
+      },
+      "shape": {
+        "origin": "explicit",
+        "availability": "value",
+        "value": "oval",
+        "source": {
+          "kind": "message",
+          "message_id": "example-request",
+          "recorded_at": "2026-09-20T12:00:00Z"
+        },
+        "confirmed": true,
+        "locked": false
+      },
+      "weight": {
+        "origin": "explicit",
+        "availability": "value",
+        "value": {
+          "value": 3,
+          "unit": "karat"
+        },
+        "source": {
+          "kind": "message",
+          "message_id": "example-request",
+          "recorded_at": "2026-09-20T12:00:00Z"
+        },
+        "confirmed": true,
+        "locked": false
+      },
+      "dimensions": {
+        "availability": "unknown",
+        "origin": "unknown"
+      }
+    },
+    "side_stones": [
+      {
+        "group_id": "accents",
+        "stones": {
+          "material": {
+            "origin": "explicit",
+            "availability": "value",
+            "value": "diamond",
+            "source": {
+              "kind": "message",
+              "message_id": "example-request",
+              "recorded_at": "2026-09-20T12:00:00Z"
+            },
+            "confirmed": true,
+            "locked": false
+          },
+          "shape": {
+            "origin": "explicit",
+            "availability": "value",
+            "value": "pear",
+            "source": {
+              "kind": "message",
+              "message_id": "example-request",
+              "recorded_at": "2026-09-20T12:00:00Z"
+            },
+            "confirmed": true,
+            "locked": false
+          }
+        },
+        "quantity": {
+          "origin": "explicit",
+          "availability": "value",
+          "value": {
+            "value": 4,
+            "scope": "per_side"
+          },
+          "source": {
+            "kind": "message",
+            "message_id": "example-request",
+            "recorded_at": "2026-09-20T12:00:00Z"
+          },
+          "confirmed": true,
+          "locked": false
+        }
+      }
+    ],
+    "style": {
+      "origin": "explicit",
+      "availability": "value",
+      "value": [
+        "classic"
+      ],
+      "source": {
+        "kind": "message",
+        "message_id": "example-request",
+        "recorded_at": "2026-09-20T12:00:00Z"
+      },
+      "confirmed": true,
+      "locked": false
+    },
+    "references": {
+      "origin": "explicit",
+      "availability": "value",
+      "value": [
+        {
+          "asset_id": "example-asset",
+          "purpose": "style"
+        }
+      ],
+      "source": {
+        "kind": "message",
+        "message_id": "example-request",
+        "recorded_at": "2026-09-20T12:00:00Z"
+      },
+      "confirmed": true,
+      "locked": false
+    },
+    "visual_constraints": {
+      "origin": "explicit",
+      "availability": "value",
+      "value": [
+        {
+          "constraint_id": "view",
+          "instruction": "Three-quarter view"
+        }
+      ],
+      "source": {
+        "kind": "message",
+        "message_id": "example-request",
+        "recorded_at": "2026-09-20T12:00:00Z"
+      },
+      "confirmed": true,
+      "locked": false
+    }
+  }
+}

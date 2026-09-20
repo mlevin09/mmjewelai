@@ -1,0 +1,3307 @@
+{
+  "$defs": {
+    "AssetReference": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "purpose": {
+          "enum": [
+            "design",
+            "material",
+            "style",
+            "proportion"
+          ],
+          "title": "Purpose",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "asset_id",
+        "purpose"
+      ],
+      "title": "AssetReference",
+      "type": "object"
+    },
+    "Assumed_Dimensions_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Dimensions"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[Dimensions]",
+      "type": "object"
+    },
+    "Assumed_Length_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Length"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[Length]",
+      "type": "object"
+    },
+    "Assumed_StoneQuantity_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/StoneQuantity"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[StoneQuantity]",
+      "type": "object"
+    },
+    "Assumed_Union_KaratPurity__FinenessPurity__": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KaratPurity"
+            },
+            {
+              "$ref": "#/$defs/FinenessPurity"
+            }
+          ],
+          "title": "Value"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[Union[KaratPurity, FinenessPurity]]",
+      "type": "object"
+    },
+    "Assumed_Weight_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Weight"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[Weight]",
+      "type": "object"
+    },
+    "Assumed_tuple_Annotated_str__StringConstraints___________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9_]{0,79}$",
+            "type": "string"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[tuple[Annotated[str, StringConstraints], ...]]",
+      "type": "object"
+    },
+    "Assumed_tuple_AssetReference__________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/AssetReference"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[tuple[AssetReference, ...]]",
+      "type": "object"
+    },
+    "Assumed_tuple_VisualConstraint__________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/VisualConstraint"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[tuple[VisualConstraint, ...]]",
+      "type": "object"
+    },
+    "Construction": {
+      "additionalProperties": false,
+      "properties": {
+        "shank": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "gallery": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "basket": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "clasp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "setting_height": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_Length_"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "shank_width": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_Length_"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "thickness": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_Length_"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Construction",
+      "type": "object"
+    },
+    "Derived_Dimensions_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Dimensions"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[Dimensions]",
+      "type": "object"
+    },
+    "Derived_Length_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Length"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[Length]",
+      "type": "object"
+    },
+    "Derived_StoneQuantity_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/StoneQuantity"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[StoneQuantity]",
+      "type": "object"
+    },
+    "Derived_Union_KaratPurity__FinenessPurity__": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KaratPurity"
+            },
+            {
+              "$ref": "#/$defs/FinenessPurity"
+            }
+          ],
+          "title": "Value"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[Union[KaratPurity, FinenessPurity]]",
+      "type": "object"
+    },
+    "Derived_Weight_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Weight"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[Weight]",
+      "type": "object"
+    },
+    "Derived_tuple_Annotated_str__StringConstraints___________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9_]{0,79}$",
+            "type": "string"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[tuple[Annotated[str, StringConstraints], ...]]",
+      "type": "object"
+    },
+    "Derived_tuple_AssetReference__________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/AssetReference"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[tuple[AssetReference, ...]]",
+      "type": "object"
+    },
+    "Derived_tuple_VisualConstraint__________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/VisualConstraint"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[tuple[VisualConstraint, ...]]",
+      "type": "object"
+    },
+    "Design": {
+      "additionalProperties": false,
+      "properties": {
+        "jewelry_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metal": {
+          "$ref": "#/$defs/Metal"
+        },
+        "center_stone": {
+          "$ref": "#/$defs/Stone"
+        },
+        "side_stones": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SideStoneGroup"
+          },
+          "title": "Side Stones",
+          "type": "array"
+        },
+        "construction": {
+          "$ref": "#/$defs/Construction"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_tuple_Annotated_str__StringConstraints___________"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "references": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_tuple_AssetReference__________"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "visual_constraints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_tuple_VisualConstraint__________"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Design",
+      "type": "object"
+    },
+    "Dimensions": {
+      "additionalProperties": false,
+      "properties": {
+        "length": {
+          "$ref": "#/$defs/Length"
+        },
+        "width": {
+          "$ref": "#/$defs/Length"
+        },
+        "depth": {
+          "$ref": "#/$defs/Length"
+        }
+      },
+      "required": [
+        "length",
+        "width",
+        "depth"
+      ],
+      "title": "Dimensions",
+      "type": "object"
+    },
+    "Explicit_Dimensions_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Dimensions"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[Dimensions]",
+      "type": "object"
+    },
+    "Explicit_Length_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Length"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[Length]",
+      "type": "object"
+    },
+    "Explicit_StoneQuantity_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/StoneQuantity"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[StoneQuantity]",
+      "type": "object"
+    },
+    "Explicit_Union_KaratPurity__FinenessPurity__": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KaratPurity"
+            },
+            {
+              "$ref": "#/$defs/FinenessPurity"
+            }
+          ],
+          "title": "Value"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[Union[KaratPurity, FinenessPurity]]",
+      "type": "object"
+    },
+    "Explicit_Weight_": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Weight"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[Weight]",
+      "type": "object"
+    },
+    "Explicit_tuple_Annotated_str__StringConstraints___________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9_]{0,79}$",
+            "type": "string"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[tuple[Annotated[str, StringConstraints], ...]]",
+      "type": "object"
+    },
+    "Explicit_tuple_AssetReference__________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/AssetReference"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[tuple[AssetReference, ...]]",
+      "type": "object"
+    },
+    "Explicit_tuple_VisualConstraint__________": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "$ref": "#/$defs/VisualConstraint"
+          },
+          "title": "Value",
+          "type": "array"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[tuple[VisualConstraint, ...]]",
+      "type": "object"
+    },
+    "FinenessPurity": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "exclusiveMinimum": 0,
+          "maximum": 1000,
+          "title": "Value",
+          "type": "integer"
+        },
+        "unit": {
+          "const": "fineness",
+          "default": "fineness",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "FinenessPurity",
+      "type": "object"
+    },
+    "KaratPurity": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "exclusiveMinimum": 0,
+          "maximum": 24,
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "const": "karat",
+          "default": "karat",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "KaratPurity",
+      "type": "object"
+    },
+    "KnowledgeSource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "knowledge",
+          "default": "knowledge",
+          "title": "Kind",
+          "type": "string"
+        },
+        "record_id": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "record_id",
+        "version",
+        "recorded_at"
+      ],
+      "title": "KnowledgeSource",
+      "type": "object"
+    },
+    "Length": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "exclusiveMinimum": 0,
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "const": "mm",
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Length",
+      "type": "object"
+    },
+    "MessageSource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "message",
+          "default": "message",
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_id": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "recorded_at"
+      ],
+      "title": "MessageSource",
+      "type": "object"
+    },
+    "Metal": {
+      "additionalProperties": false,
+      "properties": {
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "purity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_Union_KaratPurity__FinenessPurity__"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "finish": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Metal",
+      "type": "object"
+    },
+    "NotApplicable": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "const": "not_applicable",
+          "default": "not_applicable",
+          "title": "Availability",
+          "type": "string"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "value": {
+          "default": null,
+          "title": "Value",
+          "type": "null"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        },
+        "confirmed": {
+          "const": true,
+          "default": true,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "reason",
+        "source"
+      ],
+      "title": "NotApplicable",
+      "type": "object"
+    },
+    "RevisionEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "create",
+            "edit",
+            "confirm",
+            "lock",
+            "unlock"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "source",
+        "reason"
+      ],
+      "title": "RevisionEvent",
+      "type": "object"
+    },
+    "RuleSource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "rule",
+          "default": "rule",
+          "title": "Kind",
+          "type": "string"
+        },
+        "rule_id": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rule_id",
+        "version",
+        "recorded_at"
+      ],
+      "title": "RuleSource",
+      "type": "object"
+    },
+    "SideStoneGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Group Id",
+          "type": "string"
+        },
+        "stones": {
+          "$ref": "#/$defs/Stone"
+        },
+        "quantity": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_StoneQuantity_"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "group_id",
+        "stones"
+      ],
+      "title": "SideStoneGroup",
+      "type": "object"
+    },
+    "State_Dimensions_": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_Dimensions_"
+        },
+        {
+          "$ref": "#/$defs/Derived_Dimensions_"
+        },
+        {
+          "$ref": "#/$defs/Assumed_Dimensions_"
+        }
+      ]
+    },
+    "State_Length_": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_Length_"
+        },
+        {
+          "$ref": "#/$defs/Derived_Length_"
+        },
+        {
+          "$ref": "#/$defs/Assumed_Length_"
+        }
+      ]
+    },
+    "State_StoneQuantity_": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_StoneQuantity_"
+        },
+        {
+          "$ref": "#/$defs/Derived_StoneQuantity_"
+        },
+        {
+          "$ref": "#/$defs/Assumed_StoneQuantity_"
+        }
+      ]
+    },
+    "State_Union_KaratPurity__FinenessPurity__": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_Union_KaratPurity__FinenessPurity__"
+        },
+        {
+          "$ref": "#/$defs/Derived_Union_KaratPurity__FinenessPurity__"
+        },
+        {
+          "$ref": "#/$defs/Assumed_Union_KaratPurity__FinenessPurity__"
+        }
+      ]
+    },
+    "State_Weight_": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_Weight_"
+        },
+        {
+          "$ref": "#/$defs/Derived_Weight_"
+        },
+        {
+          "$ref": "#/$defs/Assumed_Weight_"
+        }
+      ]
+    },
+    "State_tuple_Annotated_str__StringConstraints___________": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_tuple_Annotated_str__StringConstraints___________"
+        },
+        {
+          "$ref": "#/$defs/Derived_tuple_Annotated_str__StringConstraints___________"
+        },
+        {
+          "$ref": "#/$defs/Assumed_tuple_Annotated_str__StringConstraints___________"
+        }
+      ]
+    },
+    "State_tuple_AssetReference__________": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_tuple_AssetReference__________"
+        },
+        {
+          "$ref": "#/$defs/Derived_tuple_AssetReference__________"
+        },
+        {
+          "$ref": "#/$defs/Assumed_tuple_AssetReference__________"
+        }
+      ]
+    },
+    "State_tuple_VisualConstraint__________": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/Explicit_tuple_VisualConstraint__________"
+        },
+        {
+          "$ref": "#/$defs/Derived_tuple_VisualConstraint__________"
+        },
+        {
+          "$ref": "#/$defs/Assumed_tuple_VisualConstraint__________"
+        }
+      ]
+    },
+    "Stone": {
+      "additionalProperties": false,
+      "properties": {
+        "material": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "cut": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_Weight_"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "dimensions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/State_Dimensions_"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "color": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____2"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "setting": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "orientation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/jewelai_domain__models__State_Annotated_str__StringConstraints____1"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "Stone",
+      "type": "object"
+    },
+    "StoneQuantity": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "exclusiveMinimum": 0,
+          "title": "Value",
+          "type": "integer"
+        },
+        "scope": {
+          "enum": [
+            "per_side",
+            "per_item",
+            "per_pair"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "scope"
+      ],
+      "title": "StoneQuantity",
+      "type": "object"
+    },
+    "Unknown": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "const": "unknown",
+          "default": "unknown",
+          "title": "Availability",
+          "type": "string"
+        },
+        "origin": {
+          "const": "unknown",
+          "default": "unknown",
+          "title": "Origin",
+          "type": "string"
+        },
+        "requirement": {
+          "default": "undetermined",
+          "enum": [
+            "required",
+            "optional",
+            "undetermined"
+          ],
+          "title": "Requirement",
+          "type": "string"
+        },
+        "value": {
+          "default": null,
+          "title": "Value",
+          "type": "null"
+        },
+        "confirmed": {
+          "const": false,
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "const": false,
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        }
+      },
+      "title": "Unknown",
+      "type": "object"
+    },
+    "VisualConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "constraint_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Constraint Id",
+          "type": "string"
+        },
+        "instruction": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Instruction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "constraint_id",
+        "instruction"
+      ],
+      "title": "VisualConstraint",
+      "type": "object"
+    },
+    "Weight": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "exclusiveMinimum": 0,
+          "title": "Value",
+          "type": "number"
+        },
+        "unit": {
+          "const": "ct",
+          "default": "ct",
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "Weight",
+      "type": "object"
+    },
+    "jewelai_domain__models__Assumed_Annotated_str__StringConstraints____1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Value",
+          "type": "string"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[Annotated[str, StringConstraints]]",
+      "type": "object"
+    },
+    "jewelai_domain__models__Assumed_Annotated_str__StringConstraints____2": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Value",
+          "type": "string"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "assumed",
+          "default": "assumed",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/RuleSource"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "source",
+        "rationale"
+      ],
+      "title": "Assumed[Annotated[str, StringConstraints]]",
+      "type": "object"
+    },
+    "jewelai_domain__models__Derived_Annotated_str__StringConstraints____1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Value",
+          "type": "string"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[Annotated[str, StringConstraints]]",
+      "type": "object"
+    },
+    "jewelai_domain__models__Derived_Annotated_str__StringConstraints____2": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Value",
+          "type": "string"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "derived",
+          "default": "derived",
+          "title": "Origin",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/KnowledgeSource"
+              },
+              {
+                "$ref": "#/$defs/RuleSource"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "uncertainty": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "sources",
+        "uncertainty"
+      ],
+      "title": "Derived[Annotated[str, StringConstraints]]",
+      "type": "object"
+    },
+    "jewelai_domain__models__Explicit_Annotated_str__StringConstraints____1": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Value",
+          "type": "string"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[Annotated[str, StringConstraints]]",
+      "type": "object"
+    },
+    "jewelai_domain__models__Explicit_Annotated_str__StringConstraints____2": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "locked": {
+                "const": true
+              }
+            },
+            "required": [
+              "locked"
+            ]
+          },
+          "then": {
+            "properties": {
+              "confirmed": {
+                "const": true
+              }
+            },
+            "required": [
+              "confirmed"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "availability": {
+          "const": "value",
+          "default": "value",
+          "title": "Availability",
+          "type": "string"
+        },
+        "value": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Value",
+          "type": "string"
+        },
+        "confirmed": {
+          "default": false,
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "default": false,
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "origin": {
+          "const": "explicit",
+          "default": "explicit",
+          "title": "Origin",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "value",
+        "source"
+      ],
+      "title": "Explicit[Annotated[str, StringConstraints]]",
+      "type": "object"
+    },
+    "jewelai_domain__models__State_Annotated_str__StringConstraints____1": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/jewelai_domain__models__Explicit_Annotated_str__StringConstraints____1"
+        },
+        {
+          "$ref": "#/$defs/jewelai_domain__models__Derived_Annotated_str__StringConstraints____1"
+        },
+        {
+          "$ref": "#/$defs/jewelai_domain__models__Assumed_Annotated_str__StringConstraints____1"
+        }
+      ]
+    },
+    "jewelai_domain__models__State_Annotated_str__StringConstraints____2": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Unknown"
+        },
+        {
+          "$ref": "#/$defs/NotApplicable"
+        },
+        {
+          "$ref": "#/$defs/jewelai_domain__models__Explicit_Annotated_str__StringConstraints____2"
+        },
+        {
+          "$ref": "#/$defs/jewelai_domain__models__Derived_Annotated_str__StringConstraints____2"
+        },
+        {
+          "$ref": "#/$defs/jewelai_domain__models__Assumed_Annotated_str__StringConstraints____2"
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "design_id": {
+      "format": "uuid",
+      "title": "Design Id",
+      "type": "string"
+    },
+    "revision_id": {
+      "format": "uuid",
+      "title": "Revision Id",
+      "type": "string"
+    },
+    "revision": {
+      "minimum": 1,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "parent_revision_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Parent Revision Id"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "event": {
+      "$ref": "#/$defs/RevisionEvent"
+    },
+    "design": {
+      "$ref": "#/$defs/Design"
+    }
+  },
+  "required": [
+    "schema_version",
+    "design_id",
+    "revision_id",
+    "revision",
+    "created_at",
+    "event",
+    "design"
+  ],
+  "title": "DesignRevision",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:design-revision:1.0.0",
+  "description": "Jewelry Design Schema v1. Snapshot structure only; Python semantic validation and revision transitions are also required. See the accompanying specification.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "revision": {
+            "const": 1
+          }
+        },
+        "required": [
+          "revision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "parent_revision_id": {
+            "type": "null"
+          },
+          "event": {
+            "properties": {
+              "action": {
+                "const": "create"
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "required": [
+          "parent_revision_id"
+        ],
+        "properties": {
+          "parent_revision_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "event": {
+            "properties": {
+              "action": {
+                "not": {
+                  "const": "create"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
