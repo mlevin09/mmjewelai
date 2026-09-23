@@ -1,4 +1,4 @@
-name: Domain schema
+name: Domain contracts
 
 on:
   pull_request:
@@ -6,12 +6,16 @@ on:
     paths:
       - packages/domain/**
       - specs/jewelry-design-schema/**
+      - specs/roles/**
+      - data/roles/**
       - .github/workflows/domain-schema.yml
   push:
     branches: [jewelai-v2]
     paths:
       - packages/domain/**
       - specs/jewelry-design-schema/**
+      - specs/roles/**
+      - data/roles/**
       - .github/workflows/domain-schema.yml
 
 permissions:

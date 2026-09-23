@@ -1,0 +1,477 @@
+{
+  "$defs": {
+    "DefaultPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "const": "no_unapproved_defaults",
+          "default": "no_unapproved_defaults",
+          "title": "Mode",
+          "type": "string"
+        }
+      },
+      "title": "DefaultPolicy",
+      "type": "object"
+    },
+    "DerivationMode": {
+      "enum": [
+        "sourced_with_uncertainty",
+        "request_exact_when_required"
+      ],
+      "title": "DerivationMode",
+      "type": "string"
+    },
+    "DerivationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/DerivationMode"
+        },
+        "provenance": {
+          "const": "required",
+          "default": "required",
+          "title": "Provenance",
+          "type": "string"
+        },
+        "uncertainty": {
+          "const": "required_for_derived_values",
+          "default": "required_for_derived_values",
+          "title": "Uncertainty",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "DerivationPolicy",
+      "type": "object"
+    },
+    "DetailLevel": {
+      "enum": [
+        "essential",
+        "operational",
+        "specification",
+        "communication",
+        "professional",
+        "engineering"
+      ],
+      "title": "DetailLevel",
+      "type": "string"
+    },
+    "ExpertiseProfile": {
+      "enum": [
+        "consumer",
+        "commercial",
+        "procurement",
+        "marketing_communication",
+        "jewelry_design",
+        "industrial_design"
+      ],
+      "title": "ExpertiseProfile",
+      "type": "string"
+    },
+    "LocalePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "supported": {
+          "items": {
+            "enum": [
+              "en",
+              "ru"
+            ],
+            "type": "string"
+          },
+          "title": "Supported",
+          "type": "array"
+        },
+        "fallback": {
+          "const": "base_language_then_reject",
+          "default": "base_language_then_reject",
+          "title": "Fallback",
+          "type": "string"
+        },
+        "scope_status": {
+          "const": "proposed_pending_domain_review",
+          "default": "proposed_pending_domain_review",
+          "title": "Scope Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "supported"
+      ],
+      "title": "LocalePolicy",
+      "type": "object"
+    },
+    "QuestionPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "selection": {
+          "const": "deterministic_rules",
+          "default": "deterministic_rules",
+          "title": "Selection",
+          "type": "string"
+        },
+        "missing_information": {
+          "const": "ask_before_assume",
+          "default": "ask_before_assume",
+          "title": "Missing Information",
+          "type": "string"
+        },
+        "budget": {
+          "const": "product_review_required",
+          "default": "product_review_required",
+          "title": "Budget",
+          "type": "string"
+        }
+      },
+      "title": "QuestionPolicy",
+      "type": "object"
+    },
+    "RoleId": {
+      "enum": [
+        "retail_client",
+        "sales_manager",
+        "buyer",
+        "marketing",
+        "jewelry_designer",
+        "industrial_designer"
+      ],
+      "title": "RoleId",
+      "type": "string"
+    },
+    "RoleProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Artifact Version",
+          "type": "string"
+        },
+        "role_id": {
+          "$ref": "#/$defs/RoleId"
+        },
+        "design_schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Design Schema Version",
+          "type": "string"
+        },
+        "expertise": {
+          "$ref": "#/$defs/ExpertiseProfile"
+        },
+        "vocabulary": {
+          "$ref": "#/$defs/VocabularyMode"
+        },
+        "detail_level": {
+          "$ref": "#/$defs/DetailLevel"
+        },
+        "question_policy": {
+          "$ref": "#/$defs/QuestionPolicy"
+        },
+        "default_policy": {
+          "$ref": "#/$defs/DefaultPolicy"
+        },
+        "derivation_policy": {
+          "$ref": "#/$defs/DerivationPolicy"
+        },
+        "locale_policy": {
+          "$ref": "#/$defs/LocalePolicy"
+        },
+        "authorization_effect": {
+          "const": "none",
+          "default": "none",
+          "title": "Authorization Effect",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "artifact_version",
+        "role_id",
+        "expertise",
+        "vocabulary",
+        "detail_level",
+        "question_policy",
+        "default_policy",
+        "derivation_policy",
+        "locale_policy"
+      ],
+      "title": "RoleProfile",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "retail_client"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expertise": {
+                "const": "consumer"
+              },
+              "vocabulary": {
+                "const": "plain"
+              },
+              "detail_level": {
+                "const": "essential"
+              },
+              "derivation_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "sourced_with_uncertainty"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "sales_manager"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expertise": {
+                "const": "commercial"
+              },
+              "vocabulary": {
+                "const": "commercial"
+              },
+              "detail_level": {
+                "const": "operational"
+              },
+              "derivation_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "sourced_with_uncertainty"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "buyer"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expertise": {
+                "const": "procurement"
+              },
+              "vocabulary": {
+                "const": "specification"
+              },
+              "detail_level": {
+                "const": "specification"
+              },
+              "derivation_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "sourced_with_uncertainty"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "marketing"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expertise": {
+                "const": "marketing_communication"
+              },
+              "vocabulary": {
+                "const": "storytelling"
+              },
+              "detail_level": {
+                "const": "communication"
+              },
+              "derivation_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "sourced_with_uncertainty"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "jewelry_designer"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expertise": {
+                "const": "jewelry_design"
+              },
+              "vocabulary": {
+                "const": "professional_design"
+              },
+              "detail_level": {
+                "const": "professional"
+              },
+              "derivation_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "sourced_with_uncertainty"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "industrial_designer"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "expertise": {
+                "const": "industrial_design"
+              },
+              "vocabulary": {
+                "const": "technical_engineering"
+              },
+              "detail_level": {
+                "const": "engineering"
+              },
+              "derivation_policy": {
+                "properties": {
+                  "mode": {
+                    "const": "request_exact_when_required"
+                  }
+                },
+                "required": [
+                  "mode"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "VocabularyMode": {
+      "enum": [
+        "plain",
+        "commercial",
+        "specification",
+        "storytelling",
+        "professional_design",
+        "technical_engineering"
+      ],
+      "title": "VocabularyMode",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Artifact Version",
+      "type": "string"
+    },
+    "review_status": {
+      "const": "proposed_pending_domain_review",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "source": {
+      "const": "docs/product/issues/02-roles.md",
+      "title": "Source",
+      "type": "string"
+    },
+    "profiles": {
+      "items": {
+        "$ref": "#/$defs/RoleProfile"
+      },
+      "maxItems": 6,
+      "minItems": 6,
+      "title": "Profiles",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact_version",
+    "review_status",
+    "source",
+    "profiles"
+  ],
+  "title": "RoleProfileBundle",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:role-profiles:1.0.0",
+  "description": "JewelAI Role Profiles v1. Conversational policy only; roles grant no authorization and do not alter the Jewelry Design Schema or its transitions."
+}
