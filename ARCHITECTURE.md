@@ -47,9 +47,28 @@ Never mutate a historical spec revision or silently replace the artifacts refere
 
 ## Repository layout
 
-Existing root files are retained as V1. Foundation contracts live in specs/, reviewed catalogs in data/, and decisions in docs/adr/.
-Future runtime layout: apps/api, apps/web, packages/domain, packages/prompts, packages/model_gateway, workers/generation, infra and tests.
-Create runtime packages only in their implementation issues; root V1 packaging must be migrated explicitly.
+Existing root files are retained as V1. Foundation contracts live in `specs/`, reviewed catalogs in `data/`, and decisions in `docs/adr/`.
+Step 2 establishes the modular-monolith skeleton below; only `packages/domain` currently contains executable V2 behavior:
+
+```text
+apps/
+  api/
+  web/
+workers/
+  generation/
+packages/
+  domain/
+  prompts/
+  model_gateway/
+data/
+specs/
+docs/
+infra/
+tests/
+```
+
+The new runtime locations are tracked placeholders until their dedicated implementation issues. Applications and workers may depend on reusable packages; reusable packages must not depend on applications or workers.
+Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions
 
