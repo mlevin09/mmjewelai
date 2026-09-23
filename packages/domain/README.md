@@ -1,6 +1,7 @@
 # JewelAI domain package
 
-Issue #1 implements an offline, immutable Jewelry Design Schema and revision transitions.
+Issue #1 implements an offline, immutable Jewelry Design Schema and revision transitions. Issue #2
+adds versioned conversational Role Profiles without altering those domain transitions.
 Python 3.12+ is required. This package is independent of the legacy root packaging.
 
 From the repository root, inside your Python environment:
@@ -19,7 +20,8 @@ The test-only jsonschema dependency independently checks the published wire cont
 Ruff provide tests and static checks. No API, database or provider dependencies are imported.
 
 See the [contract](../../specs/jewelry-design-schema/README.md) and
-[fixtures](../../specs/jewelry-design-schema/fixtures/README.md).
+[fixtures](../../specs/jewelry-design-schema/fixtures/README.md), plus the
+[Role Profiles contract](../../specs/roles/README.md).
 
 ```python
 from pathlib import Path
@@ -51,6 +53,7 @@ Re-export the schema from the repository root:
 
 ```sh
 python -m jewelai_domain.schema specs/jewelry-design-schema/schema.json
+python -m jewelai_domain.roles_schema specs/roles/schema.json
 ```
 
 The committed schema must match the exporter; tests detect drift. Regenerate and review the diff

@@ -1,0 +1,164 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_version": "1.0.0",
+  "review_status": "proposed_pending_domain_review",
+  "source": "docs/product/issues/02-roles.md",
+  "profiles": [
+    {
+      "schema_version": "1.0.0",
+      "artifact_version": "1.0.0",
+      "role_id": "retail_client",
+      "design_schema_version": "1.0.0",
+      "expertise": "consumer",
+      "vocabulary": "plain",
+      "detail_level": "essential",
+      "question_policy": {
+        "selection": "deterministic_rules",
+        "missing_information": "ask_before_assume",
+        "budget": "product_review_required"
+      },
+      "default_policy": { "mode": "no_unapproved_defaults" },
+      "derivation_policy": {
+        "mode": "sourced_with_uncertainty",
+        "provenance": "required",
+        "uncertainty": "required_for_derived_values"
+      },
+      "locale_policy": {
+        "supported": ["en", "ru"],
+        "fallback": "base_language_then_reject",
+        "scope_status": "proposed_pending_domain_review"
+      },
+      "authorization_effect": "none"
+    },
+    {
+      "schema_version": "1.0.0",
+      "artifact_version": "1.0.0",
+      "role_id": "sales_manager",
+      "design_schema_version": "1.0.0",
+      "expertise": "commercial",
+      "vocabulary": "commercial",
+      "detail_level": "operational",
+      "question_policy": {
+        "selection": "deterministic_rules",
+        "missing_information": "ask_before_assume",
+        "budget": "product_review_required"
+      },
+      "default_policy": { "mode": "no_unapproved_defaults" },
+      "derivation_policy": {
+        "mode": "sourced_with_uncertainty",
+        "provenance": "required",
+        "uncertainty": "required_for_derived_values"
+      },
+      "locale_policy": {
+        "supported": ["en", "ru"],
+        "fallback": "base_language_then_reject",
+        "scope_status": "proposed_pending_domain_review"
+      },
+      "authorization_effect": "none"
+    },
+    {
+      "schema_version": "1.0.0",
+      "artifact_version": "1.0.0",
+      "role_id": "buyer",
+      "design_schema_version": "1.0.0",
+      "expertise": "procurement",
+      "vocabulary": "specification",
+      "detail_level": "specification",
+      "question_policy": {
+        "selection": "deterministic_rules",
+        "missing_information": "ask_before_assume",
+        "budget": "product_review_required"
+      },
+      "default_policy": { "mode": "no_unapproved_defaults" },
+      "derivation_policy": {
+        "mode": "sourced_with_uncertainty",
+        "provenance": "required",
+        "uncertainty": "required_for_derived_values"
+      },
+      "locale_policy": {
+        "supported": ["en", "ru"],
+        "fallback": "base_language_then_reject",
+        "scope_status": "proposed_pending_domain_review"
+      },
+      "authorization_effect": "none"
+    },
+    {
+      "schema_version": "1.0.0",
+      "artifact_version": "1.0.0",
+      "role_id": "marketing",
+      "design_schema_version": "1.0.0",
+      "expertise": "marketing_communication",
+      "vocabulary": "storytelling",
+      "detail_level": "communication",
+      "question_policy": {
+        "selection": "deterministic_rules",
+        "missing_information": "ask_before_assume",
+        "budget": "product_review_required"
+      },
+      "default_policy": { "mode": "no_unapproved_defaults" },
+      "derivation_policy": {
+        "mode": "sourced_with_uncertainty",
+        "provenance": "required",
+        "uncertainty": "required_for_derived_values"
+      },
+      "locale_policy": {
+        "supported": ["en", "ru"],
+        "fallback": "base_language_then_reject",
+        "scope_status": "proposed_pending_domain_review"
+      },
+      "authorization_effect": "none"
+    },
+    {
+      "schema_version": "1.0.0",
+      "artifact_version": "1.0.0",
+      "role_id": "jewelry_designer",
+      "design_schema_version": "1.0.0",
+      "expertise": "jewelry_design",
+      "vocabulary": "professional_design",
+      "detail_level": "professional",
+      "question_policy": {
+        "selection": "deterministic_rules",
+        "missing_information": "ask_before_assume",
+        "budget": "product_review_required"
+      },
+      "default_policy": { "mode": "no_unapproved_defaults" },
+      "derivation_policy": {
+        "mode": "sourced_with_uncertainty",
+        "provenance": "required",
+        "uncertainty": "required_for_derived_values"
+      },
+      "locale_policy": {
+        "supported": ["en", "ru"],
+        "fallback": "base_language_then_reject",
+        "scope_status": "proposed_pending_domain_review"
+      },
+      "authorization_effect": "none"
+    },
+    {
+      "schema_version": "1.0.0",
+      "artifact_version": "1.0.0",
+      "role_id": "industrial_designer",
+      "design_schema_version": "1.0.0",
+      "expertise": "industrial_design",
+      "vocabulary": "technical_engineering",
+      "detail_level": "engineering",
+      "question_policy": {
+        "selection": "deterministic_rules",
+        "missing_information": "ask_before_assume",
+        "budget": "product_review_required"
+      },
+      "default_policy": { "mode": "no_unapproved_defaults" },
+      "derivation_policy": {
+        "mode": "request_exact_when_required",
+        "provenance": "required",
+        "uncertainty": "required_for_derived_values"
+      },
+      "locale_policy": {
+        "supported": ["en", "ru"],
+        "fallback": "base_language_then_reject",
+        "scope_status": "proposed_pending_domain_review"
+      },
+      "authorization_effect": "none"
+    }
+  ]
+}
