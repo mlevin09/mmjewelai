@@ -25,6 +25,7 @@ from jewelai_assets import (
     build_object_key,
     content_metadata,
     ingest_asset,
+    validate_asset_object_key,
 )
 from jewelai_assets.schema import asset_json_schema
 
@@ -35,6 +36,9 @@ PROJECT_ID = UUID("10000000-0000-4000-8000-000000000002")
 SESSION_ID = UUID("10000000-0000-4000-8000-000000000003")
 ASSET_ID = UUID("10000000-0000-4000-8000-000000000004")
 RUN_ID = UUID("10000000-0000-4000-8000-000000000005")
+OTHER_ORG_ID = UUID("20000000-0000-4000-8000-000000000001")
+OTHER_PROJECT_ID = UUID("20000000-0000-4000-8000-000000000002")
+OTHER_ASSET_ID = UUID("20000000-0000-4000-8000-000000000004")
 PNG = b"\x89PNG\r\n\x1a\nminimal"
 JPEG = b"\xff\xd8\xffminimal"
 WEBP = b"RIFF\x04\x00\x00\x00WEBPminimal"
@@ -231,6 +235,55 @@ def test_object_key_is_deterministic_scoped_and_safe(content_type, extension):
     assert ".." not in key and "://" not in key and "?" not in key
 
 
+@pytest.mark.parametrize(
+    "content_type",
+    [AssetContentType.PNG, AssetContentType.JPEG, AssetContentType.WEBP],
+)
+def test_canonical_object_key_validation_accepts_supported_content_types(content_type):
+    asset = pending_asset(
+        content_type=content_type,
+        object_key=build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, content_type),
+    )
+    assert validate_asset_object_key(asset) is asset
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"object_key": build_object_key(OTHER_ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG)},
+        {"object_key": build_object_key(ORG_ID, OTHER_PROJECT_ID, ASSET_ID, AssetContentType.PNG)},
+        {"object_key": build_object_key(ORG_ID, PROJECT_ID, OTHER_ASSET_ID, AssetContentType.PNG)},
+        {"object_key": build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.JPEG)},
+        {
+            "content_type": AssetContentType.JPEG,
+            "object_key": build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.WEBP),
+        },
+    ],
+)
+def test_canonical_object_key_validation_rejects_lineage_or_extension_mismatch(changes):
+    with pytest.raises(ValueError, match="canonical asset lineage"):
+        validate_asset_object_key(pending_asset(**changes))
+
+
+@pytest.mark.parametrize(
+    "kind,lineage",
+    [
+        (AssetKind.REFERENCE, {}),
+        (
+            AssetKind.GENERATED,
+            {
+                "generation_run_id": RUN_ID,
+                "generation_output_ordinal": 1,
+                "provider_output_id": "output-1",
+            },
+        ),
+    ],
+)
+def test_reference_and_generated_assets_share_object_key_invariant(kind, lineage):
+    asset = pending_asset(kind=kind, **lineage)
+    assert validate_asset_object_key(asset) is asset
+
+
 def test_memory_store_is_create_only_and_idempotent():
     store = MemoryObjectStore()
     key = build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG)
@@ -269,6 +322,7 @@ def test_reference_ingestion_succeeds_without_metadata_bytes_and_retry_skips_wri
     assert first.status is AssetStatus.READY
     assert first.content_hash == sha256(PNG).hexdigest()
     assert first.byte_size == len(PNG)
+    assert first.object_key == build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG)
     assert store.objects[first.object_key][0] == PNG
     assert b"minimal" not in json.dumps(first.model_dump(mode="json")).encode()
     assert store.write_count == 1

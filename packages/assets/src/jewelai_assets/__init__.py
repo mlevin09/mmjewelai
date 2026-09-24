@@ -10,6 +10,7 @@ from .ingestion import (
     content_metadata,
     detect_content_type,
     ingest_asset,
+    validate_asset_object_key,
 )
 from .models import (
     ASSET_SCHEMA_VERSION,
@@ -46,4 +47,5 @@ __all__ = [
     "content_metadata",
     "detect_content_type",
     "ingest_asset",
+    "validate_asset_object_key",
 ]

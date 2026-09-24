@@ -572,6 +572,28 @@ def test_asset_round_trip_scope_order_parent_and_terminal_lifecycle(engine):
         )
 
 
+def test_persistence_rejects_noncanonical_asset_object_key(engine):
+    service = build_service(engine)
+    organization, project, session = create_persisted_session(service)
+    asset_id = UUID("45454545-4545-4545-8545-454545454545")
+    mismatched = pending_asset(
+        organization,
+        project,
+        session,
+        asset_id,
+        object_key=build_object_key(
+            UUID("46464646-4646-4646-8646-464646464646"),
+            project.project_id,
+            asset_id,
+            AssetContentType.PNG,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="canonical asset lineage"):
+        service.repository.create_pending_asset(mismatched)
+    assert service.repository.list_assets(session.session_id, organization.organization_id) == ()
+
+
 def test_reference_ingestion_uses_persistence_port_and_private_store(engine):
     service = build_service(engine)
     organization, project, session = create_persisted_session(service)

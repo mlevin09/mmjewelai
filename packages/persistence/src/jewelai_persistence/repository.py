@@ -9,6 +9,7 @@ from jewelai_assets import (
     AssetErrorCode,
     AssetLineageError,
     AssetStatus,
+    validate_asset_object_key,
 )
 from jewelai_domain.models import DesignRevision
 from jewelai_model_gateway import (
@@ -418,7 +419,7 @@ class PersistenceRepository:
             return tuple(self._asset(row) for row in rows)
 
     def create_pending_asset(self, asset: Asset) -> Asset:
-        asset = Asset.model_validate(asset)
+        asset = validate_asset_object_key(Asset.model_validate(asset))
         if asset.status is not AssetStatus.PENDING:
             raise ValueError("A new asset must be pending")
         try:

@@ -95,6 +95,18 @@ def build_object_key(
     )
 
 
+def validate_asset_object_key(asset: Asset) -> Asset:
+    expected = build_object_key(
+        asset.organization_id,
+        asset.project_id,
+        asset.asset_id,
+        asset.content_type,
+    )
+    if asset.object_key != expected:
+        raise ValueError("Asset object key does not match canonical asset lineage")
+    return asset
+
+
 def ingest_asset(
     *,
     request: AssetIngestionRequest,
@@ -110,25 +122,27 @@ def ingest_asset(
     content_type, content_hash, byte_size = content_metadata(
         content, request.declared_content_type, policy
     )
-    pending = Asset(
-        schema_version=ASSET_SCHEMA_VERSION,
-        asset_id=request.asset_id,
-        organization_id=request.organization_id,
-        project_id=request.project_id,
-        session_id=request.session_id,
-        kind=request.kind,
-        status=AssetStatus.PENDING,
-        object_key=build_object_key(
-            request.organization_id, request.project_id, request.asset_id, content_type
-        ),
-        content_type=content_type,
-        content_hash=content_hash,
-        byte_size=byte_size,
-        generation_run_id=request.generation_run_id,
-        generation_output_ordinal=request.generation_output_ordinal,
-        provider_output_id=request.provider_output_id,
-        parent_asset_id=request.parent_asset_id,
-        created_at=now(),
+    pending = validate_asset_object_key(
+        Asset(
+            schema_version=ASSET_SCHEMA_VERSION,
+            asset_id=request.asset_id,
+            organization_id=request.organization_id,
+            project_id=request.project_id,
+            session_id=request.session_id,
+            kind=request.kind,
+            status=AssetStatus.PENDING,
+            object_key=build_object_key(
+                request.organization_id, request.project_id, request.asset_id, content_type
+            ),
+            content_type=content_type,
+            content_hash=content_hash,
+            byte_size=byte_size,
+            generation_run_id=request.generation_run_id,
+            generation_output_ordinal=request.generation_output_ordinal,
+            provider_output_id=request.provider_output_id,
+            parent_asset_id=request.parent_asset_id,
+            created_at=now(),
+        )
     )
     existing = repository.find_asset(request.asset_id, request.organization_id)
     if existing is not None:
