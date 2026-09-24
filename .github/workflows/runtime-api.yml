@@ -58,6 +58,7 @@ jobs:
       - run: alembic -c packages/persistence/alembic.ini upgrade head
       - run: alembic -c packages/persistence/alembic.ini check
       - run: alembic -c packages/persistence/alembic.ini current
+      - run: python -m pytest -c packages/domain/pyproject.toml packages/domain/tests -q
       - run: python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
       - run: python -m ruff check apps/api packages/persistence
       - run: python -m ruff format --check apps/api packages/persistence
