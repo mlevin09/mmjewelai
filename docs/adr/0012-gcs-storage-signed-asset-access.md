@@ -28,8 +28,13 @@ Add a separate provider-neutral Asset Access v1 contract. Only a validated `read
 canonical object key can be signed. Default TTL is five minutes and maximum TTL is fifteen minutes.
 The GCS adapter produces V4 HTTPS `GET` signed URLs. Signed URLs are ephemeral bearer secrets: do not
 persist, log, cache as durable state, or expose them through HTTP before authentication and
-membership authorization exist. Signing credentials must support Google signing; failure remains
-private and fails closed.
+membership authorization exist. Credentials that implement `google.auth.credentials.Signing` use
+the Storage SDK's local signing path without an unnecessary token refresh. Non-signing
+workload/metadata ADC credentials use a refreshed short-lived OAuth token plus an explicitly
+configured or credential-exposed, validated service-account email; passing both to the Storage SDK
+selects its IAM `signBlob` signing path without private-key material. The explicit signing identity
+takes precedence, and missing identity, token-refresh, IAM, or signing failures remain private and
+fail closed.
 
 ## Alternatives
 
@@ -41,6 +46,10 @@ selection remain separate tasks rather than being bundled into this adapter.
 ## Consequences
 
 A production storage and signing adapter now exists without coupling the Asset core to Google.
+Keyless signing requires the Service Account Credentials API, permission for the runtime principal
+to call `iam.serviceAccounts.signBlob` on the selected signing identity, and object-read permission
+for that signing identity. The signing email is non-secret configuration; OAuth tokens remain
+transient and private keys are neither configured nor stored.
 Actual binary upload transport, provider-output retrieval, authenticated HTTP access, bucket/IAM
 provisioning, reconciliation, retention, and deletion remain future work. Normal tests use injected
 fakes and require neither credentials nor network access.
@@ -49,4 +58,6 @@ fakes and require neither credentials nor network access.
 
 Unit tests assert generation-precondition writes, integrity metadata, metadata-only idempotency,
 safe conflicts/errors, private ACL behavior, existing-bucket use, V4 GET signing, HTTPS and TTL
-bounds, READY/canonical-key enforcement, schema drift, and unchanged metadata-only API behavior.
+bounds, local signing credentials without refresh, keyless IAM signing with refreshed ADC, safe
+identity/token/IAM failures, READY/canonical-key enforcement, schema drift, and unchanged
+metadata-only API behavior.

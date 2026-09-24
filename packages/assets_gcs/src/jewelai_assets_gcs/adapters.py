@@ -5,6 +5,8 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from google.api_core.exceptions import PreconditionFailed
+from google.auth.credentials import Credentials, Signing
+from google.auth.transport.requests import Request
 from google.cloud import storage
 from jewelai_assets import (
     AssetAccessUnavailableError,
@@ -16,7 +18,7 @@ from jewelai_assets import (
 from jewelai_assets.models import ContentHash, ObjectKey
 from pydantic import TypeAdapter, ValidationError
 
-from .config import GcsAssetStorageConfig
+from .config import GcsAssetStorageConfig, validate_signing_service_account_email
 
 JEWELAI_SHA256_METADATA_KEY = "jewelai-sha256"
 _OBJECT_KEY = TypeAdapter(ObjectKey)
@@ -99,13 +101,26 @@ class GcsPrivateObjectStore:
 
 
 class GcsPrivateObjectAccessSigner:
-    def __init__(self, config: GcsAssetStorageConfig, *, client: Any | None = None):
+    def __init__(
+        self,
+        config: GcsAssetStorageConfig,
+        *,
+        client: Any | None = None,
+        credentials: Credentials | None = None,
+        auth_request: Any | None = None,
+    ):
         self.config = config
         try:
             self._client = (
-                client if client is not None else storage.Client(project=config.project_id)
+                client
+                if client is not None
+                else storage.Client(project=config.project_id, credentials=credentials)
             )
             self._bucket = self._client.bucket(config.bucket_name)
+            self._credentials = (
+                credentials if credentials is not None else _client_credentials(self._client)
+            )
+            self._auth_request = auth_request
         except Exception as exc:
             raise AssetAccessUnavailableError("Google Cloud asset signing is unavailable") from exc
 
@@ -114,11 +129,13 @@ class GcsPrivateObjectAccessSigner:
             object_key = _OBJECT_KEY.validate_python(object_key)
             if expires_at.tzinfo is None or expires_at.utcoffset() is None:
                 raise ValueError("expiration must be timezone-aware")
+            signing_arguments = self._signing_arguments()
             url = self._bucket.blob(object_key).generate_signed_url(
                 version="v4",
                 expiration=expires_at,
                 method="GET",
                 scheme="https",
+                **signing_arguments,
             )
         except Exception as exc:
             raise AssetAccessUnavailableError("Google Cloud asset signing is unavailable") from exc
@@ -131,3 +148,35 @@ class GcsPrivateObjectAccessSigner:
         ):
             raise AssetAccessUnavailableError("Google Cloud asset signer returned an invalid URL")
         return url
+
+    def _signing_arguments(self) -> dict[str, Any]:
+        credentials = self._credentials
+        if isinstance(credentials, Signing):
+            return {"credentials": credentials}
+
+        credentials.refresh(self._auth_request if self._auth_request is not None else Request())
+        access_token = credentials.token
+        if not isinstance(access_token, str) or not access_token.strip():
+            raise ValueError("refreshed credentials did not provide an access token")
+
+        service_account_email = self.config.signing_service_account_email or getattr(
+            credentials, "service_account_email", None
+        )
+        if not isinstance(service_account_email, str):
+            raise ValueError("signing service-account email is unavailable")
+        validate_signing_service_account_email(service_account_email)
+        return {
+            "credentials": credentials,
+            "service_account_email": service_account_email,
+            "access_token": access_token,
+        }
+
+
+def _client_credentials(client: Any) -> Credentials:
+    # google-cloud-storage 3.x has no public credentials accessor. Blob's own
+    # signing implementation uses the same client attribute when credentials
+    # are not supplied explicitly, so keep this compatibility access isolated.
+    credentials = getattr(client, "_credentials", None)
+    if not isinstance(credentials, Credentials):
+        raise ValueError("Google Cloud client credentials are unavailable")
+    return credentials
