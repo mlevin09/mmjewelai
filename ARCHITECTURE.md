@@ -48,7 +48,9 @@ Never mutate a historical spec revision or silently replace the artifacts refere
 ## Repository layout
 
 Existing root files are retained as V1. Foundation contracts live in `specs/`, reviewed catalogs in `data/`, and decisions in `docs/adr/`.
-Step 2 establishes the modular-monolith skeleton below; only `packages/domain` currently contains executable V2 behavior:
+Step 2 established the modular-monolith skeleton below. `packages/domain` contains deterministic
+behavior, `packages/persistence` owns SQLAlchemy/Alembic storage, and `apps/api` is the first FastAPI
+runtime boundary:
 
 ```text
 apps/
@@ -58,6 +60,7 @@ workers/
   generation/
 packages/
   domain/
+  persistence/
   prompts/
   model_gateway/
 data/
@@ -67,7 +70,9 @@ infra/
 tests/
 ```
 
-The new runtime locations are tracked placeholders until their dedicated implementation issues. Applications and workers may depend on reusable packages; reusable packages must not depend on applications or workers.
+Applications and workers may depend on reusable packages; reusable packages must not depend on
+applications or workers. `packages/domain` remains independent of FastAPI and SQLAlchemy. See
+[ADR 0007](docs/adr/0007-persistence-api-runtime-boundary.md) for runtime persistence and CAS.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

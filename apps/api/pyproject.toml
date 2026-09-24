@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-api"
+version = "1.0.0"
+description = "FastAPI runtime boundary for JewelAI V2"
+requires-python = ">=3.12"
+dependencies = [
+  "alembic>=1.16,<2",
+  "fastapi>=0.116,<1",
+  "jewelai-domain==1.0.0",
+  "jewelai-persistence==1.0.0",
+  "psycopg[binary]>=3.2,<4",
+  "sqlalchemy>=2.0.43,<3",
+  "uvicorn>=0.35,<1",
+]
+
+[project.optional-dependencies]
+test = ["httpx>=0.28,<1", "pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jewelai_api"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["postgres: requires TEST_POSTGRES_URL and PostgreSQL"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

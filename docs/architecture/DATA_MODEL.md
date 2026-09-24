@@ -1,6 +1,8 @@
 # Planned data model and storage boundary
 
-This is a logical model, not a migration or approved physical SQL schema.
+This remains the broader logical model. Persistence + API Foundation v1 physically implements only
+organization, project, design_session, specification_revision, and question_event; see ADR 0007 and
+the initial Alembic migration. Later rows in this table remain plans, not implemented claims.
 
 | Entity | Scope / relationships |
 | --- | --- |

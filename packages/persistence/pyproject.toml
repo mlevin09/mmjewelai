@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-persistence"
+version = "1.0.0"
+description = "SQLAlchemy persistence boundary for JewelAI V2"
+requires-python = ">=3.12"
+dependencies = [
+  "jewelai-domain==1.0.0",
+  "sqlalchemy>=2.0.43,<3",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jewelai_persistence"]
