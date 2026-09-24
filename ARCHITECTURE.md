@@ -25,6 +25,7 @@ Provider output is an untrusted proposal. Enforce locked constraints in code bef
 | Domain Dictionary | Stable domain IDs, synonyms, translations; not question selection |
 | Question Catalog | Semantic IDs, target fields, wording and answer contracts |
 | Rules / Gap Engine | Missing-field detection, deterministic priorities, ask/derive/assume/block/ready decisions |
+| Parser Proposal | Validates untrusted structured candidates and proposes explicit schema updates; never writes revisions |
 | Limited knowledge base | Sourced estimates of gemstone geometry with uncertainty; never substitutes for exact measurements |
 | Prompt compiler | Versioned templates and verifiable locked constraint inclusion |
 | Model Gateway | Provider-neutral parsing/generation interfaces; OpenAI/Gemini adapters later |
@@ -49,8 +50,9 @@ Never mutate a historical spec revision or silently replace the artifacts refere
 
 Existing root files are retained as V1. Foundation contracts live in `specs/`, reviewed catalogs in `data/`, and decisions in `docs/adr/`.
 Step 2 established the modular-monolith skeleton below. `packages/domain` contains deterministic
-behavior, `packages/persistence` owns SQLAlchemy/Alembic storage, and `apps/api` is the first FastAPI
-runtime boundary:
+behavior, `packages/parser` owns the provider-neutral candidate/proposal boundary,
+`packages/persistence` owns SQLAlchemy/Alembic storage, and `apps/api` is the FastAPI runtime
+boundary:
 
 ```text
 apps/
@@ -60,6 +62,7 @@ workers/
   generation/
 packages/
   domain/
+  parser/
   persistence/
   prompts/
   model_gateway/
@@ -71,8 +74,10 @@ tests/
 ```
 
 Applications and workers may depend on reusable packages; reusable packages must not depend on
-applications or workers. `packages/domain` remains independent of FastAPI and SQLAlchemy. See
-[ADR 0007](docs/adr/0007-persistence-api-runtime-boundary.md) for runtime persistence and CAS.
+applications or workers. `packages/parser` depends only on the domain contract and Pydantic;
+`packages/domain` remains independent of parser, FastAPI, and SQLAlchemy. See
+[ADR 0007](docs/adr/0007-persistence-api-runtime-boundary.md) for runtime persistence and CAS and
+[ADR 0008](docs/adr/0008-parser-proposal-boundary.md) for candidate trust and proposal acceptance.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

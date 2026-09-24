@@ -7,6 +7,7 @@ from uuid import UUID
 
 from fastapi import FastAPI, Header
 from jewelai_domain import UnknownRoleError, UnsupportedLocaleError
+from jewelai_parser import ParserProposal
 from jewelai_persistence import (
     NotFoundError,
     StaleRevisionError,
@@ -19,12 +20,15 @@ from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
 from .schemas import (
+    CreateMessageRequest,
     CreateOrganizationRequest,
     CreateProjectRequest,
     CreateSessionRequest,
     EvaluateRequest,
     EvaluationResponse,
+    MessageResponse,
     OrganizationResponse,
+    ParserProposalRequest,
     ProjectResponse,
     RevisionListResponse,
     RevisionTransitionRequest,
@@ -111,6 +115,22 @@ def create_app(
         organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
     ):
         return service.get_session(session_id, organization_id)
+
+    @app.post("/sessions/{session_id}/messages", response_model=MessageResponse, status_code=201)
+    def create_message(
+        session_id: UUID,
+        request: CreateMessageRequest,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.create_message(session_id, organization_id, request.content)
+
+    @app.post("/sessions/{session_id}/parser-proposals", response_model=ParserProposal)
+    def create_parser_proposal(
+        session_id: UUID,
+        request: ParserProposalRequest,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.create_parser_proposal(session_id, organization_id, request)
 
     @app.get("/sessions/{session_id}/revisions", response_model=RevisionListResponse)
     def list_revisions(

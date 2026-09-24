@@ -268,6 +268,192 @@ def test_derive_decision_returns_proposal_without_applying_it(client):
     assert current["current_revision_id"] == edited["revision_id"]
 
 
+def test_message_parser_proposal_apply_and_evaluate_flow(client, app):
+    organization_id, _, session_response = create_hierarchy(client)
+    session = session_response.json()
+    headers = {"X-Organization-ID": organization_id}
+    session_url = f"/sessions/{session['session_id']}"
+    message = client.post(
+        f"{session_url}/messages",
+        headers=headers,
+        json={"content": "I want a ring with a 3 ct emerald."},
+    )
+    assert message.status_code == 201
+    assert message.json()["actor"] == "user"
+
+    candidate = {
+        "schema_version": "1.0.0",
+        "updates": [
+            {"target": "jewelry_type", "value": {"kind": "term", "text": "ring"}},
+            {
+                "target": "center_stone.material",
+                "value": {"kind": "term", "text": "emerald"},
+            },
+            {
+                "target": "center_stone.weight",
+                "value": {"kind": "weight", "value": {"value": 3.0, "unit": "ct"}},
+            },
+        ],
+    }
+    proposal_response = client.post(
+        f"{session_url}/parser-proposals",
+        headers=headers,
+        json={
+            "expected_revision_id": session["current_revision_id"],
+            "message_id": message.json()["message_id"],
+            "candidate": candidate,
+        },
+    )
+    assert proposal_response.status_code == 200
+    proposal_body = proposal_response.json()
+    assert proposal_body["has_changes"]
+    assert proposal_body["issues"] == []
+    assert proposal_body["proposed_design"]["center_stone"]["dimensions"] is None
+    canonical = {
+        item["concrete_target"]: item["canonical_value"]
+        for item in proposal_body["accepted_updates"]
+    }
+    assert canonical == {
+        "center_stone.material": "emerald",
+        "center_stone.weight": {"value": 3.0, "unit": "ct"},
+        "jewelry_type": "ring",
+    }
+
+    unchanged = client.get(session_url, headers=headers).json()
+    assert unchanged["current_revision_id"] == session["current_revision_id"]
+    applied = client.post(
+        f"{session_url}/revisions",
+        headers=headers,
+        json=transition(
+            "edit",
+            proposal_body["expected_revision_id"],
+            design=proposal_body["proposed_design"],
+            message_id=proposal_body["source"]["message_id"],
+        ),
+    )
+    assert applied.status_code == 200
+    applied_material = applied.json()["design"]["center_stone"]["material"]
+    assert applied_material["origin"] == "explicit"
+    assert applied_material["source"]["message_id"] == message.json()["message_id"]
+    assert not applied_material["confirmed"]
+    assert not applied_material["locked"]
+
+    evaluated = client.post(f"{session_url}/evaluate", headers=headers, json={})
+    assert evaluated.status_code == 200
+    assert evaluated.json()["decision"]["question_id"] == "CENTER_STONE_SHAPE"
+    assert evaluated.json()["rendered_question"]["locale"] == "en"
+    assert (
+        client.get(
+            f"{session_url}/revisions/{applied.json()['revision_id']}", headers=headers
+        ).json()["design"]["center_stone"]["dimensions"]
+        is None
+    )
+    stored = app.state.service.repository.get_message(
+        UUID(session["session_id"]), UUID(message.json()["message_id"]), UUID(organization_id)
+    )
+    assert stored.content == "I want a ring with a 3 ct emerald."
+
+
+def test_parser_proposal_scope_cross_session_message_and_staleness(client):
+    organization_id, _, first_response = create_hierarchy(client)
+    first = first_response.json()
+    headers = {"X-Organization-ID": organization_id}
+    first_url = f"/sessions/{first['session_id']}"
+    first_message = client.post(
+        f"{first_url}/messages", headers=headers, json={"content": "Oval center stone"}
+    ).json()
+
+    foreign = client.post("/organizations", json={"name": "Foreign"}).json()
+    denied = client.post(
+        f"{first_url}/messages",
+        headers={"X-Organization-ID": foreign["organization_id"]},
+        json={"content": "Should not be stored"},
+    )
+    assert denied.status_code == 404
+
+    foreign_project = client.post(
+        f"/organizations/{foreign['organization_id']}/projects",
+        json={"name": "Foreign project"},
+    ).json()
+    foreign_session = client.post(
+        f"/projects/{foreign_project['project_id']}/sessions",
+        headers={"X-Organization-ID": foreign["organization_id"]},
+        json={"role_id": "retail_client", "locale": "en"},
+    ).json()
+    foreign_message = client.post(
+        f"/sessions/{foreign_session['session_id']}/messages",
+        headers={"X-Organization-ID": foreign["organization_id"]},
+        json={"content": "Foreign message"},
+    ).json()
+    foreign_provenance = client.post(
+        f"{first_url}/parser-proposals",
+        headers=headers,
+        json={
+            "expected_revision_id": first["current_revision_id"],
+            "message_id": foreign_message["message_id"],
+            "candidate": {"schema_version": "1.0.0", "updates": []},
+        },
+    )
+    assert foreign_provenance.status_code == 404
+
+    project = client.post(
+        f"/organizations/{organization_id}/projects", json={"name": "Second project"}
+    ).json()
+    second = client.post(
+        f"/projects/{project['project_id']}/sessions",
+        headers=headers,
+        json={"role_id": "industrial_designer", "locale": "en"},
+    ).json()
+    wrong_message = client.post(
+        f"/sessions/{second['session_id']}/parser-proposals",
+        headers=headers,
+        json={
+            "expected_revision_id": second["current_revision_id"],
+            "message_id": first_message["message_id"],
+            "candidate": {"schema_version": "1.0.0", "updates": []},
+        },
+    )
+    assert wrong_message.status_code == 404
+
+    request = {
+        "expected_revision_id": first["current_revision_id"],
+        "message_id": first_message["message_id"],
+        "candidate": {
+            "schema_version": "1.0.0",
+            "updates": [
+                {
+                    "target": "center_stone.shape",
+                    "value": {"kind": "term", "text": "oval"},
+                }
+            ],
+        },
+    }
+    old_proposal = client.post(f"{first_url}/parser-proposals", headers=headers, json=request)
+    assert old_proposal.status_code == 200
+    applied = client.post(
+        f"{first_url}/revisions",
+        headers=headers,
+        json=transition(
+            "edit",
+            first["current_revision_id"],
+            design=old_proposal.json()["proposed_design"],
+        ),
+    )
+    assert applied.status_code == 200
+    stale_proposal = client.post(f"{first_url}/parser-proposals", headers=headers, json=request)
+    assert stale_proposal.status_code == 409
+    stale_apply = client.post(
+        f"{first_url}/revisions",
+        headers=headers,
+        json=transition(
+            "edit",
+            first["current_revision_id"],
+            design=old_proposal.json()["proposed_design"],
+        ),
+    )
+    assert stale_apply.status_code == 409
+
+
 def test_artifact_loader_requires_explicit_existing_version():
     with pytest.raises(ArtifactConfigurationError, match="missing"):
         load_runtime_artifacts(ROOT, ArtifactVersions(rules="9.9.9"))

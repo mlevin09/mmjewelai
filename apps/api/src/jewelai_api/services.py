@@ -16,7 +16,8 @@ from jewelai_domain import (
     unlock_field,
 )
 from jewelai_domain.models import MessageSource, RevisionEvent
-from jewelai_persistence.models import DesignSessionRow, QuestionEventRow
+from jewelai_parser import ParserProposal, build_parser_proposal
+from jewelai_persistence.models import DesignSessionRow, MessageRow, QuestionEventRow
 from jewelai_persistence.repository import PersistenceRepository, StaleRevisionError
 
 from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
@@ -28,6 +29,8 @@ from .schemas import (
     EvaluateRequest,
     EvaluationResponse,
     LockRevisionRequest,
+    MessageResponse,
+    ParserProposalRequest,
     SessionResponse,
     UnlockRevisionRequest,
 )
@@ -113,6 +116,50 @@ class RuntimeService:
     def get_session(self, session_id: UUID, organization_id: UUID) -> SessionResponse:
         row = self.repository.get_design_session(session_id, organization_id)
         return self._session_response(row)
+
+    def create_message(
+        self, session_id: UUID, organization_id: UUID, content: str
+    ) -> MessageResponse:
+        now = self._clock()
+        row = MessageRow(
+            message_id=self._uuid(),
+            session_id=session_id,
+            actor="user",
+            content=content,
+            created_at=now,
+        )
+        self.repository.create_message(row, organization_id)
+        return self._message_response(row)
+
+    def create_parser_proposal(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: ParserProposalRequest,
+    ) -> ParserProposal:
+        session = self.repository.get_design_session(session_id, organization_id)
+        self._assert_artifact_pins(session)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before parser proposal creation")
+        message = self.repository.get_message(session_id, request.message_id, organization_id)
+        revision = self.repository.get_revision(
+            session_id, request.expected_revision_id, organization_id
+        )
+        proposal = build_parser_proposal(
+            revision,
+            expected_revision_id=request.expected_revision_id,
+            source=MessageSource(
+                message_id=str(message.message_id),
+                recorded_at=self._utc(message.created_at),
+            ),
+            locale=session.locale,
+            dictionary=self.artifacts.dictionary,
+            candidate=request.candidate,
+        )
+        latest = self.repository.get_design_session(session_id, organization_id)
+        if latest.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed during parser proposal creation")
+        return proposal
 
     def transition_revision(self, session_id: UUID, organization_id: UUID, request):
         current = self.repository.get_current_revision(session_id, organization_id)
@@ -216,16 +263,13 @@ class RuntimeService:
 
     @staticmethod
     def _session_response(row: DesignSessionRow) -> SessionResponse:
-        def utc(value: datetime) -> datetime:
-            return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
-
         return SessionResponse(
             session_id=row.session_id,
             project_id=row.project_id,
             role_id=row.role_id,
             locale=row.locale,
-            created_at=utc(row.created_at),
-            updated_at=utc(row.updated_at),
+            created_at=RuntimeService._utc(row.created_at),
+            updated_at=RuntimeService._utc(row.updated_at),
             current_revision_id=row.current_revision_id,
             artifacts=ArtifactPins(
                 design_schema=row.design_schema_version,
@@ -235,3 +279,17 @@ class RuntimeService:
                 rules=row.rules_artifact_version,
             ),
         )
+
+    @staticmethod
+    def _message_response(row: MessageRow) -> MessageResponse:
+        return MessageResponse(
+            message_id=row.message_id,
+            session_id=row.session_id,
+            actor="user",
+            content=row.content,
+            created_at=RuntimeService._utc(row.created_at),
+        )
+
+    @staticmethod
+    def _utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)

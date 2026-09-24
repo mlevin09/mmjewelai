@@ -1,15 +1,15 @@
 # Planned data model and storage boundary
 
-This remains the broader logical model. Persistence + API Foundation v1 physically implements only
-organization, project, design_session, specification_revision, and question_event; see ADR 0007 and
-the initial Alembic migration. Later rows in this table remain plans, not implemented claims.
+This remains the broader logical model. The runtime physically implements organization, project,
+design_session, message, specification_revision, and question_event; see ADRs 0007–0008 and the
+Alembic migrations. Later rows in this table remain plans, not implemented claims.
 
 | Entity | Scope / relationships |
 | --- | --- |
 | organization, membership | Tenant and authenticated membership; separate from conversational role |
 | project | Belongs to one organization |
 | design_session | Project, selected role, locale, conversation state and pinned artifact versions |
-| message | Session, actor, content, timestamp; privacy/retention policy pending |
+| message | Implemented user-message lineage: session, bounded content, server timestamp; privacy/retention policy pending |
 | specification_revision | Immutable session revision, parent revision, schema version and field state |
 | question_event | Semantic question ID/version, rule/version, target, answer and decision explanation |
 | prompt_revision | Specification revision, template/compiler versions and compiled text |

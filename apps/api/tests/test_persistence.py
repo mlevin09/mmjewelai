@@ -109,6 +109,32 @@ def test_persistence_round_trip_lineage_pins_and_scope(engine):
         service.repository.get_design_session(session.session_id, foreign.organization_id)
 
 
+def test_message_persistence_is_session_and_organization_scoped(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    message = service.create_message(
+        session.session_id, organization.organization_id, "A persisted user message"
+    )
+    stored = service.repository.get_message(
+        session.session_id, message.message_id, organization.organization_id
+    )
+    assert stored.actor == "user"
+    assert stored.content == "A persisted user message"
+    assert stored.message_id == message.message_id
+    assert stored.session_id == session.session_id
+    assert stored.created_at.replace(tzinfo=UTC) == NOW
+
+    foreign, _, foreign_session = create_persisted_session(service)
+    with pytest.raises(OwnershipMismatchError):
+        service.repository.get_message(
+            session.session_id, message.message_id, foreign.organization_id
+        )
+    with pytest.raises(OwnershipMismatchError):
+        service.repository.get_message(
+            foreign_session.session_id, message.message_id, foreign.organization_id
+        )
+
+
 def test_compare_and_swap_rejects_second_writer_and_preserves_history(engine):
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
@@ -161,6 +187,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
     assert set(inspect(engine).get_table_names()) == {
         "alembic_version",
         "design_session",
+        "message",
         "organization",
         "project",
         "question_event",

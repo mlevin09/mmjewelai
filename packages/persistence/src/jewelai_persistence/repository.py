@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
     DesignSessionRow,
+    MessageRow,
     OrganizationRow,
     ProjectRow,
     QuestionEventRow,
@@ -193,6 +194,33 @@ class PersistenceRepository:
                 "Revision lineage violates a uniqueness constraint"
             ) from exc
         return revision
+
+    def create_message(self, row: MessageRow, organization_id: UUID) -> MessageRow:
+        with self._session_factory.begin() as db:
+            scoped = db.scalar(self._scoped_session_query(row.session_id, organization_id))
+            if scoped is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            if row.actor != "user":
+                raise ValueError("Parser Proposal v1 persists user messages only")
+            db.add(row)
+        return row
+
+    def get_message(self, session_id: UUID, message_id: UUID, organization_id: UUID) -> MessageRow:
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(MessageRow)
+                .join(DesignSessionRow, DesignSessionRow.session_id == MessageRow.session_id)
+                .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                .where(
+                    MessageRow.message_id == message_id,
+                    MessageRow.session_id == session_id,
+                    ProjectRow.organization_id == organization_id,
+                )
+            )
+            if row is None:
+                raise OwnershipMismatchError("Message not found in session organization scope")
+            db.expunge(row)
+            return row
 
     def add_question_event(self, row: QuestionEventRow, organization_id: UUID) -> QuestionEventRow:
         with self._session_factory.begin() as db:

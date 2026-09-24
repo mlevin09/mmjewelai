@@ -17,11 +17,15 @@ from jewelai_domain import (
     RenderedQuestion,
 )
 from jewelai_domain.models import MessageSource
+from jewelai_parser import ParserCandidate
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
 Target = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)]
+MessageContent = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000, pattern=r"\S")
+]
 
 
 class ApiModel(BaseModel):
@@ -71,6 +75,24 @@ class SessionResponse(ApiModel):
     updated_at: datetime
     current_revision_id: UUID
     artifacts: ArtifactPins
+
+
+class CreateMessageRequest(ApiModel):
+    content: MessageContent
+
+
+class MessageResponse(ApiModel):
+    message_id: UUID
+    session_id: UUID
+    actor: Literal["user"]
+    content: str
+    created_at: datetime
+
+
+class ParserProposalRequest(ApiModel):
+    expected_revision_id: UUID
+    message_id: UUID
+    candidate: ParserCandidate
 
 
 class EditRevisionRequest(ApiModel):
