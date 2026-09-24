@@ -17,6 +17,7 @@ from jewelai_domain import (
     unlock_field,
 )
 from jewelai_domain.models import MessageSource, RevisionEvent
+from jewelai_model_gateway import GenerationRun, GenerationStatus
 from jewelai_parser import ParserProposal, build_parser_proposal
 from jewelai_persistence.models import (
     DesignSessionRow,
@@ -28,14 +29,17 @@ from jewelai_persistence.repository import PersistenceRepository, StaleRevisionE
 from jewelai_prompts import compile_prompt, validate_compiled_prompt
 
 from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
+from .generation import GenerationProfileRegistry
 from .schemas import (
     ArtifactPins,
     ConfirmRevisionRequest,
+    CreateGenerationRunRequest,
     CreatePromptRevisionRequest,
     CreateSessionRequest,
     EditRevisionRequest,
     EvaluateRequest,
     EvaluationResponse,
+    GenerationRunListResponse,
     LockRevisionRequest,
     MessageResponse,
     ParserProposalRequest,
@@ -73,12 +77,14 @@ class RuntimeService:
         clock: Callable[[], datetime] | None = None,
         uuid_factory: Callable[[], UUID] | None = None,
         before_prompt_persist: Callable[[], None] | None = None,
+        generation_profiles: GenerationProfileRegistry | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
         self._clock = clock or (lambda: datetime.now(UTC))
         self._uuid = uuid_factory or uuid4
         self._before_prompt_persist = before_prompt_persist
+        self._generation_profiles = generation_profiles or GenerationProfileRegistry()
 
     def create_organization(self, name: str):
         return self.repository.create_organization(self._uuid(), name, self._clock())
@@ -270,6 +276,45 @@ class RuntimeService:
                     session_id, organization_id
                 )
             )
+        )
+
+    def create_generation_run(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: CreateGenerationRunRequest,
+    ) -> GenerationRun:
+        prompt_row, compiled = self.repository.get_prompt_revision(
+            session_id, request.prompt_revision_id, organization_id
+        )
+        profile = self._generation_profiles.get(request.profile_id)
+        now = self._clock()
+        run = GenerationRun(
+            generation_run_id=self._uuid(),
+            session_id=session_id,
+            prompt_revision_id=prompt_row.prompt_revision_id,
+            prompt_content_hash=compiled.content_hash,
+            profile_id=profile.profile_id,
+            profile_version=profile.profile_version,
+            provider=profile.provider,
+            model=profile.model,
+            configuration=profile.configuration,
+            status=GenerationStatus.PENDING,
+            attempt=1,
+            created_at=now,
+        )
+        return self.repository.create_generation_run(run, organization_id)
+
+    def get_generation_run(
+        self, session_id: UUID, generation_run_id: UUID, organization_id: UUID
+    ) -> GenerationRun:
+        return self.repository.get_generation_run(session_id, generation_run_id, organization_id)
+
+    def list_generation_runs(
+        self, session_id: UUID, organization_id: UUID
+    ) -> GenerationRunListResponse:
+        return GenerationRunListResponse(
+            generation_runs=self.repository.list_generation_runs(session_id, organization_id)
         )
 
     def evaluate(

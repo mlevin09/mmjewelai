@@ -3,9 +3,11 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from jewelai_model_gateway import GenerationConfiguration
 from jewelai_persistence import Base, create_database_engine
 
 from jewelai_api import create_app
+from jewelai_api.generation import GenerationProfile, GenerationProfileRegistry
 from jewelai_api.settings import RuntimeSettings
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -34,6 +36,17 @@ def app(engine):
         ),
         engine=engine,
         clock=lambda: NOW,
+        generation_profiles=GenerationProfileRegistry(
+            (
+                GenerationProfile(
+                    profile_id="test_default",
+                    profile_version="1.0.0",
+                    provider="test",
+                    model="deterministic-image-v1",
+                    configuration=GenerationConfiguration(output_count=1),
+                ),
+            )
+        ),
     )
 
 

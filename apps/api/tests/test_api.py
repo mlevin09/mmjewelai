@@ -1,11 +1,14 @@
 import json
 from copy import deepcopy
+from datetime import timedelta
 from pathlib import Path
 from uuid import UUID
 
 import pytest
 from conftest import NOW, create_hierarchy
 from jewelai_domain import Design
+from jewelai_generation import GatewayRegistry, execute_generation_run
+from jewelai_model_gateway import GeneratedOutputDescriptor, GenerationResult
 
 from jewelai_api.artifacts import ArtifactConfigurationError, load_runtime_artifacts
 from jewelai_api.schemas import EditRevisionRequest
@@ -647,3 +650,155 @@ def test_prompt_compile_rechecks_current_revision_before_persistence(client, app
     assert result.status_code == 409
     assert result.json()["error"] == "stale_revision"
     assert client.get(prompt_url, headers=headers).json() == {"prompt_revisions": []}
+
+
+class ApiTestGateway:
+    def __init__(self):
+        self.calls = 0
+
+    def generate(self, request):
+        self.calls += 1
+        return GenerationResult(
+            generation_run_id=request.generation_run_id,
+            provider=request.provider,
+            model=request.model,
+            provider_request_id="api-test-request",
+            outputs=(GeneratedOutputDescriptor(ordinal=1, provider_output_id="api-test-output"),),
+        )
+
+
+def create_ready_prompt(client):
+    organization_id, project_id, response = create_hierarchy(client)
+    session = response.json()
+    headers = {"X-Organization-ID": organization_id}
+    edited = client.post(
+        f"/sessions/{session['session_id']}/revisions",
+        headers=headers,
+        json=transition(
+            "edit",
+            session["current_revision_id"],
+            design=ready_design(),
+            message_id="generation-ready",
+        ),
+    ).json()
+    prompt = client.post(
+        f"/sessions/{session['session_id']}/prompt-revisions",
+        headers=headers,
+        json={"expected_revision_id": edited["revision_id"]},
+    )
+    assert prompt.status_code == 201
+    return organization_id, project_id, session, edited, prompt.json()
+
+
+def test_generation_run_api_creates_pending_without_inline_provider_and_reads_terminal(client, app):
+    organization_id, _, session, edited, prompt = create_ready_prompt(client)
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/generation-runs"
+    gateway = ApiTestGateway()
+    created = client.post(
+        url,
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "test_default"},
+    )
+    assert created.status_code == 201
+    run = created.json()
+    assert run["status"] == "pending"
+    assert run["profile_id"] == "test_default"
+    assert run["profile_version"] == "1.0.0"
+    assert run["provider"] == "test"
+    assert run["model"] == "deterministic-image-v1"
+    assert run["configuration"] == {"output_count": 1}
+    assert run["prompt_content_hash"] == prompt["compiled_prompt"]["content_hash"]
+    assert gateway.calls == 0
+    assert client.get(url, headers=headers).json() == {"generation_runs": [run]}
+    assert client.get(f"{url}/{run['generation_run_id']}", headers=headers).json() == run
+    assert (
+        client.get(f"/sessions/{session['session_id']}", headers=headers).json()[
+            "current_revision_id"
+        ]
+        == edited["revision_id"]
+    )
+
+    outcome = execute_generation_run(
+        app.state.service.repository,
+        session_id=UUID(session["session_id"]),
+        generation_run_id=UUID(run["generation_run_id"]),
+        organization_id=UUID(organization_id),
+        gateways=GatewayRegistry({"test": gateway}),
+        clock=iter((NOW + timedelta(seconds=1), NOW + timedelta(seconds=2))).__next__,
+    )
+    assert outcome.disposition == "succeeded"
+    assert gateway.calls == 1
+    terminal = client.get(f"{url}/{run['generation_run_id']}", headers=headers).json()
+    assert terminal["status"] == "succeeded"
+    assert terminal["result"]["provider_request_id"] == "api-test-request"
+    assert terminal["result"]["outputs"][0]["provider_output_id"] == "api-test-output"
+
+
+def test_generation_run_api_rejects_untrusted_profile_configuration_and_cross_scope(client):
+    organization_id, _, session, edited, prompt = create_ready_prompt(client)
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/generation-runs"
+    unknown = client.post(
+        url,
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "unknown"},
+    )
+    assert unknown.status_code == 422
+    assert unknown.json()["error"] == "unknown_generation_profile"
+    arbitrary = client.post(
+        url,
+        headers=headers,
+        json={
+            "prompt_revision_id": prompt["prompt_revision_id"],
+            "profile_id": "test_default",
+            "provider": "caller-provider",
+            "configuration": {"output_count": 4},
+        },
+    )
+    assert arbitrary.status_code == 422
+
+    second_project = client.post(
+        f"/organizations/{organization_id}/projects", json={"name": "Second project"}
+    ).json()
+    second_session = client.post(
+        f"/projects/{second_project['project_id']}/sessions",
+        headers=headers,
+        json={"role_id": "retail_client", "locale": "en"},
+    ).json()
+    wrong_session = client.post(
+        f"/sessions/{second_session['session_id']}/generation-runs",
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "test_default"},
+    )
+    assert wrong_session.status_code == 404
+
+    created = client.post(
+        url,
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "test_default"},
+    ).json()
+    foreign = client.post("/organizations", json={"name": "Foreign generation reader"}).json()
+    denied = client.get(
+        f"{url}/{created['generation_run_id']}",
+        headers={"X-Organization-ID": foreign["organization_id"]},
+    )
+    assert denied.status_code == 404
+
+    newer_design = deepcopy(edited["design"])
+    newer_design["center_stone"]["cut"] = explicit("later-cut", "step_cut")
+    newer = client.post(
+        f"/sessions/{session['session_id']}/revisions",
+        headers=headers,
+        json=transition(
+            "edit",
+            edited["revision_id"],
+            design=newer_design,
+            message_id="later-design-revision",
+        ),
+    )
+    assert newer.status_code == 200
+    historical = client.get(f"{url}/{created['generation_run_id']}", headers=headers)
+    assert historical.status_code == 200
+    assert historical.json()["prompt_revision_id"] == prompt["prompt_revision_id"]
+    assert historical.json()["status"] == "pending"

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     JSON,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -138,3 +139,41 @@ class PromptRevisionRow(Base):
     structured_payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class GenerationRunRow(Base):
+    __tablename__ = "generation_run"
+    __table_args__ = (
+        CheckConstraint("attempt >= 1", name="ck_generation_run_attempt_positive"),
+        CheckConstraint(
+            "status IN ('pending', 'running', 'succeeded', 'failed')",
+            name="ck_generation_run_status",
+        ),
+        Index("ix_generation_run_session_created", "session_id", "created_at"),
+    )
+
+    generation_run_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    prompt_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("prompt_revision.prompt_revision_id", ondelete="RESTRICT"), index=True
+    )
+    prompt_content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    profile_id: Mapped[str] = mapped_column(String(100))
+    profile_version: Mapped[str] = mapped_column(String(32))
+    provider: Mapped[str] = mapped_column(String(100))
+    model: Mapped[str] = mapped_column(String(100))
+    configuration: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    attempt: Mapped[int] = mapped_column(Integer)
+    parent_generation_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("generation_run.generation_run_id", ondelete="RESTRICT"), nullable=True
+    )
+    provider_request_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    result_payload: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

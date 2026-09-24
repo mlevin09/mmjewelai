@@ -17,9 +17,12 @@ from jewelai_domain import (
     RenderedQuestion,
 )
 from jewelai_domain.models import MessageSource
+from jewelai_model_gateway import GenerationRun
 from jewelai_parser import ParserCandidate
 from jewelai_prompts import CompiledPrompt
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+
+from .generation import ProfileId
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
@@ -111,6 +114,15 @@ class PromptRevisionResponse(ApiModel):
 
 class PromptRevisionListResponse(ApiModel):
     prompt_revisions: tuple[PromptRevisionResponse, ...]
+
+
+class CreateGenerationRunRequest(ApiModel):
+    prompt_revision_id: UUID
+    profile_id: ProfileId
+
+
+class GenerationRunListResponse(ApiModel):
+    generation_runs: tuple[GenerationRun, ...]
 
 
 class EditRevisionRequest(ApiModel):
