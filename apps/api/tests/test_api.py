@@ -6,6 +6,7 @@ from uuid import UUID
 
 import pytest
 from conftest import NOW, create_hierarchy
+from jewelai_assets import Asset, AssetContentType, AssetKind, AssetStatus, build_object_key
 from jewelai_domain import Design
 from jewelai_generation import GatewayRegistry, execute_generation_run
 from jewelai_model_gateway import GeneratedOutputDescriptor, GenerationResult
@@ -802,3 +803,56 @@ def test_generation_run_api_rejects_untrusted_profile_configuration_and_cross_sc
     assert historical.status_code == 200
     assert historical.json()["prompt_revision_id"] == prompt["prompt_revision_id"]
     assert historical.json()["status"] == "pending"
+
+
+def test_asset_metadata_api_is_scoped_ordered_and_redacts_storage_details(client, app):
+    organization_id, project_id, response = create_hierarchy(client)
+    session = response.json()
+    headers = {"X-Organization-ID": organization_id}
+    asset_ids = (
+        UUID("40404040-4040-4040-8040-404040404040"),
+        UUID("41414141-4141-4141-8141-414141414141"),
+    )
+    for offset, asset_id in enumerate(asset_ids):
+        asset = Asset(
+            asset_id=asset_id,
+            organization_id=UUID(organization_id),
+            project_id=UUID(project_id),
+            session_id=UUID(session["session_id"]),
+            kind=AssetKind.REFERENCE,
+            status=AssetStatus.PENDING,
+            object_key=build_object_key(
+                UUID(organization_id),
+                UUID(project_id),
+                asset_id,
+                AssetContentType.PNG,
+            ),
+            content_type=AssetContentType.PNG,
+            content_hash=str(offset) * 64,
+            byte_size=16 + offset,
+            created_at=NOW + timedelta(seconds=offset),
+        )
+        app.state.service.repository.create_pending_asset(asset)
+        app.state.service.repository.mark_asset_ready(
+            asset_id,
+            UUID(organization_id),
+            NOW + timedelta(seconds=offset + 2),
+        )
+
+    url = f"/sessions/{session['session_id']}/assets"
+    listed = client.get(url, headers=headers)
+    assert listed.status_code == 200
+    payload = listed.json()
+    assert [item["asset_id"] for item in payload["assets"]] == [str(item) for item in asset_ids]
+    single = client.get(f"{url}/{asset_ids[0]}", headers=headers)
+    assert single.status_code == 200
+    assert single.json() == payload["assets"][0]
+    forbidden_fields = {"object_key", "bucket", "url", "bytes", "provider_output_id"}
+    assert forbidden_fields.isdisjoint(single.json())
+
+    foreign = client.post("/organizations", json={"name": "Foreign asset reader"}).json()
+    denied = client.get(
+        f"{url}/{asset_ids[0]}",
+        headers={"X-Organization-ID": foreign["organization_id"]},
+    )
+    assert denied.status_code == 404

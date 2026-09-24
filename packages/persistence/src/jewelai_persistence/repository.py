@@ -3,6 +3,13 @@
 from datetime import UTC, datetime
 from uuid import UUID
 
+from jewelai_assets import (
+    Asset,
+    AssetConflictError,
+    AssetErrorCode,
+    AssetLineageError,
+    AssetStatus,
+)
 from jewelai_domain.models import DesignRevision
 from jewelai_model_gateway import (
     GenerationErrorCode,
@@ -18,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
+    AssetRow,
     DesignSessionRow,
     GenerationRunRow,
     MessageRow,
@@ -371,6 +379,135 @@ class PersistenceRepository:
             ).all()
             return tuple(self._generation_run(row) for row in rows)
 
+    def find_asset(self, asset_id: UUID, organization_id: UUID) -> Asset | None:
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(AssetRow).where(
+                    AssetRow.asset_id == asset_id,
+                    AssetRow.organization_id == organization_id,
+                    AssetRow.session_id.in_(self._scoped_session_ids(organization_id)),
+                )
+            )
+            return self._asset(row) if row is not None else None
+
+    def get_asset(self, session_id: UUID, asset_id: UUID, organization_id: UUID) -> Asset:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(AssetRow).where(
+                    AssetRow.asset_id == asset_id,
+                    AssetRow.session_id == session_id,
+                    AssetRow.organization_id == organization_id,
+                )
+            )
+            if row is None:
+                raise OwnershipMismatchError("Asset not found in session organization scope")
+            return self._asset(row)
+
+    def list_assets(self, session_id: UUID, organization_id: UUID) -> tuple[Asset, ...]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            rows = db.scalars(
+                select(AssetRow)
+                .where(
+                    AssetRow.session_id == session_id,
+                    AssetRow.organization_id == organization_id,
+                )
+                .order_by(AssetRow.created_at, AssetRow.asset_id)
+            ).all()
+            return tuple(self._asset(row) for row in rows)
+
+    def create_pending_asset(self, asset: Asset) -> Asset:
+        asset = Asset.model_validate(asset)
+        if asset.status is not AssetStatus.PENDING:
+            raise ValueError("A new asset must be pending")
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    select(DesignSessionRow)
+                    .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                    .where(
+                        DesignSessionRow.session_id == asset.session_id,
+                        DesignSessionRow.project_id == asset.project_id,
+                        ProjectRow.organization_id == asset.organization_id,
+                    )
+                )
+                if session is None:
+                    raise OwnershipMismatchError(
+                        "Asset session, project, and organization scope do not agree"
+                    )
+                if asset.parent_asset_id is not None:
+                    parent = db.scalar(
+                        select(AssetRow).where(
+                            AssetRow.asset_id == asset.parent_asset_id,
+                            AssetRow.organization_id == asset.organization_id,
+                            AssetRow.project_id == asset.project_id,
+                            AssetRow.session_id == asset.session_id,
+                        )
+                    )
+                    if parent is None:
+                        raise OwnershipMismatchError("Parent asset not found in asset scope")
+                if asset.generation_run_id is not None:
+                    run_row = db.scalar(
+                        select(GenerationRunRow).where(
+                            GenerationRunRow.generation_run_id == asset.generation_run_id,
+                            GenerationRunRow.session_id == asset.session_id,
+                        )
+                    )
+                    if run_row is None:
+                        raise OwnershipMismatchError("Generation run not found in asset scope")
+                    run = self._generation_run(run_row)
+                    if run.status is not GenerationStatus.SUCCEEDED or run.result is None:
+                        raise AssetLineageError(
+                            "Generated assets require a succeeded generation run"
+                        )
+                    output = next(
+                        (
+                            item
+                            for item in run.result.outputs
+                            if item.ordinal == asset.generation_output_ordinal
+                        ),
+                        None,
+                    )
+                    if output is None:
+                        raise AssetLineageError("Generation output ordinal does not exist")
+                    if output.media_type != "image":
+                        raise AssetLineageError("Generation output is not an image")
+                    if output.provider_output_id != asset.provider_output_id:
+                        raise AssetLineageError(
+                            "Provider output ID does not match generation output"
+                        )
+                db.add(self._asset_row(asset))
+        except IntegrityError as exc:
+            raise AssetConflictError(
+                "Asset identity, object key, or generation output already exists"
+            ) from exc
+        return asset
+
+    def mark_asset_ready(self, asset_id: UUID, organization_id: UUID, ready_at: datetime) -> Asset:
+        with self._session_factory.begin() as db:
+            row = self._pending_asset_row(db, asset_id, organization_id)
+            row.status = AssetStatus.READY.value
+            row.ready_at = ready_at
+            return self._asset(row)
+
+    def mark_asset_failed(
+        self,
+        asset_id: UUID,
+        organization_id: UUID,
+        error_code: AssetErrorCode,
+        error_detail: str,
+        failed_at: datetime,
+    ) -> Asset:
+        error_code = AssetErrorCode(error_code)
+        with self._session_factory.begin() as db:
+            row = self._pending_asset_row(db, asset_id, organization_id)
+            row.status = AssetStatus.FAILED.value
+            row.failed_at = failed_at
+            row.error_code = error_code.value
+            row.error_detail = error_detail
+            return self._asset(row)
+
     def claim_generation_run(
         self,
         session_id: UUID,
@@ -570,6 +707,54 @@ class PersistenceRepository:
         )
 
     @staticmethod
+    def _asset_row(asset: Asset) -> AssetRow:
+        return AssetRow(
+            asset_id=asset.asset_id,
+            organization_id=asset.organization_id,
+            project_id=asset.project_id,
+            session_id=asset.session_id,
+            kind=asset.kind.value,
+            status=asset.status.value,
+            object_key=asset.object_key,
+            content_type=asset.content_type.value,
+            content_hash=asset.content_hash,
+            byte_size=asset.byte_size,
+            generation_run_id=asset.generation_run_id,
+            generation_output_ordinal=asset.generation_output_ordinal,
+            provider_output_id=asset.provider_output_id,
+            parent_asset_id=asset.parent_asset_id,
+            created_at=asset.created_at,
+            ready_at=asset.ready_at,
+            failed_at=asset.failed_at,
+            error_code=asset.error_code.value if asset.error_code is not None else None,
+            error_detail=asset.error_detail,
+        )
+
+    @staticmethod
+    def _asset(row: AssetRow) -> Asset:
+        return Asset(
+            asset_id=row.asset_id,
+            organization_id=row.organization_id,
+            project_id=row.project_id,
+            session_id=row.session_id,
+            kind=row.kind,
+            status=row.status,
+            object_key=row.object_key,
+            content_type=row.content_type,
+            content_hash=row.content_hash,
+            byte_size=row.byte_size,
+            generation_run_id=row.generation_run_id,
+            generation_output_ordinal=row.generation_output_ordinal,
+            provider_output_id=row.provider_output_id,
+            parent_asset_id=row.parent_asset_id,
+            created_at=PersistenceRepository._utc(row.created_at),
+            ready_at=(PersistenceRepository._utc(row.ready_at) if row.ready_at else None),
+            failed_at=(PersistenceRepository._utc(row.failed_at) if row.failed_at else None),
+            error_code=row.error_code,
+            error_detail=row.error_detail,
+        )
+
+    @staticmethod
     def _utc(value: datetime) -> datetime:
         return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
@@ -595,6 +780,22 @@ class PersistenceRepository:
             raise GenerationStateConflictError(
                 f"Generation run cannot complete from {row.status} status"
             )
+        return row
+
+    def _pending_asset_row(self, db: Session, asset_id: UUID, organization_id: UUID) -> AssetRow:
+        row = db.scalar(
+            select(AssetRow)
+            .where(
+                AssetRow.asset_id == asset_id,
+                AssetRow.organization_id == organization_id,
+                AssetRow.session_id.in_(self._scoped_session_ids(organization_id)),
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise OwnershipMismatchError("Asset not found in organization scope")
+        if row.status != AssetStatus.PENDING.value:
+            raise AssetConflictError(f"Asset cannot transition from {row.status} status")
         return row
 
     @staticmethod

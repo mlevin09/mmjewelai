@@ -53,7 +53,8 @@ Step 2 established the modular-monolith skeleton below. `packages/domain` contai
 behavior, `packages/parser` owns the provider-neutral candidate/proposal boundary,
 `packages/prompts` owns deterministic provider-neutral prompt compilation and lock verification,
 `packages/model_gateway` owns provider-neutral generation contracts, `workers/generation` owns the
-one-shot generation unit of work, `packages/persistence` owns SQLAlchemy/Alembic storage, and
+one-shot generation unit of work, `packages/assets` owns private binary-ingestion contracts and the
+object-storage port, `packages/persistence` owns SQLAlchemy/Alembic metadata storage, and
 `apps/api` is the FastAPI runtime boundary:
 
 ```text
@@ -66,6 +67,7 @@ packages/
   domain/
   parser/
   prompts/
+  assets/
   persistence/
   model_gateway/
 data/
@@ -84,6 +86,8 @@ immutable prompt revision; API creation never invokes a provider inline. See
 [ADR 0008](docs/adr/0008-parser-proposal-boundary.md) for candidate trust and proposal acceptance.
 See [ADR 0010](docs/adr/0010-model-gateway-generation-boundary.md) for generation lifecycle,
 atomic claim, and provider-result trust.
+See [ADR 0011](docs/adr/0011-asset-ingestion-storage-boundary.md) for private object ingestion,
+metadata lifecycle, and cross-system retry semantics.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

@@ -23,6 +23,8 @@ from sqlalchemy import Engine
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
 from .generation import GenerationProfileRegistry, UnknownGenerationProfileError
 from .schemas import (
+    AssetListResponse,
+    AssetResponse,
     CreateGenerationRunRequest,
     CreateMessageRequest,
     CreateOrganizationRequest,
@@ -254,6 +256,21 @@ def create_app(
         organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
     ):
         return service.get_generation_run(session_id, generation_run_id, organization_id)
+
+    @app.get("/sessions/{session_id}/assets", response_model=AssetListResponse)
+    def list_assets(
+        session_id: UUID,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.list_assets(session_id, organization_id)
+
+    @app.get("/sessions/{session_id}/assets/{asset_id}", response_model=AssetResponse)
+    def get_asset(
+        session_id: UUID,
+        asset_id: UUID,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.get_asset(session_id, asset_id, organization_id)
 
     @app.post("/sessions/{session_id}/revisions")
     def transition_revision(

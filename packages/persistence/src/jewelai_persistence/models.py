@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -177,3 +178,75 @@ class GenerationRunRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AssetRow(Base):
+    __tablename__ = "asset"
+    __table_args__ = (
+        CheckConstraint("kind IN ('reference', 'generated')", name="ck_asset_kind"),
+        CheckConstraint("status IN ('pending', 'ready', 'failed')", name="ck_asset_status"),
+        CheckConstraint("byte_size > 0", name="ck_asset_byte_size_positive"),
+        CheckConstraint(
+            "generation_output_ordinal IS NULL OR generation_output_ordinal BETWEEN 1 AND 4",
+            name="ck_asset_generation_ordinal",
+        ),
+        CheckConstraint(
+            "parent_asset_id IS NULL OR parent_asset_id != asset_id",
+            name="ck_asset_parent",
+        ),
+        CheckConstraint(
+            "(kind = 'reference' AND generation_run_id IS NULL "
+            "AND generation_output_ordinal IS NULL AND provider_output_id IS NULL) OR "
+            "(kind = 'generated' AND generation_run_id IS NOT NULL "
+            "AND generation_output_ordinal IS NOT NULL)",
+            name="ck_asset_kind_lineage",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND ready_at IS NULL AND failed_at IS NULL "
+            "AND error_code IS NULL AND error_detail IS NULL) OR "
+            "(status = 'ready' AND ready_at IS NOT NULL AND failed_at IS NULL "
+            "AND error_code IS NULL AND error_detail IS NULL) OR "
+            "(status = 'failed' AND ready_at IS NULL AND failed_at IS NOT NULL "
+            "AND error_code IS NOT NULL AND error_detail IS NOT NULL)",
+            name="ck_asset_lifecycle",
+        ),
+        UniqueConstraint("object_key", name="uq_asset_object_key"),
+        UniqueConstraint(
+            "generation_run_id",
+            "generation_output_ordinal",
+            name="uq_asset_generation_output",
+        ),
+        Index("ix_asset_session_created", "session_id", "created_at"),
+    )
+
+    asset_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT"), index=True
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("project.project_id", ondelete="RESTRICT"), index=True
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    object_key: Mapped[str] = mapped_column(String(500))
+    content_type: Mapped[str] = mapped_column(String(32))
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    byte_size: Mapped[int] = mapped_column(BigInteger)
+    generation_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("generation_run.generation_run_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    generation_output_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    provider_output_id: Mapped[str | None] = mapped_column(String(240), nullable=True)
+    parent_asset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("asset.asset_id", ondelete="RESTRICT"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    error_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
