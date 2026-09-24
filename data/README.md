@@ -11,4 +11,6 @@ Historical revisions pin artifact versions; published contents are immutable.
 - rules/: deterministic decision policies
 - knowledge-base/: sourced gemstone geometry estimates
 
-No executable or production-ready seed data is claimed by these directory placeholders.
+Role Profiles and Domain Dictionary now contain proposed versioned foundation artifacts. They are not
+production-authoritative catalogs; their review status and remaining domain decisions are documented
+in their specifications. The other directories remain placeholders.

@@ -1,0 +1,263 @@
+{
+  "$defs": {
+    "DeprecatedAlias": {
+      "additionalProperties": false,
+      "properties": {
+        "locale": {
+          "$ref": "#/$defs/DictionaryLocale"
+        },
+        "term": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Term",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locale",
+        "term"
+      ],
+      "title": "DeprecatedAlias",
+      "type": "object"
+    },
+    "DictionaryCategory": {
+      "enum": [
+        "jewelry_type",
+        "gemstone_material",
+        "stone_shape",
+        "stone_cut",
+        "stone_setting",
+        "metal_material",
+        "metal_color",
+        "metal_purity",
+        "construction",
+        "style"
+      ],
+      "title": "DictionaryCategory",
+      "type": "string"
+    },
+    "DictionaryEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "domain_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Domain Id",
+          "type": "string"
+        },
+        "category": {
+          "$ref": "#/$defs/DictionaryCategory"
+        },
+        "canonical_terms": {
+          "$ref": "#/$defs/LocalizedText"
+        },
+        "synonyms": {
+          "$ref": "#/$defs/LocalizedSynonyms"
+        },
+        "definition": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Definition",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/DictionaryProvenance"
+        },
+        "deprecated_aliases": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/DeprecatedAlias"
+          },
+          "title": "Deprecated Aliases",
+          "type": "array"
+        },
+        "lifecycle": {
+          "$ref": "#/$defs/EntryLifecycle",
+          "default": "active"
+        },
+        "replaced_by": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{0,79}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Replaced By"
+        }
+      },
+      "required": [
+        "domain_id",
+        "category",
+        "canonical_terms",
+        "definition",
+        "provenance"
+      ],
+      "title": "DictionaryEntry",
+      "type": "object"
+    },
+    "DictionaryLocale": {
+      "enum": [
+        "en",
+        "ru"
+      ],
+      "title": "DictionaryLocale",
+      "type": "string"
+    },
+    "DictionaryProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "source_kind": {
+          "const": "repository_spec",
+          "default": "repository_spec",
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_ref": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Source Ref",
+          "type": "string"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus"
+        }
+      },
+      "required": [
+        "source_ref",
+        "review_status"
+      ],
+      "title": "DictionaryProvenance",
+      "type": "object"
+    },
+    "EntryLifecycle": {
+      "enum": [
+        "active",
+        "deprecated"
+      ],
+      "title": "EntryLifecycle",
+      "type": "string"
+    },
+    "LocalizedSynonyms": {
+      "additionalProperties": false,
+      "properties": {
+        "en": {
+          "default": [],
+          "items": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "En",
+          "type": "array"
+        },
+        "ru": {
+          "default": [],
+          "items": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "pattern": "\\S",
+            "type": "string"
+          },
+          "title": "Ru",
+          "type": "array"
+        }
+      },
+      "title": "LocalizedSynonyms",
+      "type": "object"
+    },
+    "LocalizedText": {
+      "additionalProperties": false,
+      "properties": {
+        "en": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "En",
+          "type": "string"
+        },
+        "ru": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Ru",
+          "type": "string"
+        }
+      },
+      "required": [
+        "en",
+        "ru"
+      ],
+      "title": "LocalizedText",
+      "type": "object"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "proposed_pending_domain_review",
+        "reviewed"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Artifact Version",
+      "type": "string"
+    },
+    "supported_locales": {
+      "default": [
+        "en",
+        "ru"
+      ],
+      "items": {
+        "$ref": "#/$defs/DictionaryLocale"
+      },
+      "title": "Supported Locales",
+      "type": "array"
+    },
+    "review_status": {
+      "const": "proposed_pending_domain_review",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "source": {
+      "const": "docs/product/issues/03-dictionary.md",
+      "title": "Source",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/DictionaryEntry"
+      },
+      "minItems": 1,
+      "title": "Entries",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact_version",
+    "review_status",
+    "source",
+    "entries"
+  ],
+  "title": "DictionaryBundle",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:domain-dictionary:1.0.0",
+  "description": "JewelAI Domain Dictionary v1. Vocabulary and exact normalization only; it contains no gemstone dimensions, manufacturing estimates, rules, or authorization semantics."
+}
