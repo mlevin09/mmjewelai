@@ -59,7 +59,7 @@ class FakeGateway:
             outputs=(
                 GeneratedOutputDescriptor(
                     ordinal=1,
-                    provider_output_id=f"{request.generation_run_id}:1",
+                    provider_output_id=f"{request.generation_run_id}-1",
                     width=1024,
                     height=1024,
                 ),

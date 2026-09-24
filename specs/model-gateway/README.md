@@ -13,6 +13,9 @@ provider SDK objects, or arbitrary configuration dictionaries.
 `validate_generation_result` validates the schema and requires exact generation-run, provider, model,
 output-count, ordinal, and provider-output-ID integrity. Output descriptors contain metadata only and
 are deliberately not called assets; JewelAI-owned asset ingestion and binary storage are deferred.
+`provider_output_id` is an opaque provider identifier: it starts with an ASCII letter or digit and may
+contain only ASCII letters, digits, `.`, `_`, and `-`, up to 240 characters. URLs, URIs, file paths,
+data/base64 payloads, binary content, and JewelAI asset identifiers are not valid provider output IDs.
 
 Generation lifecycle states are `pending`, `running`, `succeeded`, and `failed`, with only
 pending→running and running→succeeded/failed allowed. Lifecycle timestamps are application/worker

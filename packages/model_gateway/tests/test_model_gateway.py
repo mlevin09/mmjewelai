@@ -107,9 +107,46 @@ def test_result_rejects_invalid_output_order_and_duplicate_ids(generation_reques
         )
 
 
-def test_output_descriptor_rejects_provider_url_and_partial_dimensions():
+@pytest.mark.parametrize(
+    "provider_output_id",
+    [
+        "https://provider.example/image",
+        "http://provider.example/image",
+        "data:image/png;base64,AAAA",
+        "file:///tmp/image.png",
+        "blob:abc123",
+        "ftp://provider.example/image",
+        "gs://bucket/object",
+        "s3://bucket/object",
+        "../relative/path.png",
+        "/absolute/path.png",
+        "output/id",
+        r"output\id",
+        "id?token=abc",
+        "output id",
+    ],
+)
+def test_output_descriptor_rejects_non_opaque_provider_output_ids(provider_output_id):
     with pytest.raises(ValidationError):
-        GeneratedOutputDescriptor(ordinal=1, provider_output_id="https://provider.example/image")
+        GeneratedOutputDescriptor(ordinal=1, provider_output_id=provider_output_id)
+
+
+@pytest.mark.parametrize(
+    "provider_output_id",
+    ["output-123", "image_001", "provider.asset.v1", "ABC123", "a", "A" * 240],
+)
+def test_output_descriptor_accepts_opaque_provider_output_ids(provider_output_id):
+    descriptor = GeneratedOutputDescriptor(ordinal=1, provider_output_id=provider_output_id)
+
+    assert descriptor.provider_output_id == provider_output_id
+
+
+def test_output_descriptor_rejects_provider_output_id_over_max_length():
+    with pytest.raises(ValidationError):
+        GeneratedOutputDescriptor(ordinal=1, provider_output_id="A" * 241)
+
+
+def test_output_descriptor_rejects_partial_dimensions():
     with pytest.raises(ValidationError):
         GeneratedOutputDescriptor(ordinal=1, width=1024)
 

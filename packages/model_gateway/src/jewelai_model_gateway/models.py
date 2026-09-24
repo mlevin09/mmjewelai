@@ -23,7 +23,13 @@ ProviderRequestId = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)
 ]
 ProviderOutputId = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=240)
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=240,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$",
+    ),
 ]
 Version = Annotated[str, StringConstraints(pattern=r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")]
 
@@ -57,10 +63,6 @@ class GeneratedOutputDescriptor(GatewayModel):
     def validate_dimensions(self):
         if (self.width is None) != (self.height is None):
             raise ValueError("Provider output width and height must be supplied together")
-        if self.provider_output_id and self.provider_output_id.casefold().startswith(
-            ("http://", "https://")
-        ):
-            raise ValueError("Provider output IDs cannot be public or signed URLs")
         return self
 
 
