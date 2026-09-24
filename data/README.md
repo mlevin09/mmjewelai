@@ -11,6 +11,7 @@ Historical revisions pin artifact versions; published contents are immutable.
 - rules/: deterministic decision policies
 - knowledge-base/: sourced gemstone geometry estimates
 
-Role Profiles, Domain Dictionary, and Question Catalog now contain proposed versioned foundation
-artifacts. They are not production-authoritative catalogs; their review status and remaining domain
-decisions are documented in their specifications. The other directories remain placeholders.
+Role Profiles, Domain Dictionary, Question Catalog, and Rules Engine now contain proposed versioned
+foundation artifacts. They are not production-authoritative catalogs; their review status and
+remaining domain decisions are documented in their specifications. The Knowledge Base remains a
+placeholder.
