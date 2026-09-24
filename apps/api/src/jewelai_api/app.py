@@ -7,8 +7,10 @@ from uuid import UUID
 
 from fastapi import FastAPI, Header
 from jewelai_domain import UnknownRoleError, UnsupportedLocaleError
+from jewelai_model_gateway import GenerationRun
 from jewelai_parser import ParserProposal
 from jewelai_persistence import (
+    GenerationStateConflictError,
     NotFoundError,
     StaleRevisionError,
     create_database_engine,
@@ -19,7 +21,9 @@ from pydantic import ValidationError
 from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
+from .generation import GenerationProfileRegistry, UnknownGenerationProfileError
 from .schemas import (
+    CreateGenerationRunRequest,
     CreateMessageRequest,
     CreateOrganizationRequest,
     CreateProjectRequest,
@@ -27,6 +31,7 @@ from .schemas import (
     CreateSessionRequest,
     EvaluateRequest,
     EvaluationResponse,
+    GenerationRunListResponse,
     MessageResponse,
     OrganizationResponse,
     ParserProposalRequest,
@@ -52,12 +57,19 @@ def create_app(
     engine: Engine | None = None,
     clock: Callable[[], datetime] | None = None,
     uuid_factory: Callable[[], UUID] | None = None,
+    generation_profiles: GenerationProfileRegistry | None = None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment()
     engine = engine or create_database_engine(settings.database_url)
     artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
     repository = PersistenceRepository(create_session_factory(engine))
-    service = RuntimeService(repository, artifacts, clock=clock, uuid_factory=uuid_factory)
+    service = RuntimeService(
+        repository,
+        artifacts,
+        clock=clock,
+        uuid_factory=uuid_factory,
+        generation_profiles=generation_profiles,
+    )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
     app.state.service = service
     app.state.engine = engine
@@ -69,6 +81,14 @@ def create_app(
     @app.exception_handler(StaleRevisionError)
     async def stale_handler(_, exc):
         return _error_response(409, "stale_revision", str(exc))
+
+    @app.exception_handler(GenerationStateConflictError)
+    async def generation_state_handler(_, exc):
+        return _error_response(409, "generation_state_conflict", str(exc))
+
+    @app.exception_handler(UnknownGenerationProfileError)
+    async def generation_profile_handler(_, exc):
+        return _error_response(422, "unknown_generation_profile", str(exc))
 
     @app.exception_handler(LockedFieldConflictError)
     async def locked_handler(_, exc):
@@ -206,6 +226,34 @@ def create_app(
         organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
     ):
         return service.get_prompt_revision(session_id, prompt_revision_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/generation-runs", response_model=GenerationRun, status_code=201
+    )
+    def create_generation_run(
+        session_id: UUID,
+        request: CreateGenerationRunRequest,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.create_generation_run(session_id, organization_id, request)
+
+    @app.get("/sessions/{session_id}/generation-runs", response_model=GenerationRunListResponse)
+    def list_generation_runs(
+        session_id: UUID,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.list_generation_runs(session_id, organization_id)
+
+    @app.get(
+        "/sessions/{session_id}/generation-runs/{generation_run_id}",
+        response_model=GenerationRun,
+    )
+    def get_generation_run(
+        session_id: UUID,
+        generation_run_id: UUID,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.get_generation_run(session_id, generation_run_id, organization_id)
 
     @app.post("/sessions/{session_id}/revisions")
     def transition_revision(

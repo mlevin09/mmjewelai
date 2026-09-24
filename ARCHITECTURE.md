@@ -52,8 +52,9 @@ Existing root files are retained as V1. Foundation contracts live in `specs/`, r
 Step 2 established the modular-monolith skeleton below. `packages/domain` contains deterministic
 behavior, `packages/parser` owns the provider-neutral candidate/proposal boundary,
 `packages/prompts` owns deterministic provider-neutral prompt compilation and lock verification,
-`packages/persistence` owns SQLAlchemy/Alembic storage, and `apps/api` is the FastAPI runtime
-boundary:
+`packages/model_gateway` owns provider-neutral generation contracts, `workers/generation` owns the
+one-shot generation unit of work, `packages/persistence` owns SQLAlchemy/Alembic storage, and
+`apps/api` is the FastAPI runtime boundary:
 
 ```text
 apps/
@@ -77,9 +78,12 @@ tests/
 Applications and workers may depend on reusable packages; reusable packages must not depend on
 applications or workers. `packages/parser` depends only on the domain contract and Pydantic;
 `packages/prompts` has the same inward-only dependency boundary. `packages/domain` remains
-independent of parser, prompts, FastAPI, and SQLAlchemy. See
+independent of parser, prompts, Model Gateway, FastAPI, and SQLAlchemy. Generation is anchored to an
+immutable prompt revision; API creation never invokes a provider inline. See
 [ADR 0007](docs/adr/0007-persistence-api-runtime-boundary.md) for runtime persistence and CAS and
 [ADR 0008](docs/adr/0008-parser-proposal-boundary.md) for candidate trust and proposal acceptance.
+See [ADR 0010](docs/adr/0010-model-gateway-generation-boundary.md) for generation lifecycle,
+atomic claim, and provider-result trust.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

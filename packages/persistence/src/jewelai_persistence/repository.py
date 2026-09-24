@@ -1,9 +1,17 @@
 """Scoped repositories and atomic revision compare-and-swap."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from jewelai_domain.models import DesignRevision
+from jewelai_model_gateway import (
+    GenerationErrorCode,
+    GenerationRequest,
+    GenerationResult,
+    GenerationRun,
+    GenerationStatus,
+    validate_generation_result,
+)
 from jewelai_prompts import CompiledPrompt
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
@@ -11,6 +19,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
     DesignSessionRow,
+    GenerationRunRow,
     MessageRow,
     OrganizationRow,
     ProjectRow,
@@ -37,6 +46,10 @@ class StaleRevisionError(PersistenceError):
 
 
 class DuplicateRevisionError(PersistenceError):
+    pass
+
+
+class GenerationStateConflictError(PersistenceError):
     pass
 
 
@@ -305,6 +318,140 @@ class PersistenceRepository:
                 db.expunge(row)
             return result
 
+    def create_generation_run(self, run: GenerationRun, organization_id: UUID) -> GenerationRun:
+        run = GenerationRun.model_validate(run)
+        if run.status is not GenerationStatus.PENDING:
+            raise ValueError("A new generation run must be pending")
+        if run.attempt != 1 or run.parent_generation_run_id is not None:
+            raise ValueError("Generation Run v1 creates only initial attempt-1 runs")
+        with self._session_factory.begin() as db:
+            session = db.scalar(self._scoped_session_query(run.session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            prompt = db.scalar(
+                select(PromptRevisionRow).where(
+                    PromptRevisionRow.prompt_revision_id == run.prompt_revision_id,
+                    PromptRevisionRow.session_id == run.session_id,
+                )
+            )
+            if prompt is None:
+                raise OwnershipMismatchError(
+                    "Prompt revision does not belong to generation run session"
+                )
+            compiled = self._compiled_prompt(prompt)
+            if compiled.content_hash != run.prompt_content_hash:
+                raise ValueError("Generation run prompt hash does not match prompt revision")
+            db.add(self._generation_row(run))
+        return run
+
+    def get_generation_run(
+        self, session_id: UUID, generation_run_id: UUID, organization_id: UUID
+    ) -> GenerationRun:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(GenerationRunRow).where(
+                    GenerationRunRow.session_id == session_id,
+                    GenerationRunRow.generation_run_id == generation_run_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("Generation run not found")
+            return self._generation_run(row)
+
+    def list_generation_runs(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[GenerationRun, ...]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            rows = db.scalars(
+                select(GenerationRunRow)
+                .where(GenerationRunRow.session_id == session_id)
+                .order_by(GenerationRunRow.created_at, GenerationRunRow.generation_run_id)
+            ).all()
+            return tuple(self._generation_run(row) for row in rows)
+
+    def claim_generation_run(
+        self,
+        session_id: UUID,
+        generation_run_id: UUID,
+        organization_id: UUID,
+        started_at: datetime,
+    ) -> GenerationRun:
+        with self._session_factory.begin() as db:
+            scoped_sessions = self._scoped_session_ids(organization_id)
+            result = db.execute(
+                update(GenerationRunRow)
+                .where(
+                    GenerationRunRow.generation_run_id == generation_run_id,
+                    GenerationRunRow.session_id == session_id,
+                    GenerationRunRow.session_id.in_(scoped_sessions),
+                    GenerationRunRow.status == GenerationStatus.PENDING.value,
+                )
+                .values(status=GenerationStatus.RUNNING.value, started_at=started_at)
+            )
+            if result.rowcount != 1:
+                existing = db.scalar(
+                    select(GenerationRunRow.status).where(
+                        GenerationRunRow.generation_run_id == generation_run_id,
+                        GenerationRunRow.session_id == session_id,
+                        GenerationRunRow.session_id.in_(scoped_sessions),
+                    )
+                )
+                if existing is None:
+                    raise OwnershipMismatchError("Generation run not found in organization scope")
+                raise GenerationStateConflictError(
+                    f"Generation run cannot be claimed from {existing} status"
+                )
+            row = db.get(GenerationRunRow, generation_run_id)
+            return self._generation_run(row)
+
+    def complete_generation_run(
+        self,
+        session_id: UUID,
+        generation_run_id: UUID,
+        organization_id: UUID,
+        result: GenerationResult,
+        completed_at: datetime,
+    ) -> GenerationRun:
+        result = GenerationResult.model_validate(result)
+        with self._session_factory.begin() as db:
+            row = self._running_generation_row(db, session_id, generation_run_id, organization_id)
+            prompt = db.get(PromptRevisionRow, row.prompt_revision_id)
+            compiled = self._compiled_prompt(prompt)
+            request = GenerationRequest(
+                generation_run_id=row.generation_run_id,
+                prompt_revision_id=row.prompt_revision_id,
+                compiled_prompt=compiled,
+                provider=row.provider,
+                model=row.model,
+                configuration=row.configuration,
+            )
+            result = validate_generation_result(request, result)
+            row.status = GenerationStatus.SUCCEEDED.value
+            row.provider_request_id = result.provider_request_id
+            row.result_payload = result.model_dump(mode="json")
+            row.completed_at = completed_at
+            return self._generation_run(row)
+
+    def fail_generation_run(
+        self,
+        session_id: UUID,
+        generation_run_id: UUID,
+        organization_id: UUID,
+        error_code: GenerationErrorCode,
+        error_detail: str,
+        completed_at: datetime,
+    ) -> GenerationRun:
+        error_code = GenerationErrorCode(error_code)
+        with self._session_factory.begin() as db:
+            row = self._running_generation_row(db, session_id, generation_run_id, organization_id)
+            row.status = GenerationStatus.FAILED.value
+            row.error_code = error_code.value
+            row.error_detail = error_detail
+            row.completed_at = completed_at
+            return self._generation_run(row)
+
     def list_question_events(
         self, session_id: UUID, organization_id: UUID
     ) -> tuple[QuestionEventRow, ...]:
@@ -368,6 +515,95 @@ class PersistenceRepository:
         compiled = CompiledPrompt.model_validate(row.structured_payload)
         cls._validate_prompt_row(row, compiled)
         return compiled
+
+    @staticmethod
+    def _generation_row(run: GenerationRun) -> GenerationRunRow:
+        return GenerationRunRow(
+            generation_run_id=run.generation_run_id,
+            session_id=run.session_id,
+            prompt_revision_id=run.prompt_revision_id,
+            prompt_content_hash=run.prompt_content_hash,
+            profile_id=run.profile_id,
+            profile_version=run.profile_version,
+            provider=run.provider,
+            model=run.model,
+            configuration=run.configuration.model_dump(mode="json"),
+            status=run.status.value,
+            attempt=run.attempt,
+            parent_generation_run_id=run.parent_generation_run_id,
+            provider_request_id=None,
+            result_payload=None,
+            error_code=None,
+            error_detail=None,
+            created_at=run.created_at,
+            started_at=None,
+            completed_at=None,
+        )
+
+    @staticmethod
+    def _generation_run(row: GenerationRunRow) -> GenerationRun:
+        return GenerationRun(
+            generation_run_id=row.generation_run_id,
+            session_id=row.session_id,
+            prompt_revision_id=row.prompt_revision_id,
+            prompt_content_hash=row.prompt_content_hash,
+            profile_id=row.profile_id,
+            profile_version=row.profile_version,
+            provider=row.provider,
+            model=row.model,
+            configuration=row.configuration,
+            status=row.status,
+            attempt=row.attempt,
+            parent_generation_run_id=row.parent_generation_run_id,
+            result=row.result_payload,
+            error_code=row.error_code,
+            error_detail=row.error_detail,
+            created_at=PersistenceRepository._utc(row.created_at),
+            started_at=(
+                PersistenceRepository._utc(row.started_at) if row.started_at is not None else None
+            ),
+            completed_at=(
+                PersistenceRepository._utc(row.completed_at)
+                if row.completed_at is not None
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _utc(value: datetime) -> datetime:
+        return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+
+    def _running_generation_row(
+        self,
+        db: Session,
+        session_id: UUID,
+        generation_run_id: UUID,
+        organization_id: UUID,
+    ) -> GenerationRunRow:
+        row = db.scalar(
+            select(GenerationRunRow)
+            .where(
+                GenerationRunRow.generation_run_id == generation_run_id,
+                GenerationRunRow.session_id == session_id,
+                GenerationRunRow.session_id.in_(self._scoped_session_ids(organization_id)),
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise OwnershipMismatchError("Generation run not found in organization scope")
+        if row.status != GenerationStatus.RUNNING.value:
+            raise GenerationStateConflictError(
+                f"Generation run cannot complete from {row.status} status"
+            )
+        return row
+
+    @staticmethod
+    def _scoped_session_ids(organization_id: UUID):
+        return (
+            select(DesignSessionRow.session_id)
+            .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+            .where(ProjectRow.organization_id == organization_id)
+        )
 
     @staticmethod
     def _scoped_session_query(session_id: UUID, organization_id: UUID):

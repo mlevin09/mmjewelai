@@ -11,7 +11,9 @@ Python 3.12+ and PostgreSQL are the production-compatible target:
 ```sh
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
+python -m pip install -e './packages/model_gateway[test]'
 python -m pip install -e './packages/persistence'
+python -m pip install -e './workers/generation[test]'
 python -m pip install -e './packages/parser[test]'
 python -m pip install -e './apps/api[test]'
 export DATABASE_URL='postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai'
@@ -39,6 +41,9 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `POST /sessions/{session_id}/prompt-revisions`
 - `GET /sessions/{session_id}/prompt-revisions`
 - `GET /sessions/{session_id}/prompt-revisions/{prompt_revision_id}`
+- `POST /sessions/{session_id}/generation-runs`
+- `GET /sessions/{session_id}/generation-runs`
+- `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
 
 Session routes use `X-Organization-ID` as an explicit ownership scope. This is plumbing for future
 authenticated context, **not authentication** and not a security claim. Conversational roles never
@@ -60,14 +65,23 @@ validates the lock manifest/text/hash, rechecks current revision under the persi
 and writes one immutable prompt revision per explicit successful request. It accepts no caller prompt
 text, provider, model, transient knowledge fact, or parameters and performs no provider call.
 
+Generation-run POST accepts only a prompt revision and a server-configured versioned profile ID. It
+validates ownership and the stored prompt contract, then creates a pending run; it never invokes a
+gateway inline. No generation profile or fake provider is registered by default. Tests inject the
+`test_default@1.0.0` profile resolving to `test/deterministic-image-v1` with output count 1. The
+one-shot worker is invoked separately, claims atomically, validates untrusted result metadata, and
+does not recompile or compare against a newer current design revision.
+
 ## Verification
 
 ```sh
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
+python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-python -m ruff check apps/api packages/parser packages/prompts packages/persistence
-python -m ruff format --check apps/api packages/parser packages/prompts packages/persistence
+python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/persistence workers/generation
+python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/persistence workers/generation
 ```
 
 Set `TEST_POSTGRES_URL` to run the PostgreSQL-only concurrent CAS test. SQLite tests are portable

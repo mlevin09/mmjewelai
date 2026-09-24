@@ -13,6 +13,12 @@ prompt revisions. Relational version/text/hash metadata must match a revalidated
 payload. Prompt creation locks and checks the scoped session row before insert so a compilation whose
 source revision became stale cannot persist.
 
+The `0004_generation_runs` migration adds immutable generation input/lineage and bounded lifecycle
+metadata. Repository methods create pending runs, atomically claim pending→running with a conditional
+update, and row-lock terminal running→succeeded/failed transitions. Prompt revisions are revalidated
+on read and must belong to the same scoped session. Result payloads contain provider metadata only,
+never image bytes or long-lived URLs.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.

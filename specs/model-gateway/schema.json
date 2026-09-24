@@ -1,0 +1,673 @@
+{
+  "$defs": {
+    "CompiledPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "compiler_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Compiler Version",
+          "type": "string"
+        },
+        "template_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Template Id",
+          "type": "string"
+        },
+        "template_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Template Version",
+          "type": "string"
+        },
+        "template_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Template Artifact Version",
+          "type": "string"
+        },
+        "specification_revision_id": {
+          "format": "uuid",
+          "title": "Specification Revision Id",
+          "type": "string"
+        },
+        "design_id": {
+          "format": "uuid",
+          "title": "Design Id",
+          "type": "string"
+        },
+        "design_schema_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Design Schema Version",
+          "type": "string"
+        },
+        "prompt_text": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Prompt Text",
+          "type": "string"
+        },
+        "specification_entries": {
+          "items": {
+            "$ref": "#/$defs/SpecificationEntry"
+          },
+          "title": "Specification Entries",
+          "type": "array"
+        },
+        "locked_constraints": {
+          "items": {
+            "$ref": "#/$defs/PromptConstraint"
+          },
+          "title": "Locked Constraints",
+          "type": "array"
+        },
+        "disclosures": {
+          "items": {
+            "$ref": "#/$defs/PromptDisclosure"
+          },
+          "title": "Disclosures",
+          "type": "array"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "template_id",
+        "template_version",
+        "template_artifact_version",
+        "specification_revision_id",
+        "design_id",
+        "design_schema_version",
+        "prompt_text",
+        "specification_entries",
+        "locked_constraints",
+        "disclosures",
+        "content_hash"
+      ],
+      "title": "CompiledPrompt",
+      "type": "object"
+    },
+    "GeneratedOutputDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "ordinal": {
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "provider_output_id": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Output Id"
+        },
+        "media_type": {
+          "const": "image",
+          "default": "image",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "maximum": 32768,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Width"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "maximum": 32768,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Height"
+        }
+      },
+      "required": [
+        "ordinal"
+      ],
+      "title": "GeneratedOutputDescriptor",
+      "type": "object"
+    },
+    "GenerationConfiguration": {
+      "additionalProperties": false,
+      "properties": {
+        "output_count": {
+          "default": 1,
+          "maximum": 4,
+          "minimum": 1,
+          "title": "Output Count",
+          "type": "integer"
+        }
+      },
+      "title": "GenerationConfiguration",
+      "type": "object"
+    },
+    "GenerationErrorCode": {
+      "enum": [
+        "gateway_unavailable",
+        "gateway_timeout",
+        "provider_rejected",
+        "provider_invalid_response",
+        "gateway_contract_violation"
+      ],
+      "title": "GenerationErrorCode",
+      "type": "string"
+    },
+    "GenerationRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "generation_run_id": {
+          "format": "uuid",
+          "title": "Generation Run Id",
+          "type": "string"
+        },
+        "prompt_revision_id": {
+          "format": "uuid",
+          "title": "Prompt Revision Id",
+          "type": "string"
+        },
+        "compiled_prompt": {
+          "$ref": "#/$defs/CompiledPrompt"
+        },
+        "provider": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Model",
+          "type": "string"
+        },
+        "configuration": {
+          "$ref": "#/$defs/GenerationConfiguration"
+        }
+      },
+      "required": [
+        "generation_run_id",
+        "prompt_revision_id",
+        "compiled_prompt",
+        "provider",
+        "model",
+        "configuration"
+      ],
+      "title": "GenerationRequest",
+      "type": "object"
+    },
+    "GenerationResult": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "generation_run_id": {
+          "format": "uuid",
+          "title": "Generation Run Id",
+          "type": "string"
+        },
+        "provider": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Model",
+          "type": "string"
+        },
+        "provider_request_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Request Id"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/GeneratedOutputDescriptor"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Outputs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "generation_run_id",
+        "provider",
+        "model",
+        "outputs"
+      ],
+      "title": "GenerationResult",
+      "type": "object"
+    },
+    "GenerationRun": {
+      "additionalProperties": false,
+      "properties": {
+        "generation_run_id": {
+          "format": "uuid",
+          "title": "Generation Run Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "prompt_revision_id": {
+          "format": "uuid",
+          "title": "Prompt Revision Id",
+          "type": "string"
+        },
+        "prompt_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Prompt Content Hash",
+          "type": "string"
+        },
+        "profile_id": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Profile Id",
+          "type": "string"
+        },
+        "profile_version": {
+          "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$",
+          "title": "Profile Version",
+          "type": "string"
+        },
+        "provider": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$",
+          "title": "Model",
+          "type": "string"
+        },
+        "configuration": {
+          "$ref": "#/$defs/GenerationConfiguration"
+        },
+        "status": {
+          "$ref": "#/$defs/GenerationStatus"
+        },
+        "attempt": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "parent_generation_run_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Generation Run Id"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GenerationResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GenerationErrorCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "error_detail": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Detail"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "started_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Started At"
+        },
+        "completed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Completed At"
+        }
+      },
+      "required": [
+        "generation_run_id",
+        "session_id",
+        "prompt_revision_id",
+        "prompt_content_hash",
+        "profile_id",
+        "profile_version",
+        "provider",
+        "model",
+        "configuration",
+        "status",
+        "created_at"
+      ],
+      "title": "GenerationRun",
+      "type": "object"
+    },
+    "GenerationStatus": {
+      "enum": [
+        "pending",
+        "running",
+        "succeeded",
+        "failed"
+      ],
+      "title": "GenerationStatus",
+      "type": "string"
+    },
+    "JsonValue": {},
+    "PromptConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "concrete_target": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "applicability": {
+          "enum": [
+            "value",
+            "not_applicable"
+          ],
+          "title": "Applicability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        }
+      },
+      "required": [
+        "concrete_target",
+        "applicability"
+      ],
+      "title": "PromptConstraint",
+      "type": "object"
+    },
+    "PromptDisclosure": {
+      "additionalProperties": false,
+      "properties": {
+        "concrete_target": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "origin": {
+          "enum": [
+            "derived",
+            "assumed",
+            "not_applicable"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "uncertainty": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Uncertainty"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "sources": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PromptSourceReference"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "concrete_target",
+        "origin"
+      ],
+      "title": "PromptDisclosure",
+      "type": "object"
+    },
+    "PromptSourceReference": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "knowledge",
+            "rule"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "identifier": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Identifier",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "identifier",
+        "version"
+      ],
+      "title": "PromptSourceReference",
+      "type": "object"
+    },
+    "SpecificationEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "concrete_target": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "applicability": {
+          "enum": [
+            "value",
+            "not_applicable"
+          ],
+          "title": "Applicability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "origin": {
+          "enum": [
+            "explicit",
+            "derived",
+            "assumed"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "title": "Locked",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "concrete_target",
+        "applicability",
+        "origin",
+        "confirmed",
+        "locked"
+      ],
+      "title": "SpecificationEntry",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/GenerationRequest"
+    },
+    {
+      "$ref": "#/$defs/GenerationResult"
+    },
+    {
+      "$ref": "#/$defs/GenerationRun"
+    }
+  ]
+}

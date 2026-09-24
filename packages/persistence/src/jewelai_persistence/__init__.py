@@ -4,6 +4,7 @@ from .database import create_database_engine, create_session_factory
 from .models import Base
 from .repository import (
     DuplicateRevisionError,
+    GenerationStateConflictError,
     NotFoundError,
     OwnershipMismatchError,
     PersistenceRepository,
@@ -13,6 +14,7 @@ from .repository import (
 __all__ = [
     "Base",
     "DuplicateRevisionError",
+    "GenerationStateConflictError",
     "NotFoundError",
     "OwnershipMismatchError",
     "PersistenceRepository",

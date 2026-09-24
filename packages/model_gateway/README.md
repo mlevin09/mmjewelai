@@ -1,6 +1,18 @@
-# Model Gateway package
+# JewelAI Model Gateway
 
-Reserved for provider-neutral model interfaces and provider adapters.
+This package defines the provider-neutral Model Gateway v1 contracts. It accepts an immutable
+`CompiledPrompt`, a bounded generation configuration, and explicit provider/model identifiers. It
+contains no provider SDK, HTTP client, credential, persistence, FastAPI, worker, image bytes, or
+business-rule behavior.
 
-Step 2 establishes only the package boundary; no provider SDK or network integration is introduced here.
-Future adapters must receive validated inputs, expose model/configuration attribution, and keep provider behavior from becoming a source of domain business rules.
+`validate_generation_result` treats adapter results as untrusted. It requires exact run/provider/model
+lineage, output count agreement, and canonical ordinal ordering before a result can be persisted as
+successful. Real adapters must enforce their own bounded network timeouts; none are implemented in
+v1. Deterministic fake adapters live only in tests.
+
+```sh
+python -m jewelai_model_gateway.schema specs/model-gateway/schema.json
+python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+python -m ruff check packages/model_gateway
+python -m ruff format --check packages/model_gateway
+```
