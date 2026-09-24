@@ -474,10 +474,41 @@ def test_runtime_conflict_returns_explicit_bounded_block(
     decision = conflict_engine.evaluate(ring, "retail_client", knowledge_facts=(knowledge_fact(),))
     assert isinstance(decision, BlockDecision)
     assert decision.reason_code.value == "RULE_CONFLICT"
-    assert set(decision.conflict_rule_ids) == {
+    assert decision.conflict_rule_ids == (
         "ask_exact_center_stone_dimensions",
         "derive_center_stone_dimensions",
-    }
+    )
+
+
+def test_runtime_conflict_aggregates_three_rules_in_stable_sorted_order(
+    rules_data, roles, dictionary, questions, ring
+):
+    exact = rule(rules_data, "ask_exact_center_stone_dimensions")
+    exact["conditions"][1] = {"kind": "role_is", "role_id": "retail_client"}
+
+    third = deepcopy(exact)
+    third["rule_id"] = "block_conflicting_center_stone_dimensions"
+    third["tie_order"] = 95
+    third["conditions"].append(
+        {
+            "kind": "field_equals",
+            "target": "center_stone.shape",
+            "value": "oval",
+            "dictionary_category": "stone_shape",
+        }
+    )
+    third["action"] = {"kind": "block"}
+    rules_data["rules"].append(third)
+
+    conflict_engine = build_engine(rules_data, roles, dictionary, questions)
+    decision = conflict_engine.evaluate(ring, "retail_client", knowledge_facts=(knowledge_fact(),))
+    assert isinstance(decision, BlockDecision)
+    assert decision.reason_code.value == "RULE_CONFLICT"
+    assert decision.conflict_rule_ids == (
+        "ask_exact_center_stone_dimensions",
+        "block_conflicting_center_stone_dimensions",
+        "derive_center_stone_dimensions",
+    )
 
 
 def assumption_rule(data):

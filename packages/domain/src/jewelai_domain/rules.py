@@ -870,15 +870,22 @@ class RuleRegistry(Mapping[str, Rule]):
         return candidates[0].concrete_target if candidates else rule.target.value
 
     def _runtime_conflicts(self, rules, gaps_by_target) -> tuple[Rule, ...]:
-        for index, left in enumerate(rules):
-            left_concrete = self._concrete_target(left, gaps_by_target)
-            for right in rules[index + 1 :]:
-                if (
-                    left_concrete == self._concrete_target(right, gaps_by_target)
-                    and left.target == right.target
-                    and left.action != right.action
-                ):
-                    return (left, right)
+        grouped: dict[tuple[SchemaTarget | None, str | None], list[Rule]] = {}
+        for rule in rules:
+            key = (rule.target, self._concrete_target(rule, gaps_by_target))
+            grouped.setdefault(key, []).append(rule)
+
+        ordered_groups = sorted(
+            grouped.items(),
+            key=lambda item: (
+                item[0][0].value if item[0][0] is not None else "",
+                item[0][1] or "",
+            ),
+        )
+        for _, grouped_rules in ordered_groups:
+            actions = {rule.action.model_dump_json() for rule in grouped_rules}
+            if len(actions) > 1:
+                return tuple(sorted(grouped_rules, key=lambda rule: rule.rule_id))
         return ()
 
     def _build_trace(
