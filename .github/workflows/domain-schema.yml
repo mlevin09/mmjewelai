@@ -10,6 +10,8 @@ on:
       - data/roles/**
       - specs/dictionary/**
       - data/dictionary/**
+      - specs/questions/**
+      - data/questions/**
       - .github/workflows/domain-schema.yml
   push:
     branches: [jewelai-v2]
@@ -20,6 +22,8 @@ on:
       - data/roles/**
       - specs/dictionary/**
       - data/dictionary/**
+      - specs/questions/**
+      - data/questions/**
       - .github/workflows/domain-schema.yml
 
 permissions:

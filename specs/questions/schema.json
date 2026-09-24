@@ -1,0 +1,415 @@
+{
+  "$defs": {
+    "DictionaryAnswerContract": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "dictionary_id",
+          "default": "dictionary_id",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_type": {
+          "const": "DomainId",
+          "default": "DomainId",
+          "title": "Schema Type",
+          "type": "string"
+        },
+        "dictionary_category": {
+          "$ref": "#/$defs/DictionaryCategory"
+        }
+      },
+      "required": [
+        "dictionary_category"
+      ],
+      "title": "DictionaryAnswerContract",
+      "type": "object"
+    },
+    "DictionaryCategory": {
+      "enum": [
+        "jewelry_type",
+        "gemstone_material",
+        "stone_shape",
+        "stone_cut",
+        "stone_setting",
+        "metal_material",
+        "metal_color",
+        "metal_purity",
+        "construction",
+        "style"
+      ],
+      "title": "DictionaryCategory",
+      "type": "string"
+    },
+    "DimensionsAnswerContract": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "dimensions",
+          "default": "dimensions",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_type": {
+          "const": "Dimensions",
+          "default": "Dimensions",
+          "title": "Schema Type",
+          "type": "string"
+        },
+        "unit": {
+          "const": "mm",
+          "default": "mm",
+          "title": "Unit",
+          "type": "string"
+        },
+        "components": {
+          "default": [
+            "length",
+            "width",
+            "depth"
+          ],
+          "items": {
+            "enum": [
+              "length",
+              "width",
+              "depth"
+            ],
+            "type": "string"
+          },
+          "title": "Components",
+          "type": "array"
+        }
+      },
+      "title": "DimensionsAnswerContract",
+      "type": "object"
+    },
+    "LocalizedQuestionText": {
+      "additionalProperties": false,
+      "properties": {
+        "en": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "En",
+          "type": "string"
+        },
+        "ru": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Ru",
+          "type": "string"
+        }
+      },
+      "required": [
+        "en",
+        "ru"
+      ],
+      "title": "LocalizedQuestionText",
+      "type": "object"
+    },
+    "QuestionEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "question_id": {
+          "$ref": "#/$defs/QuestionId"
+        },
+        "target": {
+          "$ref": "#/$defs/SchemaTarget"
+        },
+        "answer_contract": {
+          "discriminator": {
+            "mapping": {
+              "dictionary_id": "#/$defs/DictionaryAnswerContract",
+              "dimensions": "#/$defs/DimensionsAnswerContract",
+              "stone_quantity": "#/$defs/StoneQuantityAnswerContract"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DictionaryAnswerContract"
+            },
+            {
+              "$ref": "#/$defs/DimensionsAnswerContract"
+            },
+            {
+              "$ref": "#/$defs/StoneQuantityAnswerContract"
+            }
+          ],
+          "title": "Answer Contract"
+        },
+        "wording": {
+          "items": {
+            "$ref": "#/$defs/RoleWording"
+          },
+          "maxItems": 6,
+          "minItems": 6,
+          "title": "Wording",
+          "type": "array"
+        },
+        "examples": {
+          "items": {
+            "$ref": "#/$defs/QuestionExample"
+          },
+          "minItems": 1,
+          "title": "Examples",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/QuestionProvenance"
+        }
+      },
+      "required": [
+        "question_id",
+        "target",
+        "answer_contract",
+        "wording",
+        "examples",
+        "provenance"
+      ],
+      "title": "QuestionEntry",
+      "type": "object"
+    },
+    "QuestionExample": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "$ref": "#/$defs/LocalizedQuestionText"
+        },
+        "dictionary_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{0,79}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dictionary Id"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "QuestionExample",
+      "type": "object"
+    },
+    "QuestionId": {
+      "enum": [
+        "CENTER_STONE_SHAPE",
+        "CENTER_STONE_DIMENSIONS",
+        "CENTER_STONE_SETTING",
+        "METAL_COLOR",
+        "SIDE_STONE_QUANTITY"
+      ],
+      "title": "QuestionId",
+      "type": "string"
+    },
+    "QuestionLocale": {
+      "enum": [
+        "en",
+        "ru"
+      ],
+      "title": "QuestionLocale",
+      "type": "string"
+    },
+    "QuestionProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "source_kind": {
+          "const": "repository_spec",
+          "default": "repository_spec",
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_ref": {
+          "const": "docs/product/issues/04-questions.md",
+          "title": "Source Ref",
+          "type": "string"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus"
+        }
+      },
+      "required": [
+        "source_ref",
+        "review_status"
+      ],
+      "title": "QuestionProvenance",
+      "type": "object"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "proposed_pending_domain_review",
+        "reviewed"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "RoleId": {
+      "enum": [
+        "retail_client",
+        "sales_manager",
+        "buyer",
+        "marketing",
+        "jewelry_designer",
+        "industrial_designer"
+      ],
+      "title": "RoleId",
+      "type": "string"
+    },
+    "RoleWording": {
+      "additionalProperties": false,
+      "properties": {
+        "role_id": {
+          "$ref": "#/$defs/RoleId"
+        },
+        "text": {
+          "$ref": "#/$defs/LocalizedQuestionText"
+        }
+      },
+      "required": [
+        "role_id",
+        "text"
+      ],
+      "title": "RoleWording",
+      "type": "object"
+    },
+    "SchemaTarget": {
+      "description": "The complete bounded target vocabulary for Question Catalog v1.",
+      "enum": [
+        "center_stone.shape",
+        "center_stone.dimensions",
+        "center_stone.setting",
+        "metal.color",
+        "side_stones[*].quantity"
+      ],
+      "title": "SchemaTarget",
+      "type": "string"
+    },
+    "StoneQuantityAnswerContract": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "stone_quantity",
+          "default": "stone_quantity",
+          "title": "Kind",
+          "type": "string"
+        },
+        "schema_type": {
+          "const": "StoneQuantity",
+          "default": "StoneQuantity",
+          "title": "Schema Type",
+          "type": "string"
+        },
+        "value": {
+          "const": "positive_integer",
+          "default": "positive_integer",
+          "title": "Value",
+          "type": "string"
+        },
+        "scopes": {
+          "default": [
+            "per_side",
+            "per_item",
+            "per_pair"
+          ],
+          "items": {
+            "enum": [
+              "per_side",
+              "per_item",
+              "per_pair"
+            ],
+            "type": "string"
+          },
+          "title": "Scopes",
+          "type": "array"
+        }
+      },
+      "title": "StoneQuantityAnswerContract",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Artifact Version",
+      "type": "string"
+    },
+    "design_schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Design Schema Version",
+      "type": "string"
+    },
+    "role_artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Role Artifact Version",
+      "type": "string"
+    },
+    "dictionary_artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Dictionary Artifact Version",
+      "type": "string"
+    },
+    "supported_locales": {
+      "default": [
+        "en",
+        "ru"
+      ],
+      "items": {
+        "$ref": "#/$defs/QuestionLocale"
+      },
+      "title": "Supported Locales",
+      "type": "array"
+    },
+    "locale_fallback": {
+      "const": "base_language_then_reject",
+      "default": "base_language_then_reject",
+      "title": "Locale Fallback",
+      "type": "string"
+    },
+    "review_status": {
+      "const": "proposed_pending_domain_review",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "source": {
+      "const": "docs/product/issues/04-questions.md",
+      "title": "Source",
+      "type": "string"
+    },
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/QuestionEntry"
+      },
+      "maxItems": 5,
+      "minItems": 5,
+      "title": "Entries",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact_version",
+    "role_artifact_version",
+    "dictionary_artifact_version",
+    "review_status",
+    "source",
+    "entries"
+  ],
+  "title": "QuestionCatalogBundle",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:question-catalog:1.0.0",
+  "description": "JewelAI Question Catalog v1. Semantic question contracts and presentation only; it contains no selection, sequencing, readiness, derivation, or authorization logic."
+}
