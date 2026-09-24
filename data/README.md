@@ -2,16 +2,17 @@
 
 This directory is reserved for reviewed non-sensitive catalogs, not application records or uploaded images.
 Each published artifact needs an explicit version, schema reference, provenance/review state and compatibility constraints.
-Validate the complete schema/role/dictionary/question/rule bundle and cross-references before accepting it.
+Validate the complete schema/role/dictionary/question/rule/prompt bundle before accepting it.
 Historical revisions pin artifact versions; published contents are immutable.
 
 - dictionary/: canonical terms and aliases
 - roles/: role profiles
 - questions/: semantic questions and wording
 - rules/: deterministic decision policies
+- prompts/: provider-neutral declarative prompt templates
 - knowledge-base/: sourced gemstone geometry estimates
 
-Role Profiles, Domain Dictionary, Question Catalog, and Rules Engine now contain proposed versioned
+Role Profiles, Domain Dictionary, Question Catalog, Rules Engine, and Prompt Compiler now contain proposed versioned
 foundation artifacts. They are not production-authoritative catalogs; their review status and
 remaining domain decisions are documented in their specifications. The Knowledge Base remains a
 placeholder.

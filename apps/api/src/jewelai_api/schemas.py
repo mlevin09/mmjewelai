@@ -18,6 +18,7 @@ from jewelai_domain import (
 )
 from jewelai_domain.models import MessageSource
 from jewelai_parser import ParserCandidate
+from jewelai_prompts import CompiledPrompt
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -64,6 +65,7 @@ class ArtifactPins(ApiModel):
     dictionary: str
     questions: str
     rules: str
+    prompts: str
 
 
 class SessionResponse(ApiModel):
@@ -93,6 +95,22 @@ class ParserProposalRequest(ApiModel):
     expected_revision_id: UUID
     message_id: UUID
     candidate: ParserCandidate
+
+
+class CreatePromptRevisionRequest(ApiModel):
+    expected_revision_id: UUID
+
+
+class PromptRevisionResponse(ApiModel):
+    prompt_revision_id: UUID
+    session_id: UUID
+    specification_revision_id: UUID
+    compiled_prompt: CompiledPrompt
+    created_at: datetime
+
+
+class PromptRevisionListResponse(ApiModel):
+    prompt_revisions: tuple[PromptRevisionResponse, ...]
 
 
 class EditRevisionRequest(ApiModel):

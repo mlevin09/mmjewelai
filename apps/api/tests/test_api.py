@@ -1,3 +1,4 @@
+import json
 from copy import deepcopy
 from pathlib import Path
 from uuid import UUID
@@ -7,6 +8,7 @@ from conftest import NOW, create_hierarchy
 from jewelai_domain import Design
 
 from jewelai_api.artifacts import ArtifactConfigurationError, load_runtime_artifacts
+from jewelai_api.schemas import EditRevisionRequest
 from jewelai_api.settings import ArtifactVersions
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -457,3 +459,191 @@ def test_parser_proposal_scope_cross_session_message_and_staleness(client):
 def test_artifact_loader_requires_explicit_existing_version():
     with pytest.raises(ArtifactConfigurationError, match="missing"):
         load_runtime_artifacts(ROOT, ArtifactVersions(rules="9.9.9"))
+    with pytest.raises(ArtifactConfigurationError, match="missing"):
+        load_runtime_artifacts(ROOT, ArtifactVersions(prompts="9.9.9"))
+
+
+def ready_design():
+    fixture = json.loads(
+        (ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json").read_text()
+    )["design"]
+
+    def unconfirm(value):
+        if isinstance(value, dict):
+            if value.get("availability") == "value":
+                value["confirmed"] = False
+                value["locked"] = False
+            for child in value.values():
+                unconfirm(child)
+        elif isinstance(value, list):
+            for child in value:
+                unconfirm(child)
+
+    unconfirm(fixture)
+    fixture["center_stone"]["dimensions"] = explicit(
+        "ready-dimensions",
+        {
+            "length": {"value": 9.1, "unit": "mm"},
+            "width": {"value": 7.2, "unit": "mm"},
+            "depth": {"value": 4.8, "unit": "mm"},
+        },
+    )
+    fixture["center_stone"]["setting"] = explicit("ready-setting", "prong_setting")
+    return fixture
+
+
+def test_prompt_compile_requires_ready_without_question_side_effect(client, app):
+    organization_id, _, response = create_hierarchy(client)
+    session = response.json()
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/prompt-revisions"
+    result = client.post(
+        url,
+        headers=headers,
+        json={"expected_revision_id": session["current_revision_id"]},
+    )
+    assert result.status_code == 409
+    assert result.json()["error"] == "specification_not_ready"
+    assert client.get(url, headers=headers).json() == {"prompt_revisions": []}
+    assert (
+        app.state.service.repository.list_question_events(
+            UUID(session["session_id"]), UUID(organization_id)
+        )
+        == ()
+    )
+    assert (
+        client.get(f"/sessions/{session['session_id']}", headers=headers).json()[
+            "current_revision_id"
+        ]
+        == session["current_revision_id"]
+    )
+
+
+def test_ready_prompt_compile_get_list_scope_and_request_strictness(client, app):
+    organization_id, _, response = create_hierarchy(client, role_id="industrial_designer")
+    session = response.json()
+    headers = {"X-Organization-ID": organization_id}
+    revisions_url = f"/sessions/{session['session_id']}/revisions"
+    edited = client.post(
+        revisions_url,
+        headers=headers,
+        json=transition(
+            "edit",
+            session["current_revision_id"],
+            design=ready_design(),
+            message_id="ready-design",
+        ),
+    )
+    assert edited.status_code == 200
+    edited = edited.json()
+    confirmed = client.post(
+        revisions_url,
+        headers=headers,
+        json=transition("confirm", edited["revision_id"], target="metal.color"),
+    ).json()
+    locked = client.post(
+        revisions_url,
+        headers=headers,
+        json=transition("lock", confirmed["revision_id"], target="metal.color"),
+    )
+    assert locked.status_code == 200
+    locked = locked.json()
+    prompt_url = f"/sessions/{session['session_id']}/prompt-revisions"
+    created = client.post(
+        prompt_url,
+        headers=headers,
+        json={"expected_revision_id": locked["revision_id"]},
+    )
+    assert created.status_code == 201
+    body = created.json()
+    compiled = body["compiled_prompt"]
+    assert body["specification_revision_id"] == locked["revision_id"]
+    assert compiled["template_artifact_version"] == "1.0.0"
+    locks = {item["concrete_target"]: item for item in compiled["locked_constraints"]}
+    assert locks["metal.color"]["value"] == "white"
+    assert "LOCKED CONSTRAINTS — MUST NOT CHANGE" in compiled["prompt_text"]
+    assert "metal.color" in compiled["prompt_text"]
+
+    listed = client.get(prompt_url, headers=headers).json()["prompt_revisions"]
+    assert listed == [body]
+    fetched = client.get(f"{prompt_url}/{body['prompt_revision_id']}", headers=headers)
+    assert fetched.status_code == 200 and fetched.json() == body
+
+    current = client.get(f"/sessions/{session['session_id']}", headers=headers).json()
+    assert current["current_revision_id"] == locked["revision_id"]
+    assert current["artifacts"]["prompts"] == "1.0.0"
+    assert (
+        app.state.service.repository.list_question_events(
+            UUID(session["session_id"]), UUID(organization_id)
+        )
+        == ()
+    )
+
+    bad = client.post(
+        prompt_url,
+        headers=headers,
+        json={
+            "expected_revision_id": locked["revision_id"],
+            "prompt_text": "caller-controlled",
+            "provider": "forbidden",
+        },
+    )
+    assert bad.status_code == 422
+    stale = client.post(
+        prompt_url,
+        headers=headers,
+        json={"expected_revision_id": session["current_revision_id"]},
+    )
+    assert stale.status_code == 409
+
+    foreign = client.post("/organizations", json={"name": "Foreign prompt reader"}).json()
+    denied = client.get(
+        f"{prompt_url}/{body['prompt_revision_id']}",
+        headers={"X-Organization-ID": foreign["organization_id"]},
+    )
+    assert denied.status_code == 404
+
+
+def test_prompt_compile_rechecks_current_revision_before_persistence(client, app):
+    organization_id, _, response = create_hierarchy(client)
+    session = response.json()
+    headers = {"X-Organization-ID": organization_id}
+    revisions_url = f"/sessions/{session['session_id']}/revisions"
+    edited = client.post(
+        revisions_url,
+        headers=headers,
+        json=transition(
+            "edit",
+            session["current_revision_id"],
+            design=ready_design(),
+            message_id="ready-for-race",
+        ),
+    ).json()
+
+    def advance_revision():
+        design = deepcopy(edited["design"])
+        design["center_stone"]["cut"] = explicit("concurrent-cut", "step_cut")
+        app.state.service.transition_revision(
+            UUID(session["session_id"]),
+            UUID(organization_id),
+            EditRevisionRequest.model_validate(
+                transition(
+                    "edit",
+                    edited["revision_id"],
+                    design=design,
+                    message_id="concurrent-write",
+                )
+            ),
+        )
+
+    app.state.service._before_prompt_persist = advance_revision
+    prompt_url = f"/sessions/{session['session_id']}/prompt-revisions"
+    result = client.post(
+        prompt_url,
+        headers=headers,
+        json={"expected_revision_id": edited["revision_id"]},
+    )
+    app.state.service._before_prompt_persist = None
+    assert result.status_code == 409
+    assert result.json()["error"] == "stale_revision"
+    assert client.get(prompt_url, headers=headers).json() == {"prompt_revisions": []}

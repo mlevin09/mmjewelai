@@ -11,6 +11,7 @@ class ArtifactVersions:
     dictionary: str = "1.0.0"
     questions: str = "1.0.0"
     rules: str = "1.0.0"
+    prompts: str = "1.0.0"
 
 
 @dataclass(frozen=True)
@@ -30,5 +31,6 @@ class RuntimeSettings:
                 dictionary=os.getenv("DICTIONARY_ARTIFACT_VERSION", "1.0.0"),
                 questions=os.getenv("QUESTION_ARTIFACT_VERSION", "1.0.0"),
                 rules=os.getenv("RULES_ARTIFACT_VERSION", "1.0.0"),
+                prompts=os.getenv("PROMPT_ARTIFACT_VERSION", "1.0.0"),
             ),
         )

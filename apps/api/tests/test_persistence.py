@@ -2,6 +2,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from alembic import command
@@ -17,6 +18,8 @@ from jewelai_persistence import (
     create_database_engine,
     create_session_factory,
 )
+from jewelai_persistence.models import PromptRevisionRow
+from jewelai_prompts import compile_prompt
 from sqlalchemy import inspect
 
 from jewelai_api.artifacts import load_runtime_artifacts
@@ -88,6 +91,7 @@ def test_persistence_round_trip_lineage_pins_and_scope(engine):
         "dictionary": "1.0.0",
         "questions": "1.0.0",
         "rules": "1.0.0",
+        "prompts": "1.0.0",
     }
 
     updated = next_revision(current, "oval")
@@ -190,12 +194,95 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "message",
         "organization",
         "project",
+        "prompt_revision",
         "question_event",
         "specification_revision",
+    }
+    assert "prompt_artifact_version" in {
+        column["name"] for column in inspect(engine).get_columns("design_session")
     }
     command.downgrade(config, "base")
     assert inspect(engine).get_table_names() == ["alembic_version"]
     engine.dispose()
+
+
+def test_prompt_revision_round_trip_immutability_and_scope(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    current = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+    compiled = compile_prompt(current, service.artifacts.prompts)
+
+    def row(identifier):
+        return PromptRevisionRow(
+            prompt_revision_id=identifier,
+            session_id=session.session_id,
+            specification_revision_id=current.revision_id,
+            prompt_schema_version=compiled.schema_version,
+            compiler_version=compiled.compiler_version,
+            template_id=compiled.template_id,
+            template_version=compiled.template_version,
+            template_artifact_version=compiled.template_artifact_version,
+            compiled_text=compiled.prompt_text,
+            structured_payload=compiled.model_dump(mode="json"),
+            content_hash=compiled.content_hash,
+            created_at=NOW,
+        )
+
+    first_id = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+    second_id = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+    service.repository.create_prompt_revision(
+        row(first_id), compiled, organization.organization_id, current.revision_id
+    )
+    service.repository.create_prompt_revision(
+        row(second_id), compiled, organization.organization_id, current.revision_id
+    )
+    stored, restored = service.repository.get_prompt_revision(
+        session.session_id, first_id, organization.organization_id
+    )
+    assert restored == compiled
+    assert stored.compiled_text == compiled.prompt_text
+    assert stored.content_hash == compiled.content_hash
+    assert [
+        item[0].prompt_revision_id
+        for item in service.repository.list_prompt_revisions(
+            session.session_id, organization.organization_id
+        )
+    ] == [first_id, second_id]
+
+    foreign = service.create_organization("Foreign prompt owner")
+    with pytest.raises(OwnershipMismatchError):
+        service.repository.get_prompt_revision(
+            session.session_id, first_id, foreign.organization_id
+        )
+
+    foreign_organization, _, foreign_session = create_persisted_session(service)
+    foreign_current = service.repository.get_current_revision(
+        foreign_session.session_id, foreign_organization.organization_id
+    )
+    foreign_compiled = compile_prompt(foreign_current, service.artifacts.prompts)
+    mismatched = PromptRevisionRow(
+        prompt_revision_id=UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+        session_id=session.session_id,
+        specification_revision_id=foreign_current.revision_id,
+        prompt_schema_version=foreign_compiled.schema_version,
+        compiler_version=foreign_compiled.compiler_version,
+        template_id=foreign_compiled.template_id,
+        template_version=foreign_compiled.template_version,
+        template_artifact_version=foreign_compiled.template_artifact_version,
+        compiled_text=foreign_compiled.prompt_text,
+        structured_payload=foreign_compiled.model_dump(mode="json"),
+        content_hash=foreign_compiled.content_hash,
+        created_at=NOW,
+    )
+    with pytest.raises(OwnershipMismatchError, match="does not belong"):
+        service.repository.create_prompt_revision(
+            mismatched,
+            foreign_compiled,
+            organization.organization_id,
+            current.revision_id,
+        )
 
 
 @pytest.mark.postgres

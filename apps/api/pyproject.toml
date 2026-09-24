@@ -13,6 +13,7 @@ dependencies = [
   "jewelai-domain==1.0.0",
   "jewelai-parser==1.0.0",
   "jewelai-persistence==1.0.0",
+  "jewelai-prompts==1.0.0",
   "psycopg[binary]>=3.2,<4",
   "sqlalchemy>=2.0.43,<3",
   "uvicorn>=0.35,<1",

@@ -56,6 +56,7 @@ class DesignSessionRow(Base):
     dictionary_artifact_version: Mapped[str] = mapped_column(String(32))
     question_artifact_version: Mapped[str] = mapped_column(String(32))
     rules_artifact_version: Mapped[str] = mapped_column(String(32))
+    prompt_artifact_version: Mapped[str] = mapped_column(String(32))
 
 
 class SpecificationRevisionRow(Base):
@@ -114,4 +115,26 @@ class QuestionEventRow(Base):
     decision: Mapped[str] = mapped_column(String(32))
     reason_code: Mapped[str] = mapped_column(String(100))
     trace_payload: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PromptRevisionRow(Base):
+    __tablename__ = "prompt_revision"
+    __table_args__ = (Index("ix_prompt_revision_session_created", "session_id", "created_at"),)
+
+    prompt_revision_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    specification_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"), index=True
+    )
+    prompt_schema_version: Mapped[str] = mapped_column(String(32))
+    compiler_version: Mapped[str] = mapped_column(String(32))
+    template_id: Mapped[str] = mapped_column(String(80))
+    template_version: Mapped[str] = mapped_column(String(32))
+    template_artifact_version: Mapped[str] = mapped_column(String(32))
+    compiled_text: Mapped[str] = mapped_column(String)
+    structured_payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
