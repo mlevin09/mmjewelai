@@ -1,0 +1,599 @@
+{
+  "$defs": {
+    "AllRequiredSatisfiedCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "all_required_targets_satisfied",
+          "default": "all_required_targets_satisfied",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "AllRequiredSatisfiedCondition",
+      "type": "object"
+    },
+    "AskAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "ask",
+          "default": "ask",
+          "title": "Kind",
+          "type": "string"
+        },
+        "question_id": {
+          "$ref": "#/$defs/QuestionId"
+        }
+      },
+      "required": [
+        "question_id"
+      ],
+      "title": "AskAction",
+      "type": "object"
+    },
+    "AssumeAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "assume",
+          "default": "assume",
+          "title": "Kind",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Value",
+          "type": "string"
+        },
+        "dictionary_category": {
+          "$ref": "#/$defs/DictionaryCategory"
+        },
+        "rationale": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "dictionary_category",
+        "rationale",
+        "recorded_at"
+      ],
+      "title": "AssumeAction",
+      "type": "object"
+    },
+    "BlockAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "block",
+          "default": "block",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "BlockAction",
+      "type": "object"
+    },
+    "DerivationMode": {
+      "enum": [
+        "sourced_with_uncertainty",
+        "request_exact_when_required"
+      ],
+      "title": "DerivationMode",
+      "type": "string"
+    },
+    "DeriveAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "derive",
+          "default": "derive",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "DeriveAction",
+      "type": "object"
+    },
+    "DictionaryCategory": {
+      "enum": [
+        "jewelry_type",
+        "gemstone_material",
+        "stone_shape",
+        "stone_cut",
+        "stone_setting",
+        "metal_material",
+        "metal_color",
+        "metal_purity",
+        "construction",
+        "style"
+      ],
+      "title": "DictionaryCategory",
+      "type": "string"
+    },
+    "FieldEqualsCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "field_equals",
+          "default": "field_equals",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "enum": [
+            "center_stone.shape",
+            "center_stone.setting",
+            "metal.color"
+          ],
+          "title": "Target",
+          "type": "string"
+        },
+        "value": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Value",
+          "type": "string"
+        },
+        "dictionary_category": {
+          "$ref": "#/$defs/DictionaryCategory"
+        }
+      },
+      "required": [
+        "target",
+        "value",
+        "dictionary_category"
+      ],
+      "title": "FieldEqualsCondition",
+      "type": "object"
+    },
+    "GapState": {
+      "enum": [
+        "absent",
+        "unknown",
+        "unsatisfied",
+        "satisfied"
+      ],
+      "title": "GapState",
+      "type": "string"
+    },
+    "KnowledgeFactCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "compatible_knowledge_fact",
+          "default": "compatible_knowledge_fact",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "const": "center_stone.dimensions",
+          "title": "Target",
+          "type": "string"
+        },
+        "exists": {
+          "title": "Exists",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target",
+        "exists"
+      ],
+      "title": "KnowledgeFactCondition",
+      "type": "object"
+    },
+    "LockedUpdateConflictCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "locked_update_conflict",
+          "default": "locked_update_conflict",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "const": "metal.color",
+          "title": "Target",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "title": "LockedUpdateConflictCondition",
+      "type": "object"
+    },
+    "QuestionId": {
+      "enum": [
+        "CENTER_STONE_SHAPE",
+        "CENTER_STONE_DIMENSIONS",
+        "CENTER_STONE_SETTING",
+        "METAL_COLOR",
+        "SIDE_STONE_QUANTITY"
+      ],
+      "title": "QuestionId",
+      "type": "string"
+    },
+    "ReadyAction": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "ready",
+          "default": "ready",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "title": "ReadyAction",
+      "type": "object"
+    },
+    "ReasonCode": {
+      "enum": [
+        "MISSING_REQUIRED_FIELD",
+        "EXACT_MEASUREMENT_REQUIRED",
+        "SOURCED_DERIVATION_AVAILABLE",
+        "NO_VALID_KB_MATCH",
+        "LOCKED_FIELD_CONFLICT",
+        "ALL_REQUIRED_FIELDS_SATISFIED",
+        "APPROVED_ASSUMPTION",
+        "RULE_CONFLICT",
+        "NO_VALID_DECISION"
+      ],
+      "title": "ReasonCode",
+      "type": "string"
+    },
+    "ReviewStatus": {
+      "enum": [
+        "proposed_pending_domain_review",
+        "reviewed"
+      ],
+      "title": "ReviewStatus",
+      "type": "string"
+    },
+    "RoleCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "role_is",
+          "default": "role_is",
+          "title": "Kind",
+          "type": "string"
+        },
+        "role_id": {
+          "$ref": "#/$defs/RoleId"
+        }
+      },
+      "required": [
+        "role_id"
+      ],
+      "title": "RoleCondition",
+      "type": "object"
+    },
+    "RoleDerivationCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "role_derivation_mode",
+          "default": "role_derivation_mode",
+          "title": "Kind",
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/DerivationMode"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "RoleDerivationCondition",
+      "type": "object"
+    },
+    "RoleId": {
+      "enum": [
+        "retail_client",
+        "sales_manager",
+        "buyer",
+        "marketing",
+        "jewelry_designer",
+        "industrial_designer"
+      ],
+      "title": "RoleId",
+      "type": "string"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SchemaTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "conditions": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "all_required_targets_satisfied": "#/$defs/AllRequiredSatisfiedCondition",
+                "compatible_knowledge_fact": "#/$defs/KnowledgeFactCondition",
+                "field_equals": "#/$defs/FieldEqualsCondition",
+                "locked_update_conflict": "#/$defs/LockedUpdateConflictCondition",
+                "role_derivation_mode": "#/$defs/RoleDerivationCondition",
+                "role_is": "#/$defs/RoleCondition",
+                "target_state": "#/$defs/TargetStateCondition"
+              },
+              "propertyName": "kind"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/TargetStateCondition"
+              },
+              {
+                "$ref": "#/$defs/RoleCondition"
+              },
+              {
+                "$ref": "#/$defs/RoleDerivationCondition"
+              },
+              {
+                "$ref": "#/$defs/KnowledgeFactCondition"
+              },
+              {
+                "$ref": "#/$defs/LockedUpdateConflictCondition"
+              },
+              {
+                "$ref": "#/$defs/FieldEqualsCondition"
+              },
+              {
+                "$ref": "#/$defs/AllRequiredSatisfiedCondition"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Conditions",
+          "type": "array"
+        },
+        "action": {
+          "discriminator": {
+            "mapping": {
+              "ask": "#/$defs/AskAction",
+              "assume": "#/$defs/AssumeAction",
+              "block": "#/$defs/BlockAction",
+              "derive": "#/$defs/DeriveAction",
+              "ready": "#/$defs/ReadyAction"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AskAction"
+            },
+            {
+              "$ref": "#/$defs/DeriveAction"
+            },
+            {
+              "$ref": "#/$defs/AssumeAction"
+            },
+            {
+              "$ref": "#/$defs/BlockAction"
+            },
+            {
+              "$ref": "#/$defs/ReadyAction"
+            }
+          ],
+          "title": "Action"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "depends_on": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z][a-z0-9_]{0,79}$",
+            "type": "string"
+          },
+          "title": "Depends On",
+          "type": "array"
+        },
+        "provenance": {
+          "$ref": "#/$defs/RuleProvenance"
+        }
+      },
+      "required": [
+        "rule_id",
+        "rule_version",
+        "priority",
+        "tie_order",
+        "target",
+        "conditions",
+        "action",
+        "reason_code",
+        "reason",
+        "provenance"
+      ],
+      "title": "Rule",
+      "type": "object"
+    },
+    "RuleProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "source_kind": {
+          "const": "repository_spec",
+          "default": "repository_spec",
+          "title": "Source Kind",
+          "type": "string"
+        },
+        "source_ref": {
+          "const": "docs/product/issues/05-rules.md",
+          "title": "Source Ref",
+          "type": "string"
+        },
+        "review_status": {
+          "$ref": "#/$defs/ReviewStatus"
+        }
+      },
+      "required": [
+        "source_ref",
+        "review_status"
+      ],
+      "title": "RuleProvenance",
+      "type": "object"
+    },
+    "SchemaTarget": {
+      "description": "The complete bounded target vocabulary for Question Catalog v1.",
+      "enum": [
+        "center_stone.shape",
+        "center_stone.dimensions",
+        "center_stone.setting",
+        "metal.color",
+        "side_stones[*].quantity"
+      ],
+      "title": "SchemaTarget",
+      "type": "string"
+    },
+    "TargetStateCondition": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "target_state",
+          "default": "target_state",
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/SchemaTarget"
+        },
+        "states": {
+          "items": {
+            "$ref": "#/$defs/GapState"
+          },
+          "minItems": 1,
+          "title": "States",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target",
+        "states"
+      ],
+      "title": "TargetStateCondition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Artifact Version",
+      "type": "string"
+    },
+    "design_schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Design Schema Version",
+      "type": "string"
+    },
+    "role_artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Role Artifact Version",
+      "type": "string"
+    },
+    "dictionary_artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Dictionary Artifact Version",
+      "type": "string"
+    },
+    "question_artifact_version": {
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "title": "Question Artifact Version",
+      "type": "string"
+    },
+    "review_status": {
+      "const": "proposed_pending_domain_review",
+      "title": "Review Status",
+      "type": "string"
+    },
+    "source": {
+      "const": "docs/product/issues/05-rules.md",
+      "title": "Source",
+      "type": "string"
+    },
+    "required_targets": {
+      "items": {
+        "$ref": "#/$defs/SchemaTarget"
+      },
+      "title": "Required Targets",
+      "type": "array"
+    },
+    "rules": {
+      "items": {
+        "$ref": "#/$defs/Rule"
+      },
+      "minItems": 1,
+      "title": "Rules",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifact_version",
+    "role_artifact_version",
+    "dictionary_artifact_version",
+    "question_artifact_version",
+    "review_status",
+    "source",
+    "required_targets",
+    "rules"
+  ],
+  "title": "RulesBundle",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:rules:1.0.0",
+  "description": "JewelAI Rules Engine v1 declarative artifact. The bounded Python interpreter owns evaluation; catalogs contain no executable expressions or user-facing wording."
+}

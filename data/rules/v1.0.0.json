@@ -1,0 +1,231 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_version": "1.0.0",
+  "design_schema_version": "1.0.0",
+  "role_artifact_version": "1.0.0",
+  "dictionary_artifact_version": "1.0.0",
+  "question_artifact_version": "1.0.0",
+  "review_status": "proposed_pending_domain_review",
+  "source": "docs/product/issues/05-rules.md",
+  "required_targets": [
+    "center_stone.shape",
+    "center_stone.dimensions",
+    "center_stone.setting",
+    "metal.color",
+    "side_stones[*].quantity"
+  ],
+  "rules": [
+    {
+      "rule_id": "block_locked_metal_conflict",
+      "rule_version": "1.0.0",
+      "priority": 1000,
+      "tie_order": 10,
+      "target": "metal.color",
+      "conditions": [
+        {"kind": "locked_update_conflict", "target": "metal.color"}
+      ],
+      "action": {"kind": "block"},
+      "reason_code": "LOCKED_FIELD_CONFLICT",
+      "reason": "The proposed metal-color update conflicts with a confirmed locked value.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ask_center_stone_shape",
+      "rule_version": "1.0.0",
+      "priority": 900,
+      "tie_order": 20,
+      "target": "center_stone.shape",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "center_stone.shape",
+          "states": ["absent", "unknown", "unsatisfied"]
+        }
+      ],
+      "action": {"kind": "ask", "question_id": "CENTER_STONE_SHAPE"},
+      "reason_code": "MISSING_REQUIRED_FIELD",
+      "reason": "The proposed v1 required center-stone shape is not satisfied.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ask_exact_center_stone_dimensions",
+      "rule_version": "1.0.0",
+      "priority": 800,
+      "tie_order": 30,
+      "target": "center_stone.dimensions",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "center_stone.dimensions",
+          "states": ["absent", "unknown", "unsatisfied"]
+        },
+        {
+          "kind": "role_derivation_mode",
+          "mode": "request_exact_when_required"
+        }
+      ],
+      "action": {"kind": "ask", "question_id": "CENTER_STONE_DIMENSIONS"},
+      "reason_code": "EXACT_MEASUREMENT_REQUIRED",
+      "reason": "This role requires exact center-stone dimensions rather than an estimate.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "derive_center_stone_dimensions",
+      "rule_version": "1.0.0",
+      "priority": 800,
+      "tie_order": 40,
+      "target": "center_stone.dimensions",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "center_stone.dimensions",
+          "states": ["absent", "unknown", "unsatisfied"]
+        },
+        {
+          "kind": "role_derivation_mode",
+          "mode": "sourced_with_uncertainty"
+        },
+        {
+          "kind": "compatible_knowledge_fact",
+          "target": "center_stone.dimensions",
+          "exists": true
+        }
+      ],
+      "action": {"kind": "derive"},
+      "reason_code": "SOURCED_DERIVATION_AVAILABLE",
+      "reason": "A supplied sourced fact exactly matches the bounded v1 context.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ask_center_stone_dimensions_without_fact",
+      "rule_version": "1.0.0",
+      "priority": 800,
+      "tie_order": 50,
+      "target": "center_stone.dimensions",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "center_stone.dimensions",
+          "states": ["absent", "unknown", "unsatisfied"]
+        },
+        {
+          "kind": "role_derivation_mode",
+          "mode": "sourced_with_uncertainty"
+        },
+        {
+          "kind": "compatible_knowledge_fact",
+          "target": "center_stone.dimensions",
+          "exists": false
+        }
+      ],
+      "action": {"kind": "ask", "question_id": "CENTER_STONE_DIMENSIONS"},
+      "reason_code": "NO_VALID_KB_MATCH",
+      "reason": "No compatible sourced fact was supplied, so exact dimensions must be requested.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ask_center_stone_setting",
+      "rule_version": "1.0.0",
+      "priority": 700,
+      "tie_order": 60,
+      "target": "center_stone.setting",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "center_stone.setting",
+          "states": ["absent", "unknown", "unsatisfied"]
+        }
+      ],
+      "action": {"kind": "ask", "question_id": "CENTER_STONE_SETTING"},
+      "reason_code": "MISSING_REQUIRED_FIELD",
+      "reason": "The proposed v1 required center-stone setting is not satisfied.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ask_metal_color",
+      "rule_version": "1.0.0",
+      "priority": 600,
+      "tie_order": 70,
+      "target": "metal.color",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "metal.color",
+          "states": ["absent", "unknown", "unsatisfied"]
+        }
+      ],
+      "action": {"kind": "ask", "question_id": "METAL_COLOR"},
+      "reason_code": "MISSING_REQUIRED_FIELD",
+      "reason": "The proposed v1 required metal color is not satisfied.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ask_side_stone_quantity",
+      "rule_version": "1.0.0",
+      "priority": 500,
+      "tie_order": 80,
+      "target": "side_stones[*].quantity",
+      "conditions": [
+        {
+          "kind": "target_state",
+          "target": "side_stones[*].quantity",
+          "states": ["absent", "unknown", "unsatisfied"]
+        }
+      ],
+      "action": {"kind": "ask", "question_id": "SIDE_STONE_QUANTITY"},
+      "reason_code": "MISSING_REQUIRED_FIELD",
+      "reason": "An existing side-stone group has no satisfied quantity.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "rule_id": "ready_when_required_targets_satisfied",
+      "rule_version": "1.0.0",
+      "priority": 0,
+      "tie_order": 90,
+      "target": null,
+      "conditions": [
+        {"kind": "all_required_targets_satisfied"}
+      ],
+      "action": {"kind": "ready"},
+      "reason_code": "ALL_REQUIRED_FIELDS_SATISFIED",
+      "reason": "All targets in the proposed Rules v1 requiredness scope are satisfied.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/05-rules.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    }
+  ]
+}
