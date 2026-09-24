@@ -81,6 +81,19 @@ class SpecificationRevisionRow(Base):
     snapshot: Mapped[dict] = mapped_column(JSON)
 
 
+class MessageRow(Base):
+    __tablename__ = "message"
+    __table_args__ = (Index("ix_message_session_created", "session_id", "created_at"),)
+
+    message_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    actor: Mapped[str] = mapped_column(String(32))
+    content: Mapped[str] = mapped_column(String(4000))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class QuestionEventRow(Base):
     __tablename__ = "question_event"
     __table_args__ = (Index("ix_question_event_session_created", "session_id", "created_at"),)

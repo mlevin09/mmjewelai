@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-parser"
+version = "1.0.0"
+description = "Provider-neutral deterministic Parser Proposal boundary for JewelAI V2"
+requires-python = ">=3.12"
+dependencies = ["jewelai-domain==1.0.0", "pydantic>=2.11,<3"]
+
+[project.optional-dependencies]
+test = ["jsonschema>=4.23,<5", "pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jewelai_parser"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
