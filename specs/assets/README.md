@@ -14,8 +14,9 @@ not part of public API responses.
 Ingestion persists pending metadata, performs a create-only private object write, verifies returned
 metadata, then transitions to ready or a typed failed state. PostgreSQL and object storage are not a
 distributed transaction; a crash can leave a pending row for future reconciliation. Reconciliation,
-retention/deletion, transformations, production GCS, provider output transport, uploads/downloads,
-and signed access are deferred.
+retention/deletion, transformations, provider output transport, and HTTP upload/download endpoints
+are deferred. The production GCS adapter and provider-neutral signed-read contract are separate from
+Asset metadata; see [Asset Access v1](../asset-access/README.md).
 
 ```sh
 python -m jewelai_assets.schema specs/assets/schema.json

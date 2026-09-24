@@ -849,6 +849,7 @@ def test_asset_metadata_api_is_scoped_ordered_and_redacts_storage_details(client
     assert single.json() == payload["assets"][0]
     forbidden_fields = {"object_key", "bucket", "url", "bytes", "provider_output_id"}
     assert forbidden_fields.isdisjoint(single.json())
+    assert "/sessions/{session_id}/assets/{asset_id}/access" not in client.app.openapi()["paths"]
 
     foreign = client.post("/organizations", json={"name": "Foreign asset reader"}).json()
     denied = client.get(

@@ -76,9 +76,10 @@ one-shot worker is invoked separately, claims atomically, validates untrusted re
 does not recompile or compare against a newer current design revision.
 
 Asset endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets, and
-URLs. Asset ingestion is an internal reusable boundary in `packages/assets`; this API exposes no
-binary upload/download and registers no object store. Authentication, production GCS, signed access,
-retention, and reconciliation remain unimplemented.
+URLs. Asset ingestion and signed-read contracts are internal reusable boundaries in `packages/assets`;
+the production GCS adapter is isolated in `packages/assets_gcs`. This API exposes no binary
+upload/download, registers no object store or signer, and has no route that issues signed URLs.
+Authentication, authenticated asset access, retention, and reconciliation remain unimplemented.
 
 ## Verification
 
@@ -87,10 +88,11 @@ python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
 python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
+python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/persistence workers/generation
-python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/persistence workers/generation
+python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/assets_gcs packages/persistence workers/generation
 ```
 
 Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim, and

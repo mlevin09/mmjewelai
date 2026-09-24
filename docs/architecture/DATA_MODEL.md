@@ -24,5 +24,7 @@ A lock is independent of provenance. Unknown cannot silently become assumed; inf
 Concurrent state writes require revision checks. Jobs require idempotency and bounded retries before deployment.
 All foreign-key ownership checks must prevent cross-tenant access.
 
-Binary assets belong in GCS; PostgreSQL contains metadata and object identifiers, not image bytes or long-lived public URLs.
+Binary assets belong in private GCS; PostgreSQL contains metadata and object identifiers, not image
+bytes or signed URLs. Temporary read URLs are ephemeral bearer capabilities and are never durable
+model state.
 Local repository data/ contains non-sensitive versioned catalogs only.

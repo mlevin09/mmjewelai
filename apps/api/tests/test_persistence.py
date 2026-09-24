@@ -631,6 +631,7 @@ def test_reference_ingestion_uses_persistence_port_and_private_store(engine):
     assert store.objects[result.object_key][0] == PNG
     assert store.write_count == 1
     assert "content" not in AssetRow.__table__.columns
+    assert "signed_url" not in AssetRow.__table__.columns
 
 
 def test_generated_asset_requires_exact_succeeded_output_and_is_unique(engine):
