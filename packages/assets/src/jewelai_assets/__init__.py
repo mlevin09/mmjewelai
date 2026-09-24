@@ -1,5 +1,16 @@
 """Private Asset v1 contracts and ingestion boundary."""
 
+from .access import (
+    ASSET_ACCESS_SCHEMA_VERSION,
+    AssetAccessContractError,
+    AssetAccessError,
+    AssetAccessPolicy,
+    AssetAccessUnavailableError,
+    AssetNotReadyError,
+    PrivateObjectAccessSigner,
+    SignedAssetReadAccess,
+    issue_asset_read_access,
+)
 from .ingestion import (
     AssetConflictError,
     AssetContentRejectedError,
@@ -26,8 +37,13 @@ from .models import (
 from .storage import AssetStorageConflictError, AssetStorageError, PrivateObjectStore
 
 __all__ = [
+    "ASSET_ACCESS_SCHEMA_VERSION",
     "ASSET_SCHEMA_VERSION",
     "Asset",
+    "AssetAccessContractError",
+    "AssetAccessError",
+    "AssetAccessPolicy",
+    "AssetAccessUnavailableError",
     "AssetConflictError",
     "AssetContentRejectedError",
     "AssetContentType",
@@ -38,14 +54,18 @@ __all__ = [
     "AssetKind",
     "AssetLineageError",
     "AssetMetadataRepository",
+    "AssetNotReadyError",
     "AssetStatus",
     "AssetStorageConflictError",
     "AssetStorageError",
     "PrivateObjectStore",
+    "PrivateObjectAccessSigner",
+    "SignedAssetReadAccess",
     "StoredObject",
     "build_object_key",
     "content_metadata",
     "detect_content_type",
     "ingest_asset",
+    "issue_asset_read_access",
     "validate_asset_object_key",
 ]

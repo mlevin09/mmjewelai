@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "AssetAccessPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "default_ttl_seconds": {
+          "default": 300,
+          "maximum": 900,
+          "minimum": 1,
+          "title": "Default Ttl Seconds",
+          "type": "integer"
+        },
+        "max_ttl_seconds": {
+          "default": 900,
+          "maximum": 900,
+          "minimum": 1,
+          "title": "Max Ttl Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "AssetAccessPolicy",
+      "type": "object"
+    },
+    "AssetContentType": {
+      "enum": [
+        "image/png",
+        "image/jpeg",
+        "image/webp"
+      ],
+      "title": "AssetContentType",
+      "type": "string"
+    },
+    "SignedAssetReadAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "asset_id": {
+          "format": "uuid",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "method": {
+          "const": "GET",
+          "default": "GET",
+          "title": "Method",
+          "type": "string"
+        },
+        "url": {
+          "maxLength": 8192,
+          "minLength": 1,
+          "pattern": "^https://[^\\s]+$",
+          "title": "Url",
+          "type": "string"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "content_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssetContentType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "asset_id",
+        "url",
+        "expires_at"
+      ],
+      "title": "SignedAssetReadAccess",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/AssetAccessPolicy"
+    },
+    {
+      "$ref": "#/$defs/SignedAssetReadAccess"
+    }
+  ]
+}
