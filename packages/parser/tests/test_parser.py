@@ -14,7 +14,13 @@ from jewelai_domain.dictionary import (
     ResolvedMatch,
     load_domain_dictionary,
 )
-from jewelai_domain.models import Design, DesignRevision, MessageSource, RevisionEvent
+from jewelai_domain.models import (
+    Design,
+    DesignRevision,
+    MessageSource,
+    NotApplicable,
+    RevisionEvent,
+)
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
@@ -209,6 +215,48 @@ def test_locked_values_are_preserved_and_equal_values_are_noops(dictionary):
     assert not same.issues
     assert not same.has_changes
     assert same.proposed_design == current.design
+
+
+def test_not_applicable_field_cannot_be_silently_replaced(dictionary):
+    original_source = MessageSource(message_id="not-applicable", recorded_at=NOW)
+    original = NotApplicable(
+        reason="The design intentionally has no center stone shape.",
+        source=original_source,
+        locked=True,
+    )
+    current = revision(Design(center_stone={"shape": original}))
+
+    result = proposal(current, [term("center_stone.shape", "oval")], dictionary)
+
+    assert [issue.code for issue in result.issues] == [ParserIssueCode.NOT_APPLICABLE_CONFLICT]
+    assert not result.has_changes
+    assert not result.accepted_updates
+    assert isinstance(result.proposed_design.center_stone.shape, NotApplicable)
+    assert result.proposed_design.center_stone.shape == original
+    assert result.proposed_design.center_stone.shape.source == original_source
+    assert result.proposed_design.center_stone.shape.confirmed
+    assert result.proposed_design.center_stone.shape.locked
+    assert result.proposed_design.center_stone.shape.origin == "explicit"
+
+
+def test_not_applicable_conflict_does_not_block_unrelated_update_and_is_deterministic(
+    dictionary,
+):
+    original = NotApplicable(
+        reason="The design intentionally has no center stone shape.",
+        source=MessageSource(message_id="not-applicable", recorded_at=NOW),
+    )
+    current = revision(Design(center_stone={"shape": original}))
+    updates = [term("jewelry_type", "ring"), term("center_stone.shape", "oval")]
+
+    first = proposal(current, updates, dictionary)
+    second = proposal(current, list(reversed(updates)), dictionary)
+
+    assert first == second
+    assert first.proposed_design.center_stone.shape == original
+    assert first.proposed_design.jewelry_type.value == "ring"
+    assert [item.concrete_target for item in first.accepted_updates] == ["jewelry_type"]
+    assert [issue.code for issue in first.issues] == [ParserIssueCode.NOT_APPLICABLE_CONFLICT]
 
 
 @pytest.mark.parametrize("origin", ["unknown", "explicit", "derived", "assumed"])

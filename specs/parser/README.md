@@ -48,9 +48,10 @@ locale. Normalization is the existing bounded Dictionary behavior—no fuzzy mat
 Material `emerald` and shape `emerald_cut` remain distinct.
 
 Stable issues are `AMBIGUOUS_TERM`, `UNSUPPORTED_TERM`, `DEPRECATED_ENTRY`,
-`LOCKED_FIELD_CONFLICT`, and `UNKNOWN_SIDE_STONE_GROUP`. Deprecated aliases resolving to active
-entries use the canonical ID and emit `DEPRECATED_ALIAS_USED`. Deprecated entries are not silently
-replaced. Issues leave the field unchanged and expose deterministic candidate data where relevant.
+`LOCKED_FIELD_CONFLICT`, `NOT_APPLICABLE_CONFLICT`, and `UNKNOWN_SIDE_STONE_GROUP`. Deprecated
+aliases resolving to active entries use the canonical ID and emit `DEPRECATED_ALIAS_USED`.
+Deprecated entries are not silently replaced. Issues leave the field unchanged and expose
+deterministic candidate data where relevant.
 
 Duplicate concrete targets fail candidate validation; “last value wins” is forbidden. Updates,
 issues, and warnings use stable target/code ordering. Omitted fields remain model-equivalent. An
@@ -62,6 +63,9 @@ Changed values are always explicit, unconfirmed, and unlocked. Different values 
 locked field; the same value preserves the locked state. Weight never implies dimensions. An emerald
 plus 3 ct candidate without explicit dimensions leaves dimensions untouched. Parser output never
 creates `Derived`, `Assumed`, `Unknown`, or `NotApplicable` state.
+
+An existing `NotApplicable` state is an explicit applicability declaration. Parser Proposal v1
+preserves it exactly and emits `NOT_APPLICABLE_CONFLICT` instead of converting it into a value.
 
 The [JSON Schema](schema.json) is generated from the immutable Pydantic contract:
 

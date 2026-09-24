@@ -17,6 +17,7 @@ from jewelai_domain.models import (
     KaratPurity,
     KnownValue,
     MessageSource,
+    NotApplicable,
     StoneQuantity,
     Weight,
 )
@@ -83,6 +84,19 @@ def build_parser_proposal(
                     target=update.target,
                     concrete_target=update.concrete_target,
                     detail="The side-stone group does not exist in the current design.",
+                )
+            )
+            continue
+        if isinstance(current, NotApplicable):
+            issues.append(
+                ParserIssue(
+                    code=ParserIssueCode.NOT_APPLICABLE_CONFLICT,
+                    target=update.target,
+                    concrete_target=update.concrete_target,
+                    detail=(
+                        "The existing field is explicitly marked not applicable; "
+                        "Parser Proposal v1 cannot reinterpret applicability."
+                    ),
                 )
             )
             continue

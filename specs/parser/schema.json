@@ -2582,6 +2582,7 @@
         "UNSUPPORTED_TERM",
         "DEPRECATED_ENTRY",
         "LOCKED_FIELD_CONFLICT",
+        "NOT_APPLICABLE_CONFLICT",
         "UNKNOWN_SIDE_STONE_GROUP"
       ],
       "title": "ParserIssueCode",
