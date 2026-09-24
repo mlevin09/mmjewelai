@@ -23,6 +23,7 @@ from .schemas import (
     CreateMessageRequest,
     CreateOrganizationRequest,
     CreateProjectRequest,
+    CreatePromptRevisionRequest,
     CreateSessionRequest,
     EvaluateRequest,
     EvaluationResponse,
@@ -30,11 +31,18 @@ from .schemas import (
     OrganizationResponse,
     ParserProposalRequest,
     ProjectResponse,
+    PromptRevisionListResponse,
+    PromptRevisionResponse,
     RevisionListResponse,
     RevisionTransitionRequest,
     SessionResponse,
 )
-from .services import InvalidTransitionError, LockedFieldConflictError, RuntimeService
+from .services import (
+    InvalidTransitionError,
+    LockedFieldConflictError,
+    RuntimeService,
+    SpecificationNotReadyError,
+)
 from .settings import RuntimeSettings
 
 
@@ -65,6 +73,23 @@ def create_app(
     @app.exception_handler(LockedFieldConflictError)
     async def locked_handler(_, exc):
         return _error_response(409, "locked_field_conflict", str(exc))
+
+    @app.exception_handler(SpecificationNotReadyError)
+    async def not_ready_handler(_, exc):
+        from fastapi.responses import JSONResponse
+
+        decision = exc.decision
+        return JSONResponse(
+            status_code=409,
+            content={
+                "error": "specification_not_ready",
+                "detail": str(exc),
+                "decision": decision.decision,
+                "reason_code": decision.reason_code,
+                "target": decision.target,
+                "concrete_target": decision.concrete_target,
+            },
+        )
 
     async def invalid_handler(_, exc):
         return _error_response(422, "invalid_transition", str(exc))
@@ -148,6 +173,39 @@ def create_app(
         organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
     ):
         return repository.get_revision(session_id, revision_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/prompt-revisions",
+        response_model=PromptRevisionResponse,
+        status_code=201,
+    )
+    def create_prompt_revision(
+        session_id: UUID,
+        request: CreatePromptRevisionRequest,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.create_prompt_revision(session_id, organization_id, request)
+
+    @app.get(
+        "/sessions/{session_id}/prompt-revisions",
+        response_model=PromptRevisionListResponse,
+    )
+    def list_prompt_revisions(
+        session_id: UUID,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.list_prompt_revisions(session_id, organization_id)
+
+    @app.get(
+        "/sessions/{session_id}/prompt-revisions/{prompt_revision_id}",
+        response_model=PromptRevisionResponse,
+    )
+    def get_prompt_revision(
+        session_id: UUID,
+        prompt_revision_id: UUID,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ):
+        return service.get_prompt_revision(session_id, prompt_revision_id, organization_id)
 
     @app.post("/sessions/{session_id}/revisions")
     def transition_revision(

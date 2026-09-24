@@ -9,6 +9,7 @@ description = "SQLAlchemy persistence boundary for JewelAI V2"
 requires-python = ">=3.12"
 dependencies = [
   "jewelai-domain==1.0.0",
+  "jewelai-prompts==1.0.0",
   "sqlalchemy>=2.0.43,<3",
 ]
 

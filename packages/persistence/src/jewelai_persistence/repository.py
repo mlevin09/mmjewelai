@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from jewelai_domain.models import DesignRevision
+from jewelai_prompts import CompiledPrompt
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -13,6 +14,7 @@ from .models import (
     MessageRow,
     OrganizationRow,
     ProjectRow,
+    PromptRevisionRow,
     QuestionEventRow,
     SpecificationRevisionRow,
 )
@@ -238,6 +240,71 @@ class PersistenceRepository:
             db.add(row)
         return row
 
+    def create_prompt_revision(
+        self,
+        row: PromptRevisionRow,
+        compiled: CompiledPrompt,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+    ) -> PromptRevisionRow:
+        compiled = CompiledPrompt.model_validate(compiled)
+        self._validate_prompt_row(row, compiled)
+        with self._session_factory.begin() as db:
+            session = db.scalar(
+                self._scoped_session_query(row.session_id, organization_id).with_for_update()
+            )
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            if session.current_revision_id != expected_revision_id:
+                raise StaleRevisionError("Current revision changed during prompt compilation")
+            revision = db.scalar(
+                select(SpecificationRevisionRow.revision_id).where(
+                    SpecificationRevisionRow.session_id == row.session_id,
+                    SpecificationRevisionRow.revision_id == row.specification_revision_id,
+                )
+            )
+            if revision is None:
+                raise OwnershipMismatchError(
+                    "Specification revision does not belong to prompt session"
+                )
+            db.add(row)
+        return row
+
+    def get_prompt_revision(
+        self,
+        session_id: UUID,
+        prompt_revision_id: UUID,
+        organization_id: UUID,
+    ) -> tuple[PromptRevisionRow, CompiledPrompt]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(PromptRevisionRow).where(
+                    PromptRevisionRow.session_id == session_id,
+                    PromptRevisionRow.prompt_revision_id == prompt_revision_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("Prompt revision not found")
+            compiled = self._compiled_prompt(row)
+            db.expunge(row)
+            return row, compiled
+
+    def list_prompt_revisions(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[tuple[PromptRevisionRow, CompiledPrompt], ...]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            rows = db.scalars(
+                select(PromptRevisionRow)
+                .where(PromptRevisionRow.session_id == session_id)
+                .order_by(PromptRevisionRow.created_at, PromptRevisionRow.prompt_revision_id)
+            ).all()
+            result = tuple((row, self._compiled_prompt(row)) for row in rows)
+            for row in rows:
+                db.expunge(row)
+            return result
+
     def list_question_events(
         self, session_id: UUID, organization_id: UUID
     ) -> tuple[QuestionEventRow, ...]:
@@ -270,6 +337,37 @@ class PersistenceRepository:
     @staticmethod
     def _domain_revision(row: SpecificationRevisionRow) -> DesignRevision:
         return DesignRevision.model_validate(row.snapshot)
+
+    @staticmethod
+    def _validate_prompt_row(row: PromptRevisionRow, compiled: CompiledPrompt) -> None:
+        expected = (
+            row.specification_revision_id,
+            row.prompt_schema_version,
+            row.compiler_version,
+            row.template_id,
+            row.template_version,
+            row.template_artifact_version,
+            row.compiled_text,
+            row.content_hash,
+        )
+        actual = (
+            compiled.specification_revision_id,
+            compiled.schema_version,
+            compiled.compiler_version,
+            compiled.template_id,
+            compiled.template_version,
+            compiled.template_artifact_version,
+            compiled.prompt_text,
+            compiled.content_hash,
+        )
+        if expected != actual or row.structured_payload != compiled.model_dump(mode="json"):
+            raise ValueError("Prompt revision relational metadata does not match compiled payload")
+
+    @classmethod
+    def _compiled_prompt(cls, row: PromptRevisionRow) -> CompiledPrompt:
+        compiled = CompiledPrompt.model_validate(row.structured_payload)
+        cls._validate_prompt_row(row, compiled)
+        return compiled
 
     @staticmethod
     def _scoped_session_query(session_id: UUID, organization_id: UUID):

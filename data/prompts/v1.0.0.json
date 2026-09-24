@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_version": "1.0.0",
+  "provenance": {
+    "source_kind": "repository_spec",
+    "source_ref": "specs/prompts/README.md",
+    "review_status": "proposed_pending_product_review"
+  },
+  "templates": [
+    {
+      "template_id": "jewelry_visualization",
+      "template_version": "1.0.0",
+      "purpose": "jewelry_visualization",
+      "output_language": "en",
+      "introduction": "Create a jewelry visualization from the canonical specification below.",
+      "instructions": [
+        "Do not invent unspecified design facts.",
+        "Locked constraints must not be changed.",
+        "Treat disclosed assumptions and uncertain derived values as disclosed, not exact user facts."
+      ],
+      "labels": {
+        "specification": "CANONICAL SPECIFICATION",
+        "locked_constraints": "LOCKED CONSTRAINTS — MUST NOT CHANGE",
+        "disclosures": "DISCLOSURES — ASSUMPTIONS AND UNCERTAINTY"
+      }
+    }
+  ]
+}

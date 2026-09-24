@@ -9,6 +9,7 @@ from jewelai_domain import (
     AskDecision,
     Design,
     DesignRevision,
+    ReadyDecision,
     RevisionConflict,
     confirm_field,
     lock_field,
@@ -17,13 +18,20 @@ from jewelai_domain import (
 )
 from jewelai_domain.models import MessageSource, RevisionEvent
 from jewelai_parser import ParserProposal, build_parser_proposal
-from jewelai_persistence.models import DesignSessionRow, MessageRow, QuestionEventRow
+from jewelai_persistence.models import (
+    DesignSessionRow,
+    MessageRow,
+    PromptRevisionRow,
+    QuestionEventRow,
+)
 from jewelai_persistence.repository import PersistenceRepository, StaleRevisionError
+from jewelai_prompts import compile_prompt, validate_compiled_prompt
 
 from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
 from .schemas import (
     ArtifactPins,
     ConfirmRevisionRequest,
+    CreatePromptRevisionRequest,
     CreateSessionRequest,
     EditRevisionRequest,
     EvaluateRequest,
@@ -31,6 +39,8 @@ from .schemas import (
     LockRevisionRequest,
     MessageResponse,
     ParserProposalRequest,
+    PromptRevisionListResponse,
+    PromptRevisionResponse,
     SessionResponse,
     UnlockRevisionRequest,
 )
@@ -48,6 +58,12 @@ class LockedFieldConflictError(ApplicationError):
     pass
 
 
+class SpecificationNotReadyError(ApplicationError):
+    def __init__(self, decision):
+        super().__init__("Specification is not ready for prompt compilation")
+        self.decision = decision
+
+
 class RuntimeService:
     def __init__(
         self,
@@ -56,11 +72,13 @@ class RuntimeService:
         *,
         clock: Callable[[], datetime] | None = None,
         uuid_factory: Callable[[], UUID] | None = None,
+        before_prompt_persist: Callable[[], None] | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
         self._clock = clock or (lambda: datetime.now(UTC))
         self._uuid = uuid_factory or uuid4
+        self._before_prompt_persist = before_prompt_persist
 
     def create_organization(self, name: str):
         return self.repository.create_organization(self._uuid(), name, self._clock())
@@ -109,6 +127,7 @@ class RuntimeService:
             dictionary_artifact_version=versions.dictionary,
             question_artifact_version=versions.questions,
             rules_artifact_version=versions.rules,
+            prompt_artifact_version=versions.prompts,
         )
         self.repository.create_design_session(row, revision, organization_id=organization_id)
         return self._session_response(row)
@@ -194,6 +213,65 @@ class RuntimeService:
             revision,
         )
 
+    def create_prompt_revision(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: CreatePromptRevisionRequest,
+    ) -> PromptRevisionResponse:
+        session = self.repository.get_design_session(session_id, organization_id)
+        self._assert_artifact_pins(session)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before prompt compilation")
+        revision = self.repository.get_revision(
+            session_id, request.expected_revision_id, organization_id
+        )
+        decision = self.artifacts.rules.evaluate(revision, session.role_id)
+        if not isinstance(decision, ReadyDecision):
+            raise SpecificationNotReadyError(decision)
+        compiled = compile_prompt(revision, self.artifacts.prompts)
+        validate_compiled_prompt(compiled, revision, self.artifacts.prompts)
+        if self._before_prompt_persist is not None:
+            self._before_prompt_persist()
+        row = PromptRevisionRow(
+            prompt_revision_id=self._uuid(),
+            session_id=session_id,
+            specification_revision_id=revision.revision_id,
+            prompt_schema_version=compiled.schema_version,
+            compiler_version=compiled.compiler_version,
+            template_id=compiled.template_id,
+            template_version=compiled.template_version,
+            template_artifact_version=compiled.template_artifact_version,
+            compiled_text=compiled.prompt_text,
+            structured_payload=compiled.model_dump(mode="json"),
+            content_hash=compiled.content_hash,
+            created_at=self._clock(),
+        )
+        self.repository.create_prompt_revision(
+            row, compiled, organization_id, request.expected_revision_id
+        )
+        return self._prompt_response(row, compiled)
+
+    def get_prompt_revision(
+        self, session_id: UUID, prompt_revision_id: UUID, organization_id: UUID
+    ) -> PromptRevisionResponse:
+        row, compiled = self.repository.get_prompt_revision(
+            session_id, prompt_revision_id, organization_id
+        )
+        return self._prompt_response(row, compiled)
+
+    def list_prompt_revisions(
+        self, session_id: UUID, organization_id: UUID
+    ) -> PromptRevisionListResponse:
+        return PromptRevisionListResponse(
+            prompt_revisions=tuple(
+                self._prompt_response(row, compiled)
+                for row, compiled in self.repository.list_prompt_revisions(
+                    session_id, organization_id
+                )
+            )
+        )
+
     def evaluate(
         self,
         session_id: UUID,
@@ -248,6 +326,7 @@ class RuntimeService:
             row.dictionary_artifact_version,
             row.question_artifact_version,
             row.rules_artifact_version,
+            row.prompt_artifact_version,
         )
         loaded = (
             SCHEMA_VERSION,
@@ -255,6 +334,7 @@ class RuntimeService:
             versions.dictionary,
             versions.questions,
             versions.rules,
+            versions.prompts,
         )
         if stored != loaded:
             raise ArtifactConfigurationError(
@@ -277,7 +357,18 @@ class RuntimeService:
                 dictionary=row.dictionary_artifact_version,
                 questions=row.question_artifact_version,
                 rules=row.rules_artifact_version,
+                prompts=row.prompt_artifact_version,
             ),
+        )
+
+    @staticmethod
+    def _prompt_response(row: PromptRevisionRow, compiled) -> PromptRevisionResponse:
+        return PromptRevisionResponse(
+            prompt_revision_id=row.prompt_revision_id,
+            session_id=row.session_id,
+            specification_revision_id=row.specification_revision_id,
+            compiled_prompt=compiled,
+            created_at=RuntimeService._utc(row.created_at),
         )
 
     @staticmethod
