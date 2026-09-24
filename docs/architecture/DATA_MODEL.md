@@ -1,8 +1,9 @@
 # Planned data model and storage boundary
 
 This remains the broader logical model. The runtime physically implements organization, project,
-design_session, message, specification_revision, question_event, prompt_revision, and generation_run;
-see ADRs 0007–0010 and the Alembic migrations. Later rows remain plans, not implemented claims.
+design_session, message, specification_revision, question_event, prompt_revision, generation_run,
+and asset; see ADRs 0007–0011 and the Alembic migrations. Later rows remain plans, not implemented
+claims.
 
 | Entity | Scope / relationships |
 | --- | --- |
@@ -14,7 +15,7 @@ see ADRs 0007–0010 and the Alembic migrations. Later rows remain plans, not im
 | question_event | Semantic question ID/version, rule/version, target, answer and decision explanation |
 | prompt_revision | Implemented immutable specification link, template/compiler versions, validated structured prompt, text and hash |
 | generation_run | Implemented immutable prompt/profile/provider/config input, pending/running/succeeded/failed lifecycle, attempt/parent lineage and metadata-only result/error |
-| asset | Organization/project, object key, content type/hash/size, parent asset, owning run and lifecycle state |
+| asset | Implemented private metadata: organization/project/session, object key, type/hash/size, optional parent and generation-output lineage, pending/ready/failed lifecycle |
 | experiment_assignment / event | Stable assignment, variant, outcome and related run/spec revision |
 
 Field state separates value origin (explicit/derived/assumed/unknown) from confirmation and lock.

@@ -12,6 +12,7 @@ Python 3.12+ and PostgreSQL are the production-compatible target:
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
 python -m pip install -e './packages/model_gateway[test]'
+python -m pip install -e './packages/assets[test]'
 python -m pip install -e './packages/persistence'
 python -m pip install -e './workers/generation[test]'
 python -m pip install -e './packages/parser[test]'
@@ -44,6 +45,8 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `POST /sessions/{session_id}/generation-runs`
 - `GET /sessions/{session_id}/generation-runs`
 - `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
+- `GET /sessions/{session_id}/assets`
+- `GET /sessions/{session_id}/assets/{asset_id}`
 
 Session routes use `X-Organization-ID` as an explicit ownership scope. This is plumbing for future
 authenticated context, **not authentication** and not a security claim. Conversational roles never
@@ -72,17 +75,24 @@ gateway inline. No generation profile or fake provider is registered by default.
 one-shot worker is invoked separately, claims atomically, validates untrusted result metadata, and
 does not recompile or compare against a newer current design revision.
 
+Asset endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets, and
+URLs. Asset ingestion is an internal reusable boundary in `packages/assets`; this API exposes no
+binary upload/download and registers no object store. Authentication, production GCS, signed access,
+retention, and reconciliation remain unimplemented.
+
 ## Verification
 
 ```sh
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/persistence workers/generation
-python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/persistence workers/generation
+python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/persistence workers/generation
+python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/persistence workers/generation
 ```
 
-Set `TEST_POSTGRES_URL` to run the PostgreSQL-only concurrent CAS test. SQLite tests are portable
-behavior tests and are not presented as proof of PostgreSQL locking behavior.
+Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim, and
+generated-output asset uniqueness tests. SQLite tests are portable behavior tests and are not
+presented as proof of PostgreSQL locking behavior.

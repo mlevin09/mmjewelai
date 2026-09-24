@@ -32,6 +32,8 @@ from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
 from .generation import GenerationProfileRegistry
 from .schemas import (
     ArtifactPins,
+    AssetListResponse,
+    AssetResponse,
     ConfirmRevisionRequest,
     CreateGenerationRunRequest,
     CreatePromptRevisionRequest,
@@ -317,6 +319,19 @@ class RuntimeService:
             generation_runs=self.repository.list_generation_runs(session_id, organization_id)
         )
 
+    def get_asset(self, session_id: UUID, asset_id: UUID, organization_id: UUID) -> AssetResponse:
+        return self._asset_response(
+            self.repository.get_asset(session_id, asset_id, organization_id)
+        )
+
+    def list_assets(self, session_id: UUID, organization_id: UUID) -> AssetListResponse:
+        return AssetListResponse(
+            assets=tuple(
+                self._asset_response(asset)
+                for asset in self.repository.list_assets(session_id, organization_id)
+            )
+        )
+
     def evaluate(
         self,
         session_id: UUID,
@@ -414,6 +429,27 @@ class RuntimeService:
             specification_revision_id=row.specification_revision_id,
             compiled_prompt=compiled,
             created_at=RuntimeService._utc(row.created_at),
+        )
+
+    @staticmethod
+    def _asset_response(asset) -> AssetResponse:
+        return AssetResponse(
+            schema_version=asset.schema_version,
+            asset_id=asset.asset_id,
+            session_id=asset.session_id,
+            kind=asset.kind,
+            status=asset.status,
+            content_type=asset.content_type,
+            content_hash=asset.content_hash,
+            byte_size=asset.byte_size,
+            generation_run_id=asset.generation_run_id,
+            generation_output_ordinal=asset.generation_output_ordinal,
+            parent_asset_id=asset.parent_asset_id,
+            created_at=asset.created_at,
+            ready_at=asset.ready_at,
+            failed_at=asset.failed_at,
+            error_code=asset.error_code,
+            error_detail=asset.error_detail,
         )
 
     @staticmethod

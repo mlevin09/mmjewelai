@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
+from jewelai_assets import AssetContentType, AssetErrorCode, AssetKind, AssetStatus
 from jewelai_domain import (
     AskDecision,
     AssumeDecision,
@@ -123,6 +124,29 @@ class CreateGenerationRunRequest(ApiModel):
 
 class GenerationRunListResponse(ApiModel):
     generation_runs: tuple[GenerationRun, ...]
+
+
+class AssetResponse(ApiModel):
+    schema_version: Literal["1.0.0"]
+    asset_id: UUID
+    session_id: UUID
+    kind: AssetKind
+    status: AssetStatus
+    content_type: AssetContentType
+    content_hash: str
+    byte_size: int
+    generation_run_id: UUID | None = None
+    generation_output_ordinal: int | None = None
+    parent_asset_id: UUID | None = None
+    created_at: datetime
+    ready_at: datetime | None = None
+    failed_at: datetime | None = None
+    error_code: AssetErrorCode | None = None
+    error_detail: str | None = None
+
+
+class AssetListResponse(ApiModel):
+    assets: tuple[AssetResponse, ...]
 
 
 class EditRevisionRequest(ApiModel):

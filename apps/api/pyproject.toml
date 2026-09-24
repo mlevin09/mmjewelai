@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
   "alembic>=1.16,<2",
   "fastapi>=0.116,<1",
+  "jewelai-assets==1.0.0",
   "jewelai-domain==1.0.0",
   "jewelai-model-gateway==1.0.0",
   "jewelai-parser==1.0.0",

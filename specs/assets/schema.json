@@ -1,0 +1,378 @@
+{
+  "$defs": {
+    "Asset": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "asset_id": {
+          "format": "uuid",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "project_id": {
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AssetKind"
+        },
+        "status": {
+          "$ref": "#/$defs/AssetStatus"
+        },
+        "object_key": {
+          "maxLength": 500,
+          "minLength": 1,
+          "pattern": "^organizations/[0-9a-f-]+/projects/[0-9a-f-]+/assets/[0-9a-f-]+/original\\.(png|jpg|webp)$",
+          "title": "Object Key",
+          "type": "string"
+        },
+        "content_type": {
+          "$ref": "#/$defs/AssetContentType"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "byte_size": {
+          "exclusiveMinimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        },
+        "generation_run_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Run Id"
+        },
+        "generation_output_ordinal": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Output Ordinal"
+        },
+        "provider_output_id": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Output Id"
+        },
+        "parent_asset_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Asset Id"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "ready_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ready At"
+        },
+        "failed_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failed At"
+        },
+        "error_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssetErrorCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "error_detail": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Error Detail"
+        }
+      },
+      "required": [
+        "asset_id",
+        "organization_id",
+        "project_id",
+        "session_id",
+        "kind",
+        "status",
+        "object_key",
+        "content_type",
+        "content_hash",
+        "byte_size",
+        "created_at"
+      ],
+      "title": "Asset",
+      "type": "object"
+    },
+    "AssetContentType": {
+      "enum": [
+        "image/png",
+        "image/jpeg",
+        "image/webp"
+      ],
+      "title": "AssetContentType",
+      "type": "string"
+    },
+    "AssetErrorCode": {
+      "enum": [
+        "storage_unavailable",
+        "storage_conflict"
+      ],
+      "title": "AssetErrorCode",
+      "type": "string"
+    },
+    "AssetIngestionPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_bytes": {
+          "default": 20971520,
+          "maximum": 104857600,
+          "minimum": 1,
+          "title": "Max Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "AssetIngestionPolicy",
+      "type": "object"
+    },
+    "AssetIngestionRequest": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "format": "uuid",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "project_id": {
+          "format": "uuid",
+          "title": "Project Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AssetKind"
+        },
+        "declared_content_type": {
+          "$ref": "#/$defs/AssetContentType"
+        },
+        "generation_run_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Run Id"
+        },
+        "generation_output_ordinal": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Generation Output Ordinal"
+        },
+        "provider_output_id": {
+          "anyOf": [
+            {
+              "maxLength": 240,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Output Id"
+        },
+        "parent_asset_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Asset Id"
+        }
+      },
+      "required": [
+        "asset_id",
+        "organization_id",
+        "project_id",
+        "session_id",
+        "kind",
+        "declared_content_type"
+      ],
+      "title": "AssetIngestionRequest",
+      "type": "object"
+    },
+    "AssetKind": {
+      "enum": [
+        "reference",
+        "generated"
+      ],
+      "title": "AssetKind",
+      "type": "string"
+    },
+    "AssetStatus": {
+      "enum": [
+        "pending",
+        "ready",
+        "failed"
+      ],
+      "title": "AssetStatus",
+      "type": "string"
+    },
+    "StoredObject": {
+      "additionalProperties": false,
+      "properties": {
+        "object_key": {
+          "maxLength": 500,
+          "minLength": 1,
+          "pattern": "^organizations/[0-9a-f-]+/projects/[0-9a-f-]+/assets/[0-9a-f-]+/original\\.(png|jpg|webp)$",
+          "title": "Object Key",
+          "type": "string"
+        },
+        "content_type": {
+          "$ref": "#/$defs/AssetContentType"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "byte_size": {
+          "exclusiveMinimum": 0,
+          "title": "Byte Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "object_key",
+        "content_type",
+        "content_hash",
+        "byte_size"
+      ],
+      "title": "StoredObject",
+      "type": "object"
+    }
+  },
+  "anyOf": [
+    {
+      "$ref": "#/$defs/Asset"
+    },
+    {
+      "$ref": "#/$defs/AssetIngestionRequest"
+    },
+    {
+      "$ref": "#/$defs/AssetIngestionPolicy"
+    },
+    {
+      "$ref": "#/$defs/StoredObject"
+    }
+  ]
+}

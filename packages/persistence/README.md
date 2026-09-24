@@ -19,6 +19,11 @@ update, and row-lock terminal running→succeeded/failed transitions. Prompt rev
 on read and must belong to the same scoped session. Result payloads contain provider metadata only,
 never image bytes or long-lived URLs.
 
+The `0005_assets` migration adds private object metadata and reference/generated lineage only. Image
+bytes remain behind the `PrivateObjectStore` port. Repository methods validate organization → project
+→ session, parent scope, and exact succeeded GenerationRun output lineage. A unique run/ordinal pair
+prevents duplicate canonical generated assets.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.
