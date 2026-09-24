@@ -1,8 +1,9 @@
 # JewelAI domain package
 
 Issue #1 implements an offline, immutable Jewelry Design Schema and revision transitions. Issue #2
-adds versioned conversational Role Profiles, and Issue #3 adds deterministic Domain Dictionary
-normalization. Neither policy artifact alters the schema transitions.
+adds versioned conversational Role Profiles, Issue #3 adds deterministic Domain Dictionary
+normalization, and Issue #4 adds semantic Question Catalog rendering. These artifacts do not alter
+schema transitions.
 Python 3.12+ is required. This package is independent of the legacy root packaging.
 
 From the repository root, inside your Python environment:
@@ -23,7 +24,8 @@ Ruff provide tests and static checks. No API, database or provider dependencies 
 See the [contract](../../specs/jewelry-design-schema/README.md) and
 [fixtures](../../specs/jewelry-design-schema/fixtures/README.md), plus the
 [Role Profiles contract](../../specs/roles/README.md) and
-[Domain Dictionary contract](../../specs/dictionary/README.md).
+[Domain Dictionary contract](../../specs/dictionary/README.md), and the
+[Question Catalog contract](../../specs/questions/README.md).
 
 ```python
 from pathlib import Path
@@ -57,6 +59,7 @@ Re-export the schema from the repository root:
 python -m jewelai_domain.schema specs/jewelry-design-schema/schema.json
 python -m jewelai_domain.roles_schema specs/roles/schema.json
 python -m jewelai_domain.dictionary_schema specs/dictionary/schema.json
+python -m jewelai_domain.questions_schema specs/questions/schema.json
 ```
 
 The committed schema must match the exporter; tests detect drift. Regenerate and review the diff

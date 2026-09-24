@@ -1,0 +1,348 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_version": "1.0.0",
+  "design_schema_version": "1.0.0",
+  "role_artifact_version": "1.0.0",
+  "dictionary_artifact_version": "1.0.0",
+  "supported_locales": ["en", "ru"],
+  "locale_fallback": "base_language_then_reject",
+  "review_status": "proposed_pending_domain_review",
+  "source": "docs/product/issues/04-questions.md",
+  "entries": [
+    {
+      "question_id": "CENTER_STONE_SHAPE",
+      "target": "center_stone.shape",
+      "answer_contract": {
+        "kind": "dictionary_id",
+        "schema_type": "DomainId",
+        "dictionary_category": "stone_shape"
+      },
+      "wording": [
+        {
+          "role_id": "retail_client",
+          "text": {
+            "en": "What shape would you like for the center stone?",
+            "ru": "Какую форму центрального камня вы хотели бы выбрать?"
+          }
+        },
+        {
+          "role_id": "sales_manager",
+          "text": {
+            "en": "Which center-stone shape should be recorded for the order?",
+            "ru": "Какую форму центрального камня указать в заказе?"
+          }
+        },
+        {
+          "role_id": "buyer",
+          "text": {
+            "en": "Which center-stone shape is required for sourcing?",
+            "ru": "Какая форма центрального камня требуется для закупки?"
+          }
+        },
+        {
+          "role_id": "marketing",
+          "text": {
+            "en": "Which center-stone shape should the design feature?",
+            "ru": "Какая форма центрального камня должна быть представлена в дизайне?"
+          }
+        },
+        {
+          "role_id": "jewelry_designer",
+          "text": {
+            "en": "Specify the center-stone shape for the design.",
+            "ru": "Укажите форму центрального камня для дизайна."
+          }
+        },
+        {
+          "role_id": "industrial_designer",
+          "text": {
+            "en": "Specify the canonical center-stone shape identifier.",
+            "ru": "Укажите канонический идентификатор формы центрального камня."
+          }
+        }
+      ],
+      "examples": [
+        {
+          "description": {
+            "en": "A valid answer is the stone-shape dictionary ID oval.",
+            "ru": "Допустимый ответ — идентификатор oval из категории форм камня."
+          },
+          "dictionary_id": "oval"
+        }
+      ],
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/04-questions.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "question_id": "CENTER_STONE_DIMENSIONS",
+      "target": "center_stone.dimensions",
+      "answer_contract": {
+        "kind": "dimensions",
+        "schema_type": "Dimensions",
+        "unit": "mm",
+        "components": ["length", "width", "depth"]
+      },
+      "wording": [
+        {
+          "role_id": "retail_client",
+          "text": {
+            "en": "What are the center stone's length, width, and depth in millimetres?",
+            "ru": "Каковы длина, ширина и глубина центрального камня в миллиметрах?"
+          }
+        },
+        {
+          "role_id": "sales_manager",
+          "text": {
+            "en": "What center-stone dimensions should be recorded in millimetres?",
+            "ru": "Какие размеры центрального камня в миллиметрах указать в заказе?"
+          }
+        },
+        {
+          "role_id": "buyer",
+          "text": {
+            "en": "Provide the center-stone length, width, and depth in millimetres.",
+            "ru": "Укажите длину, ширину и глубину центрального камня в миллиметрах."
+          }
+        },
+        {
+          "role_id": "marketing",
+          "text": {
+            "en": "What are the confirmed center-stone dimensions in millimetres?",
+            "ru": "Каковы подтвержденные размеры центрального камня в миллиметрах?"
+          }
+        },
+        {
+          "role_id": "jewelry_designer",
+          "text": {
+            "en": "Specify the center-stone length, width, and depth in millimetres.",
+            "ru": "Задайте длину, ширину и глубину центрального камня в миллиметрах."
+          }
+        },
+        {
+          "role_id": "industrial_designer",
+          "text": {
+            "en": "Specify the center-stone L × W × D values in millimetres.",
+            "ru": "Задайте значения Д × Ш × Г центрального камня в миллиметрах."
+          }
+        }
+      ],
+      "examples": [
+        {
+          "description": {
+            "en": "Return a Dimensions value with positive length, width, and depth Length fields in mm.",
+            "ru": "Верните значение Dimensions с положительными полями Length для длины, ширины и глубины в мм."
+          }
+        }
+      ],
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/04-questions.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "question_id": "CENTER_STONE_SETTING",
+      "target": "center_stone.setting",
+      "answer_contract": {
+        "kind": "dictionary_id",
+        "schema_type": "DomainId",
+        "dictionary_category": "stone_setting"
+      },
+      "wording": [
+        {
+          "role_id": "retail_client",
+          "text": {
+            "en": "How would you like the center stone to be set?",
+            "ru": "Как вы хотели бы закрепить центральный камень?"
+          }
+        },
+        {
+          "role_id": "sales_manager",
+          "text": {
+            "en": "Which center-stone setting should be recorded for the order?",
+            "ru": "Какой тип закрепки центрального камня указать в заказе?"
+          }
+        },
+        {
+          "role_id": "buyer",
+          "text": {
+            "en": "Which center-stone setting is specified?",
+            "ru": "Какой тип закрепки центрального камня задан?"
+          }
+        },
+        {
+          "role_id": "marketing",
+          "text": {
+            "en": "Which setting should describe the center stone in this design?",
+            "ru": "Какой тип закрепки должен описывать центральный камень в этом дизайне?"
+          }
+        },
+        {
+          "role_id": "jewelry_designer",
+          "text": {
+            "en": "Specify the center-stone setting type.",
+            "ru": "Укажите тип закрепки центрального камня."
+          }
+        },
+        {
+          "role_id": "industrial_designer",
+          "text": {
+            "en": "Specify the canonical setting identifier for the center-stone assembly.",
+            "ru": "Укажите канонический идентификатор закрепки узла центрального камня."
+          }
+        }
+      ],
+      "examples": [
+        {
+          "description": {
+            "en": "A valid answer is the stone-setting dictionary ID prong_setting.",
+            "ru": "Допустимый ответ — идентификатор prong_setting из категории закрепок."
+          },
+          "dictionary_id": "prong_setting"
+        }
+      ],
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/04-questions.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "question_id": "METAL_COLOR",
+      "target": "metal.color",
+      "answer_contract": {
+        "kind": "dictionary_id",
+        "schema_type": "DomainId",
+        "dictionary_category": "metal_color"
+      },
+      "wording": [
+        {
+          "role_id": "retail_client",
+          "text": {
+            "en": "What metal color would you prefer?",
+            "ru": "Какой цвет металла вы предпочитаете?"
+          }
+        },
+        {
+          "role_id": "sales_manager",
+          "text": {
+            "en": "Which metal color should be recorded for the order?",
+            "ru": "Какой цвет металла указать в заказе?"
+          }
+        },
+        {
+          "role_id": "buyer",
+          "text": {
+            "en": "Which metal color is required for sourcing?",
+            "ru": "Какой цвет металла требуется для закупки?"
+          }
+        },
+        {
+          "role_id": "marketing",
+          "text": {
+            "en": "Which metal color should be presented for this design?",
+            "ru": "Какой цвет металла следует представить для этого дизайна?"
+          }
+        },
+        {
+          "role_id": "jewelry_designer",
+          "text": {
+            "en": "Specify the design's metal color.",
+            "ru": "Укажите цвет металла в дизайне."
+          }
+        },
+        {
+          "role_id": "industrial_designer",
+          "text": {
+            "en": "Specify the canonical metal-color identifier.",
+            "ru": "Укажите канонический идентификатор цвета металла."
+          }
+        }
+      ],
+      "examples": [
+        {
+          "description": {
+            "en": "A valid answer is the metal-color dictionary ID white.",
+            "ru": "Допустимый ответ — идентификатор white из категории цвета металла."
+          },
+          "dictionary_id": "white"
+        }
+      ],
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/04-questions.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "question_id": "SIDE_STONE_QUANTITY",
+      "target": "side_stones[*].quantity",
+      "answer_contract": {
+        "kind": "stone_quantity",
+        "schema_type": "StoneQuantity",
+        "value": "positive_integer",
+        "scopes": ["per_side", "per_item", "per_pair"]
+      },
+      "wording": [
+        {
+          "role_id": "retail_client",
+          "text": {
+            "en": "How many stones should be in this side-stone group, and is that per side, item, or pair?",
+            "ru": "Сколько камней должно быть в этой группе боковых камней: на сторону, изделие или пару?"
+          }
+        },
+        {
+          "role_id": "sales_manager",
+          "text": {
+            "en": "What quantity and scope should be recorded for this side-stone group?",
+            "ru": "Какое количество и область подсчета указать для этой группы боковых камней?"
+          }
+        },
+        {
+          "role_id": "buyer",
+          "text": {
+            "en": "Specify the positive quantity and scope for this side-stone group.",
+            "ru": "Укажите положительное количество и область подсчета для этой группы боковых камней."
+          }
+        },
+        {
+          "role_id": "marketing",
+          "text": {
+            "en": "How many stones are specified for this side-stone group, and with what scope?",
+            "ru": "Сколько камней задано для этой группы боковых камней и с какой областью подсчета?"
+          }
+        },
+        {
+          "role_id": "jewelry_designer",
+          "text": {
+            "en": "Specify the quantity and scope for this side-stone group.",
+            "ru": "Задайте количество и область подсчета для этой группы боковых камней."
+          }
+        },
+        {
+          "role_id": "industrial_designer",
+          "text": {
+            "en": "Specify the StoneQuantity value and scope for the selected side-stone group instance.",
+            "ru": "Задайте значение StoneQuantity и область подсчета для выбранного экземпляра группы боковых камней."
+          }
+        }
+      ],
+      "examples": [
+        {
+          "description": {
+            "en": "Return a StoneQuantity with a positive integer and one explicit canonical scope.",
+            "ru": "Верните StoneQuantity с положительным целым числом и одной явно указанной канонической областью подсчета."
+          }
+        }
+      ],
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/04-questions.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    }
+  ]
+}

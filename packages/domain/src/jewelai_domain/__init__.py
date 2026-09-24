@@ -10,6 +10,15 @@ from .dictionary import (
     load_domain_dictionary,
 )
 from .models import SCHEMA_VERSION, Design, DesignRevision
+from .questions import (
+    QUESTION_SCHEMA_VERSION,
+    QuestionCatalog,
+    QuestionId,
+    RenderedQuestion,
+    SchemaTarget,
+    UnknownQuestionError,
+    load_question_catalog,
+)
 from .revisions import RevisionConflict, confirm_field, lock_field, revise_design, unlock_field
 from .roles import (
     ROLE_SCHEMA_VERSION,
@@ -23,24 +32,31 @@ from .roles import (
 
 __all__ = [
     "DICTIONARY_SCHEMA_VERSION",
+    "QUESTION_SCHEMA_VERSION",
     "SCHEMA_VERSION",
     "AmbiguousMatch",
     "Design",
     "DesignRevision",
     "DictionaryCategory",
     "DictionaryRegistry",
+    "QuestionCatalog",
+    "QuestionId",
     "RevisionConflict",
     "ResolvedMatch",
+    "RenderedQuestion",
     "ROLE_SCHEMA_VERSION",
     "RoleId",
     "RoleProfile",
     "RoleRegistry",
+    "SchemaTarget",
+    "UnknownQuestionError",
     "UnknownRoleError",
     "UnsupportedLocaleError",
     "UnsupportedMatch",
     "confirm_field",
     "lock_field",
     "load_domain_dictionary",
+    "load_question_catalog",
     "load_role_profiles",
     "revise_design",
     "unlock_field",
