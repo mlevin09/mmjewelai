@@ -1,0 +1,265 @@
+{
+  "schema_version": "1.0.0",
+  "artifact_version": "1.0.0",
+  "supported_locales": ["en", "ru"],
+  "review_status": "proposed_pending_domain_review",
+  "source": "docs/product/issues/03-dictionary.md",
+  "entries": [
+    {
+      "domain_id": "basket_gallery",
+      "category": "construction",
+      "canonical_terms": {"en": "basket gallery", "ru": "корзиночная галерея"},
+      "synonyms": {"en": ["basket"], "ru": ["корзина"]},
+      "definition": "Proposed construction term for a basket-form gallery supporting a stone setting.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "split_shank",
+      "category": "construction",
+      "canonical_terms": {"en": "split shank", "ru": "раздвоенная шинка"},
+      "synonyms": {"en": [], "ru": []},
+      "definition": "Proposed construction term for a shank described as visibly divided.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "diamond",
+      "category": "gemstone_material",
+      "canonical_terms": {"en": "diamond", "ru": "алмаз"},
+      "synonyms": {"en": [], "ru": ["бриллиант"]},
+      "definition": "Gemstone material concept identified by the catalog term diamond.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "emerald",
+      "category": "gemstone_material",
+      "canonical_terms": {"en": "emerald", "ru": "изумруд"},
+      "synonyms": {"en": ["emerald gemstone"], "ru": ["изумрудный камень"]},
+      "definition": "Gemstone material concept identified by the catalog term emerald.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "pendant",
+      "category": "jewelry_type",
+      "canonical_terms": {"en": "pendant", "ru": "подвеска"},
+      "synonyms": {"en": [], "ru": []},
+      "definition": "Jewelry type identified by the catalog term pendant.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "ring",
+      "category": "jewelry_type",
+      "canonical_terms": {"en": "ring", "ru": "кольцо"},
+      "synonyms": {"en": [], "ru": []},
+      "definition": "Jewelry type identified by the catalog term ring.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "rose",
+      "category": "metal_color",
+      "canonical_terms": {"en": "rose", "ru": "розовый"},
+      "synonyms": {"en": ["rose gold"], "ru": ["розовое золото"]},
+      "definition": "Metal color concept identified by the catalog term rose.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "white",
+      "category": "metal_color",
+      "canonical_terms": {"en": "white", "ru": "белый"},
+      "synonyms": {"en": ["white metal color"], "ru": ["белый цвет металла"]},
+      "definition": "Metal color concept identified by the catalog term white.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "yellow",
+      "category": "metal_color",
+      "canonical_terms": {"en": "yellow", "ru": "желтый"},
+      "synonyms": {"en": ["yellow metal color"], "ru": ["желтый цвет металла"]},
+      "definition": "Metal color concept identified by the catalog term yellow.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "gold",
+      "category": "metal_material",
+      "canonical_terms": {"en": "gold", "ru": "золото"},
+      "synonyms": {"en": [], "ru": []},
+      "definition": "Metal material concept identified by the catalog term gold.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "platinum",
+      "category": "metal_material",
+      "canonical_terms": {"en": "platinum", "ru": "платина"},
+      "synonyms": {"en": [], "ru": []},
+      "definition": "Metal material concept identified by the catalog term platinum.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "fineness",
+      "category": "metal_purity",
+      "canonical_terms": {"en": "fineness", "ru": "проба"},
+      "synonyms": {"en": ["millesimal fineness"], "ru": ["метрическая проба"]},
+      "definition": "Terminology for expressing metal purity using a fineness value.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "karat",
+      "category": "metal_purity",
+      "canonical_terms": {"en": "karat", "ru": "каратность"},
+      "synonyms": {"en": ["karat purity", "kt"], "ru": ["каратная проба"]},
+      "definition": "Terminology for expressing metal purity using a karat value.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "brilliant_cut",
+      "category": "stone_cut",
+      "canonical_terms": {"en": "brilliant cut", "ru": "бриллиантовая огранка"},
+      "synonyms": {"en": ["brilliant-cut"], "ru": []},
+      "definition": "Stone cut terminology identified by the catalog term brilliant cut.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "step_cut",
+      "category": "stone_cut",
+      "canonical_terms": {"en": "step cut", "ru": "ступенчатая огранка"},
+      "synonyms": {"en": ["step-cut"], "ru": []},
+      "definition": "Stone cut terminology identified by the catalog term step cut.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "halo_setting",
+      "category": "stone_setting",
+      "canonical_terms": {"en": "halo", "ru": "гало"},
+      "synonyms": {"en": ["halo setting"], "ru": ["закрепка гало"]},
+      "definition": "Proposed stone-setting term identified by the catalog term halo.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "prong_setting",
+      "category": "stone_setting",
+      "canonical_terms": {"en": "prong setting", "ru": "крапановая закрепка"},
+      "synonyms": {"en": ["prong"], "ru": ["крапан"]},
+      "definition": "Proposed stone-setting term identified by the catalog term prong setting.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "emerald_cut",
+      "category": "stone_shape",
+      "canonical_terms": {"en": "emerald cut", "ru": "изумрудная огранка"},
+      "synonyms": {"en": ["emerald-cut"], "ru": []},
+      "definition": "Stone shape/cut designation kept distinct from the emerald material concept.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      },
+      "deprecated_aliases": [
+        {"locale": "en", "term": "emerald shape"},
+        {"locale": "ru", "term": "изумрудная форма"}
+      ]
+    },
+    {
+      "domain_id": "oval",
+      "category": "stone_shape",
+      "canonical_terms": {"en": "oval", "ru": "овал"},
+      "synonyms": {"en": ["oval shape"], "ru": ["овальная форма"]},
+      "definition": "Stone outline category identified by the catalog term oval.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "halo_style",
+      "category": "style",
+      "canonical_terms": {"en": "halo", "ru": "гало"},
+      "synonyms": {"en": ["halo style"], "ru": ["стиль гало"]},
+      "definition": "Proposed visual style term identified by the catalog term halo.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    },
+    {
+      "domain_id": "minimalist",
+      "category": "style",
+      "canonical_terms": {"en": "minimalist", "ru": "минимализм"},
+      "synonyms": {"en": ["minimal style"], "ru": ["минималистичный стиль"]},
+      "definition": "Proposed visual style term identified by the catalog term minimalist.",
+      "provenance": {
+        "source_kind": "repository_spec",
+        "source_ref": "docs/product/issues/03-dictionary.md",
+        "review_status": "proposed_pending_domain_review"
+      }
+    }
+  ]
+}

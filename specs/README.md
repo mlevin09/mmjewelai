@@ -1,7 +1,8 @@
 # Foundation specification index
 
-Jewelry Design Schema v1.0.0 and Role Profiles v1.0.0 are implemented with JSON Schemas, Python
-models and tests. The remaining entries are implementation briefs, not production catalogs.
+Jewelry Design Schema v1.0.0, Role Profiles v1.0.0, and Domain Dictionary v1.0.0 are implemented with
+JSON Schemas, Python models, versioned artifacts, and tests. The remaining entries are implementation
+briefs, not production catalogs.
 
 1. [Jewelry Design Schema](jewelry-design-schema/README.md)
 2. [Role Profiles](roles/README.md)

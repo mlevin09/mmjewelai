@@ -8,6 +8,8 @@ on:
       - specs/jewelry-design-schema/**
       - specs/roles/**
       - data/roles/**
+      - specs/dictionary/**
+      - data/dictionary/**
       - .github/workflows/domain-schema.yml
   push:
     branches: [jewelai-v2]
@@ -16,6 +18,8 @@ on:
       - specs/jewelry-design-schema/**
       - specs/roles/**
       - data/roles/**
+      - specs/dictionary/**
+      - data/dictionary/**
       - .github/workflows/domain-schema.yml
 
 permissions:
