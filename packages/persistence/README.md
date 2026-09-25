@@ -24,6 +24,11 @@ bytes remain behind the `PrivateObjectStore` port. Repository methods validate o
 → session, parent scope, and exact succeeded GenerationRun output lineage. A unique run/ordinal pair
 prevents duplicate canonical generated assets.
 
+The `0006_auth_membership` migration adds principals keyed uniquely by `(issuer, subject)` and
+organization memberships. API organization creation writes the organization and creator OWNER
+membership atomically. Owner deletion/demotion locks the organization row before checking for
+another owner. Existing organizations are not assigned owners automatically.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.
@@ -35,5 +40,6 @@ DATABASE_URL=postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai \
   alembic -c packages/persistence/alembic.ini upgrade head
 ```
 
-Authentication is not implemented. Repository methods require an explicit organization scope and
-join through project ownership so a future authenticated organization context can be supplied.
+Authentication is established above this package. Repository methods retain explicit organization
+scope and ownership joins as defense in depth; they do not interpret bearer tokens or authorize from
+IDs alone.

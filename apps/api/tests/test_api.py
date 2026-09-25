@@ -6,16 +6,25 @@ from uuid import UUID
 
 import pytest
 from conftest import NOW, create_hierarchy
+from fastapi.testclient import TestClient
 from jewelai_assets import Asset, AssetContentType, AssetKind, AssetStatus, build_object_key
+from jewelai_auth import AuthenticationUnavailableError
 from jewelai_domain import Design
 from jewelai_generation import GatewayRegistry, execute_generation_run
 from jewelai_model_gateway import GeneratedOutputDescriptor, GenerationResult
+from jewelai_persistence import create_session_factory
+from jewelai_persistence.models import AuthPrincipalRow
+from sqlalchemy import select
 
 from jewelai_api.artifacts import ArtifactConfigurationError, load_runtime_artifacts
 from jewelai_api.schemas import EditRevisionRequest
 from jewelai_api.settings import ArtifactVersions
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def auth(token):
+    return {"Authorization": f"Bearer {token}"}
 
 
 def source(message_id):
@@ -82,6 +91,220 @@ def test_health_organization_project_session_and_scope(client):
         ),
     )
     assert response.status_code == 404
+
+
+def test_authentication_is_required_and_health_is_public(client):
+    assert client.get("/health", headers={"Authorization": ""}).status_code == 200
+    missing = client.get("/me", headers={"Authorization": ""})
+    assert missing.status_code == 401
+    assert missing.headers["www-authenticate"] == "Bearer"
+    invalid = client.get("/me", headers=auth("invalid"))
+    assert invalid.status_code == 401
+    header_only = client.get(
+        "/sessions/00000000-0000-0000-0000-000000000000",
+        headers={"Authorization": "", "X-Organization-ID": str(UUID(int=1))},
+    )
+    assert header_only.status_code == 401
+
+
+def test_me_membership_lifecycle_and_cross_tenant_authorization(client):
+    organization_id, _, session_response = create_hierarchy(client)
+    session_id = session_response.json()["session_id"]
+    owner_me = client.get("/me").json()
+    assert owner_me["memberships"] == [
+        {
+            "organization_id": organization_id,
+            "organization_name": "Organization A",
+            "role": "owner",
+        }
+    ]
+    member = client.get("/me", headers=auth("test-member-b")).json()
+    principal_id = member["principal_id"]
+    selected = {"X-Organization-ID": organization_id, **auth("test-member-b")}
+    assert client.get(f"/sessions/{session_id}", headers=selected).status_code == 404
+
+    created = client.post(
+        f"/organizations/{organization_id}/memberships",
+        json={"principal_id": principal_id, "role": "member"},
+    )
+    assert created.status_code == 201
+    assert client.get(f"/sessions/{session_id}", headers=selected).status_code == 200
+    assert (
+        client.get(
+            f"/organizations/{organization_id}/memberships", headers=auth("test-member-b")
+        ).status_code
+        == 403
+    )
+    removed = client.delete(f"/organizations/{organization_id}/memberships/{principal_id}")
+    assert removed.status_code == 204
+    assert client.get(f"/sessions/{session_id}", headers=selected).status_code == 404
+
+
+def test_membership_policy_and_last_owner_http_mapping(client):
+    organization = client.post("/organizations", json={"name": "Policy org"}).json()
+    organization_id = organization["organization_id"]
+    owner_id = client.get("/me").json()["principal_id"]
+    with pytest.raises(KeyError):
+        _ = client.get("/me").json()["subject"]
+    assert (
+        client.delete(f"/organizations/{organization_id}/memberships/{owner_id}").status_code == 409
+    )
+    admin = client.get("/me", headers=auth("test-admin")).json()
+    client.post(
+        f"/organizations/{organization_id}/memberships",
+        json={"principal_id": admin["principal_id"], "role": "admin"},
+    )
+    assert (
+        client.get(
+            f"/organizations/{organization_id}/memberships", headers=auth("test-admin")
+        ).status_code
+        == 200
+    )
+    target = client.get("/me", headers=auth("test-target")).json()
+    denied = client.post(
+        f"/organizations/{organization_id}/memberships",
+        headers=auth("test-admin"),
+        json={"principal_id": target["principal_id"], "role": "admin"},
+    )
+    assert denied.status_code == 403
+    allowed = client.post(
+        f"/organizations/{organization_id}/memberships",
+        headers=auth("test-admin"),
+        json={"principal_id": target["principal_id"], "role": "member"},
+    )
+    assert allowed.status_code == 201
+    assert (
+        client.post(
+            f"/organizations/{organization_id}/memberships",
+            json={"principal_id": target["principal_id"], "role": "member"},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            f"/organizations/{organization_id}/memberships",
+            json={"principal_id": str(UUID(int=999)), "role": "member"},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.patch(
+            f"/organizations/{organization_id}/memberships/{target['principal_id']}",
+            headers=auth("test-admin"),
+            json={"role": "admin"},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            f"/organizations/{organization_id}/memberships",
+            headers=auth("test-target"),
+            json={"principal_id": owner_id, "role": "owner"},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.delete(
+            f"/organizations/{organization_id}/memberships/{target['principal_id']}",
+            headers=auth("test-admin"),
+        ).status_code
+        == 204
+    )
+
+    second_owner = client.get("/me", headers=auth("test-owner-two")).json()
+    assert (
+        client.post(
+            f"/organizations/{organization_id}/memberships",
+            json={"principal_id": second_owner["principal_id"], "role": "owner"},
+        ).status_code
+        == 201
+    )
+    assert (
+        client.patch(
+            f"/organizations/{organization_id}/memberships/{owner_id}",
+            json={"role": "member"},
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/organizations/{organization_id}/memberships/{second_owner['principal_id']}",
+            headers=auth("test-owner-two"),
+            json={"role": "admin"},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.delete(
+            f"/organizations/{organization_id}/memberships/{admin['principal_id']}",
+            headers=auth("test-owner-two"),
+        ).status_code
+        == 204
+    )
+
+
+def test_openapi_marks_business_routes_bearer_protected(client):
+    document = client.get("/openapi.json", headers={"Authorization": ""}).json()
+    assert "HTTPBearer" in document["components"]["securitySchemes"]
+    assert "security" not in document["paths"]["/health"]["get"]
+    for path, operations in document["paths"].items():
+        if path == "/health":
+            continue
+        for operation in operations.values():
+            assert operation["security"] == [{"HTTPBearer": []}], path
+
+
+def test_authentication_infrastructure_failure_is_503_without_principal_mutation(app):
+    class UnavailableVerifier:
+        def verify(self, token):
+            raise AuthenticationUnavailableError("Identity key service is unavailable")
+
+    from jewelai_api import create_app
+    from jewelai_api.settings import RuntimeSettings
+
+    unavailable = create_app(
+        RuntimeSettings(repository_root=ROOT),
+        engine=app.state.engine,
+        clock=lambda: NOW,
+        token_verifier=UnavailableVerifier(),
+    )
+    with TestClient(unavailable) as isolated:
+        response = isolated.get("/me", headers=auth("test-any"))
+    assert response.status_code == 503
+    with create_session_factory(app.state.engine)() as db:
+        assert db.scalars(select(AuthPrincipalRow)).all() == []
+
+
+def test_app_factory_without_verifier_or_oidc_configuration_fails_closed(engine):
+    from jewelai_api import create_app
+    from jewelai_api.settings import RuntimeSettings
+
+    with pytest.raises(ValueError, match="OIDC configuration"):
+        create_app(RuntimeSettings(repository_root=ROOT), engine=engine)
+
+
+def test_membership_role_does_not_replace_conversational_role(client):
+    organization = client.post("/organizations", json={"name": "Role separation"}).json()
+    member = client.get("/me", headers=auth("test-retail-client")).json()
+    client.post(
+        f"/organizations/{organization['organization_id']}/memberships",
+        json={"principal_id": member["principal_id"], "role": "member"},
+    )
+    project = client.post(
+        f"/organizations/{organization['organization_id']}/projects",
+        headers=auth("test-retail-client"),
+        json={"name": "Member project"},
+    ).json()
+    session = client.post(
+        f"/projects/{project['project_id']}/sessions",
+        headers={
+            **auth("test-retail-client"),
+            "X-Organization-ID": organization["organization_id"],
+        },
+        json={"role_id": "industrial_designer", "locale": "en"},
+    )
+    assert session.status_code == 201
+    assert session.json()["role_id"] == "industrial_designer"
 
 
 @pytest.mark.parametrize(

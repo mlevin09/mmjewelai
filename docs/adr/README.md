@@ -16,5 +16,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0011 — Asset ingestion and storage boundary](0011-asset-ingestion-storage-boundary.md)
 - [0012 — GCS storage and signed Asset access](0012-gcs-storage-signed-asset-access.md)
 - [0013 — OpenAI image provider output retrieval](0013-openai-image-provider-output-retrieval.md)
+- [0014 — Authentication and organization membership](0014-authentication-organization-membership.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

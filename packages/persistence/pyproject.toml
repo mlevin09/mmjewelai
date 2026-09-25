@@ -8,6 +8,7 @@ version = "1.0.0"
 description = "SQLAlchemy persistence boundary for JewelAI V2"
 requires-python = ">=3.12"
 dependencies = [
+  "jewelai-auth==1.0.0",
   "jewelai-assets==1.0.0",
   "jewelai-domain==1.0.0",
   "jewelai-model-gateway==1.0.0",

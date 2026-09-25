@@ -1,13 +1,15 @@
 # Planned data model and storage boundary
 
 This remains the broader logical model. The runtime physically implements organization, project,
-design_session, message, specification_revision, question_event, prompt_revision, generation_run,
-and asset; see ADRs 0007–0011 and the Alembic migrations. Later rows remain plans, not implemented
+auth_principal, organization_membership, design_session, message, specification_revision,
+question_event, prompt_revision, generation_run, and asset; see ADRs 0007–0014 and the Alembic
+migrations. Later rows remain plans, not implemented
 claims.
 
 | Entity | Scope / relationships |
 | --- | --- |
-| organization, membership | Tenant and authenticated membership; separate from conversational role |
+| auth_principal | External `(issuer, subject)` identity plus optional verified metadata; tokens are never stored |
+| organization, organization_membership | Tenant and owner/admin/member access; separate from conversational role |
 | project | Belongs to one organization |
 | design_session | Project, selected role, locale, conversation state and pinned artifact versions |
 | message | Implemented user-message lineage: session, bounded content, server timestamp; privacy/retention policy pending |

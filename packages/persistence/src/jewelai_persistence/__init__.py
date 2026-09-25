@@ -1,7 +1,7 @@
 """Persistence boundary for immutable JewelAI domain revisions."""
 
 from .database import create_database_engine, create_session_factory
-from .models import AssetRow, Base
+from .models import AssetRow, AuthPrincipalRow, Base, OrganizationMembershipRow
 from .repository import (
     DuplicateRevisionError,
     GenerationStateConflictError,
@@ -14,10 +14,12 @@ from .repository import (
 __all__ = [
     "Base",
     "AssetRow",
+    "AuthPrincipalRow",
     "DuplicateRevisionError",
     "GenerationStateConflictError",
     "NotFoundError",
     "OwnershipMismatchError",
+    "OrganizationMembershipRow",
     "PersistenceRepository",
     "StaleRevisionError",
     "create_database_engine",

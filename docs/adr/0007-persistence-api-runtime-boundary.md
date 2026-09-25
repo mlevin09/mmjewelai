@@ -56,3 +56,7 @@ assets, queues, and deployment remain unresolved and out of scope.
 
 Run the unchanged domain suite, runtime tests, PostgreSQL-marked concurrency test, Alembic upgrade,
 Ruff lint/format checks, and schema/diff checks documented in the package READMEs and CI workflows.
+
+The temporary unauthenticated `X-Organization-ID` API behavior is superseded by
+[ADR 0014](0014-authentication-organization-membership.md). Its ownership-scoped repository checks
+remain defense in depth beneath authenticated organization membership.
