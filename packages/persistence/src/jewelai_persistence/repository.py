@@ -140,6 +140,7 @@ class PersistenceRepository:
                 raise MembershipNotFoundError("Principal not found")
             row = OrganizationRow(organization_id=organization_id, name=name, created_at=created_at)
             db.add(row)
+            db.flush()
             db.add(
                 OrganizationMembershipRow(
                     organization_id=organization_id,
