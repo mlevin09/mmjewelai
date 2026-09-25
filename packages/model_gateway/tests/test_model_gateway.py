@@ -14,9 +14,12 @@ from jewelai_model_gateway import (
     GatewayContractViolationError,
     GeneratedOutputDescriptor,
     GenerationConfiguration,
+    GenerationExecution,
     GenerationRequest,
     GenerationResult,
     ImageGenerationGateway,
+    RetrievedImageOutput,
+    validate_generation_execution,
     validate_generation_result,
 )
 from jewelai_model_gateway.schema import model_gateway_json_schema
@@ -169,6 +172,50 @@ def test_gateway_is_narrow_synchronous_protocol():
     signature = inspect.signature(ImageGenerationGateway.generate)
     assert tuple(signature.parameters) == ("self", "request")
     assert not inspect.iscoroutinefunction(ImageGenerationGateway.generate)
+
+
+def test_transient_execution_aligns_metadata_and_hidden_png_bytes(generation_request):
+    result = result_for(generation_request)
+    execution = GenerationExecution(
+        result=result,
+        outputs=(
+            RetrievedImageOutput(1, "output-1", "image/png", b"first"),
+            RetrievedImageOutput(2, "output-2", "image/png", b"second"),
+        ),
+    )
+
+    assert validate_generation_execution(generation_request, execution) == execution
+    assert "first" not in repr(execution.outputs[0])
+
+
+@pytest.mark.parametrize(
+    "outputs",
+    [
+        (RetrievedImageOutput(2, "output-1", "image/png", b"first"),),
+        (
+            RetrievedImageOutput(1, "wrong", "image/png", b"first"),
+            RetrievedImageOutput(2, "output-2", "image/png", b"second"),
+        ),
+    ],
+)
+def test_transient_execution_rejects_count_ordinal_and_id_mismatch(generation_request, outputs):
+    execution = GenerationExecution(result=result_for(generation_request), outputs=outputs)
+    with pytest.raises(GatewayContractViolationError):
+        validate_generation_execution(generation_request, execution)
+
+
+def test_transient_output_rejects_non_png_or_empty_content():
+    with pytest.raises(ValueError, match="image/png"):
+        RetrievedImageOutput(1, None, "image/jpeg", b"content")
+    with pytest.raises(ValueError, match="non-empty"):
+        RetrievedImageOutput(1, None, "image/png", b"")
+
+
+def test_transient_execution_is_excluded_from_published_schema():
+    schema = json.dumps(model_gateway_json_schema(), sort_keys=True)
+    assert "GenerationExecution" not in schema
+    assert "RetrievedImageOutput" not in schema
+    assert '"content":' not in schema
 
 
 def test_contract_contains_no_domain_mutation_or_provider_secret_fields(generation_request):

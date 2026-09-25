@@ -12,6 +12,7 @@ Python 3.12+ and PostgreSQL are the production-compatible target:
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
 python -m pip install -e './packages/model_gateway[test]'
+python -m pip install -e './packages/model_gateway_openai[test]'
 python -m pip install -e './packages/assets[test]'
 python -m pip install -e './packages/persistence'
 python -m pip install -e './workers/generation[test]'
@@ -73,7 +74,9 @@ validates ownership and the stored prompt contract, then creates a pending run; 
 gateway inline. No generation profile or fake provider is registered by default. Tests inject the
 `test_default@1.0.0` profile resolving to `test/deterministic-image-v1` with output count 1. The
 one-shot worker is invoked separately, claims atomically, validates untrusted result metadata, and
-does not recompile or compare against a newer current design revision.
+does not recompile or compare against a newer current design revision. The OpenAI adapter is never
+constructed by `create_app()` and no API route invokes a provider. Production composition may inject
+it into the worker with environment-managed credentials, bounded timeout, and disabled SDK retries.
 
 Asset endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets, and
 URLs. Asset ingestion and signed-read contracts are internal reusable boundaries in `packages/assets`;
@@ -87,12 +90,13 @@ Authentication, authenticated asset access, retention, and reconciliation remain
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
 python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
 python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/assets_gcs packages/persistence workers/generation
-python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
 ```
 
 Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim, and
