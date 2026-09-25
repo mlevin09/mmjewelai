@@ -24,7 +24,9 @@ from jewelai_assets import (
     StoredObject,
     build_object_key,
     content_metadata,
+    finalize_staged_asset,
     ingest_asset,
+    stage_asset_object,
     validate_asset_object_key,
 )
 from jewelai_assets.schema import asset_json_schema
@@ -326,6 +328,88 @@ def test_reference_ingestion_succeeds_without_metadata_bytes_and_retry_skips_wri
     assert store.objects[first.object_key][0] == PNG
     assert b"minimal" not in json.dumps(first.model_dump(mode="json")).encode()
     assert store.write_count == 1
+
+
+def test_stage_asset_object_writes_once_to_canonical_key_with_authoritative_metadata():
+    store = MemoryObjectStore()
+    stored = stage_asset_object(request=request(), content=PNG, object_store=store)
+
+    assert stored.object_key == build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG)
+    assert stored.content_type is AssetContentType.PNG
+    assert stored.content_hash == sha256(PNG).hexdigest()
+    assert stored.byte_size == len(PNG)
+    assert store.write_count == 1
+    assert store.objects[stored.object_key] == (PNG, stored)
+
+
+def test_stage_asset_object_rejects_invalid_binary_before_storage():
+    store = MemoryObjectStore()
+    with pytest.raises(AssetContentRejectedError):
+        stage_asset_object(request=request(), content=b"not-png", object_store=store)
+    assert store.write_count == 0
+
+
+def test_stage_asset_object_rejects_mismatched_storage_metadata_without_repository_mutation():
+    repository = MemoryRepository()
+
+    class MismatchedStore:
+        def put_if_absent(self, object_key, content, *, content_type, content_hash):
+            return StoredObject(
+                object_key=build_object_key(
+                    ORG_ID, PROJECT_ID, OTHER_ASSET_ID, AssetContentType.PNG
+                ),
+                content_type=content_type,
+                content_hash=content_hash,
+                byte_size=len(content),
+            )
+
+    with pytest.raises(AssetStorageConflictError):
+        stage_asset_object(request=request(), content=PNG, object_store=MismatchedStore())
+    assert repository.assets == {}
+
+
+def test_finalize_staged_asset_creates_ready_metadata_without_second_storage_write():
+    repository = MemoryRepository()
+    store = MemoryObjectStore()
+    stored = stage_asset_object(request=request(), content=PNG, object_store=store)
+
+    first = finalize_staged_asset(
+        request=request(),
+        content=PNG,
+        stored_object=stored,
+        repository=repository,
+        clock=ticking_clock(),
+    )
+    second = finalize_staged_asset(
+        request=request(),
+        content=PNG,
+        stored_object=stored,
+        repository=repository,
+        clock=lambda: NOW + timedelta(minutes=1),
+    )
+
+    assert first == second
+    assert first.status is AssetStatus.READY
+    assert repository.assets == {ASSET_ID: first}
+    assert store.write_count == 1
+
+
+def test_finalize_staged_asset_rejects_wrong_metadata_before_repository_mutation():
+    repository = MemoryRepository()
+    wrong = StoredObject(
+        object_key=build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG),
+        content_type=AssetContentType.PNG,
+        content_hash="0" * 64,
+        byte_size=len(PNG),
+    )
+    with pytest.raises(AssetStorageConflictError):
+        finalize_staged_asset(
+            request=request(),
+            content=PNG,
+            stored_object=wrong,
+            repository=repository,
+        )
+    assert repository.assets == {}
 
 
 def test_conflicting_same_id_retry_preserves_original():

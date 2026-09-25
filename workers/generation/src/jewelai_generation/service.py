@@ -9,14 +9,12 @@ from uuid import UUID
 from jewelai_assets import (
     Asset,
     AssetContentRejectedError,
-    AssetContentType,
-    AssetIngestionPolicy,
     AssetIngestionRequest,
     AssetKind,
-    AssetStatus,
+    AssetStorageError,
     PrivateObjectStore,
-    content_metadata,
-    ingest_asset,
+    finalize_staged_asset,
+    stage_asset_object,
 )
 from jewelai_model_gateway import (
     GatewayError,
@@ -122,7 +120,7 @@ def execute_generation_run_with_assets(
     object_store: PrivateObjectStore,
     clock: Callable[[], datetime] | None = None,
 ) -> ExecutionOutcome:
-    """Execute once, persist metadata success, then materialize transient outputs."""
+    """Execute once, durably stage all outputs, then persist success and Asset metadata."""
     clock = clock or (lambda: datetime.now(UTC))
     prepared = _prepare_execution(repository, session_id, generation_run_id, organization_id, clock)
     if isinstance(prepared, ExecutionOutcome):
@@ -132,21 +130,45 @@ def execute_generation_run_with_assets(
     try:
         executor = executors.get(claimed.provider)
         execution = validate_generation_execution(request, executor.execute(request))
+        session = repository.get_design_session(session_id, organization_id)
+        staged = []
         for output in execution.outputs:
+            descriptor = execution.result.outputs[output.ordinal - 1]
+            ingestion_request = AssetIngestionRequest(
+                asset_id=generated_asset_id(generation_run_id, output.ordinal),
+                organization_id=organization_id,
+                project_id=session.project_id,
+                session_id=session_id,
+                kind=AssetKind.GENERATED,
+                declared_content_type=output.declared_content_type,
+                generation_run_id=generation_run_id,
+                generation_output_ordinal=output.ordinal,
+                provider_output_id=descriptor.provider_output_id,
+            )
             try:
-                content_metadata(
-                    output.content,
-                    AssetContentType(output.declared_content_type),
-                    AssetIngestionPolicy(),
+                stored_object = stage_asset_object(
+                    request=ingestion_request,
+                    content=output.content,
+                    object_store=object_store,
                 )
             except (AssetContentRejectedError, ValueError) as exc:
                 raise InvalidProviderResponseError from exc
+            staged.append((ingestion_request, output, stored_object))
         completed = repository.complete_generation_run(
             session_id,
             generation_run_id,
             organization_id,
             execution.result,
             clock(),
+        )
+    except AssetStorageError:
+        return _fail(
+            repository,
+            claimed,
+            organization_id,
+            GenerationErrorCode.GATEWAY_UNAVAILABLE,
+            "Generated output could not be durably staged",
+            clock,
         )
     except GatewayError as exc:
         return _fail(
@@ -167,34 +189,18 @@ def execute_generation_run_with_assets(
             clock,
         )
 
-    try:
-        session = repository.get_design_session(session_id, organization_id)
-    except Exception:
-        return ExecutionOutcome(disposition="materialization_failed", run=completed)
     assets = []
     materialization_failed = False
-    for output in execution.outputs:
-        descriptor = execution.result.outputs[output.ordinal - 1]
+    for ingestion_request, output, stored_object in staged:
         try:
-            asset = ingest_asset(
-                request=AssetIngestionRequest(
-                    asset_id=generated_asset_id(generation_run_id, output.ordinal),
-                    organization_id=organization_id,
-                    project_id=session.project_id,
-                    session_id=session_id,
-                    kind=AssetKind.GENERATED,
-                    declared_content_type=output.declared_content_type,
-                    generation_run_id=generation_run_id,
-                    generation_output_ordinal=output.ordinal,
-                    provider_output_id=descriptor.provider_output_id,
-                ),
+            asset = finalize_staged_asset(
+                request=ingestion_request,
                 content=output.content,
+                stored_object=stored_object,
                 repository=repository,
-                object_store=object_store,
                 clock=clock,
             )
             assets.append(asset)
-            materialization_failed = materialization_failed or asset.status is AssetStatus.FAILED
         except Exception:
             materialization_failed = True
     return ExecutionOutcome(

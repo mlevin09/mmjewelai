@@ -12,6 +12,8 @@ from jewelai_assets import AssetStatus, StoredObject
 from jewelai_domain import DesignRevision
 from jewelai_generation import (
     ExecutorRegistry,
+    GatewayRegistry,
+    execute_generation_run,
     execute_generation_run_with_assets,
     generated_asset_id,
 )
@@ -41,6 +43,7 @@ PROJECT_ID = UUID("20000000-0000-4000-8000-000000000002")
 SESSION_ID = UUID("20000000-0000-4000-8000-000000000003")
 PROMPT_ID = UUID("20000000-0000-4000-8000-000000000004")
 RUN_ID = UUID("20000000-0000-4000-8000-000000000005")
+LEGACY_RUN_ID = UUID("20000000-0000-4000-8000-000000000006")
 MODEL = "gpt-image-2.5-sunburst-2026-09-08"
 PNG = b"\x89PNG\r\n\x1a\nopenai-integration-output"
 
@@ -56,10 +59,14 @@ class FakeOpenAIClient:
 
 
 class MemoryObjectStore:
-    def __init__(self):
+    def __init__(self, events):
         self.objects = {}
+        self.events = events
+        self.write_count = 0
 
     def put_if_absent(self, object_key, content, *, content_type, content_hash):
+        self.events.append("object_staged")
+        self.write_count += 1
         self.objects[object_key] = content
         return StoredObject(
             object_key=object_key,
@@ -140,7 +147,21 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
     adapter = OpenAIImageGenerationAdapter(
         OpenAIImageProviderConfig(allowed_models=(MODEL,)), client=client
     )
-    store = MemoryObjectStore()
+    events = []
+    store = MemoryObjectStore(events)
+    original_complete = repository.complete_generation_run
+    original_create = repository.create_pending_asset
+
+    def complete(*args, **kwargs):
+        events.append("run_succeeded")
+        return original_complete(*args, **kwargs)
+
+    def create(asset):
+        events.append("asset_metadata_created")
+        return original_create(asset)
+
+    repository.complete_generation_run = complete
+    repository.create_pending_asset = create
     ticks = iter(NOW + timedelta(seconds=value) for value in range(1, 10))
 
     outcome = execute_generation_run_with_assets(
@@ -155,6 +176,8 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
 
     assert outcome.disposition == "succeeded"
     assert outcome.run.status is GenerationStatus.SUCCEEDED
+    assert events == ["object_staged", "run_succeeded", "asset_metadata_created"]
+    assert store.write_count == 1
     assert client.calls == [
         {
             "model": MODEL,
@@ -181,4 +204,31 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
         assert "content" not in AssetRow.__table__.columns
         assert asset_row.byte_size == len(PNG)
         assert asset_row.content_hash == sha256(PNG).hexdigest()
+
+    repository.create_generation_run(
+        GenerationRun(
+            generation_run_id=LEGACY_RUN_ID,
+            session_id=SESSION_ID,
+            prompt_revision_id=PROMPT_ID,
+            prompt_content_hash=compiled.content_hash,
+            profile_id="openai_legacy_guard",
+            profile_version="1.0.0",
+            provider="openai",
+            model=MODEL,
+            configuration=GenerationConfiguration(output_count=1),
+            status=GenerationStatus.PENDING,
+            created_at=NOW,
+        ),
+        ORG_ID,
+    )
+    legacy = execute_generation_run(
+        repository,
+        session_id=SESSION_ID,
+        generation_run_id=LEGACY_RUN_ID,
+        organization_id=ORG_ID,
+        gateways=GatewayRegistry({"openai": adapter}),
+        clock=ticks.__next__,
+    )
+    assert legacy.run.status is GenerationStatus.FAILED
+    assert len(client.calls) == 1
     engine.dispose()

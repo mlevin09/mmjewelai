@@ -35,9 +35,6 @@ class OpenAIImageGenerationAdapter:
             )
         )
 
-    def generate(self, request: GenerationRequest) -> GenerationResult:
-        return self.execute(request).result
-
     def execute(self, request: GenerationRequest) -> GenerationExecution:
         request = GenerationRequest.model_validate(request)
         self._validate_request(request)

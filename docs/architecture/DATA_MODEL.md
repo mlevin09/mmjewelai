@@ -26,6 +26,8 @@ All foreign-key ownership checks must prevent cross-tenant access.
 
 Binary assets belong in private GCS; PostgreSQL contains metadata and object identifiers, not image
 bytes or signed URLs. Temporary read URLs are ephemeral bearer capabilities and are never durable
-model state. OpenAI base64 is decoded only in memory and generated outputs are passed through Asset
-ingestion after GenerationRun success. A crash between those steps requires future reconciliation.
+model state. OpenAI base64 is decoded only in memory; every generated output is durably written to
+its deterministic final private object key before GenerationRun success. Asset metadata is finalized
+afterward without a second storage write. Reconciliation of durable objects with missing metadata is
+future work.
 Local repository data/ contains non-sensitive versioned catalogs only.

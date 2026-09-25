@@ -13,6 +13,8 @@ from jewelai_model_gateway import (
     GatewayUnavailableError,
     GenerationConfiguration,
     GenerationRequest,
+    ImageGenerationExecutor,
+    ImageGenerationGateway,
     InvalidProviderResponseError,
     ProviderRejectedError,
     validate_generation_execution,
@@ -102,11 +104,15 @@ def test_exact_request_mapping_uses_immutable_prompt_png_and_no_url_option(compi
     assert "url" not in client.images.calls[0]
 
 
-def test_legacy_metadata_gateway_method_calls_provider_once(compiled_prompt):
+def test_adapter_is_executor_only_and_cannot_discard_outputs_through_legacy_gateway(
+    compiled_prompt,
+):
     client = FakeClient(response_for(PNG))
-    result = adapter_for(client).generate(request_for(compiled_prompt))
-    assert result.outputs[0].ordinal == 1
-    assert len(client.images.calls) == 1
+    adapter = adapter_for(client)
+    assert isinstance(adapter, ImageGenerationExecutor)
+    assert not isinstance(adapter, ImageGenerationGateway)
+    assert not hasattr(adapter, "generate")
+    assert client.images.calls == []
 
 
 @pytest.mark.parametrize("output_count", [1, 2, 3, 4])

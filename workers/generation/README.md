@@ -10,12 +10,15 @@ Generation remains anchored to `prompt_revision_id`; a newer current specificati
 invalidate historical generation lineage.
 
 `execute_generation_run_with_assets` is the production-capable provider-neutral path. It validates
-one transient `GenerationExecution`, checks PNG content before run completion, persists only result
-metadata, then uses existing Asset ingestion with an injected `PrivateObjectStore`. Generated Asset
-IDs are deterministic UUIDv5 values from a fixed namespace plus `{generation_run_id}:{ordinal}`.
-Storage failure leaves the run succeeded and the Asset failed. A crash can leave a succeeded run
-without its Asset; reconciliation, queue delivery, and automatic retries remain separate future
-work. The worker imports neither OpenAI nor GCS.
+one transient `GenerationExecution`, derives deterministic UUIDv5 Asset IDs, and stages every output
+at its final private object key through the injected `PrivateObjectStore`. Only after all writes and
+returned metadata verify does it persist result metadata and mark the run succeeded. It then creates
+and readies Asset metadata without another storage operation.
+
+Storage failure before success fails the run and creates no Asset rows. A crash after success can
+leave Asset metadata missing, but the original bytes remain durable for future reconciliation. A
+crash before staging may leave a RUNNING run, while partial staging may leave private orphan objects;
+recovery and cleanup remain future work. The worker imports neither OpenAI nor GCS.
 
 ```sh
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
