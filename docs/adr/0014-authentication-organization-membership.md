@@ -22,6 +22,9 @@ pair plus optional verified email and display-name metadata. Email is never an i
 authorization key. Tokens, raw claims, role/group/organization claims, and signatures are neither
 persisted nor used for access decisions.
 
+External `issuer` and `subject` identifiers are never canonicalized. Leading or trailing whitespace
+is rejected rather than trimmed; accepted identifiers are persisted exactly.
+
 Persist organization memberships with separate `owner`, `admin`, and `member` roles. All three may
 use normal product functionality. Owners manage every membership role; admins may list memberships
 and add/remove members only; members cannot manage memberships. Owner deletion/demotion locks the

@@ -40,9 +40,10 @@ from jewelai_persistence import (
     create_database_engine,
     create_session_factory,
 )
-from jewelai_persistence.models import AssetRow, PromptRevisionRow
+from jewelai_persistence.models import AssetRow, AuthPrincipalRow, PromptRevisionRow
 from jewelai_prompts import compile_prompt
-from sqlalchemy import inspect
+from pydantic import ValidationError
+from sqlalchemy import func, inspect, select
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.schemas import CreateSessionRequest
@@ -367,6 +368,22 @@ def test_principal_identity_and_membership_persistence(engine):
             MembershipRole.MEMBER,
             NOW,
         )
+
+
+def test_exact_subject_is_persisted_without_normalization_or_collision(engine):
+    repository = PersistenceRepository(create_session_factory(engine))
+    identity = VerifiedIdentity(issuer="https://issuer.test", subject="alice")
+    principal = repository.get_or_create_principal(
+        identity,
+        UUID("51515151-5151-4151-8151-515151515151"),
+        NOW,
+    )
+    assert principal.issuer == "https://issuer.test"
+    assert principal.subject == "alice"
+    with pytest.raises(ValidationError, match="leading or trailing whitespace"):
+        VerifiedIdentity(issuer="https://issuer.test", subject=" alice ")
+    with create_session_factory(engine)() as db:
+        assert db.scalar(select(func.count()).select_from(AuthPrincipalRow)) == 1
 
 
 def test_pre_auth_organization_is_not_claimed(engine):

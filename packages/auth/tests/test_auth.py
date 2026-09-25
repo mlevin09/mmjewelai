@@ -30,6 +30,31 @@ def test_identity_and_principal_are_strict_immutable_contracts():
     }
 
 
+def test_external_identity_identifiers_are_preserved_exactly():
+    identity = VerifiedIdentity(issuer="https://issuer.test", subject="alice")
+    assert identity.issuer == "https://issuer.test"
+    assert identity.subject == "alice"
+
+
+@pytest.mark.parametrize("subject", [" alice", "alice ", " alice ", " "])
+def test_subject_with_boundary_whitespace_is_rejected_not_normalized(subject):
+    with pytest.raises(ValidationError, match="leading or trailing whitespace"):
+        VerifiedIdentity(issuer="https://issuer.test", subject=subject)
+
+
+@pytest.mark.parametrize("issuer", [" https://issuer.test", "https://issuer.test ", " "])
+def test_issuer_with_boundary_whitespace_is_rejected_not_normalized(issuer):
+    with pytest.raises(ValidationError, match="leading or trailing whitespace"):
+        VerifiedIdentity(issuer=issuer, subject="alice")
+
+
+def test_distinct_external_subject_cannot_collapse_through_normalization():
+    exact = VerifiedIdentity(issuer="https://issuer.test", subject="alice")
+    assert exact.subject == "alice"
+    with pytest.raises(ValidationError):
+        VerifiedIdentity(issuer="https://issuer.test", subject=" alice ")
+
+
 @pytest.mark.parametrize("role", [MembershipRole.OWNER, MembershipRole.ADMIN])
 def test_owner_and_admin_can_list_memberships(role):
     require_can_list_memberships(role)

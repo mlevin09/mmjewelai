@@ -4,10 +4,10 @@ from enum import StrEnum
 from typing import Annotated, Protocol, runtime_checkable
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, StringConstraints
+from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
 
-Issuer = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
-Subject = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+Issuer = Annotated[str, StringConstraints(min_length=1, max_length=500)]
+Subject = Annotated[str, StringConstraints(min_length=1, max_length=255)]
 Email = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]
 DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 
@@ -25,6 +25,13 @@ class VerifiedIdentity(BaseModel):
     subject: Subject
     email: Email | None = None
     display_name: DisplayName | None = None
+
+    @field_validator("issuer", "subject")
+    @classmethod
+    def security_identifiers_are_exact(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("Security identifiers must not have leading or trailing whitespace")
+        return value
 
 
 class AuthenticatedPrincipal(BaseModel):

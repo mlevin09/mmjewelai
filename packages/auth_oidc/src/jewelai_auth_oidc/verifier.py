@@ -37,6 +37,8 @@ class OidcJwtConfig(BaseModel):
     @field_validator("issuer")
     @classmethod
     def https_issuer(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("Issuer must not have leading or trailing whitespace")
         parsed = urlparse(value)
         if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
             raise ValueError("Issuer must be an absolute HTTPS URL without user information")
@@ -173,7 +175,12 @@ class OidcJwtVerifier:
                 options={"require": ["iss", "aud", "sub", "exp"]},
             )
             subject = claims["sub"]
-            if not isinstance(subject, str) or not subject.strip() or len(subject) > 255:
+            if (
+                not isinstance(subject, str)
+                or not subject
+                or subject != subject.strip()
+                or len(subject) > 255
+            ):
                 raise AuthenticationError("Bearer token is invalid")
             email = claims.get("email") if claims.get("email_verified") is True else None
             if not isinstance(email, str):

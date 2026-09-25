@@ -77,6 +77,19 @@ def test_valid_rs256_token_and_verified_email_metadata(keys):
     assert not hasattr(identity, "role")
 
 
+def test_valid_subject_is_preserved_exactly(keys):
+    private, _ = keys
+    identity = verifier(keys).verify(token(private, sub="alice"))
+    assert identity.subject == "alice"
+
+
+@pytest.mark.parametrize("subject", [" alice", "alice ", " alice ", " "])
+def test_subject_boundary_whitespace_is_rejected(keys, subject):
+    private, _ = keys
+    with pytest.raises(AuthenticationError, match="Bearer token is invalid"):
+        verifier(keys).verify(token(private, sub=subject))
+
+
 def test_unverified_or_string_verified_email_is_ignored(keys):
     private, _ = keys
     for verified in (False, "true", None):
@@ -226,6 +239,8 @@ def test_jwks_redirect_is_not_followed_and_timeout_is_bounded(keys):
     "changes",
     [
         {"issuer": "http://issuer.test"},
+        {"issuer": " https://issuer.test"},
+        {"issuer": "https://issuer.test "},
         {"jwks_url": "http://issuer.test/keys"},
         {"allowed_algorithms": ("HS256",)},
         {"http_timeout_seconds": 0},
