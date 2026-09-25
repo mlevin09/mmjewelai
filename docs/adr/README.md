@@ -15,5 +15,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0010 — Model Gateway generation boundary](0010-model-gateway-generation-boundary.md)
 - [0011 — Asset ingestion and storage boundary](0011-asset-ingestion-storage-boundary.md)
 - [0012 — GCS storage and signed Asset access](0012-gcs-storage-signed-asset-access.md)
+- [0013 — OpenAI image provider output retrieval](0013-openai-image-provider-output-retrieval.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

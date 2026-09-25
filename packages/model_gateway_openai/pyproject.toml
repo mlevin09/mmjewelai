@@ -3,22 +3,20 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [project]
-name = "jewelai-generation-worker"
+name = "jewelai-model-gateway-openai"
 version = "1.0.0"
-description = "One-shot generation orchestration boundary for JewelAI V2"
+description = "OpenAI image-generation adapter for JewelAI V2"
 requires-python = ">=3.12"
 dependencies = [
-  "jewelai-assets==1.0.0",
   "jewelai-model-gateway==1.0.0",
-  "jewelai-persistence==1.0.0",
-  "pydantic>=2.11,<3",
+  "openai>=3.19,<4",
 ]
 
 [project.optional-dependencies]
 test = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/jewelai_generation"]
+packages = ["src/jewelai_model_gateway_openai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

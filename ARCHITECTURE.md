@@ -52,8 +52,10 @@ Existing root files are retained as V1. Foundation contracts live in `specs/`, r
 Step 2 established the modular-monolith skeleton below. `packages/domain` contains deterministic
 behavior, `packages/parser` owns the provider-neutral candidate/proposal boundary,
 `packages/prompts` owns deterministic provider-neutral prompt compilation and lock verification,
-`packages/model_gateway` owns provider-neutral generation contracts, `workers/generation` owns the
-one-shot generation unit of work, `packages/assets` owns private binary-ingestion and temporary
+`packages/model_gateway` owns provider-neutral persisted and transient generation contracts,
+`packages/model_gateway_openai` translates those contracts to the production OpenAI Images API,
+`workers/generation` owns the one-shot generation and generated-Asset materialization unit of work,
+`packages/assets` owns private binary-ingestion and temporary
 read-access contracts, `packages/assets_gcs` implements the production Google Cloud storage/signing
 adapter, `packages/persistence` owns SQLAlchemy/Alembic metadata storage, and
 `apps/api` is the FastAPI runtime boundary:
@@ -72,6 +74,7 @@ packages/
   assets_gcs/
   persistence/
   model_gateway/
+  model_gateway_openai/
 data/
 specs/
 docs/
@@ -92,6 +95,8 @@ See [ADR 0011](docs/adr/0011-asset-ingestion-storage-boundary.md) for private ob
 metadata lifecycle, and cross-system retry semantics.
 See [ADR 0012](docs/adr/0012-gcs-storage-signed-asset-access.md) for create-only GCS writes and the
 provider-neutral signed-read boundary. No signed-access HTTP route exists before authentication.
+See [ADR 0013](docs/adr/0013-openai-image-provider-output-retrieval.md) for isolated OpenAI Images API
+translation, transient base64 retrieval, and GenerationRun-to-Asset materialization.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

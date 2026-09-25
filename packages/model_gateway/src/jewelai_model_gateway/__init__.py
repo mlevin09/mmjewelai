@@ -20,6 +20,12 @@ from .models import (
     GenerationRun,
     GenerationStatus,
 )
+from .runtime import (
+    GenerationExecution,
+    ImageGenerationExecutor,
+    RetrievedImageOutput,
+    validate_generation_execution,
+)
 
 __all__ = [
     "MODEL_GATEWAY_SCHEMA_VERSION",
@@ -30,12 +36,16 @@ __all__ = [
     "GeneratedOutputDescriptor",
     "GenerationConfiguration",
     "GenerationErrorCode",
+    "GenerationExecution",
     "GenerationRequest",
     "GenerationResult",
     "GenerationRun",
     "GenerationStatus",
     "ImageGenerationGateway",
+    "ImageGenerationExecutor",
     "InvalidProviderResponseError",
     "ProviderRejectedError",
+    "RetrievedImageOutput",
+    "validate_generation_execution",
     "validate_generation_result",
 ]

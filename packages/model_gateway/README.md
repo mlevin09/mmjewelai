@@ -2,13 +2,15 @@
 
 This package defines the provider-neutral Model Gateway v1 contracts. It accepts an immutable
 `CompiledPrompt`, a bounded generation configuration, and explicit provider/model identifiers. It
-contains no provider SDK, HTTP client, credential, persistence, FastAPI, worker, image bytes, or
-business-rule behavior.
+contains no provider SDK, HTTP client, credential, persistence, FastAPI, worker, or business-rule
+behavior. `GenerationExecution` and `RetrievedImageOutput` are separate transient runtime contracts;
+they are not Pydantic persistence models and are excluded from the published JSON Schema.
 
 `validate_generation_result` treats adapter results as untrusted. It requires exact run/provider/model
 lineage, output count agreement, and canonical ordinal ordering before a result can be persisted as
-successful. Real adapters must enforce their own bounded network timeouts; none are implemented in
-v1. Deterministic fake adapters live only in tests.
+successful. `validate_generation_execution` additionally aligns transient ordinals and provider IDs
+with those descriptors. The production OpenAI adapter lives in `packages/model_gateway_openai` and
+owns its timeout, response validation, and SDK dependency.
 
 ```sh
 python -m jewelai_model_gateway.schema specs/model-gateway/schema.json

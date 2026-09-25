@@ -116,63 +116,22 @@ def ingest_asset(
     policy: AssetIngestionPolicy | None = None,
     clock: Callable[[], datetime] | None = None,
 ) -> Asset:
-    request = AssetIngestionRequest.model_validate(request)
     policy = policy or AssetIngestionPolicy()
     now = clock or (lambda: datetime.now(UTC))
-    content_type, content_hash, byte_size = content_metadata(
-        content, request.declared_content_type, policy
+    request, expected = _expected_stored_object(request, content, policy)
+    pending = _ensure_pending_asset(
+        repository, _build_pending_asset(request, expected, created_at=now())
     )
-    pending = validate_asset_object_key(
-        Asset(
-            schema_version=ASSET_SCHEMA_VERSION,
-            asset_id=request.asset_id,
-            organization_id=request.organization_id,
-            project_id=request.project_id,
-            session_id=request.session_id,
-            kind=request.kind,
-            status=AssetStatus.PENDING,
-            object_key=build_object_key(
-                request.organization_id, request.project_id, request.asset_id, content_type
-            ),
-            content_type=content_type,
-            content_hash=content_hash,
-            byte_size=byte_size,
-            generation_run_id=request.generation_run_id,
-            generation_output_ordinal=request.generation_output_ordinal,
-            provider_output_id=request.provider_output_id,
-            parent_asset_id=request.parent_asset_id,
-            created_at=now(),
-        )
-    )
-    existing = repository.find_asset(request.asset_id, request.organization_id)
-    if existing is not None:
-        _require_same_operation(existing, pending)
-        if existing.status is AssetStatus.READY:
-            return existing
-        if existing.status is AssetStatus.FAILED:
-            raise AssetConflictError("A failed asset identity cannot be reopened")
-        pending = existing
-    else:
-        try:
-            pending = repository.create_pending_asset(pending)
-        except AssetConflictError:
-            existing = repository.find_asset(request.asset_id, request.organization_id)
-            if existing is None:
-                raise
-            _require_same_operation(existing, pending)
-            if existing.status is AssetStatus.READY:
-                return existing
-            if existing.status is AssetStatus.FAILED:
-                raise AssetConflictError("A failed asset identity cannot be reopened") from None
-            pending = existing
+    if pending.status is AssetStatus.READY:
+        return pending
     try:
         stored = object_store.put_if_absent(
-            pending.object_key,
+            expected.object_key,
             content,
-            content_type=pending.content_type,
-            content_hash=pending.content_hash,
+            content_type=expected.content_type,
+            content_hash=expected.content_hash,
         )
-        _verify_stored_object(pending, stored)
+        _verify_stored_object(expected, stored)
     except AssetStorageConflictError:
         return repository.mark_asset_failed(
             pending.asset_id,
@@ -208,6 +167,126 @@ def ingest_asset(
         raise
 
 
+def stage_asset_object(
+    *,
+    request: AssetIngestionRequest,
+    content: bytes,
+    object_store: PrivateObjectStore,
+    policy: AssetIngestionPolicy | None = None,
+) -> StoredObject:
+    """Durably write validated bytes at their final canonical private object key."""
+    policy = policy or AssetIngestionPolicy()
+    _, expected = _expected_stored_object(request, content, policy)
+    try:
+        stored = object_store.put_if_absent(
+            expected.object_key,
+            content,
+            content_type=expected.content_type,
+            content_hash=expected.content_hash,
+        )
+    except AssetStorageError:
+        raise
+    except Exception as exc:
+        raise AssetStorageError("Private object storage failed safely") from exc
+    return _verify_stored_object(expected, stored)
+
+
+def finalize_staged_asset(
+    *,
+    request: AssetIngestionRequest,
+    content: bytes,
+    stored_object: StoredObject,
+    repository: AssetMetadataRepository,
+    policy: AssetIngestionPolicy | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> Asset:
+    """Create and finalize metadata for bytes already durable in private storage."""
+    policy = policy or AssetIngestionPolicy()
+    now = clock or (lambda: datetime.now(UTC))
+    request, expected = _expected_stored_object(request, content, policy)
+    _verify_stored_object(expected, stored_object)
+    pending = _ensure_pending_asset(
+        repository, _build_pending_asset(request, expected, created_at=now())
+    )
+    if pending.status is AssetStatus.READY:
+        return pending
+    try:
+        return repository.mark_asset_ready(pending.asset_id, pending.organization_id, now())
+    except AssetConflictError:
+        existing = repository.find_asset(pending.asset_id, pending.organization_id)
+        if existing is not None:
+            _require_same_operation(existing, pending)
+            if existing.status is AssetStatus.READY:
+                return existing
+        raise
+
+
+def _expected_stored_object(
+    request: AssetIngestionRequest,
+    content: bytes,
+    policy: AssetIngestionPolicy,
+) -> tuple[AssetIngestionRequest, StoredObject]:
+    request = AssetIngestionRequest.model_validate(request)
+    content_type, content_hash, byte_size = content_metadata(
+        content, request.declared_content_type, policy
+    )
+    return request, StoredObject(
+        object_key=build_object_key(
+            request.organization_id, request.project_id, request.asset_id, content_type
+        ),
+        content_type=content_type,
+        content_hash=content_hash,
+        byte_size=byte_size,
+    )
+
+
+def _build_pending_asset(
+    request: AssetIngestionRequest,
+    stored: StoredObject,
+    *,
+    created_at: datetime,
+) -> Asset:
+    return validate_asset_object_key(
+        Asset(
+            schema_version=ASSET_SCHEMA_VERSION,
+            asset_id=request.asset_id,
+            organization_id=request.organization_id,
+            project_id=request.project_id,
+            session_id=request.session_id,
+            kind=request.kind,
+            status=AssetStatus.PENDING,
+            object_key=stored.object_key,
+            content_type=stored.content_type,
+            content_hash=stored.content_hash,
+            byte_size=stored.byte_size,
+            generation_run_id=request.generation_run_id,
+            generation_output_ordinal=request.generation_output_ordinal,
+            provider_output_id=request.provider_output_id,
+            parent_asset_id=request.parent_asset_id,
+            created_at=created_at,
+        )
+    )
+
+
+def _ensure_pending_asset(repository: AssetMetadataRepository, pending: Asset) -> Asset:
+    existing = repository.find_asset(pending.asset_id, pending.organization_id)
+    if existing is not None:
+        _require_same_operation(existing, pending)
+        if existing.status is AssetStatus.FAILED:
+            raise AssetConflictError("A failed asset identity cannot be reopened")
+        return existing
+    try:
+        return repository.create_pending_asset(pending)
+    except AssetConflictError:
+        existing = repository.find_asset(pending.asset_id, pending.organization_id)
+        if existing is None:
+            raise
+        _require_same_operation(existing, pending)
+        if existing.status is AssetStatus.FAILED:
+            raise AssetConflictError("A failed asset identity cannot be reopened") from None
+        return existing
+
+
 def _require_same_operation(existing: Asset, pending: Asset) -> None:
     comparable = (
         "organization_id",
@@ -227,8 +306,19 @@ def _require_same_operation(existing: Asset, pending: Asset) -> None:
         raise AssetConflictError("Asset identity was reused for different content or lineage")
 
 
-def _verify_stored_object(asset: Asset, stored: StoredObject) -> None:
-    expected = (asset.object_key, asset.content_type, asset.content_hash, asset.byte_size)
+def _verify_stored_object(expected_object: StoredObject, stored: StoredObject) -> StoredObject:
+    try:
+        stored = StoredObject.model_validate(stored)
+    except Exception as exc:
+        raise AssetStorageConflictError(
+            "Stored object metadata does not match ingestion input"
+        ) from exc
+    expected = (
+        expected_object.object_key,
+        expected_object.content_type,
+        expected_object.content_hash,
+        expected_object.byte_size,
+    )
     actual = (
         stored.object_key,
         stored.content_type,
@@ -237,3 +327,4 @@ def _verify_stored_object(asset: Asset, stored: StoredObject) -> None:
     )
     if actual != expected:
         raise AssetStorageConflictError("Stored object metadata does not match ingestion input")
+    return stored

@@ -1,5 +1,20 @@
 """One-shot JewelAI generation orchestration."""
 
-from .service import ExecutionOutcome, GatewayRegistry, execute_generation_run
+from .materialization import GENERATED_ASSET_NAMESPACE, generated_asset_id
+from .service import (
+    ExecutionOutcome,
+    ExecutorRegistry,
+    GatewayRegistry,
+    execute_generation_run,
+    execute_generation_run_with_assets,
+)
 
-__all__ = ["ExecutionOutcome", "GatewayRegistry", "execute_generation_run"]
+__all__ = [
+    "GENERATED_ASSET_NAMESPACE",
+    "ExecutionOutcome",
+    "ExecutorRegistry",
+    "GatewayRegistry",
+    "execute_generation_run",
+    "execute_generation_run_with_assets",
+    "generated_asset_id",
+]

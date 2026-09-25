@@ -6,6 +6,11 @@ server-owned tenant/project/asset object key, and coordinates durable `pending �
 metadata with a create-only `PrivateObjectStore` port. It also defines a separate READY-only,
 canonical-key-validated, short-lived `PrivateObjectAccessSigner` boundary.
 
+Generated-output orchestration may call `stage_asset_object` to durably write validated bytes at the
+final deterministic private key before run success, then call `finalize_staged_asset` after success
+to establish READY metadata without a second storage write. Ordinary reference ingestion continues
+to use `ingest_asset` and its existing `pending → storage → ready|failed` behavior.
+
 The package depends only on Pydantic and the Python standard library. It has no SQLAlchemy, FastAPI,
 Model Gateway, provider, network, or cloud SDK dependency. The production adapter lives separately in
 `packages/assets_gcs`; core tests use in-memory fakes only. Signed access defaults to 300 seconds,

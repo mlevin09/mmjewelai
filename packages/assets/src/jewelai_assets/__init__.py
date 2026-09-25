@@ -20,7 +20,9 @@ from .ingestion import (
     build_object_key,
     content_metadata,
     detect_content_type,
+    finalize_staged_asset,
     ingest_asset,
+    stage_asset_object,
     validate_asset_object_key,
 )
 from .models import (
@@ -65,7 +67,9 @@ __all__ = [
     "build_object_key",
     "content_metadata",
     "detect_content_type",
+    "finalize_staged_asset",
     "ingest_asset",
     "issue_asset_read_access",
+    "stage_asset_object",
     "validate_asset_object_key",
 ]
