@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from jewelai_auth import AuthenticationError, VerifiedIdentity
 from jewelai_model_gateway import GenerationConfiguration
 from jewelai_persistence import Base, create_database_engine
 
@@ -12,6 +13,19 @@ from jewelai_api.settings import RuntimeSettings
 
 ROOT = Path(__file__).resolve().parents[3]
 NOW = datetime(2026, 9, 24, 12, 0, tzinfo=UTC)
+
+
+class FakeTokenVerifier:
+    def verify(self, token: str) -> VerifiedIdentity:
+        if not token.startswith("test-"):
+            raise AuthenticationError("Bearer token is invalid")
+        subject = token.removeprefix("test-")
+        return VerifiedIdentity(
+            issuer="https://issuer.test",
+            subject=subject,
+            email=f"{subject}@example.test",
+            display_name=subject.replace("-", " ").title(),
+        )
 
 
 @pytest.fixture
@@ -47,12 +61,14 @@ def app(engine):
                 ),
             )
         ),
+        token_verifier=FakeTokenVerifier(),
     )
 
 
 @pytest.fixture
 def client(app):
     with TestClient(app) as value:
+        value.headers["Authorization"] = "Bearer test-owner-a"
         yield value
 
 

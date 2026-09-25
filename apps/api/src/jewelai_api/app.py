@@ -5,7 +5,19 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import FastAPI, Header
+from fastapi import Depends, FastAPI, Header, Request, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jewelai_auth import (
+    AuthenticatedPrincipal,
+    AuthenticationError,
+    AuthenticationUnavailableError,
+    AuthorizationDeniedError,
+    LastOwnerError,
+    MembershipConflictError,
+    MembershipNotFoundError,
+    TokenVerifier,
+)
+from jewelai_auth_oidc import OidcJwtVerifier
 from jewelai_domain import UnknownRoleError, UnsupportedLocaleError
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import ParserProposal
@@ -26,6 +38,7 @@ from .schemas import (
     AssetListResponse,
     AssetResponse,
     CreateGenerationRunRequest,
+    CreateMembershipRequest,
     CreateMessageRequest,
     CreateOrganizationRequest,
     CreateProjectRequest,
@@ -34,6 +47,9 @@ from .schemas import (
     EvaluateRequest,
     EvaluationResponse,
     GenerationRunListResponse,
+    MembershipListResponse,
+    MembershipResponse,
+    MeResponse,
     MessageResponse,
     OrganizationResponse,
     ParserProposalRequest,
@@ -43,6 +59,7 @@ from .schemas import (
     RevisionListResponse,
     RevisionTransitionRequest,
     SessionResponse,
+    UpdateMembershipRequest,
 )
 from .services import (
     InvalidTransitionError,
@@ -60,8 +77,13 @@ def create_app(
     clock: Callable[[], datetime] | None = None,
     uuid_factory: Callable[[], UUID] | None = None,
     generation_profiles: GenerationProfileRegistry | None = None,
+    token_verifier: TokenVerifier | None = None,
 ) -> FastAPI:
-    settings = settings or RuntimeSettings.from_environment()
+    settings = settings or RuntimeSettings.from_environment(require_oidc=token_verifier is None)
+    if token_verifier is None:
+        if settings.oidc is None:
+            raise ValueError("OIDC configuration is required when no token verifier is injected")
+        token_verifier = OidcJwtVerifier(settings.oidc)
     engine = engine or create_database_engine(settings.database_url)
     artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
     repository = PersistenceRepository(create_session_factory(engine))
@@ -79,6 +101,32 @@ def create_app(
     @app.exception_handler(NotFoundError)
     async def not_found_handler(_, exc):
         return _error_response(404, "not_found", str(exc))
+
+    @app.exception_handler(AuthenticationError)
+    async def authentication_handler(_, exc):
+        return _error_response(
+            401, "authentication_failed", str(exc), headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    @app.exception_handler(AuthenticationUnavailableError)
+    async def authentication_unavailable_handler(_, exc):
+        return _error_response(503, "authentication_unavailable", str(exc))
+
+    @app.exception_handler(AuthorizationDeniedError)
+    async def authorization_handler(_, exc):
+        return _error_response(403, "authorization_denied", str(exc))
+
+    @app.exception_handler(MembershipNotFoundError)
+    async def membership_not_found_handler(_, exc):
+        return _error_response(404, "not_found", str(exc))
+
+    @app.exception_handler(MembershipConflictError)
+    async def membership_conflict_handler(_, exc):
+        return _error_response(409, "membership_conflict", str(exc))
+
+    @app.exception_handler(LastOwnerError)
+    async def last_owner_handler(_, exc):
+        return _error_response(409, "last_owner", str(exc))
 
     @app.exception_handler(StaleRevisionError)
     async def stale_handler(_, exc):
@@ -136,30 +184,96 @@ def create_app(
     def health():
         return {"status": "ok"}
 
+    bearer = HTTPBearer(auto_error=False)
+
+    def get_authenticated_principal(
+        request: Request,
+        credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    ) -> AuthenticatedPrincipal:
+        if credentials is None or credentials.scheme.lower() != "bearer":
+            raise AuthenticationError("Bearer authentication is required")
+        identity = token_verifier.verify(credentials.credentials)
+        return request.app.state.service.resolve_identity(identity)
+
+    Authenticated = Annotated[AuthenticatedPrincipal, Depends(get_authenticated_principal)]
+
+    def require_header_organization(
+        principal: Authenticated,
+        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+    ) -> UUID:
+        service.require_organization_member(organization_id, principal.principal_id)
+        return organization_id
+
+    AuthorizedOrganization = Annotated[UUID, Depends(require_header_organization)]
+
+    @app.get("/me", response_model=MeResponse)
+    def get_me(principal: Authenticated):
+        return service.get_me(principal)
+
     @app.post("/organizations", response_model=OrganizationResponse, status_code=201)
-    def create_organization(request: CreateOrganizationRequest):
-        return service.create_organization(request.name)
+    def create_organization(request: CreateOrganizationRequest, principal: Authenticated):
+        return service.create_organization(request.name, principal.principal_id)
+
+    @app.get("/organizations/{organization_id}/memberships", response_model=MembershipListResponse)
+    def list_memberships(organization_id: UUID, principal: Authenticated):
+        return service.list_memberships(organization_id, principal.principal_id)
+
+    @app.post(
+        "/organizations/{organization_id}/memberships",
+        response_model=MembershipResponse,
+        status_code=201,
+    )
+    def add_membership(
+        organization_id: UUID, request: CreateMembershipRequest, principal: Authenticated
+    ):
+        return service.add_membership(
+            organization_id, principal.principal_id, request.principal_id, request.role
+        )
+
+    @app.patch(
+        "/organizations/{organization_id}/memberships/{principal_id}",
+        response_model=MembershipResponse,
+    )
+    def update_membership(
+        organization_id: UUID,
+        principal_id: UUID,
+        request: UpdateMembershipRequest,
+        principal: Authenticated,
+    ):
+        return service.update_membership(
+            organization_id, principal.principal_id, principal_id, request.role
+        )
+
+    @app.delete("/organizations/{organization_id}/memberships/{principal_id}", status_code=204)
+    def delete_membership(
+        organization_id: UUID, principal_id: UUID, principal: Authenticated
+    ) -> Response:
+        service.delete_membership(organization_id, principal.principal_id, principal_id)
+        return Response(status_code=204)
 
     @app.post(
         "/organizations/{organization_id}/projects",
         response_model=ProjectResponse,
         status_code=201,
     )
-    def create_project(organization_id: UUID, request: CreateProjectRequest):
+    def create_project(
+        organization_id: UUID, request: CreateProjectRequest, principal: Authenticated
+    ):
+        service.require_organization_member(organization_id, principal.principal_id)
         return service.create_project(organization_id, request.name)
 
     @app.post("/projects/{project_id}/sessions", response_model=SessionResponse, status_code=201)
     def create_session(
         project_id: UUID,
         request: CreateSessionRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.create_session(project_id, organization_id, request)
 
     @app.get("/sessions/{session_id}", response_model=SessionResponse)
     def get_session(
         session_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.get_session(session_id, organization_id)
 
@@ -167,7 +281,7 @@ def create_app(
     def create_message(
         session_id: UUID,
         request: CreateMessageRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.create_message(session_id, organization_id, request.content)
 
@@ -175,14 +289,14 @@ def create_app(
     def create_parser_proposal(
         session_id: UUID,
         request: ParserProposalRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.create_parser_proposal(session_id, organization_id, request)
 
     @app.get("/sessions/{session_id}/revisions", response_model=RevisionListResponse)
     def list_revisions(
         session_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return RevisionListResponse(
             revisions=repository.list_revisions(session_id, organization_id)
@@ -192,7 +306,7 @@ def create_app(
     def get_revision(
         session_id: UUID,
         revision_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return repository.get_revision(session_id, revision_id, organization_id)
 
@@ -204,7 +318,7 @@ def create_app(
     def create_prompt_revision(
         session_id: UUID,
         request: CreatePromptRevisionRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.create_prompt_revision(session_id, organization_id, request)
 
@@ -214,7 +328,7 @@ def create_app(
     )
     def list_prompt_revisions(
         session_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.list_prompt_revisions(session_id, organization_id)
 
@@ -225,7 +339,7 @@ def create_app(
     def get_prompt_revision(
         session_id: UUID,
         prompt_revision_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.get_prompt_revision(session_id, prompt_revision_id, organization_id)
 
@@ -235,14 +349,14 @@ def create_app(
     def create_generation_run(
         session_id: UUID,
         request: CreateGenerationRunRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.create_generation_run(session_id, organization_id, request)
 
     @app.get("/sessions/{session_id}/generation-runs", response_model=GenerationRunListResponse)
     def list_generation_runs(
         session_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.list_generation_runs(session_id, organization_id)
 
@@ -253,14 +367,14 @@ def create_app(
     def get_generation_run(
         session_id: UUID,
         generation_run_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.get_generation_run(session_id, generation_run_id, organization_id)
 
     @app.get("/sessions/{session_id}/assets", response_model=AssetListResponse)
     def list_assets(
         session_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.list_assets(session_id, organization_id)
 
@@ -268,7 +382,7 @@ def create_app(
     def get_asset(
         session_id: UUID,
         asset_id: UUID,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.get_asset(session_id, asset_id, organization_id)
 
@@ -276,7 +390,7 @@ def create_app(
     def transition_revision(
         session_id: UUID,
         request: RevisionTransitionRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.transition_revision(session_id, organization_id, request)
 
@@ -284,14 +398,20 @@ def create_app(
     def evaluate(
         session_id: UUID,
         request: EvaluateRequest,
-        organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
+        organization_id: AuthorizedOrganization,
     ):
         return service.evaluate(session_id, organization_id, request)
 
     return app
 
 
-def _error_response(status_code: int, code: str, detail: str):
+def _error_response(
+    status_code: int, code: str, detail: str, *, headers: dict[str, str] | None = None
+):
     from fastapi.responses import JSONResponse
 
-    return JSONResponse(status_code=status_code, content={"error": code, "detail": detail})
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": code, "detail": detail},
+        headers=headers,
+    )

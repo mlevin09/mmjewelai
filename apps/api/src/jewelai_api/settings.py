@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from jewelai_auth_oidc import OidcJwtConfig
+
 
 @dataclass(frozen=True)
 class ArtifactVersions:
@@ -19,10 +21,21 @@ class RuntimeSettings:
     database_url: str = "sqlite+pysqlite:///./jewelai-v2.db"
     repository_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[4])
     artifacts: ArtifactVersions = field(default_factory=ArtifactVersions)
+    oidc: OidcJwtConfig | None = None
 
     @classmethod
-    def from_environment(cls) -> "RuntimeSettings":
+    def from_environment(cls, *, require_oidc: bool = True) -> "RuntimeSettings":
         root = os.getenv("JEWELAI_REPOSITORY_ROOT")
+        issuer = os.getenv("OIDC_ISSUER")
+        audience = os.getenv("OIDC_AUDIENCE")
+        jwks_url = os.getenv("OIDC_JWKS_URL")
+        if require_oidc and not all((issuer, audience, jwks_url)):
+            raise ValueError("OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL are required")
+        algorithms = tuple(
+            item.strip()
+            for item in os.getenv("OIDC_ALLOWED_ALGORITHMS", "RS256").split(",")
+            if item.strip()
+        )
         return cls(
             database_url=os.getenv("DATABASE_URL", cls.database_url),
             repository_root=Path(root).resolve() if root else Path(__file__).resolve().parents[4],
@@ -32,5 +45,18 @@ class RuntimeSettings:
                 questions=os.getenv("QUESTION_ARTIFACT_VERSION", "1.0.0"),
                 rules=os.getenv("RULES_ARTIFACT_VERSION", "1.0.0"),
                 prompts=os.getenv("PROMPT_ARTIFACT_VERSION", "1.0.0"),
+            ),
+            oidc=(
+                OidcJwtConfig(
+                    issuer=issuer,
+                    audience=audience,
+                    jwks_url=jwks_url,
+                    allowed_algorithms=algorithms,
+                    http_timeout_seconds=float(os.getenv("OIDC_HTTP_TIMEOUT_SECONDS", "5")),
+                    jwks_cache_ttl_seconds=int(os.getenv("OIDC_JWKS_CACHE_TTL_SECONDS", "300")),
+                    leeway_seconds=int(os.getenv("OIDC_LEEWAY_SECONDS", "30")),
+                )
+                if all((issuer, audience, jwks_url))
+                else None
             ),
         )

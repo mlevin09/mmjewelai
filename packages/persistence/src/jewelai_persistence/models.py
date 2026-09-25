@@ -30,6 +30,40 @@ class OrganizationRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class AuthPrincipalRow(Base):
+    __tablename__ = "auth_principal"
+    __table_args__ = (
+        UniqueConstraint("issuer", "subject", name="uq_auth_principal_issuer_subject"),
+    )
+
+    principal_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    issuer: Mapped[str] = mapped_column(String(500))
+    subject: Mapped[str] = mapped_column(String(255))
+    email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class OrganizationMembershipRow(Base):
+    __tablename__ = "organization_membership"
+    __table_args__ = (
+        CheckConstraint("role IN ('owner', 'admin', 'member')", name="ck_membership_role"),
+        Index("ix_membership_principal", "principal_id"),
+        Index("ix_membership_organization", "organization_id"),
+    )
+
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT"), primary_key=True
+    )
+    principal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("auth_principal.principal_id", ondelete="RESTRICT"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(16))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ProjectRow(Base):
     __tablename__ = "project"
 

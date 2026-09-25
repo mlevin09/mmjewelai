@@ -4,6 +4,15 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from jewelai_auth import (
+    AuthenticatedPrincipal,
+    MembershipRole,
+    VerifiedIdentity,
+    require_can_add_membership,
+    require_can_change_membership,
+    require_can_list_memberships,
+    require_can_remove_membership,
+)
 from jewelai_domain import (
     SCHEMA_VERSION,
     AskDecision,
@@ -43,8 +52,12 @@ from .schemas import (
     EvaluationResponse,
     GenerationRunListResponse,
     LockRevisionRequest,
+    MembershipListResponse,
+    MembershipResponse,
+    MeResponse,
     MessageResponse,
     ParserProposalRequest,
+    PrincipalMembership,
     PromptRevisionListResponse,
     PromptRevisionResponse,
     SessionResponse,
@@ -88,11 +101,100 @@ class RuntimeService:
         self._before_prompt_persist = before_prompt_persist
         self._generation_profiles = generation_profiles or GenerationProfileRegistry()
 
-    def create_organization(self, name: str):
-        return self.repository.create_organization(self._uuid(), name, self._clock())
+    def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
+        row = self.repository.get_or_create_principal(identity, self._uuid(), self._clock())
+        return AuthenticatedPrincipal(
+            principal_id=row.principal_id,
+            email=row.email,
+            display_name=row.display_name,
+        )
+
+    def create_organization(self, name: str, principal_id: UUID | None = None):
+        if principal_id is None:
+            return self.repository.create_organization(self._uuid(), name, self._clock())
+        return self.repository.create_organization_with_owner(
+            self._uuid(), name, principal_id, self._clock()
+        )
+
+    def require_organization_member(
+        self, organization_id: UUID, principal_id: UUID
+    ) -> MembershipRole:
+        return MembershipRole(self.repository.get_membership(organization_id, principal_id).role)
+
+    def get_me(self, principal: AuthenticatedPrincipal) -> MeResponse:
+        memberships = self.repository.list_principal_memberships(principal.principal_id)
+        return MeResponse(
+            principal_id=principal.principal_id,
+            email=principal.email,
+            display_name=principal.display_name,
+            memberships=tuple(
+                PrincipalMembership(
+                    organization_id=membership.organization_id,
+                    organization_name=organization.name,
+                    role=MembershipRole(membership.role),
+                )
+                for membership, organization in memberships
+            ),
+        )
+
+    def list_memberships(self, organization_id: UUID, actor_id: UUID) -> MembershipListResponse:
+        actor = self.require_organization_member(organization_id, actor_id)
+        require_can_list_memberships(actor)
+        return MembershipListResponse(
+            memberships=tuple(
+                self._membership_response(membership, principal)
+                for membership, principal in self.repository.list_organization_memberships(
+                    organization_id
+                )
+            )
+        )
+
+    def add_membership(
+        self,
+        organization_id: UUID,
+        actor_id: UUID,
+        principal_id: UUID,
+        role: MembershipRole,
+    ) -> MembershipResponse:
+        actor = self.require_organization_member(organization_id, actor_id)
+        require_can_add_membership(actor, role)
+        row = self.repository.add_membership(organization_id, principal_id, role, self._clock())
+        return self._membership_response(row, self.repository.get_principal(principal_id))
+
+    def update_membership(
+        self,
+        organization_id: UUID,
+        actor_id: UUID,
+        principal_id: UUID,
+        role: MembershipRole,
+    ) -> MembershipResponse:
+        actor = self.require_organization_member(organization_id, actor_id)
+        current = self.repository.get_membership(organization_id, principal_id)
+        require_can_change_membership(actor, MembershipRole(current.role), role)
+        row = self.repository.update_membership_role(
+            organization_id, principal_id, role, self._clock()
+        )
+        return self._membership_response(row, self.repository.get_principal(principal_id))
+
+    def delete_membership(self, organization_id: UUID, actor_id: UUID, principal_id: UUID) -> None:
+        actor = self.require_organization_member(organization_id, actor_id)
+        target = self.repository.get_membership(organization_id, principal_id)
+        require_can_remove_membership(actor, MembershipRole(target.role))
+        self.repository.delete_membership(organization_id, principal_id)
 
     def create_project(self, organization_id: UUID, name: str):
         return self.repository.create_project(self._uuid(), organization_id, name, self._clock())
+
+    @staticmethod
+    def _membership_response(membership, principal) -> MembershipResponse:
+        return MembershipResponse(
+            principal_id=principal.principal_id,
+            email=principal.email,
+            display_name=principal.display_name,
+            role=MembershipRole(membership.role),
+            created_at=membership.created_at,
+            updated_at=membership.updated_at,
+        )
 
     def create_session(
         self,

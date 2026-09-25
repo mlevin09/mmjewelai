@@ -57,7 +57,9 @@ behavior, `packages/parser` owns the provider-neutral candidate/proposal boundar
 `workers/generation` owns the one-shot generation and generated-Asset materialization unit of work,
 `packages/assets` owns private binary-ingestion and temporary
 read-access contracts, `packages/assets_gcs` implements the production Google Cloud storage/signing
-adapter, `packages/persistence` owns SQLAlchemy/Alembic metadata storage, and
+adapter, `packages/auth` owns provider-neutral identity and membership policy,
+`packages/auth_oidc` verifies configured asymmetric OIDC JWTs, `packages/persistence` owns
+SQLAlchemy/Alembic metadata storage, and
 `apps/api` is the FastAPI runtime boundary:
 
 ```text
@@ -67,6 +69,8 @@ apps/
 workers/
   generation/
 packages/
+  auth/
+  auth_oidc/
   domain/
   parser/
   prompts/
@@ -97,6 +101,8 @@ See [ADR 0012](docs/adr/0012-gcs-storage-signed-asset-access.md) for create-only
 provider-neutral signed-read boundary. No signed-access HTTP route exists before authentication.
 See [ADR 0013](docs/adr/0013-openai-image-provider-output-retrieval.md) for isolated OpenAI Images API
 translation, transient base64 retrieval, and GenerationRun-to-Asset materialization.
+See [ADR 0014](docs/adr/0014-authentication-organization-membership.md) for bearer identity,
+database-authoritative organization membership, and final-owner protection.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions
@@ -108,6 +114,7 @@ Root V1 packaging, Docker files and README are preserved and must be migrated ex
 5. Persistence/API, parser and prompt compiler; then assets/jobs, frontend and A/B.
 See [backlog](docs/product/BACKLOG.md), [data model](docs/architecture/DATA_MODEL.md) and [specifications](specs/README.md).
 
-Before runtime deployment resolve authentication/tenancy model, queue, supported jewelry families/locales, retention policy and experimental assignment unit.
+Before runtime deployment resolve identity-provider provisioning, queue, supported jewelry
+families/locales, retention policy and experimental assignment unit.
 Exact role question budgets, domain catalogs and manufacturing constraints require product/domain review.
 The reference conversation mentions image/template attachments; they are not treated as authoritative machine-readable specifications in this baseline.

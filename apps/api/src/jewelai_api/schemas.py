@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from jewelai_assets import AssetContentType, AssetErrorCode, AssetKind, AssetStatus
+from jewelai_auth import MembershipRole
 from jewelai_domain import (
     AskDecision,
     AssumeDecision,
@@ -54,6 +55,41 @@ class OrganizationResponse(ApiModel):
     organization_id: UUID
     name: str
     created_at: datetime
+
+
+class PrincipalSummary(ApiModel):
+    principal_id: UUID
+    email: str | None = None
+    display_name: str | None = None
+
+
+class PrincipalMembership(ApiModel):
+    organization_id: UUID
+    organization_name: str
+    role: MembershipRole
+
+
+class MeResponse(PrincipalSummary):
+    memberships: tuple[PrincipalMembership, ...]
+
+
+class MembershipResponse(PrincipalSummary):
+    role: MembershipRole
+    created_at: datetime
+    updated_at: datetime
+
+
+class MembershipListResponse(ApiModel):
+    memberships: tuple[MembershipResponse, ...]
+
+
+class CreateMembershipRequest(ApiModel):
+    principal_id: UUID
+    role: MembershipRole
+
+
+class UpdateMembershipRequest(ApiModel):
+    role: MembershipRole
 
 
 class ProjectResponse(ApiModel):

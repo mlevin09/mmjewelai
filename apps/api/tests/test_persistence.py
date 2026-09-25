@@ -19,6 +19,7 @@ from jewelai_assets import (
     build_object_key,
     ingest_asset,
 )
+from jewelai_auth import LastOwnerError, MembershipRole, VerifiedIdentity
 from jewelai_domain import Design, revise_design
 from jewelai_domain.models import MessageSource
 from jewelai_model_gateway import (
@@ -39,9 +40,10 @@ from jewelai_persistence import (
     create_database_engine,
     create_session_factory,
 )
-from jewelai_persistence.models import AssetRow, PromptRevisionRow
+from jewelai_persistence.models import AssetRow, AuthPrincipalRow, PromptRevisionRow
 from jewelai_prompts import compile_prompt
-from sqlalchemy import inspect
+from pydantic import ValidationError
+from sqlalchemy import func, inspect, select
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.schemas import CreateSessionRequest
@@ -295,10 +297,12 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
     assert set(inspect(engine).get_table_names()) == {
         "asset",
         "alembic_version",
+        "auth_principal",
         "design_session",
         "generation_run",
         "message",
         "organization",
+        "organization_membership",
         "project",
         "prompt_revision",
         "question_event",
@@ -309,6 +313,153 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
     }
     command.downgrade(config, "base")
     assert inspect(engine).get_table_names() == ["alembic_version"]
+    engine.dispose()
+
+
+def test_principal_identity_and_membership_persistence(engine):
+    repository = PersistenceRepository(create_session_factory(engine))
+    first = repository.get_or_create_principal(
+        VerifiedIdentity(
+            issuer="https://issuer-a.test",
+            subject="same-subject",
+            email="shared@example.test",
+        ),
+        UUID("41414141-4141-4141-8141-414141414141"),
+        NOW,
+    )
+    refreshed = repository.get_or_create_principal(
+        VerifiedIdentity(
+            issuer="https://issuer-a.test",
+            subject="same-subject",
+            email="changed@example.test",
+        ),
+        UUID("42424242-4242-4242-8242-424242424242"),
+        NOW + timedelta(seconds=1),
+    )
+    separate = repository.get_or_create_principal(
+        VerifiedIdentity(
+            issuer="https://issuer-b.test",
+            subject="same-subject",
+            email="changed@example.test",
+        ),
+        UUID("43434343-4343-4343-8343-434343434343"),
+        NOW,
+    )
+    assert refreshed.principal_id == first.principal_id
+    assert refreshed.email == "changed@example.test"
+    assert separate.principal_id != first.principal_id
+
+    organization = repository.create_organization_with_owner(
+        UUID("44444444-4444-4444-8444-444444444444"),
+        "Owned organization",
+        first.principal_id,
+        NOW,
+    )
+    assert (
+        repository.get_membership(organization.organization_id, first.principal_id).role
+        == MembershipRole.OWNER.value
+    )
+    with pytest.raises(LastOwnerError):
+        repository.delete_membership(organization.organization_id, first.principal_id)
+    with pytest.raises(LastOwnerError):
+        repository.update_membership_role(
+            organization.organization_id,
+            first.principal_id,
+            MembershipRole.MEMBER,
+            NOW,
+        )
+
+
+def test_exact_subject_is_persisted_without_normalization_or_collision(engine):
+    repository = PersistenceRepository(create_session_factory(engine))
+    identity = VerifiedIdentity(issuer="https://issuer.test", subject="alice")
+    principal = repository.get_or_create_principal(
+        identity,
+        UUID("51515151-5151-4151-8151-515151515151"),
+        NOW,
+    )
+    assert principal.issuer == "https://issuer.test"
+    assert principal.subject == "alice"
+    with pytest.raises(ValidationError, match="leading or trailing whitespace"):
+        VerifiedIdentity(issuer="https://issuer.test", subject=" alice ")
+    with create_session_factory(engine)() as db:
+        assert db.scalar(select(func.count()).select_from(AuthPrincipalRow)) == 1
+
+
+def test_pre_auth_organization_is_not_claimed(engine):
+    repository = PersistenceRepository(create_session_factory(engine))
+    organization = repository.create_organization(
+        UUID("45454545-4545-4545-8545-454545454545"), "Legacy", NOW
+    )
+    assert repository.list_organization_memberships(organization.organization_id) == ()
+
+
+@pytest.mark.postgres
+def test_postgres_last_owner_mutations_are_serialized():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    repository = PersistenceRepository(create_session_factory(engine))
+    owners = tuple(
+        repository.get_or_create_principal(
+            VerifiedIdentity(issuer="https://issuer.test", subject=f"owner-{number}"),
+            UUID(f"4{number}464646-4646-4646-8646-464646464646"),
+            NOW,
+        )
+        for number in (6, 7)
+    )
+    organization = repository.create_organization_with_owner(
+        UUID("48484848-4848-4848-8848-484848484848"),
+        "Concurrent owners",
+        owners[0].principal_id,
+        NOW,
+    )
+    repository.add_membership(
+        organization.organization_id, owners[1].principal_id, MembershipRole.OWNER, NOW
+    )
+
+    def remove(principal):
+        isolated = PersistenceRepository(create_session_factory(engine))
+        try:
+            isolated.delete_membership(organization.organization_id, principal.principal_id)
+            return "removed"
+        except LastOwnerError:
+            return "retained"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = tuple(pool.map(remove, owners))
+    assert sorted(outcomes) == ["removed", "retained"]
+    remaining = repository.list_organization_memberships(organization.organization_id)
+    assert [membership.role for membership, _ in remaining] == [MembershipRole.OWNER.value]
+    engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_concurrent_principal_creation_resolves_one_identity():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    identity = VerifiedIdentity(issuer="https://issuer.test", subject="racing-principal")
+    identifiers = (
+        UUID("49494949-4949-4949-8949-494949494949"),
+        UUID("50505050-5050-4050-8050-505050505050"),
+    )
+
+    def resolve(principal_id):
+        repository = PersistenceRepository(create_session_factory(engine))
+        return repository.get_or_create_principal(identity, principal_id, NOW).principal_id
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = tuple(pool.map(resolve, identifiers))
+    assert results[0] == results[1]
+    repository = PersistenceRepository(create_session_factory(engine))
+    assert repository.get_principal(results[0]).subject == "racing-principal"
     engine.dispose()
 
 

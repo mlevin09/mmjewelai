@@ -14,11 +14,16 @@ python -m pip install -e './packages/prompts[test]'
 python -m pip install -e './packages/model_gateway[test]'
 python -m pip install -e './packages/model_gateway_openai[test]'
 python -m pip install -e './packages/assets[test]'
+python -m pip install -e './packages/auth[test]'
+python -m pip install -e './packages/auth_oidc[test]'
 python -m pip install -e './packages/persistence'
 python -m pip install -e './workers/generation[test]'
 python -m pip install -e './packages/parser[test]'
 python -m pip install -e './apps/api[test]'
 export DATABASE_URL='postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai'
+export OIDC_ISSUER='https://identity.example/'
+export OIDC_AUDIENCE='jewelai-api'
+export OIDC_JWKS_URL='https://identity.example/.well-known/jwks.json'
 alembic -c packages/persistence/alembic.ini upgrade head
 uvicorn jewelai_api.app:create_app --factory
 ```
@@ -30,7 +35,10 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 ## API scope
 
 - `GET /health`
+- `GET /me`
 - `POST /organizations`
+- `GET|POST /organizations/{organization_id}/memberships`
+- `PATCH|DELETE /organizations/{organization_id}/memberships/{principal_id}`
 - `POST /organizations/{organization_id}/projects`
 - `POST /projects/{project_id}/sessions`
 - `GET /sessions/{session_id}`
@@ -49,9 +57,15 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/assets/{asset_id}`
 
-Session routes use `X-Organization-ID` as an explicit ownership scope. This is plumbing for future
-authenticated context, **not authentication** and not a security claim. Conversational roles never
-grant permissions.
+`GET /health` is public. Every product route requires a verified bearer JWT. The JWT establishes an
+external identity, which resolves to a JewelAI principal; current database membership authorizes an
+organization. Session routes use `X-Organization-ID` only as the requested tenant selector, never as
+identity proof. Existing repository scopes remain defense in depth. Conversational roles never
+grant permissions, and JWT role/group/organization claims are ignored.
+
+Production startup fails closed unless `OIDC_ISSUER`, `OIDC_AUDIENCE`, and HTTPS `OIDC_JWKS_URL` are
+configured. The resource server stores no token or raw claims. Existing pre-auth organizations are
+not automatically claimed; any production backfill requires an explicit trusted process.
 
 Runtime timestamps and IDs are server-owned. Transition message provenance is accepted from the
 caller and checked by the existing domain model against the server revision timestamp. Evaluation
@@ -82,12 +96,14 @@ Asset endpoints expose scoped metadata only. They omit internal object keys, byt
 URLs. Asset ingestion and signed-read contracts are internal reusable boundaries in `packages/assets`;
 the production GCS adapter is isolated in `packages/assets_gcs`. This API exposes no binary
 upload/download, registers no object store or signer, and has no route that issues signed URLs.
-Authentication, authenticated asset access, retention, and reconciliation remain unimplemented.
+Authenticated signed Asset access, retention, and reconciliation remain unimplemented.
 
 ## Verification
 
 ```sh
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
+python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
+python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
 python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
@@ -95,10 +111,10 @@ python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
 python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-python -m ruff check apps/api packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
-python -m ruff format --check apps/api packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
 ```
 
-Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim, and
-generated-output asset uniqueness tests. SQLite tests are portable behavior tests and are not
-presented as proof of PostgreSQL locking behavior.
+Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim,
+generated-output asset uniqueness, and final-owner tests. SQLite tests are portable behavior tests
+and are not presented as proof of PostgreSQL locking behavior.

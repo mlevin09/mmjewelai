@@ -11,6 +11,13 @@ from jewelai_assets import (
     AssetStatus,
     validate_asset_object_key,
 )
+from jewelai_auth import (
+    LastOwnerError,
+    MembershipConflictError,
+    MembershipNotFoundError,
+    MembershipRole,
+    VerifiedIdentity,
+)
 from jewelai_domain.models import DesignRevision
 from jewelai_model_gateway import (
     GenerationErrorCode,
@@ -21,15 +28,17 @@ from jewelai_model_gateway import (
     validate_generation_result,
 )
 from jewelai_prompts import CompiledPrompt
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .models import (
     AssetRow,
+    AuthPrincipalRow,
     DesignSessionRow,
     GenerationRunRow,
     MessageRow,
+    OrganizationMembershipRow,
     OrganizationRow,
     ProjectRow,
     PromptRevisionRow,
@@ -73,6 +82,209 @@ class PersistenceRepository:
             row = OrganizationRow(organization_id=organization_id, name=name, created_at=created_at)
             db.add(row)
         return row
+
+    def get_or_create_principal(
+        self,
+        identity: VerifiedIdentity,
+        principal_id: UUID,
+        now: datetime,
+    ) -> AuthPrincipalRow:
+        identity = VerifiedIdentity.model_validate(identity)
+        for attempt in range(2):
+            try:
+                with self._session_factory.begin() as db:
+                    row = db.scalar(
+                        select(AuthPrincipalRow).where(
+                            AuthPrincipalRow.issuer == identity.issuer,
+                            AuthPrincipalRow.subject == identity.subject,
+                        )
+                    )
+                    if row is None:
+                        row = AuthPrincipalRow(
+                            principal_id=principal_id,
+                            issuer=identity.issuer,
+                            subject=identity.subject,
+                            email=identity.email,
+                            display_name=identity.display_name,
+                            created_at=now,
+                            updated_at=now,
+                        )
+                        db.add(row)
+                    elif row.email != identity.email or row.display_name != identity.display_name:
+                        row.email = identity.email
+                        row.display_name = identity.display_name
+                        row.updated_at = now
+                return row
+            except IntegrityError:
+                if attempt:
+                    raise
+        raise AssertionError("Principal resolution retry was not reached")
+
+    def get_principal(self, principal_id: UUID) -> AuthPrincipalRow:
+        with self._session_factory() as db:
+            row = db.get(AuthPrincipalRow, principal_id)
+            if row is None:
+                raise MembershipNotFoundError("Principal not found")
+            db.expunge(row)
+            return row
+
+    def create_organization_with_owner(
+        self,
+        organization_id: UUID,
+        name: str,
+        principal_id: UUID,
+        created_at: datetime,
+    ) -> OrganizationRow:
+        with self._session_factory.begin() as db:
+            if db.get(AuthPrincipalRow, principal_id) is None:
+                raise MembershipNotFoundError("Principal not found")
+            row = OrganizationRow(organization_id=organization_id, name=name, created_at=created_at)
+            db.add(row)
+            db.flush()
+            db.add(
+                OrganizationMembershipRow(
+                    organization_id=organization_id,
+                    principal_id=principal_id,
+                    role=MembershipRole.OWNER.value,
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+            )
+        return row
+
+    def get_membership(
+        self, organization_id: UUID, principal_id: UUID
+    ) -> OrganizationMembershipRow:
+        with self._session_factory() as db:
+            row = db.get(OrganizationMembershipRow, (organization_id, principal_id))
+            if row is None:
+                raise MembershipNotFoundError("Organization membership not found")
+            db.expunge(row)
+            return row
+
+    def list_principal_memberships(
+        self, principal_id: UUID
+    ) -> tuple[tuple[OrganizationMembershipRow, OrganizationRow], ...]:
+        with self._session_factory() as db:
+            rows = db.execute(
+                select(OrganizationMembershipRow, OrganizationRow)
+                .join(
+                    OrganizationRow,
+                    OrganizationRow.organization_id == OrganizationMembershipRow.organization_id,
+                )
+                .where(OrganizationMembershipRow.principal_id == principal_id)
+                .order_by(
+                    OrganizationMembershipRow.created_at,
+                    OrganizationMembershipRow.organization_id,
+                )
+            ).all()
+            for membership, organization in rows:
+                db.expunge(membership)
+                db.expunge(organization)
+            return tuple(rows)
+
+    def list_organization_memberships(
+        self, organization_id: UUID
+    ) -> tuple[tuple[OrganizationMembershipRow, AuthPrincipalRow], ...]:
+        with self._session_factory() as db:
+            if db.get(OrganizationRow, organization_id) is None:
+                raise MembershipNotFoundError("Organization not found")
+            rows = db.execute(
+                select(OrganizationMembershipRow, AuthPrincipalRow)
+                .join(
+                    AuthPrincipalRow,
+                    AuthPrincipalRow.principal_id == OrganizationMembershipRow.principal_id,
+                )
+                .where(OrganizationMembershipRow.organization_id == organization_id)
+                .order_by(
+                    OrganizationMembershipRow.created_at,
+                    OrganizationMembershipRow.principal_id,
+                )
+            ).all()
+            for membership, principal in rows:
+                db.expunge(membership)
+                db.expunge(principal)
+            return tuple(rows)
+
+    def add_membership(
+        self,
+        organization_id: UUID,
+        principal_id: UUID,
+        role: MembershipRole,
+        now: datetime,
+    ) -> OrganizationMembershipRow:
+        try:
+            with self._session_factory.begin() as db:
+                if db.get(OrganizationRow, organization_id) is None:
+                    raise MembershipNotFoundError("Organization not found")
+                if db.get(AuthPrincipalRow, principal_id) is None:
+                    raise MembershipNotFoundError("Principal not found")
+                row = OrganizationMembershipRow(
+                    organization_id=organization_id,
+                    principal_id=principal_id,
+                    role=MembershipRole(role).value,
+                    created_at=now,
+                    updated_at=now,
+                )
+                db.add(row)
+            return row
+        except IntegrityError as exc:
+            raise MembershipConflictError("Principal is already an organization member") from exc
+
+    def update_membership_role(
+        self,
+        organization_id: UUID,
+        principal_id: UUID,
+        role: MembershipRole,
+        now: datetime,
+    ) -> OrganizationMembershipRow:
+        with self._session_factory.begin() as db:
+            organization = db.scalar(
+                select(OrganizationRow)
+                .where(OrganizationRow.organization_id == organization_id)
+                .with_for_update()
+            )
+            if organization is None:
+                raise MembershipNotFoundError("Organization not found")
+            row = db.get(OrganizationMembershipRow, (organization_id, principal_id))
+            if row is None:
+                raise MembershipNotFoundError("Organization membership not found")
+            target = MembershipRole(role)
+            if row.role == MembershipRole.OWNER.value and target is not MembershipRole.OWNER:
+                self._require_another_owner(db, organization_id, principal_id)
+            row.role = target.value
+            row.updated_at = now
+        return row
+
+    def delete_membership(self, organization_id: UUID, principal_id: UUID) -> None:
+        with self._session_factory.begin() as db:
+            organization = db.scalar(
+                select(OrganizationRow)
+                .where(OrganizationRow.organization_id == organization_id)
+                .with_for_update()
+            )
+            if organization is None:
+                raise MembershipNotFoundError("Organization not found")
+            row = db.get(OrganizationMembershipRow, (organization_id, principal_id))
+            if row is None:
+                raise MembershipNotFoundError("Organization membership not found")
+            if row.role == MembershipRole.OWNER.value:
+                self._require_another_owner(db, organization_id, principal_id)
+            db.delete(row)
+
+    @staticmethod
+    def _require_another_owner(db: Session, organization_id: UUID, principal_id: UUID) -> None:
+        count = db.scalar(
+            select(func.count())
+            .select_from(OrganizationMembershipRow)
+            .where(
+                OrganizationMembershipRow.organization_id == organization_id,
+                OrganizationMembershipRow.role == MembershipRole.OWNER.value,
+                OrganizationMembershipRow.principal_id != principal_id,
+            )
+        )
+        if not count:
+            raise LastOwnerError("Organization must retain at least one owner")
 
     def create_project(
         self,
