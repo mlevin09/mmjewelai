@@ -27,6 +27,8 @@ from jewelai_auth import (
 )
 from jewelai_auth_oidc import OidcJwtVerifier
 from jewelai_domain import UnknownRoleError, UnsupportedLocaleError
+from jewelai_generation_queue import GenerationTaskPublisher
+from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import ParserProposal
 from jewelai_persistence import (
@@ -88,10 +90,12 @@ def create_app(
     generation_profiles: GenerationProfileRegistry | None = None,
     token_verifier: TokenVerifier | None = None,
     asset_access_signer: PrivateObjectAccessSigner | None = None,
+    generation_task_publisher: GenerationTaskPublisher | None = None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
         require_asset_signer=asset_access_signer is None,
+        require_generation_publisher=generation_task_publisher is None,
     )
     if token_verifier is None:
         if settings.oidc is None:
@@ -104,6 +108,12 @@ def create_app(
                 "signer is injected"
             )
         asset_access_signer = GcsPrivateObjectAccessSigner(settings.asset_signing)
+    if generation_task_publisher is None:
+        if settings.generation_tasks is None:
+            raise ValueError(
+                "Cloud Tasks configuration is required when no generation publisher is injected"
+            )
+        generation_task_publisher = CloudTasksGenerationPublisher(settings.generation_tasks)
     engine = engine or create_database_engine(settings.database_url)
     artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
     repository = PersistenceRepository(create_session_factory(engine))
@@ -114,6 +124,7 @@ def create_app(
         uuid_factory=uuid_factory,
         generation_profiles=generation_profiles,
         asset_access_signer=asset_access_signer,
+        generation_task_publisher=generation_task_publisher,
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
     app.state.service = service

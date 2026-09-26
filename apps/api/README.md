@@ -130,3 +130,13 @@ python -m ruff format --check apps/api packages/auth packages/auth_oidc packages
 Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim,
 generated-output asset uniqueness, and final-owner tests. SQLite tests are portable behavior tests
 and are not presented as proof of PostgreSQL locking behavior.
+
+Generation creation atomically commits the PENDING GenerationRun and one dispatch-outbox row. The API
+then attempts immediate Cloud Tasks publication but never executes OpenAI/GCS inline. Publication
+failure leaves the accepted run PENDING and its outbox recoverable. Run a bounded redrive with
+`python -m jewelai_api.dispatch_pending --batch-size 100`.
+
+Production queue configuration uses `CLOUD_TASKS_PROJECT_ID`, `CLOUD_TASKS_LOCATION`,
+`CLOUD_TASKS_QUEUE_ID`, `GENERATION_WORKER_TASK_URL`,
+`GENERATION_TASK_SERVICE_ACCOUNT_EMAIL`, `GENERATION_TASK_OIDC_AUDIENCE`, and optional bounded
+`CLOUD_TASKS_API_TIMEOUT_SECONDS`. Credentials come only from ADC/workload identity.

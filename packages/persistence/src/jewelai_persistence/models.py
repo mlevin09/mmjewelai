@@ -214,6 +214,17 @@ class GenerationRunRow(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class GenerationDispatchOutboxRow(Base):
+    __tablename__ = "generation_dispatch_outbox"
+    __table_args__ = (Index("ix_generation_dispatch_pending", "published_at", "created_at"),)
+
+    generation_run_id: Mapped[UUID] = mapped_column(
+        ForeignKey("generation_run.generation_run_id", ondelete="RESTRICT"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class AssetRow(Base):
     __tablename__ = "asset"
     __table_args__ = (

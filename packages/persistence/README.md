@@ -29,6 +29,10 @@ organization memberships. API organization creation writes the organization and 
 membership atomically. Owner deletion/demotion locks the organization row before checking for
 another owner. Existing organizations are not assigned owners automatically.
 
+The `0007_generation_dispatch_outbox` migration adds one minimal durable dispatch intent per
+API-created GenerationRun. Creation is atomic with the run; pending rows contain no task body or
+secret and are marked published idempotently after deterministic Cloud Tasks publication.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.

@@ -42,6 +42,17 @@ class FakeAssetAccessSigner:
         return self.url
 
 
+class FakeGenerationTaskPublisher:
+    def __init__(self):
+        self.calls = []
+        self.error = None
+
+    def publish(self, task):
+        self.calls.append(task)
+        if self.error is not None:
+            raise self.error
+
+
 @pytest.fixture
 def engine(tmp_path):
     database = tmp_path / "runtime.db"
@@ -61,7 +72,12 @@ def asset_access_signer():
 
 
 @pytest.fixture
-def app(engine, asset_access_signer):
+def generation_task_publisher():
+    return FakeGenerationTaskPublisher()
+
+
+@pytest.fixture
+def app(engine, asset_access_signer, generation_task_publisher):
     return create_app(
         RuntimeSettings(
             database_url="sqlite+pysqlite://",
@@ -82,6 +98,7 @@ def app(engine, asset_access_signer):
         ),
         token_verifier=FakeTokenVerifier(),
         asset_access_signer=asset_access_signer,
+        generation_task_publisher=generation_task_publisher,
     )
 
 

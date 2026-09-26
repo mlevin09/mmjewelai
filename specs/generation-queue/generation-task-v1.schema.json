@@ -1,0 +1,33 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "generation_run_id": {
+      "format": "uuid",
+      "title": "Generation Run Id",
+      "type": "string"
+    },
+    "organization_id": {
+      "format": "uuid",
+      "title": "Organization Id",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "default": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "session_id": {
+      "format": "uuid",
+      "title": "Session Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "generation_run_id",
+    "session_id",
+    "organization_id"
+  ],
+  "title": "GenerationTaskEnvelope",
+  "type": "object"
+}

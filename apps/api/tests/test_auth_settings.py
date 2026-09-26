@@ -82,3 +82,30 @@ def test_runtime_settings_do_not_require_gcs_when_signer_is_injected(monkeypatch
     monkeypatch.delenv("GCS_ASSET_BUCKET", raising=False)
     settings = RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)
     assert settings.asset_signing is None
+
+
+def test_runtime_settings_load_cloud_tasks_and_fail_closed_when_required(monkeypatch):
+    names = {
+        "CLOUD_TASKS_PROJECT_ID": "jewelai-prod",
+        "CLOUD_TASKS_LOCATION": "us-central1",
+        "CLOUD_TASKS_QUEUE_ID": "generation",
+        "GENERATION_WORKER_TASK_URL": ("https://worker.test/internal/generation-tasks/execute"),
+        "GENERATION_TASK_SERVICE_ACCOUNT_EMAIL": ("tasker@jewelai-prod.iam.gserviceaccount.com"),
+        "GENERATION_TASK_OIDC_AUDIENCE": "https://worker.test",
+    }
+    for key in names:
+        monkeypatch.delenv(key, raising=False)
+    with pytest.raises(ValueError, match="Cloud Tasks"):
+        RuntimeSettings.from_environment(
+            require_oidc=False,
+            require_asset_signer=False,
+            require_generation_publisher=True,
+        )
+    for key, value in names.items():
+        monkeypatch.setenv(key, value)
+    settings = RuntimeSettings.from_environment(
+        require_oidc=False,
+        require_asset_signer=False,
+        require_generation_publisher=True,
+    )
+    assert settings.generation_tasks.queue_id == "generation"

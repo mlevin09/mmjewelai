@@ -40,3 +40,6 @@ The boundary proves contract validation, lineage, state transitions, atomic Post
 duplicate-delivery safety. It does not prove visual quality or pixel-level lock compliance. Real
 providers, credentials, bounded network timeouts, durable queue choice, retries, asset ingestion/GCS,
 visual QA, authentication, and deployment remain deferred.
+
+Durable command delivery is subsequently defined by [ADR 0016](0016-durable-generation-cloud-tasks.md);
+the atomic GenerationRun claim semantics remain unchanged.

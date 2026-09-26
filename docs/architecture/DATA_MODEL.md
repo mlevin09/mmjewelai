@@ -2,7 +2,8 @@
 
 This remains the broader logical model. The runtime physically implements organization, project,
 auth_principal, organization_membership, design_session, message, specification_revision,
-question_event, prompt_revision, generation_run, and asset; see ADRs 0007–0014 and the Alembic
+question_event, prompt_revision, generation_run, generation_dispatch_outbox, and asset; see ADRs
+0007–0016 and the Alembic
 migrations. Later rows remain plans, not implemented
 claims.
 
@@ -17,6 +18,7 @@ claims.
 | question_event | Semantic question ID/version, rule/version, target, answer and decision explanation |
 | prompt_revision | Implemented immutable specification link, template/compiler versions, validated structured prompt, text and hash |
 | generation_run | Implemented immutable prompt/profile/provider/config input, pending/running/succeeded/failed lifecycle, attempt/parent lineage and metadata-only result/error; provider bytes remain transient |
+| generation_dispatch_outbox | One row per API-created GenerationRun; pending until deterministic Cloud Task publication succeeds. Stores no task body or secret and is not a GenerationRun lifecycle state. |
 | asset | Implemented private metadata: organization/project/session, object key, type/hash/size, optional parent and generation-output lineage, pending/ready/failed lifecycle |
 | experiment_assignment / event | Stable assignment, variant, outcome and related run/spec revision |
 

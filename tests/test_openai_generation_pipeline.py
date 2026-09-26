@@ -17,6 +17,7 @@ from jewelai_generation import (
     execute_generation_run_with_assets,
     generated_asset_id,
 )
+from jewelai_generation_queue import dispatch_pending_generation_tasks
 from jewelai_model_gateway import GenerationConfiguration, GenerationRun, GenerationStatus
 from jewelai_model_gateway_openai import (
     OpenAIImageGenerationAdapter,
@@ -76,6 +77,14 @@ class MemoryObjectStore:
         )
 
 
+class CapturingPublisher:
+    def __init__(self):
+        self.tasks = []
+
+    def publish(self, task):
+        self.tasks.append(task)
+
+
 def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persistence(
     tmp_path,
 ):
@@ -127,7 +136,7 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
         ORG_ID,
         revision.revision_id,
     )
-    repository.create_generation_run(
+    repository.create_generation_run_with_dispatch(
         GenerationRun(
             generation_run_id=RUN_ID,
             session_id=SESSION_ID,
@@ -143,6 +152,18 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
         ),
         ORG_ID,
     )
+    publisher = CapturingPublisher()
+    summary = dispatch_pending_generation_tasks(
+        repository, publisher, batch_size=10, clock=lambda: NOW + timedelta(seconds=1)
+    )
+    assert summary.published == 1
+    task = publisher.tasks[0]
+    assert (task.generation_run_id, task.session_id, task.organization_id) == (
+        RUN_ID,
+        SESSION_ID,
+        ORG_ID,
+    )
+
     client = FakeOpenAIClient()
     adapter = OpenAIImageGenerationAdapter(
         OpenAIImageProviderConfig(allowed_models=(MODEL,)), client=client
@@ -166,9 +187,9 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
 
     outcome = execute_generation_run_with_assets(
         repository,
-        session_id=SESSION_ID,
-        generation_run_id=RUN_ID,
-        organization_id=ORG_ID,
+        session_id=task.session_id,
+        generation_run_id=task.generation_run_id,
+        organization_id=task.organization_id,
         executors=ExecutorRegistry({"openai": adapter}),
         object_store=store,
         clock=ticks.__next__,

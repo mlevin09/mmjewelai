@@ -65,3 +65,6 @@ strict and bounded decoding, safe provider-error mapping, metadata/payload align
 Asset IDs, duplicate delivery, storage failure, malformed output, and a full persisted
 PromptRevision-to-READY-Asset flow without network or credentials. Existing PostgreSQL concurrency,
 Alembic, schema-drift, lint, and regression suites remain required in CI.
+
+[ADR 0016](0016-durable-generation-cloud-tasks.md) now defines Cloud Tasks delivery. Provider retry
+and stale-RUNNING recovery remain separate decisions.
