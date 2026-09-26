@@ -19,5 +19,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0014 — Authentication and organization membership](0014-authentication-organization-membership.md)
 - [0015 — Authenticated signed Asset HTTP access](0015-authenticated-signed-asset-http-access.md)
 - [0016 — Durable generation delivery with Cloud Tasks](0016-durable-generation-cloud-tasks.md)
+- [0017 — Generation recovery and explicit retry lineage](0017-generation-recovery-retry-lineage.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

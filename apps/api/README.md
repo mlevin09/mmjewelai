@@ -59,6 +59,7 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `POST /sessions/{session_id}/generation-runs`
 - `GET /sessions/{session_id}/generation-runs`
 - `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
+- `POST /sessions/{session_id}/generation-runs/{generation_run_id}/retry`
 - `GET /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/assets/{asset_id}`
 - `POST /sessions/{session_id}/assets/{asset_id}/access`
@@ -128,8 +129,9 @@ python -m ruff format --check apps/api packages/auth packages/auth_oidc packages
 ```
 
 Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim,
-generated-output asset uniqueness, and final-owner tests. SQLite tests are portable behavior tests
-and are not presented as proof of PostgreSQL locking behavior.
+dispatch redrive, explicit retry, stale-recovery/worker completion, generated-output asset
+uniqueness, principal creation, and final-owner tests. SQLite tests are portable behavior tests and
+are not presented as proof of PostgreSQL locking behavior.
 
 Generation creation atomically commits the PENDING GenerationRun and one dispatch-outbox row. The API
 then attempts immediate Cloud Tasks publication but never executes OpenAI/GCS inline. Publication
@@ -140,3 +142,10 @@ Production queue configuration uses `CLOUD_TASKS_PROJECT_ID`, `CLOUD_TASKS_LOCAT
 `CLOUD_TASKS_QUEUE_ID`, `GENERATION_WORKER_TASK_URL`,
 `GENERATION_TASK_SERVICE_ACCOUNT_EMAIL`, `GENERATION_TASK_OIDC_AUDIENCE`, and optional bounded
 `CLOUD_TASKS_API_TIMEOUT_SECONDS`. Credentials come only from ADC/workload identity.
+
+Generation retry accepts only strict `{}` and only for a FAILED run. It creates a new PENDING child
+with a new UUID, exact historical prompt/profile/provider/model/configuration, incremented attempt,
+and immediate-parent lineage. The child and outbox commit atomically; typed publication failure
+leaves both recoverable. Repeating the same retry returns the existing direct child (201 when first
+created, 200 thereafter). The original run is never reopened, no current profile is consulted, and
+no prompt is recompiled or provider invoked inline.

@@ -35,5 +35,9 @@ payloads, end-user JWT service authentication, and a public worker were rejected
 
 Every API-accepted run has durable dispatch intent, though publication and delivery may duplicate.
 Deployment must provision the queue, private worker, least-privilege IAM, finite retry/backoff and
-rate/concurrency controls, plus bounded redrive invocation. Stale RUNNING recovery, explicit retry
-lineage, Asset reconciliation, and infrastructure provisioning remain future work.
+rate/concurrency controls, plus bounded redrive invocation. Asset reconciliation and infrastructure
+provisioning remain future work.
+
+[ADR 0017](0017-generation-recovery-retry-lineage.md) now defines stale RUNNING classification and
+explicit generation retry. Cloud Tasks redelivery remains delivery retry only; it never increments
+`GenerationRun.attempt`.

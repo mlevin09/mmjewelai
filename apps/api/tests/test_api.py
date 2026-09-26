@@ -11,12 +11,18 @@ from jewelai_assets import Asset, AssetContentType, AssetKind, AssetStatus, buil
 from jewelai_auth import AuthenticationUnavailableError, VerifiedIdentity
 from jewelai_domain import Design
 from jewelai_generation import GatewayRegistry, execute_generation_run
-from jewelai_model_gateway import GeneratedOutputDescriptor, GenerationResult
+from jewelai_model_gateway import (
+    GeneratedOutputDescriptor,
+    GenerationConfiguration,
+    GenerationErrorCode,
+    GenerationResult,
+)
 from jewelai_persistence import create_session_factory
 from jewelai_persistence.models import AuthPrincipalRow
 from sqlalchemy import select
 
 from jewelai_api.artifacts import ArtifactConfigurationError, load_runtime_artifacts
+from jewelai_api.generation import GenerationProfile, GenerationProfileRegistry
 from jewelai_api.schemas import EditRevisionRequest
 from jewelai_api.settings import ArtifactVersions
 
@@ -252,6 +258,17 @@ def test_openapi_marks_business_routes_bearer_protected(client):
             continue
         for operation in operations.values():
             assert operation["security"] == [{"HTTPBearer": []}], path
+
+
+def test_openapi_exposes_strict_generation_retry_action(client):
+    document = client.get("/openapi.json", headers={"Authorization": ""}).json()
+    path = "/sessions/{session_id}/generation-runs/{generation_run_id}/retry"
+    operation = document["paths"][path]["post"]
+    schema_ref = operation["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    request_schema = document["components"]["schemas"][schema_ref.rsplit("/", 1)[-1]]
+    assert request_schema["properties"] == {}
+    assert request_schema["additionalProperties"] is False
+    assert operation["security"] == [{"HTTPBearer": []}]
 
 
 def test_authentication_infrastructure_failure_is_503_without_principal_mutation(
@@ -1028,6 +1045,149 @@ def test_generation_publication_failure_keeps_pending_run_and_outbox(
     assert not any(key in run for key in ("outbox", "task", "queue"))
     dispatch = app.state.service.repository.get_generation_dispatch(UUID(run["generation_run_id"]))
     assert dispatch.published_at is None
+
+
+def test_failed_generation_retry_is_new_exact_child_and_idempotent(
+    client, app, generation_task_publisher
+):
+    organization_id, _, session, edited, prompt = create_ready_prompt(client)
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/generation-runs"
+    parent = client.post(
+        url,
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "test_default"},
+    ).json()
+    repository = app.state.service.repository
+    parent_id = UUID(parent["generation_run_id"])
+    repository.claim_generation_run(
+        UUID(session["session_id"]), parent_id, UUID(organization_id), NOW
+    )
+    repository.fail_generation_run(
+        UUID(session["session_id"]),
+        parent_id,
+        UUID(organization_id),
+        GenerationErrorCode.PROVIDER_REJECTED,
+        "Provider rejected the request",
+        NOW,
+    )
+
+    newer_design = deepcopy(edited["design"])
+    newer_design["center_stone"]["cut"] = explicit("retry-later-cut", "step_cut")
+    assert (
+        client.post(
+            f"/sessions/{session['session_id']}/revisions",
+            headers=headers,
+            json=transition(
+                "edit",
+                edited["revision_id"],
+                design=newer_design,
+                message_id="retry-later-design",
+            ),
+        ).status_code
+        == 200
+    )
+    app.state.service._generation_profiles = GenerationProfileRegistry(
+        (
+            GenerationProfile(
+                profile_id="test_default",
+                profile_version="2.0.0",
+                provider="test",
+                model="new-model-v2",
+                configuration=GenerationConfiguration(output_count=4),
+            ),
+        )
+    )
+
+    retry_url = f"{url}/{parent['generation_run_id']}/retry"
+    created = client.post(retry_url, headers=headers, json={})
+    assert created.status_code == 201
+    child = created.json()
+    assert child["generation_run_id"] != parent["generation_run_id"]
+    assert child["status"] == "pending"
+    assert child["attempt"] == 2
+    assert child["parent_generation_run_id"] == parent["generation_run_id"]
+    for field in (
+        "prompt_revision_id",
+        "prompt_content_hash",
+        "profile_id",
+        "profile_version",
+        "provider",
+        "model",
+        "configuration",
+    ):
+        assert child[field] == parent[field]
+    assert len(generation_task_publisher.calls) == 2
+    assert str(generation_task_publisher.calls[-1].generation_run_id) == child["generation_run_id"]
+    assert repository.get_generation_dispatch(UUID(child["generation_run_id"])).published_at
+
+    repeated = client.post(retry_url, headers=headers, json={})
+    assert repeated.status_code == 200
+    assert repeated.json() == child
+    assert len(generation_task_publisher.calls) == 2
+    assert client.post(retry_url, headers=headers, json={"model": "override"}).status_code == 422
+    persisted_parent = client.get(f"{url}/{parent['generation_run_id']}", headers=headers).json()
+    assert persisted_parent["status"] == "failed"
+    assert persisted_parent["generation_run_id"] == parent["generation_run_id"]
+
+
+def test_retry_requires_failed_parent_and_preserves_pending_dispatch_on_publish_failure(
+    client, app, generation_task_publisher
+):
+    from jewelai_generation_queue import GenerationTaskPublishUnavailableError
+
+    organization_id, _, session, _, prompt = create_ready_prompt(client)
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/generation-runs"
+    parent = client.post(
+        url,
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "test_default"},
+    ).json()
+    retry_url = f"{url}/{parent['generation_run_id']}/retry"
+    blocked = client.post(retry_url, headers=headers, json={})
+    assert blocked.status_code == 409
+    assert blocked.json()["error"] == "generation_retry_not_allowed"
+
+    parent_id = UUID(parent["generation_run_id"])
+    repository = app.state.service.repository
+    repository.claim_generation_run(
+        UUID(session["session_id"]), parent_id, UUID(organization_id), NOW
+    )
+    repository.fail_generation_run(
+        UUID(session["session_id"]),
+        parent_id,
+        UUID(organization_id),
+        GenerationErrorCode.GATEWAY_UNAVAILABLE,
+        "The generation gateway failed safely",
+        NOW,
+    )
+    generation_task_publisher.error = GenerationTaskPublishUnavailableError("unavailable")
+    created = client.post(retry_url, headers=headers, json={})
+    assert created.status_code == 201
+    child = created.json()
+    assert child["status"] == "pending"
+    dispatch = repository.get_generation_dispatch(UUID(child["generation_run_id"]))
+    assert dispatch.published_at is None
+
+    generation_task_publisher.error = None
+    repeated = client.post(retry_url, headers=headers, json={})
+    assert repeated.status_code == 200
+    assert repeated.json()["generation_run_id"] == child["generation_run_id"]
+    assert (
+        repository.get_generation_dispatch(UUID(child["generation_run_id"])).published_at
+        is not None
+    )
+
+    foreign = client.post("/organizations", json={"name": "Foreign retry"}).json()
+    calls = len(generation_task_publisher.calls)
+    denied = client.post(
+        retry_url,
+        headers={"X-Organization-ID": foreign["organization_id"]},
+        json={},
+    )
+    assert denied.status_code == 404
+    assert len(generation_task_publisher.calls) == calls
 
 
 def test_generation_run_api_rejects_untrusted_profile_configuration_and_cross_scope(client):

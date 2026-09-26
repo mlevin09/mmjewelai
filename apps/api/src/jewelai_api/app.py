@@ -32,6 +32,7 @@ from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import ParserProposal
 from jewelai_persistence import (
+    GenerationRetryNotAllowedError,
     GenerationStateConflictError,
     NotFoundError,
     StaleRevisionError,
@@ -67,6 +68,7 @@ from .schemas import (
     ProjectResponse,
     PromptRevisionListResponse,
     PromptRevisionResponse,
+    RetryGenerationRunRequest,
     RevisionListResponse,
     RevisionTransitionRequest,
     SessionResponse,
@@ -167,6 +169,14 @@ def create_app(
     @app.exception_handler(GenerationStateConflictError)
     async def generation_state_handler(_, exc):
         return _error_response(409, "generation_state_conflict", str(exc))
+
+    @app.exception_handler(GenerationRetryNotAllowedError)
+    async def generation_retry_handler(_, __):
+        return _error_response(
+            409,
+            "generation_retry_not_allowed",
+            "Generation run is not eligible for retry",
+        )
 
     @app.exception_handler(AssetNotReadyError)
     async def asset_not_ready_handler(_, __):
@@ -402,6 +412,25 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.create_generation_run(session_id, organization_id, request)
+
+    @app.post(
+        "/sessions/{session_id}/generation-runs/{generation_run_id}/retry",
+        response_model=GenerationRun,
+        status_code=201,
+    )
+    def retry_generation_run(
+        session_id: UUID,
+        generation_run_id: UUID,
+        request: RetryGenerationRunRequest,
+        response: Response,
+        organization_id: AuthorizedOrganization,
+    ):
+        run, created = service.retry_generation_run(
+            session_id, generation_run_id, organization_id, request
+        )
+        if not created:
+            response.status_code = 200
+        return run
 
     @app.get("/sessions/{session_id}/generation-runs", response_model=GenerationRunListResponse)
     def list_generation_runs(

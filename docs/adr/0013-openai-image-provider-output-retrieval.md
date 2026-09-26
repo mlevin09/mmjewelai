@@ -52,11 +52,10 @@ store such as GCS. A crash after GenerationRun success but before metadata final
 missing or PENDING Asset row, but the exact bytes remain durable at the deterministic final object
 key, making future adoption/reconciliation possible. Reconciliation is not implemented.
 
-A crash before durable staging may leave a RUNNING run; stuck-run recovery remains future work. A
-partial multi-output staging failure leaves the run FAILED and may leave private orphan objects at
-their final keys; cleanup/retention is also deferred. Durable queue delivery, explicit retry lineage,
-authentication, signed-access HTTP, reference-image input, visual QA, provider cost accounting, and
-a second provider remain future work.
+A crash before durable staging may leave a RUNNING run until ADR 0017's bounded timeout recovery
+marks it failed. A partial multi-output staging failure leaves the run FAILED and may leave private
+orphan objects at their final keys; cleanup/retention is still deferred. Reference-image input,
+visual QA, provider cost accounting, and a second provider remain future work.
 
 ## Validation
 
@@ -66,5 +65,7 @@ Asset IDs, duplicate delivery, storage failure, malformed output, and a full per
 PromptRevision-to-READY-Asset flow without network or credentials. Existing PostgreSQL concurrency,
 Alembic, schema-drift, lint, and regression suites remain required in CI.
 
-[ADR 0016](0016-durable-generation-cloud-tasks.md) now defines Cloud Tasks delivery. Provider retry
-and stale-RUNNING recovery remain separate decisions.
+[ADR 0016](0016-durable-generation-cloud-tasks.md) defines Cloud Tasks delivery. Timeout-based stale
+execution recovery and explicit retry lineage are defined by
+[ADR 0017](0017-generation-recovery-retry-lineage.md). Asset reconciliation and orphan cleanup remain
+future work.

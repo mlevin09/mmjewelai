@@ -1,4 +1,6 @@
+import json
 import os
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -35,6 +37,7 @@ from jewelai_model_gateway import (
 from jewelai_persistence import (
     Base,
     DuplicateRevisionError,
+    GenerationRetryNotAllowedError,
     GenerationStateConflictError,
     NotFoundError,
     OwnershipMismatchError,
@@ -43,10 +46,16 @@ from jewelai_persistence import (
     create_database_engine,
     create_session_factory,
 )
-from jewelai_persistence.models import AssetRow, AuthPrincipalRow, PromptRevisionRow
+from jewelai_persistence.models import (
+    AssetRow,
+    AuthPrincipalRow,
+    GenerationDispatchOutboxRow,
+    GenerationRunRow,
+    PromptRevisionRow,
+)
 from jewelai_prompts import compile_prompt
 from pydantic import ValidationError
-from sqlalchemy import func, inspect, select
+from sqlalchemy import func, inspect, select, update
 from sqlalchemy.exc import IntegrityError
 
 from jewelai_api.artifacts import load_runtime_artifacts
@@ -214,6 +223,308 @@ def test_generation_run_and_dispatch_outbox_are_atomic_and_idempotently_publishe
         )
         == run
     )
+
+
+def test_stale_running_scan_is_bounded_ordered_and_transition_is_atomic(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    run_ids = tuple(UUID(int=value) for value in range(821, 828))
+    starts = (
+        NOW + timedelta(minutes=1),
+        NOW + timedelta(minutes=2),
+        NOW + timedelta(minutes=30),
+        NOW + timedelta(minutes=31),
+    )
+    for offset, run_id in enumerate(run_ids):
+        create_prompt_and_run(
+            service,
+            organization,
+            session,
+            UUID(int=830 + offset),
+            run_id,
+            dispatch=True,
+        )
+    for run_id, started_at in zip(run_ids[:4], starts, strict=True):
+        service.repository.claim_generation_run(
+            session.session_id, run_id, organization.organization_id, started_at
+        )
+    service.repository.claim_generation_run(
+        session.session_id, run_ids[5], organization.organization_id, NOW
+    )
+    service.repository.complete_generation_run(
+        session.session_id,
+        run_ids[5],
+        organization.organization_id,
+        GenerationResult(
+            generation_run_id=run_ids[5],
+            provider="test",
+            model="deterministic-image-v1",
+            outputs=(GeneratedOutputDescriptor(ordinal=1),),
+        ),
+        NOW + timedelta(seconds=1),
+    )
+    service.repository.claim_generation_run(
+        session.session_id, run_ids[6], organization.organization_id, NOW
+    )
+    service.repository.fail_generation_run(
+        session.session_id,
+        run_ids[6],
+        organization.organization_id,
+        GenerationErrorCode.PROVIDER_REJECTED,
+        "Provider rejected the request",
+        NOW + timedelta(seconds=1),
+    )
+
+    cutoff = NOW + timedelta(minutes=30)
+    first_page = service.repository.list_stale_running_generation_runs(cutoff, 2)
+    assert [item.generation_run_id for item in first_page] == list(run_ids[:2])
+    candidates = service.repository.list_stale_running_generation_runs(cutoff, 100)
+    assert [item.generation_run_id for item in candidates] == list(run_ids[:3])
+    with pytest.raises(ValueError, match="between 1 and 100"):
+        service.repository.list_stale_running_generation_runs(cutoff, 101)
+
+    recovered_at = NOW + timedelta(hours=1)
+    assert service.repository.fail_stale_generation_run(
+        run_ids[2], cutoff=cutoff, completed_at=recovered_at
+    )
+    assert not service.repository.fail_stale_generation_run(
+        run_ids[2], cutoff=cutoff, completed_at=recovered_at
+    )
+    recovered = service.repository.get_generation_run(
+        session.session_id, run_ids[2], organization.organization_id
+    )
+    assert recovered.status is GenerationStatus.FAILED
+    assert recovered.error_code is GenerationErrorCode.EXECUTION_STALE
+    assert recovered.error_detail == "Generation execution exceeded the recovery deadline"
+    assert recovered.started_at == starts[2]
+    assert recovered.completed_at == recovered_at
+    assert recovered.result is None
+    assert service.repository.get_generation_dispatch(run_ids[2]).published_at is None
+    assert (
+        service.repository.get_generation_run(
+            session.session_id, run_ids[3], organization.organization_id
+        ).status
+        is GenerationStatus.RUNNING
+    )
+    assert (
+        service.repository.get_generation_run(
+            session.session_id, run_ids[4], organization.organization_id
+        ).status
+        is GenerationStatus.PENDING
+    )
+    assert (
+        service.repository.get_generation_run(
+            session.session_id, run_ids[5], organization.organization_id
+        ).status
+        is GenerationStatus.SUCCEEDED
+    )
+    assert (
+        service.repository.get_generation_run(
+            session.session_id, run_ids[6], organization.organization_id
+        ).error_code
+        is GenerationErrorCode.PROVIDER_REJECTED
+    )
+
+
+def test_generation_retry_derives_exact_parent_input_and_is_idempotent(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    parent_id = UUID(int=841)
+    compiled, parent = create_prompt_and_run(
+        service,
+        organization,
+        session,
+        UUID(int=842),
+        parent_id,
+        dispatch=True,
+    )
+    service.repository.claim_generation_run(
+        session.session_id, parent_id, organization.organization_id, NOW
+    )
+    failed_at = NOW + timedelta(seconds=1)
+    failed = service.repository.fail_generation_run(
+        session.session_id,
+        parent_id,
+        organization.organization_id,
+        GenerationErrorCode.PROVIDER_REJECTED,
+        "Provider rejected the request",
+        failed_at,
+    )
+
+    child_id = UUID(int=843)
+    created_at = NOW + timedelta(seconds=2)
+    retry = service.repository.create_generation_retry_with_dispatch(
+        parent_generation_run_id=parent_id,
+        session_id=session.session_id,
+        organization_id=organization.organization_id,
+        new_generation_run_id=child_id,
+        created_at=created_at,
+    )
+    assert retry.created
+    assert retry.dispatch is not None
+    child = retry.run
+    assert child.generation_run_id == child_id
+    assert child.status is GenerationStatus.PENDING
+    assert (child.attempt, child.parent_generation_run_id) == (2, parent_id)
+    assert child.prompt_revision_id == parent.prompt_revision_id
+    assert child.prompt_content_hash == compiled.content_hash
+    assert child.profile_id == failed.profile_id
+    assert child.profile_version == failed.profile_version
+    assert child.provider == failed.provider
+    assert child.model == failed.model
+    assert child.configuration == failed.configuration
+    assert child.result is child.error_code is child.started_at is child.completed_at is None
+    assert (
+        service.repository.get_generation_run(
+            session.session_id, parent_id, organization.organization_id
+        )
+        == failed
+    )
+
+    repeated = service.repository.create_generation_retry_with_dispatch(
+        parent_generation_run_id=parent_id,
+        session_id=session.session_id,
+        organization_id=organization.organization_id,
+        new_generation_run_id=UUID(int=844),
+        created_at=NOW + timedelta(seconds=3),
+    )
+    assert not repeated.created
+    assert repeated.run == child
+    assert repeated.dispatch is not None
+    assert repeated.dispatch.task.generation_run_id == child_id
+    assert (
+        len(
+            [
+                run
+                for run in service.repository.list_generation_runs(
+                    session.session_id, organization.organization_id
+                )
+                if run.parent_generation_run_id == parent_id
+            ]
+        )
+        == 1
+    )
+
+    service.repository.mark_generation_dispatch_published(child_id, NOW + timedelta(seconds=4))
+    published_repeat = service.repository.create_generation_retry_with_dispatch(
+        parent_generation_run_id=parent_id,
+        session_id=session.session_id,
+        organization_id=organization.organization_id,
+        new_generation_run_id=UUID(int=845),
+        created_at=NOW + timedelta(seconds=5),
+    )
+    assert published_repeat.run == child
+    assert published_repeat.dispatch is None
+
+    service.repository.claim_generation_run(
+        session.session_id,
+        child_id,
+        organization.organization_id,
+        NOW + timedelta(seconds=6),
+    )
+    service.repository.fail_generation_run(
+        session.session_id,
+        child_id,
+        organization.organization_id,
+        GenerationErrorCode.GATEWAY_TIMEOUT,
+        "Provider request timed out",
+        NOW + timedelta(seconds=7),
+    )
+    third = service.repository.create_generation_retry_with_dispatch(
+        parent_generation_run_id=child_id,
+        session_id=session.session_id,
+        organization_id=organization.organization_id,
+        new_generation_run_id=UUID(int=846),
+        created_at=NOW + timedelta(seconds=8),
+    ).run
+    assert (third.attempt, third.parent_generation_run_id) == (3, child_id)
+    assert third.prompt_revision_id == parent.prompt_revision_id
+
+
+def test_generation_retry_rejects_nonfailed_and_foreign_scope(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    _, pending = create_prompt_and_run(
+        service, organization, session, UUID(int=851), UUID(int=852), dispatch=True
+    )
+    _, running = create_prompt_and_run(
+        service, organization, session, UUID(int=855), UUID(int=856), dispatch=True
+    )
+    service.repository.claim_generation_run(
+        session.session_id, running.generation_run_id, organization.organization_id, NOW
+    )
+    _, succeeded = create_prompt_and_run(
+        service, organization, session, UUID(int=857), UUID(int=858), dispatch=True
+    )
+    service.repository.claim_generation_run(
+        session.session_id, succeeded.generation_run_id, organization.organization_id, NOW
+    )
+    service.repository.complete_generation_run(
+        session.session_id,
+        succeeded.generation_run_id,
+        organization.organization_id,
+        GenerationResult(
+            generation_run_id=succeeded.generation_run_id,
+            provider="test",
+            model="deterministic-image-v1",
+            outputs=(GeneratedOutputDescriptor(ordinal=1),),
+        ),
+        NOW + timedelta(seconds=1),
+    )
+    for offset, ineligible in enumerate((pending, running, succeeded), start=1):
+        with pytest.raises(GenerationRetryNotAllowedError):
+            service.repository.create_generation_retry_with_dispatch(
+                parent_generation_run_id=ineligible.generation_run_id,
+                session_id=session.session_id,
+                organization_id=organization.organization_id,
+                new_generation_run_id=UUID(int=860 + offset),
+                created_at=NOW + timedelta(seconds=2),
+            )
+    foreign = service.create_organization("Foreign retry scope")
+    with pytest.raises(OwnershipMismatchError):
+        service.repository.create_generation_retry_with_dispatch(
+            parent_generation_run_id=pending.generation_run_id,
+            session_id=session.session_id,
+            organization_id=foreign.organization_id,
+            new_generation_run_id=UUID(int=854),
+            created_at=NOW,
+        )
+
+
+def test_database_rejects_inconsistent_generation_retry_lineage(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    _, run = create_prompt_and_run(service, organization, session, UUID(int=861), UUID(int=862))
+    with pytest.raises(IntegrityError):
+        with create_session_factory(engine).begin() as db:
+            db.execute(
+                update(GenerationRunRow)
+                .where(GenerationRunRow.generation_run_id == run.generation_run_id)
+                .values(attempt=2)
+            )
+
+
+def test_stale_recovery_cli_requires_only_database_configuration(engine, monkeypatch, capsys):
+    from jewelai_persistence.recover_stale import main
+
+    monkeypatch.setenv("DATABASE_URL", str(engine.url))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "jewelai_persistence.recover_stale",
+            "--stale-after-seconds",
+            "1800",
+            "--batch-size",
+            "10",
+        ],
+    )
+    main()
+    assert json.loads(capsys.readouterr().out) == {
+        "inspected": 0,
+        "recovered": 0,
+        "skipped": 0,
+    }
 
 
 def test_generation_dispatch_transaction_rolls_back_run_when_lineage_is_invalid(engine):
@@ -1129,6 +1440,141 @@ def test_postgres_concurrent_outbox_redrive_uses_one_logical_task_identity():
     assert [summary.published for summary in summaries] == [1, 1]
     assert task_ids == [generation_task_id(run_id), generation_task_id(run_id)]
     assert service.repository.list_pending_generation_dispatches(100) == ()
+    engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_concurrent_retry_creates_one_child_and_outbox():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    parent_id = UUID(int=1911)
+    create_prompt_and_run(service, organization, session, UUID(int=1912), parent_id, dispatch=True)
+    service.repository.claim_generation_run(
+        session.session_id, parent_id, organization.organization_id, NOW
+    )
+    service.repository.fail_generation_run(
+        session.session_id,
+        parent_id,
+        organization.organization_id,
+        GenerationErrorCode.GATEWAY_UNAVAILABLE,
+        "The generation gateway failed safely",
+        NOW + timedelta(seconds=1),
+    )
+    barrier = Barrier(2)
+
+    def retry(offset):
+        repository = PersistenceRepository(create_session_factory(engine))
+        barrier.wait()
+        return repository.create_generation_retry_with_dispatch(
+            parent_generation_run_id=parent_id,
+            session_id=session.session_id,
+            organization_id=organization.organization_id,
+            new_generation_run_id=UUID(int=1920 + offset),
+            created_at=NOW + timedelta(seconds=2),
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        retries = tuple(pool.map(retry, (1, 2)))
+    assert len({item.run.generation_run_id for item in retries}) == 1
+    assert sorted(item.created for item in retries) == [False, True]
+    child = retries[0].run
+    assert (child.attempt, child.parent_generation_run_id) == (2, parent_id)
+    with create_session_factory(engine)() as db:
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(GenerationRunRow)
+                .where(GenerationRunRow.parent_generation_run_id == parent_id)
+            )
+            == 1
+        )
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(GenerationDispatchOutboxRow)
+                .where(GenerationDispatchOutboxRow.generation_run_id == child.generation_run_id)
+            )
+            == 1
+        )
+    engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_stale_recovery_and_completion_have_one_terminal_winner():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    run_id = UUID(int=1931)
+    create_prompt_and_run(service, organization, session, UUID(int=1932), run_id)
+    service.repository.claim_generation_run(
+        session.session_id, run_id, organization.organization_id, NOW
+    )
+    result = GenerationResult(
+        generation_run_id=run_id,
+        provider="test",
+        model="deterministic-image-v1",
+        outputs=(GeneratedOutputDescriptor(ordinal=1),),
+    )
+    barrier = Barrier(2)
+
+    def complete():
+        repository = PersistenceRepository(create_session_factory(engine))
+        barrier.wait()
+        try:
+            repository.complete_generation_run(
+                session.session_id,
+                run_id,
+                organization.organization_id,
+                result,
+                NOW + timedelta(hours=1),
+            )
+            return "succeeded"
+        except GenerationStateConflictError:
+            return "conflict"
+
+    def recover():
+        repository = PersistenceRepository(create_session_factory(engine))
+        barrier.wait()
+        return (
+            "recovered"
+            if repository.fail_stale_generation_run(
+                run_id,
+                cutoff=NOW,
+                completed_at=NOW + timedelta(hours=1),
+            )
+            else "skipped"
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        completion = pool.submit(complete)
+        recovery = pool.submit(recover)
+        outcomes = {completion.result(), recovery.result()}
+    assert outcomes in ({"succeeded", "skipped"}, {"recovered", "conflict"})
+    terminal = service.repository.get_generation_run(
+        session.session_id, run_id, organization.organization_id
+    )
+    assert terminal.status in (GenerationStatus.SUCCEEDED, GenerationStatus.FAILED)
+    if terminal.status is GenerationStatus.FAILED:
+        assert terminal.error_code is GenerationErrorCode.EXECUTION_STALE
+        with pytest.raises(GenerationStateConflictError):
+            service.repository.complete_generation_run(
+                session.session_id,
+                run_id,
+                organization.organization_id,
+                result,
+                NOW + timedelta(hours=2),
+            )
     engine.dispose()
 
 

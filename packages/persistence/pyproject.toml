@@ -14,6 +14,7 @@ dependencies = [
   "jewelai-generation-queue==1.0.0",
   "jewelai-model-gateway==1.0.0",
   "jewelai-prompts==1.0.0",
+  "pydantic>=2.11,<3",
   "sqlalchemy>=2.0.43,<3",
 ]
 

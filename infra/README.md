@@ -12,3 +12,7 @@ rate/concurrency configuration, and an operational bounded outbox-redrive invoca
 may create tasks and use the delivery identity; that identity may invoke only the worker; the worker
 has only its database, private GCS, and OpenAI runtime access. Never make the worker public or grant
 project-wide Owner/Editor or broad Storage Admin roles. These resources are not provisioned here.
+
+Operations must also invoke the bounded stale-recovery command, eventually through a private Cloud
+Run Job/Scheduler arrangement. This repository does not provision that job. Recovery uses only
+PostgreSQL, marks old RUNNING rows failed, and never calls the provider or creates retries.

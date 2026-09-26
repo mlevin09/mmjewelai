@@ -98,6 +98,7 @@ class GenerationErrorCode(StrEnum):
     PROVIDER_REJECTED = "provider_rejected"
     PROVIDER_INVALID_RESPONSE = "provider_invalid_response"
     GATEWAY_CONTRACT_VIOLATION = "gateway_contract_violation"
+    EXECUTION_STALE = "execution_stale"
 
 
 class GenerationRun(GatewayModel):
@@ -124,6 +125,10 @@ class GenerationRun(GatewayModel):
     def validate_lifecycle(self):
         if self.parent_generation_run_id == self.generation_run_id:
             raise ValueError("A generation run cannot be its own parent")
+        if self.attempt == 1 and self.parent_generation_run_id is not None:
+            raise ValueError("An initial generation run cannot have a parent")
+        if self.attempt > 1 and self.parent_generation_run_id is None:
+            raise ValueError("A retry generation run requires an immediate parent")
         if self.status is GenerationStatus.PENDING:
             valid = (
                 self.started_at is None

@@ -26,6 +26,7 @@ from jewelai_persistence import (
     PersistenceRepository,
     create_database_engine,
     create_session_factory,
+    recover_stale_generation_runs,
 )
 from jewelai_persistence.models import DesignSessionRow, PromptRevisionRow
 from jewelai_prompts import compile_prompt, load_prompt_templates
@@ -272,6 +273,70 @@ def test_private_http_delivery_executes_once_and_acknowledges_duplicate(persiste
     assert second.json()["disposition"] == "not_claimed"
     assert poison.status_code == 204
     assert executor.calls == 1
+
+
+def test_stale_recovery_fails_old_run_and_old_task_cannot_invoke_provider(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    recovery_time = NOW + timedelta(minutes=30)
+    summary = recover_stale_generation_runs(
+        repository,
+        stale_after_seconds=1800,
+        batch_size=100,
+        clock=lambda: recovery_time,
+    )
+    assert summary.model_dump() == {"inspected": 1, "recovered": 1, "skipped": 0}
+    recovered = repository.get_generation_run(SESSION_ID, RUN_ID, ORG_ID)
+    assert recovered.status is GenerationStatus.FAILED
+    assert recovered.error_code.value == "execution_stale"
+    assert recovered.started_at == NOW
+    assert recovered.completed_at == recovery_time
+
+    executor = FakeExecutor()
+    app = create_worker_app(
+        GenerationWorkerSettings(
+            database_url="sqlite+pysqlite://",
+            gcs_asset_bucket="unused-bucket",
+            openai_allowed_models=("gpt-image-1",),
+        ),
+        repository=repository,
+        executor=executor,
+        object_store=MemoryObjectStore(),
+        clock=lambda: recovery_time,
+    )
+    response = TestClient(app).post(
+        "/internal/generation-tasks/execute",
+        json={
+            "schema_version": "1.0.0",
+            "generation_run_id": str(RUN_ID),
+            "session_id": str(SESSION_ID),
+            "organization_id": str(ORG_ID),
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["disposition"] == "not_claimed"
+    assert executor.calls == 0
+    assert recover_stale_generation_runs(
+        repository,
+        stale_after_seconds=1800,
+        batch_size=100,
+        clock=lambda: recovery_time,
+    ).model_dump() == {"inspected": 0, "recovered": 0, "skipped": 0}
+
+
+@pytest.mark.parametrize(
+    "stale_after_seconds,batch_size",
+    [(899, 100), (86401, 100), (1800, 0), (1800, 101), (True, 100), (1800, False)],
+)
+def test_recovery_settings_are_strictly_bounded(persisted, stale_after_seconds, batch_size):
+    repository, _, _ = persisted
+    with pytest.raises(ValueError):
+        recover_stale_generation_runs(
+            repository,
+            stale_after_seconds=stale_after_seconds,
+            batch_size=batch_size,
+            clock=lambda: NOW,
+        )
 
 
 def test_worker_task_contract_rejects_business_state_before_provider(persisted):

@@ -18,7 +18,12 @@ from jewelai_generation import (
     generated_asset_id,
 )
 from jewelai_generation_queue import dispatch_pending_generation_tasks
-from jewelai_model_gateway import GenerationConfiguration, GenerationRun, GenerationStatus
+from jewelai_model_gateway import (
+    GenerationConfiguration,
+    GenerationErrorCode,
+    GenerationRun,
+    GenerationStatus,
+)
 from jewelai_model_gateway_openai import (
     OpenAIImageGenerationAdapter,
     OpenAIImageProviderConfig,
@@ -28,6 +33,7 @@ from jewelai_persistence import (
     PersistenceRepository,
     create_database_engine,
     create_session_factory,
+    recover_stale_generation_runs,
 )
 from jewelai_persistence.models import (
     AssetRow,
@@ -45,6 +51,7 @@ SESSION_ID = UUID("20000000-0000-4000-8000-000000000003")
 PROMPT_ID = UUID("20000000-0000-4000-8000-000000000004")
 RUN_ID = UUID("20000000-0000-4000-8000-000000000005")
 LEGACY_RUN_ID = UUID("20000000-0000-4000-8000-000000000006")
+RETRY_RUN_ID = UUID("20000000-0000-4000-8000-000000000007")
 MODEL = "gpt-image-2.5-sunburst-2026-09-08"
 PNG = b"\x89PNG\r\n\x1a\nopenai-integration-output"
 
@@ -252,4 +259,122 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
     )
     assert legacy.run.status is GenerationStatus.FAILED
     assert len(client.calls) == 1
+    engine.dispose()
+
+
+def test_stale_run_explicit_retry_becomes_independent_ready_asset(tmp_path):
+    engine = create_database_engine(f"sqlite+pysqlite:///{tmp_path / 'retry-pipeline.db'}")
+    Base.metadata.create_all(engine)
+    repository = PersistenceRepository(create_session_factory(engine))
+    repository.create_organization(ORG_ID, "Organization", NOW)
+    repository.create_project(PROJECT_ID, ORG_ID, "Project", NOW)
+    revision = DesignRevision.model_validate_json(
+        (ROOT / "specs/jewelry-design-schema/fixtures/valid/ring.json").read_text()
+    )
+    repository.create_design_session(
+        DesignSessionRow(
+            session_id=SESSION_ID,
+            project_id=PROJECT_ID,
+            role_id="retail_client",
+            locale="en",
+            created_at=NOW,
+            updated_at=NOW,
+            current_revision_id=revision.revision_id,
+            design_schema_version="1.0.0",
+            role_artifact_version="1.0.0",
+            dictionary_artifact_version="1.0.0",
+            question_artifact_version="1.0.0",
+            rules_artifact_version="1.0.0",
+            prompt_artifact_version="1.0.0",
+        ),
+        revision,
+        organization_id=ORG_ID,
+    )
+    compiled = compile_prompt(revision, load_prompt_templates(ROOT / "data/prompts/v1.0.0.json"))
+    repository.create_prompt_revision(
+        PromptRevisionRow(
+            prompt_revision_id=PROMPT_ID,
+            session_id=SESSION_ID,
+            specification_revision_id=revision.revision_id,
+            prompt_schema_version=compiled.schema_version,
+            compiler_version=compiled.compiler_version,
+            template_id=compiled.template_id,
+            template_version=compiled.template_version,
+            template_artifact_version=compiled.template_artifact_version,
+            compiled_text=compiled.prompt_text,
+            structured_payload=compiled.model_dump(mode="json"),
+            content_hash=compiled.content_hash,
+            created_at=NOW,
+        ),
+        compiled,
+        ORG_ID,
+        revision.revision_id,
+    )
+    parent = GenerationRun(
+        generation_run_id=RUN_ID,
+        session_id=SESSION_ID,
+        prompt_revision_id=PROMPT_ID,
+        prompt_content_hash=compiled.content_hash,
+        profile_id="openai_image_production",
+        profile_version="1.0.0",
+        provider="openai",
+        model=MODEL,
+        configuration=GenerationConfiguration(output_count=1),
+        status=GenerationStatus.PENDING,
+        created_at=NOW,
+    )
+    repository.create_generation_run_with_dispatch(parent, ORG_ID)
+    repository.mark_generation_dispatch_published(RUN_ID, NOW)
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    recovery_time = NOW + timedelta(minutes=30)
+    assert (
+        recover_stale_generation_runs(
+            repository,
+            stale_after_seconds=1800,
+            clock=lambda: recovery_time,
+        ).recovered
+        == 1
+    )
+
+    retry = repository.create_generation_retry_with_dispatch(
+        parent_generation_run_id=RUN_ID,
+        session_id=SESSION_ID,
+        organization_id=ORG_ID,
+        new_generation_run_id=RETRY_RUN_ID,
+        created_at=recovery_time + timedelta(seconds=1),
+    )
+    assert retry.created and retry.dispatch is not None
+    publisher = CapturingPublisher()
+    assert (
+        dispatch_pending_generation_tasks(
+            repository,
+            publisher,
+            batch_size=100,
+            clock=lambda: recovery_time + timedelta(seconds=2),
+        ).published
+        == 1
+    )
+    assert publisher.tasks[0].generation_run_id == RETRY_RUN_ID
+
+    client = FakeOpenAIClient()
+    adapter = OpenAIImageGenerationAdapter(
+        OpenAIImageProviderConfig(allowed_models=(MODEL,)), client=client
+    )
+    outcome = execute_generation_run_with_assets(
+        repository,
+        session_id=SESSION_ID,
+        generation_run_id=RETRY_RUN_ID,
+        organization_id=ORG_ID,
+        executors=ExecutorRegistry({"openai": adapter}),
+        object_store=MemoryObjectStore([]),
+        clock=iter(recovery_time + timedelta(seconds=value) for value in range(3, 10)).__next__,
+    )
+    assert outcome.run.status is GenerationStatus.SUCCEEDED
+    assert outcome.run.attempt == 2
+    assert outcome.run.parent_generation_run_id == RUN_ID
+    assert outcome.assets[0].generation_run_id == RETRY_RUN_ID
+    original = repository.get_generation_run(SESSION_ID, RUN_ID, ORG_ID)
+    assert original.status is GenerationStatus.FAILED
+    assert original.error_code is GenerationErrorCode.EXECUTION_STALE
+    assert client.calls[0]["prompt"] == compiled.prompt_text
     engine.dispose()

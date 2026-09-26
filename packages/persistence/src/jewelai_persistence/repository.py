@@ -1,5 +1,6 @@
 """Scoped repositories and atomic revision compare-and-swap."""
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -71,6 +72,25 @@ class DuplicateRevisionError(PersistenceError):
 
 class GenerationStateConflictError(PersistenceError):
     pass
+
+
+class GenerationRetryNotAllowedError(GenerationStateConflictError):
+    pass
+
+
+@dataclass(frozen=True)
+class StaleGenerationRunCandidate:
+    generation_run_id: UUID
+    session_id: UUID
+    organization_id: UUID
+    started_at: datetime
+
+
+@dataclass(frozen=True)
+class GenerationRetryCreation:
+    run: GenerationRun
+    dispatch: PendingGenerationDispatch | None
+    created: bool
 
 
 class PersistenceRepository:
@@ -621,6 +641,139 @@ class PersistenceRepository:
                 raise NotFoundError("Generation dispatch not found")
             db.expunge(row)
             return row
+
+    def list_stale_running_generation_runs(
+        self, cutoff: datetime, batch_size: int
+    ) -> tuple[StaleGenerationRunCandidate, ...]:
+        if isinstance(batch_size, bool) or not 1 <= batch_size <= 100:
+            raise ValueError("batch_size must be between 1 and 100")
+        with self._session_factory() as db:
+            rows = db.execute(
+                select(
+                    GenerationRunRow.generation_run_id,
+                    GenerationRunRow.session_id,
+                    ProjectRow.organization_id,
+                    GenerationRunRow.started_at,
+                )
+                .join(DesignSessionRow, DesignSessionRow.session_id == GenerationRunRow.session_id)
+                .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                .where(
+                    GenerationRunRow.status == GenerationStatus.RUNNING.value,
+                    GenerationRunRow.started_at.is_not(None),
+                    GenerationRunRow.started_at <= cutoff,
+                )
+                .order_by(GenerationRunRow.started_at, GenerationRunRow.generation_run_id)
+                .limit(batch_size)
+            ).all()
+            return tuple(
+                StaleGenerationRunCandidate(
+                    generation_run_id=generation_run_id,
+                    session_id=session_id,
+                    organization_id=organization_id,
+                    started_at=self._utc(started_at),
+                )
+                for generation_run_id, session_id, organization_id, started_at in rows
+            )
+
+    def fail_stale_generation_run(
+        self,
+        generation_run_id: UUID,
+        *,
+        cutoff: datetime,
+        completed_at: datetime,
+    ) -> bool:
+        """Atomically classify one sufficiently old RUNNING run as terminal FAILED."""
+        with self._session_factory.begin() as db:
+            result = db.execute(
+                update(GenerationRunRow)
+                .where(
+                    GenerationRunRow.generation_run_id == generation_run_id,
+                    GenerationRunRow.status == GenerationStatus.RUNNING.value,
+                    GenerationRunRow.started_at.is_not(None),
+                    GenerationRunRow.started_at <= cutoff,
+                )
+                .values(
+                    status=GenerationStatus.FAILED.value,
+                    error_code=GenerationErrorCode.EXECUTION_STALE.value,
+                    error_detail="Generation execution exceeded the recovery deadline",
+                    completed_at=completed_at,
+                )
+            )
+            return result.rowcount == 1
+
+    def create_generation_retry_with_dispatch(
+        self,
+        *,
+        parent_generation_run_id: UUID,
+        session_id: UUID,
+        organization_id: UUID,
+        new_generation_run_id: UUID,
+        created_at: datetime,
+    ) -> GenerationRetryCreation:
+        """Idempotently create one exact-input retry child and durable dispatch."""
+        with self._session_factory.begin() as db:
+            parent = db.scalar(
+                select(GenerationRunRow)
+                .where(
+                    GenerationRunRow.generation_run_id == parent_generation_run_id,
+                    GenerationRunRow.session_id == session_id,
+                    GenerationRunRow.session_id.in_(self._scoped_session_ids(organization_id)),
+                )
+                .with_for_update()
+            )
+            if parent is None:
+                raise OwnershipMismatchError("Generation run not found in organization scope")
+            if parent.status != GenerationStatus.FAILED.value:
+                raise GenerationRetryNotAllowedError("Generation run is not eligible for retry")
+
+            child = db.scalar(
+                select(GenerationRunRow).where(
+                    GenerationRunRow.parent_generation_run_id == parent_generation_run_id
+                )
+            )
+            created = child is None
+            if child is None:
+                child_run = GenerationRun(
+                    generation_run_id=new_generation_run_id,
+                    session_id=parent.session_id,
+                    prompt_revision_id=parent.prompt_revision_id,
+                    prompt_content_hash=parent.prompt_content_hash,
+                    profile_id=parent.profile_id,
+                    profile_version=parent.profile_version,
+                    provider=parent.provider,
+                    model=parent.model,
+                    configuration=parent.configuration,
+                    status=GenerationStatus.PENDING,
+                    attempt=parent.attempt + 1,
+                    parent_generation_run_id=parent.generation_run_id,
+                    created_at=created_at,
+                )
+                child = self._generation_row(child_run)
+                db.add(child)
+                db.flush()
+                outbox = GenerationDispatchOutboxRow(
+                    generation_run_id=child.generation_run_id,
+                    created_at=created_at,
+                    published_at=None,
+                )
+                db.add(outbox)
+            else:
+                child_run = self._generation_run(child)
+                outbox = db.get(GenerationDispatchOutboxRow, child.generation_run_id)
+                if outbox is None:
+                    raise GenerationStateConflictError("Retry generation dispatch is missing")
+
+            dispatch = None
+            if outbox.published_at is None:
+                dispatch = PendingGenerationDispatch(
+                    task=GenerationTaskEnvelope(
+                        generation_run_id=child.generation_run_id,
+                        session_id=child.session_id,
+                        organization_id=organization_id,
+                    ),
+                    created_at=self._utc(outbox.created_at),
+                )
+            return GenerationRetryCreation(run=child_run, dispatch=dispatch, created=created)
 
     def get_generation_run(
         self, session_id: UUID, generation_run_id: UUID, organization_id: UUID
