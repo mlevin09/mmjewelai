@@ -35,10 +35,17 @@ membership is checked for each issuance, while an already-issued URL remains usa
 OpenAI base64 is decoded only in memory; every generated output is durably written to
 its deterministic final private object key before GenerationRun success. Asset metadata is finalized
 afterward without a second storage write. Reconciliation of durable objects with missing metadata is
-future work.
+implemented through exact metadata-only inspection; failed-run orphan deletion is delayed and
+version-conditional.
 Local repository data/ contains non-sensitive versioned catalogs only.
 
 Generation attempt 1 requires a NULL parent. Attempts greater than 1 require the immediate failed
 parent, and a unique parent reference permits only one direct retry child. Each child has its own
 atomic dispatch-outbox row. Timeout recovery records `FAILED(execution_stale)` on an old RUNNING row
 without altering its outbox or creating a retry.
+
+Persistence also records nullable internal `generation_run.assets_reconciled_at` and
+`generation_run.orphan_cleanup_completed_at` timestamps. They provide bounded maintenance progress
+only and are deliberately absent from the public Model Gateway `GenerationRun` contract. Successful
+runs are marked reconciled only after every expected generated Asset is exact and READY; failed runs
+are marked cleanup-complete only after every expected ordinal is absent or conditionally deleted.

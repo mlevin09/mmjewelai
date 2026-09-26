@@ -21,10 +21,13 @@ from jewelai_assets import (
     AssetStatus,
     AssetStorageConflictError,
     AssetStorageError,
+    PrivateObjectMetadata,
     StoredObject,
+    adopt_stored_asset,
     build_object_key,
     content_metadata,
     finalize_staged_asset,
+    generated_asset_id,
     ingest_asset,
     stage_asset_object,
     validate_asset_object_key,
@@ -142,6 +145,120 @@ def pending_asset(**changes):
 def ticking_clock():
     values = iter((NOW, NOW + timedelta(seconds=1), NOW + timedelta(seconds=2)))
     return lambda: next(values)
+
+
+def stored_metadata(**changes):
+    values = {
+        "object_key": build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG),
+        "content_type": AssetContentType.PNG,
+        "content_hash": sha256(PNG).hexdigest(),
+        "byte_size": len(PNG),
+        "created_at": NOW - timedelta(minutes=1),
+        "version_token": "123",
+    }
+    values.update(changes)
+    return PrivateObjectMetadata(**values)
+
+
+def test_generated_asset_id_moved_inward_without_changing_historical_identity():
+    assert generated_asset_id(RUN_ID, 1) == UUID("a04c5232-b91d-5b9c-9251-d6bf5f33dbba")
+
+
+def test_metadata_only_adoption_creates_ready_without_storage_or_bytes():
+    repository = MemoryRepository()
+    result = adopt_stored_asset(
+        request=request(),
+        stored_metadata=stored_metadata(),
+        repository=repository,
+        clock=lambda: NOW,
+    )
+    assert result.status is AssetStatus.READY
+    assert result.content_hash == sha256(PNG).hexdigest()
+
+
+def test_metadata_only_adoption_completes_pending_and_is_idempotent():
+    repository = MemoryRepository()
+    repository.assets[ASSET_ID] = pending_asset()
+    first = adopt_stored_asset(
+        request=request(),
+        stored_metadata=stored_metadata(),
+        repository=repository,
+        clock=lambda: NOW,
+    )
+    second = adopt_stored_asset(
+        request=request(),
+        stored_metadata=stored_metadata(),
+        repository=repository,
+        clock=lambda: NOW,
+    )
+    assert first == second
+    assert second.status is AssetStatus.READY
+
+
+def test_metadata_only_adoption_never_reopens_failed_asset():
+    repository = MemoryRepository()
+    repository.assets[ASSET_ID] = pending_asset(
+        status=AssetStatus.FAILED,
+        failed_at=NOW,
+        error_code=AssetErrorCode.STORAGE_CONFLICT,
+        error_detail="failed",
+    )
+    with pytest.raises(AssetConflictError, match="cannot be reopened"):
+        adopt_stored_asset(
+            request=request(),
+            stored_metadata=stored_metadata(),
+            repository=repository,
+            clock=lambda: NOW,
+        )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"content_hash": "f" * 64},
+        {"byte_size": len(PNG) + 1},
+        {
+            "object_key": build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.JPEG),
+            "content_type": AssetContentType.JPEG,
+        },
+    ],
+)
+def test_metadata_only_adoption_rejects_conflicting_existing_metadata(changes):
+    repository = MemoryRepository()
+    repository.assets[ASSET_ID] = pending_asset()
+    with pytest.raises(AssetConflictError):
+        adopt_stored_asset(
+            request=request(),
+            stored_metadata=stored_metadata(**changes),
+            repository=repository,
+            clock=lambda: NOW,
+        )
+
+
+def test_metadata_only_adoption_rejects_wrong_canonical_lineage():
+    with pytest.raises(AssetConflictError, match="canonical"):
+        adopt_stored_asset(
+            request=request(),
+            stored_metadata=stored_metadata(
+                object_key=build_object_key(
+                    OTHER_ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.PNG
+                )
+            ),
+            repository=MemoryRepository(),
+            clock=lambda: NOW,
+        )
+
+
+def test_metadata_only_adoption_rejects_existing_cross_session_lineage():
+    repository = MemoryRepository()
+    repository.assets[ASSET_ID] = pending_asset(session_id=UUID(int=999))
+    with pytest.raises(AssetConflictError, match="lineage"):
+        adopt_stored_asset(
+            request=request(),
+            stored_metadata=stored_metadata(),
+            repository=repository,
+            clock=lambda: NOW,
+        )
 
 
 def test_contract_is_frozen_forbids_extra_and_has_stable_version():

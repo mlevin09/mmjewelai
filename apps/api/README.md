@@ -149,3 +149,8 @@ and immediate-parent lineage. The child and outbox commit atomically; typed publ
 leaves both recoverable. Repeating the same retry returns the existing direct child (201 when first
 created, 200 thereafter). The original run is never reopened, no current profile is consulted, and
 no prompt is recompiled or provider invoked inline.
+
+Generated-Asset reconciliation and failed-run orphan cleanup are intentionally not HTTP routes.
+They are bounded operator commands in `workers/generation`, with separate metadata-read and
+version-conditional-delete authority. Existing Asset metadata and signed-access API contracts are
+unchanged.

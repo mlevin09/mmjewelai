@@ -39,3 +39,7 @@ will require a future reconciliation job. Signed downloads, upload transport, re
 transformations, EXIF handling, full image decoding/security analysis, and provider-output retrieval
 remain separate decisions. The v1 signature check identifies supported formats but is not a complete
 image decoder or malware analysis system.
+
+Metadata-only generated-output adoption and delayed failed-run object cleanup are subsequently
+defined by [ADR 0018](0018-asset-reconciliation-orphan-cleanup.md); normal ingestion remains
+create-only.

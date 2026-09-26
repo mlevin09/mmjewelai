@@ -9,6 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 ASSET_SCHEMA_VERSION = "1.0.0"
 ContentHash = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
+ObjectVersionToken = Annotated[
+    str,
+    StringConstraints(min_length=1, max_length=100, pattern=r"^[A-Za-z0-9._-]+$"),
+]
 ObjectKey = Annotated[
     str,
     StringConstraints(
@@ -92,6 +96,27 @@ class StoredObject(AssetModel):
     content_type: AssetContentType
     content_hash: ContentHash
     byte_size: Annotated[int, Field(gt=0)]
+
+
+class PrivateObjectMetadata(StoredObject):
+    """Metadata-only evidence for one exact private object version."""
+
+    byte_size: Annotated[int, Field(gt=0, le=100 * 1024 * 1024)]
+    created_at: datetime
+    version_token: ObjectVersionToken
+
+    @model_validator(mode="after")
+    def validate_created_at(self):
+        if self.created_at.tzinfo is None or self.created_at.utcoffset() is None:
+            raise ValueError("Private object creation time must be timezone-aware")
+        extension = {
+            AssetContentType.PNG: ".png",
+            AssetContentType.JPEG: ".jpg",
+            AssetContentType.WEBP: ".webp",
+        }[self.content_type]
+        if not self.object_key.endswith(extension):
+            raise ValueError("Private object content type does not match its canonical key")
+        return self
 
 
 class Asset(AssetModel):

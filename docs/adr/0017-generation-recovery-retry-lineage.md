@@ -42,7 +42,9 @@ Abandoned executions become inspectable terminal failures and explicit retry cha
 deterministic. A retry can still duplicate external work if the ambiguous old provider request
 actually executed, but the new paid attempt has separate immutable lineage. Old failed runs may have
 orphan private objects, and succeeded runs may still lack Asset metadata. Asset reconciliation and
-orphan cleanup remain the next separate reliability task.
+orphan cleanup are now defined separately by
+[ADR 0018](0018-asset-reconciliation-orphan-cleanup.md), including conservative cleanup for objects
+written by ambiguous stale workers.
 
 ## Validation
 
