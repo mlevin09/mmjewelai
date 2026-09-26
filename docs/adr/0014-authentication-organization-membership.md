@@ -9,6 +9,9 @@ internet-facing API now needs a verified identity and an authorization boundary 
 organization tenant. Conversational Role Profiles describe jewelry interactions, not permissions.
 Signed Asset HTTP access was deliberately deferred until this boundary existed.
 
+Authenticated signed Asset capability issuance is implemented separately by
+[ADR 0015](0015-authenticated-signed-asset-http-access.md).
+
 ## Decision
 
 JewelAI is an OAuth/OIDC resource server. It accepts externally issued bearer JWTs through a

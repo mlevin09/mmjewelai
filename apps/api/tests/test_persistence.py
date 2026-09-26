@@ -76,7 +76,17 @@ class MemoryObjectStore:
 def build_service(engine):
     repository = PersistenceRepository(create_session_factory(engine))
     artifacts = load_runtime_artifacts(ROOT, ArtifactVersions())
-    return RuntimeService(repository, artifacts, clock=lambda: NOW)
+
+    class UnusedAssetAccessSigner:
+        def sign_read(self, object_key, expires_at):
+            raise AssertionError("Asset access signer is not used by persistence tests")
+
+    return RuntimeService(
+        repository,
+        artifacts,
+        asset_access_signer=UnusedAssetAccessSigner(),
+        clock=lambda: NOW,
+    )
 
 
 def create_persisted_session(service):

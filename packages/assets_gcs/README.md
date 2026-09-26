@@ -28,8 +28,9 @@ supports two credential modes:
 For keyless signing, the explicit `signing_service_account_email` takes precedence over an identity
 exposed by refreshed credentials. If neither provides a valid `*.iam.gserviceaccount.com` identity,
 signing fails closed. The OAuth token authorizes `signBlob`; it is not included in the resulting URL.
-Signed URLs are ephemeral bearer secrets and must not be logged or persisted. There is deliberately
-no signed-access FastAPI endpoint before authentication.
+Signed URLs are ephemeral bearer secrets and must not be logged or persisted. The authenticated API
+integration defined by ADR 0015 now issues them only after current database membership and exact
+session/Asset scope checks; ordinary Asset metadata endpoints remain URL-free.
 
 Conceptual runtime permissions are limited to `storage.objects.create` and `storage.objects.get` in
 the configured bucket. For keyless signing, enable the Service Account Credentials API, allow the

@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_oidc import OidcJwtConfig
 
 
@@ -22,15 +23,21 @@ class RuntimeSettings:
     repository_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[4])
     artifacts: ArtifactVersions = field(default_factory=ArtifactVersions)
     oidc: OidcJwtConfig | None = None
+    asset_signing: GcsAssetStorageConfig | None = None
 
     @classmethod
-    def from_environment(cls, *, require_oidc: bool = True) -> "RuntimeSettings":
+    def from_environment(
+        cls, *, require_oidc: bool = True, require_asset_signer: bool = True
+    ) -> "RuntimeSettings":
         root = os.getenv("JEWELAI_REPOSITORY_ROOT")
         issuer = os.getenv("OIDC_ISSUER")
         audience = os.getenv("OIDC_AUDIENCE")
         jwks_url = os.getenv("OIDC_JWKS_URL")
         if require_oidc and not all((issuer, audience, jwks_url)):
             raise ValueError("OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL are required")
+        asset_bucket = os.getenv("GCS_ASSET_BUCKET")
+        if require_asset_signer and not asset_bucket:
+            raise ValueError("GCS_ASSET_BUCKET is required")
         algorithms = tuple(
             item.strip()
             for item in os.getenv("OIDC_ALLOWED_ALGORITHMS", "RS256").split(",")
@@ -57,6 +64,15 @@ class RuntimeSettings:
                     leeway_seconds=int(os.getenv("OIDC_LEEWAY_SECONDS", "30")),
                 )
                 if all((issuer, audience, jwks_url))
+                else None
+            ),
+            asset_signing=(
+                GcsAssetStorageConfig(
+                    bucket_name=asset_bucket,
+                    project_id=os.getenv("GCP_PROJECT_ID"),
+                    signing_service_account_email=os.getenv("GCS_SIGNING_SERVICE_ACCOUNT_EMAIL"),
+                )
+                if asset_bucket
                 else None
             ),
         )

@@ -7,6 +7,14 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, Request, Response
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jewelai_assets import (
+    AssetAccessContractError,
+    AssetAccessUnavailableError,
+    AssetNotReadyError,
+    PrivateObjectAccessSigner,
+    SignedAssetReadAccess,
+)
+from jewelai_assets_gcs import GcsPrivateObjectAccessSigner
 from jewelai_auth import (
     AuthenticatedPrincipal,
     AuthenticationError,
@@ -37,6 +45,7 @@ from .generation import GenerationProfileRegistry, UnknownGenerationProfileError
 from .schemas import (
     AssetListResponse,
     AssetResponse,
+    CreateAssetAccessRequest,
     CreateGenerationRunRequest,
     CreateMembershipRequest,
     CreateMessageRequest,
@@ -78,12 +87,23 @@ def create_app(
     uuid_factory: Callable[[], UUID] | None = None,
     generation_profiles: GenerationProfileRegistry | None = None,
     token_verifier: TokenVerifier | None = None,
+    asset_access_signer: PrivateObjectAccessSigner | None = None,
 ) -> FastAPI:
-    settings = settings or RuntimeSettings.from_environment(require_oidc=token_verifier is None)
+    settings = settings or RuntimeSettings.from_environment(
+        require_oidc=token_verifier is None,
+        require_asset_signer=asset_access_signer is None,
+    )
     if token_verifier is None:
         if settings.oidc is None:
             raise ValueError("OIDC configuration is required when no token verifier is injected")
         token_verifier = OidcJwtVerifier(settings.oidc)
+    if asset_access_signer is None:
+        if settings.asset_signing is None:
+            raise ValueError(
+                "GCS Asset signing configuration is required when no Asset access "
+                "signer is injected"
+            )
+        asset_access_signer = GcsPrivateObjectAccessSigner(settings.asset_signing)
     engine = engine or create_database_engine(settings.database_url)
     artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
     repository = PersistenceRepository(create_session_factory(engine))
@@ -93,6 +113,7 @@ def create_app(
         clock=clock,
         uuid_factory=uuid_factory,
         generation_profiles=generation_profiles,
+        asset_access_signer=asset_access_signer,
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
     app.state.service = service
@@ -135,6 +156,24 @@ def create_app(
     @app.exception_handler(GenerationStateConflictError)
     async def generation_state_handler(_, exc):
         return _error_response(409, "generation_state_conflict", str(exc))
+
+    @app.exception_handler(AssetNotReadyError)
+    async def asset_not_ready_handler(_, __):
+        return _error_response(
+            409,
+            "asset_not_ready",
+            "Asset is not ready for temporary read access",
+        )
+
+    async def asset_access_unavailable_handler(_, __):
+        return _error_response(
+            503,
+            "asset_access_unavailable",
+            "Temporary asset read access is unavailable",
+        )
+
+    app.add_exception_handler(AssetAccessUnavailableError, asset_access_unavailable_handler)
+    app.add_exception_handler(AssetAccessContractError, asset_access_unavailable_handler)
 
     @app.exception_handler(UnknownGenerationProfileError)
     async def generation_profile_handler(_, exc):
@@ -385,6 +424,27 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.get_asset(session_id, asset_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/assets/{asset_id}/access",
+        response_model=SignedAssetReadAccess,
+    )
+    def create_asset_access(
+        session_id: UUID,
+        asset_id: UUID,
+        request: CreateAssetAccessRequest,
+        response: Response,
+        organization_id: AuthorizedOrganization,
+    ):
+        access = service.create_asset_read_access(
+            session_id,
+            asset_id,
+            organization_id,
+            request.ttl_seconds,
+        )
+        response.headers["Cache-Control"] = "no-store, private"
+        response.headers["Pragma"] = "no-cache"
+        return access
 
     @app.post("/sessions/{session_id}/revisions")
     def transition_revision(

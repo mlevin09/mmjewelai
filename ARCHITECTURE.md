@@ -103,6 +103,9 @@ See [ADR 0013](docs/adr/0013-openai-image-provider-output-retrieval.md) for isol
 translation, transient base64 retrieval, and GenerationRun-to-Asset materialization.
 See [ADR 0014](docs/adr/0014-authentication-organization-membership.md) for bearer identity,
 database-authoritative organization membership, and final-owner protection.
+See [ADR 0015](docs/adr/0015-authenticated-signed-asset-http-access.md) for authenticated,
+session-scoped issuance of short-lived private Asset read capabilities without exposing object keys
+or proxying bytes.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

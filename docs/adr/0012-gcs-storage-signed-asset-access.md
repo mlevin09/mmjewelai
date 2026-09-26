@@ -54,6 +54,11 @@ Actual binary upload transport, provider-output retrieval, authenticated HTTP ac
 provisioning, reconciliation, retention, and deletion remain future work. Normal tests use injected
 fakes and require neither credentials nor network access.
 
+Authentication and organization membership are now established by
+[ADR 0014](0014-authentication-organization-membership.md). Authenticated HTTP issuance of this
+existing signed-read contract is defined separately by
+[ADR 0015](0015-authenticated-signed-asset-http-access.md).
+
 ## Validation
 
 Unit tests assert generation-precondition writes, integrity metadata, metadata-only idempotency,

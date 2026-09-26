@@ -185,6 +185,10 @@ class AssetListResponse(ApiModel):
     assets: tuple[AssetResponse, ...]
 
 
+class CreateAssetAccessRequest(ApiModel):
+    ttl_seconds: Annotated[int, Field(strict=True, ge=1, le=900)] | None = None
+
+
 class EditRevisionRequest(ApiModel):
     action: Literal["edit"]
     expected_revision_id: UUID

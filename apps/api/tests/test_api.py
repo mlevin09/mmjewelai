@@ -254,7 +254,9 @@ def test_openapi_marks_business_routes_bearer_protected(client):
             assert operation["security"] == [{"HTTPBearer": []}], path
 
 
-def test_authentication_infrastructure_failure_is_503_without_principal_mutation(app):
+def test_authentication_infrastructure_failure_is_503_without_principal_mutation(
+    app, asset_access_signer
+):
     class UnavailableVerifier:
         def verify(self, token):
             raise AuthenticationUnavailableError("Identity key service is unavailable")
@@ -267,6 +269,7 @@ def test_authentication_infrastructure_failure_is_503_without_principal_mutation
         engine=app.state.engine,
         clock=lambda: NOW,
         token_verifier=UnavailableVerifier(),
+        asset_access_signer=asset_access_signer,
     )
     with TestClient(unavailable) as isolated:
         response = isolated.get("/me", headers=auth("test-any"))
@@ -1072,7 +1075,6 @@ def test_asset_metadata_api_is_scoped_ordered_and_redacts_storage_details(client
     assert single.json() == payload["assets"][0]
     forbidden_fields = {"object_key", "bucket", "url", "bytes", "provider_output_id"}
     assert forbidden_fields.isdisjoint(single.json())
-    assert "/sessions/{session_id}/assets/{asset_id}/access" not in client.app.openapi()["paths"]
 
     foreign = client.post("/organizations", json={"name": "Foreign asset reader"}).json()
     denied = client.get(

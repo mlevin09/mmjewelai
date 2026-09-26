@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from jewelai_assets import AssetAccessUnavailableError
 from jewelai_auth import AuthenticationError, VerifiedIdentity
 from jewelai_model_gateway import GenerationConfiguration
 from jewelai_persistence import Base, create_database_engine
@@ -28,6 +29,19 @@ class FakeTokenVerifier:
         )
 
 
+class FakeAssetAccessSigner:
+    def __init__(self):
+        self.calls = []
+        self.url = "https://assets.example.test/signed?test-capability=1"
+        self.error = None
+
+    def sign_read(self, object_key, expires_at):
+        self.calls.append((object_key, expires_at))
+        if self.error is not None:
+            raise AssetAccessUnavailableError(self.error)
+        return self.url
+
+
 @pytest.fixture
 def engine(tmp_path):
     database = tmp_path / "runtime.db"
@@ -42,7 +56,12 @@ def engine(tmp_path):
 
 
 @pytest.fixture
-def app(engine):
+def asset_access_signer():
+    return FakeAssetAccessSigner()
+
+
+@pytest.fixture
+def app(engine, asset_access_signer):
     return create_app(
         RuntimeSettings(
             database_url="sqlite+pysqlite://",
@@ -62,6 +81,7 @@ def app(engine):
             )
         ),
         token_verifier=FakeTokenVerifier(),
+        asset_access_signer=asset_access_signer,
     )
 
 
