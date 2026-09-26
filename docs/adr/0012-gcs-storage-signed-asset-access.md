@@ -54,6 +54,10 @@ Actual binary upload transport, provider-output retrieval, authenticated HTTP ac
 provisioning, reconciliation, retention, and deletion remain future work. Normal tests use injected
 fakes and require neither credentials nor network access.
 
+[ADR 0018](0018-asset-reconciliation-orphan-cleanup.md) adds a separate exact-key metadata-read and
+generation-conditional-delete maintenance authority without adding deletion to the normal
+create-only storage port.
+
 Authentication and organization membership are now established by
 [ADR 0014](0014-authentication-organization-membership.md). Authenticated HTTP issuance of this
 existing signed-read contract is defined separately by

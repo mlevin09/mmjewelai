@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
-from jewelai_assets import AssetStatus, StoredObject
+from jewelai_assets import AssetContentType, AssetStatus, PrivateObjectMetadata, StoredObject
 from jewelai_domain import DesignRevision
 from jewelai_generation import (
     ExecutorRegistry,
@@ -16,6 +16,7 @@ from jewelai_generation import (
     execute_generation_run,
     execute_generation_run_with_assets,
     generated_asset_id,
+    reconcile_generated_assets,
 )
 from jewelai_generation_queue import dispatch_pending_generation_tasks
 from jewelai_model_gateway import (
@@ -81,6 +82,19 @@ class MemoryObjectStore:
             content_type=content_type,
             content_hash=content_hash,
             byte_size=len(content),
+        )
+
+    def inspect(self, object_key):
+        content = self.objects.get(object_key)
+        if content is None:
+            return None
+        return PrivateObjectMetadata(
+            object_key=object_key,
+            content_type=AssetContentType.PNG,
+            content_hash=sha256(content).hexdigest(),
+            byte_size=len(content),
+            created_at=NOW,
+            version_token="1",
         )
 
 
@@ -232,6 +246,21 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
         assert "content" not in AssetRow.__table__.columns
         assert asset_row.byte_size == len(PNG)
         assert asset_row.content_hash == sha256(PNG).hexdigest()
+
+        db.delete(asset_row)
+        db.commit()
+
+    reconciliation = reconcile_generated_assets(
+        repository,
+        object_reader=store,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(minutes=10),
+    )
+    adopted = repository.find_asset(asset.asset_id, ORG_ID)
+    assert reconciliation.assets_adopted == reconciliation.runs_completed == 1
+    assert adopted.status is AssetStatus.READY
+    assert adopted.content_hash == sha256(PNG).hexdigest()
+    assert len(client.calls) == 1
 
     repository.create_generation_run(
         GenerationRun(

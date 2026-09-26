@@ -18,6 +18,7 @@ from .recovery import (
 )
 from .repository import (
     DuplicateRevisionError,
+    GenerationAssetMaintenanceCandidate,
     GenerationRetryCreation,
     GenerationRetryNotAllowedError,
     GenerationStateConflictError,
@@ -37,6 +38,7 @@ __all__ = [
     "GenerationRetryCreation",
     "GenerationRetryNotAllowedError",
     "GenerationStateConflictError",
+    "GenerationAssetMaintenanceCandidate",
     "GenerationDispatchOutboxRow",
     "NotFoundError",
     "MAX_RECOVERY_BATCH_SIZE",

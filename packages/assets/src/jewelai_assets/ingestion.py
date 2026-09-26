@@ -14,6 +14,7 @@ from .models import (
     AssetIngestionPolicy,
     AssetIngestionRequest,
     AssetStatus,
+    PrivateObjectMetadata,
     StoredObject,
 )
 from .storage import AssetStorageConflictError, AssetStorageError, PrivateObjectStore
@@ -205,8 +206,48 @@ def finalize_staged_asset(
     now = clock or (lambda: datetime.now(UTC))
     request, expected = _expected_stored_object(request, content, policy)
     _verify_stored_object(expected, stored_object)
+    return adopt_stored_asset(
+        request=request,
+        stored_metadata=expected,
+        repository=repository,
+        policy=policy,
+        clock=now,
+    )
+
+
+def adopt_stored_asset(
+    *,
+    request: AssetIngestionRequest,
+    stored_metadata: StoredObject | PrivateObjectMetadata,
+    repository: AssetMetadataRepository,
+    policy: AssetIngestionPolicy | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> Asset:
+    """Adopt exact durable-object metadata without reading or writing object bytes."""
+    now = clock or (lambda: datetime.now(UTC))
+    policy = policy or AssetIngestionPolicy()
+    request = AssetIngestionRequest.model_validate(request)
+    stored = StoredObject(
+        object_key=stored_metadata.object_key,
+        content_type=stored_metadata.content_type,
+        content_hash=stored_metadata.content_hash,
+        byte_size=stored_metadata.byte_size,
+    )
+    expected_key = build_object_key(
+        request.organization_id,
+        request.project_id,
+        request.asset_id,
+        request.declared_content_type,
+    )
+    if (
+        stored.object_key != expected_key
+        or stored.content_type is not request.declared_content_type
+    ):
+        raise AssetConflictError("Stored object metadata does not match canonical Asset lineage")
+    if stored.byte_size > policy.max_bytes:
+        raise AssetConflictError("Stored object exceeds the configured Asset byte limit")
     pending = _ensure_pending_asset(
-        repository, _build_pending_asset(request, expected, created_at=now())
+        repository, _build_pending_asset(request, stored, created_at=now())
     )
     if pending.status is AssetStatus.READY:
         return pending

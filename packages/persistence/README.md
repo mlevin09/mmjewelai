@@ -38,6 +38,11 @@ direct retry child per parent, and an indexed stale scan. Recovery atomically ma
 old RUNNING rows `FAILED(execution_stale)`. Explicit retry locks a FAILED parent and derives the exact
 child request from persisted history while inserting child and outbox in one transaction.
 
+The `0009_generation_asset_maint` migration adds internal nullable reconciliation and orphan-cleanup
+completion timestamps plus bounded-scan indexes. Repository scans select only old SUCCEEDED or FAILED
+runs in deterministic batches. Guarded updates can mark reconciliation only on SUCCEEDED runs and
+cleanup only on FAILED runs. These timestamps are not exposed by the Model Gateway contract or API.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.

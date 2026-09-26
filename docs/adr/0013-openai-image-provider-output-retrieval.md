@@ -67,5 +67,6 @@ Alembic, schema-drift, lint, and regression suites remain required in CI.
 
 [ADR 0016](0016-durable-generation-cloud-tasks.md) defines Cloud Tasks delivery. Timeout-based stale
 execution recovery and explicit retry lineage are defined by
-[ADR 0017](0017-generation-recovery-retry-lineage.md). Asset reconciliation and orphan cleanup remain
-future work.
+[ADR 0017](0017-generation-recovery-retry-lineage.md). Metadata reconciliation for durable succeeded
+output and delayed cleanup of failed-run staged objects are now defined by
+[ADR 0018](0018-asset-reconciliation-orphan-cleanup.md).

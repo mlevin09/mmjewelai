@@ -113,6 +113,8 @@ See [ADR 0016](docs/adr/0016-durable-generation-cloud-tasks.md) for transactiona
 dispatch, deterministic Cloud Task identity, and private IAM-authenticated worker delivery.
 See [ADR 0017](docs/adr/0017-generation-recovery-retry-lineage.md) for bounded stale RUNNING
 classification and exact-input explicit retry children.
+See [ADR 0018](docs/adr/0018-asset-reconciliation-orphan-cleanup.md) for metadata-only adoption of
+durable successful output and delayed version-conditional cleanup of failed-run orphan objects.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions
@@ -133,3 +135,9 @@ Generation delivery and business retry are separate flows. Cloud Tasks delivers 
 an atomic worker claim leads to one terminal outcome. A bounded recovery operation changes an old
 RUNNING row only to `FAILED(execution_stale)`. A later explicit retry creates a new GenerationRun and
 outbox using the exact historical request; no stale run is reset or automatically regenerated.
+
+Generated output follows provider → create-only durable object staging → SUCCEEDED → Asset metadata
+finalization. A separate metadata-read-only reconciliation path repairs incomplete successful Asset
+metadata. Failed-run cleanup is a distinct operator capability: after a seven-day default grace it
+may delete only an unreferenced exact object version. Neither maintenance path downloads image bytes,
+lists the bucket, invokes a provider, or changes GenerationRun status or lineage.

@@ -6,6 +6,13 @@ server-owned tenant/project/asset object key, and coordinates durable `pending â
 metadata with a create-only `PrivateObjectStore` port. It also defines a separate READY-only,
 canonical-key-validated, short-lived `PrivateObjectAccessSigner` boundary.
 
+Maintenance authority remains separate from normal generation. `PrivateObjectMetadataReader`
+inspects an exact key without bytes, while `PrivateObjectVersionDeleter` can delete only the exact
+inspected version. `PrivateObjectMaintenance` combines those capabilities for cleanup composition;
+the generation path still receives only `PrivateObjectStore`. `adopt_stored_asset` can finalize exact
+durable metadata without a storage write or binary input. Object version tokens are transient and
+never enter Asset JSON or PostgreSQL.
+
 Generated-output orchestration may call `stage_asset_object` to durably write validated bytes at the
 final deterministic private key before run success, then call `finalize_staged_asset` after success
 to establish READY metadata without a second storage write. Ordinary reference ingestion continues

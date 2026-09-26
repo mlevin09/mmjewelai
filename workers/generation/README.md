@@ -16,10 +16,10 @@ returned metadata verify does it persist result metadata and mark the run succee
 and readies Asset metadata without another storage operation.
 
 Storage failure before success fails the run and creates no Asset rows. A crash after success can
-leave Asset metadata missing, but the original bytes remain durable for future reconciliation. A
-crash before staging may leave a RUNNING run, while partial staging may leave private orphan objects;
-bounded timeout recovery is implemented, while reconciliation and cleanup remain future work. The
-core service module imports neither OpenAI nor GCS; the separate production runtime composes those
+leave Asset metadata missing, but the original bytes remain durable for metadata-only reconciliation.
+A crash before staging may leave a RUNNING run, while partial staging may leave private orphan
+objects; bounded timeout recovery and delayed version-conditional cleanup are implemented. The core
+service module imports neither OpenAI nor GCS; the separate production runtime composes those
 adapters.
 
 Production composition now delivers Cloud Tasks to the private
@@ -41,6 +41,25 @@ composition:
 DATABASE_URL=postgresql+psycopg://... \
   python -m jewelai_persistence.recover_stale --stale-after-seconds 1800 --batch-size 100
 ```
+
+Generated Asset maintenance is provider-free and one-shot. Reconciliation defaults to a five-minute
+grace and receives metadata-read authority only:
+
+```sh
+DATABASE_URL=postgresql+psycopg://... GCS_ASSET_BUCKET=private-bucket \
+  python -m jewelai_generation.reconcile_assets --grace-seconds 300 --batch-size 25
+```
+
+Failed-run orphan cleanup defaults to seven-day retention and dry-run. Actual version-conditional
+deletion requires `--apply`:
+
+```sh
+DATABASE_URL=postgresql+psycopg://... GCS_ASSET_BUCKET=private-bucket \
+  python -m jewelai_generation.cleanup_orphans --retention-seconds 604800 --batch-size 25
+```
+
+Neither command constructs the OpenAI adapter, downloads object bodies, lists the bucket, changes a
+GenerationRun lifecycle, or deletes an object referenced by any Asset row.
 
 ```sh
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q

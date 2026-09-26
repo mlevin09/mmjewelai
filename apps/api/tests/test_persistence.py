@@ -19,7 +19,9 @@ from jewelai_assets import (
     AssetLineageError,
     AssetStatus,
     StoredObject,
+    adopt_stored_asset,
     build_object_key,
+    generated_asset_id,
     ingest_asset,
 )
 from jewelai_auth import LastOwnerError, MembershipRole, VerifiedIdentity
@@ -502,6 +504,102 @@ def test_database_rejects_inconsistent_generation_retry_lineage(engine):
                 .where(GenerationRunRow.generation_run_id == run.generation_run_id)
                 .values(attempt=2)
             )
+
+
+def test_generation_asset_maintenance_progress_is_internal_bounded_and_status_guarded(engine):
+    service = build_service(engine)
+    organization, project, session = create_persisted_session(service)
+    success_id = UUID(int=871)
+    failed_id = UUID(int=872)
+    later_success_id = UUID(int=875)
+    later_failed_id = UUID(int=876)
+    for offset, run_id in enumerate(
+        (success_id, failed_id, later_success_id, later_failed_id), start=1
+    ):
+        create_prompt_and_run(service, organization, session, UUID(int=872 + offset), run_id)
+        service.repository.claim_generation_run(
+            session.session_id, run_id, organization.organization_id, NOW
+        )
+    succeeded = service.repository.complete_generation_run(
+        session.session_id,
+        success_id,
+        organization.organization_id,
+        GenerationResult(
+            generation_run_id=success_id,
+            provider="test",
+            model="deterministic-image-v1",
+            outputs=(GeneratedOutputDescriptor(ordinal=1),),
+        ),
+        NOW + timedelta(seconds=1),
+    )
+    failed = service.repository.fail_generation_run(
+        session.session_id,
+        failed_id,
+        organization.organization_id,
+        GenerationErrorCode.GATEWAY_UNAVAILABLE,
+        "safe",
+        NOW + timedelta(seconds=2),
+    )
+    service.repository.complete_generation_run(
+        session.session_id,
+        later_success_id,
+        organization.organization_id,
+        GenerationResult(
+            generation_run_id=later_success_id,
+            provider="test",
+            model="deterministic-image-v1",
+            outputs=(GeneratedOutputDescriptor(ordinal=1),),
+        ),
+        NOW + timedelta(seconds=3),
+    )
+    service.repository.fail_generation_run(
+        session.session_id,
+        later_failed_id,
+        organization.organization_id,
+        GenerationErrorCode.GATEWAY_UNAVAILABLE,
+        "safe",
+        NOW + timedelta(seconds=4),
+    )
+    assert "assets_reconciled_at" not in succeeded.model_dump()
+    assert "orphan_cleanup_completed_at" not in failed.model_dump()
+
+    cutoff = NOW + timedelta(minutes=1)
+    reconcile = service.repository.list_generation_runs_for_asset_reconciliation(cutoff, 1)
+    cleanup = service.repository.list_failed_generation_runs_for_orphan_cleanup(cutoff, 1)
+    assert [(item.run.generation_run_id, item.project_id) for item in reconcile] == [
+        (success_id, project.project_id)
+    ]
+    assert [(item.run.generation_run_id, item.organization_id) for item in cleanup] == [
+        (failed_id, organization.organization_id)
+    ]
+    assert [
+        item.run.generation_run_id
+        for item in service.repository.list_generation_runs_for_asset_reconciliation(cutoff, 100)
+    ] == [success_id, later_success_id]
+    assert [
+        item.run.generation_run_id
+        for item in service.repository.list_failed_generation_runs_for_orphan_cleanup(cutoff, 100)
+    ] == [failed_id, later_failed_id]
+    with pytest.raises(ValueError, match="between 1 and 100"):
+        service.repository.list_generation_runs_for_asset_reconciliation(cutoff, 0)
+
+    with create_session_factory(engine)() as db:
+        success_row = db.get(GenerationRunRow, success_id)
+        failed_row = db.get(GenerationRunRow, failed_id)
+        assert success_row.assets_reconciled_at is None
+        assert failed_row.orphan_cleanup_completed_at is None
+
+    marked_at = NOW + timedelta(minutes=2)
+    assert service.repository.mark_generation_assets_reconciled(success_id, marked_at)
+    assert not service.repository.mark_generation_assets_reconciled(success_id, marked_at)
+    assert not service.repository.mark_generation_assets_reconciled(failed_id, marked_at)
+    assert service.repository.mark_generation_assets_reconciled(later_success_id, marked_at)
+    assert service.repository.mark_generation_orphan_cleanup_completed(failed_id, marked_at)
+    assert not service.repository.mark_generation_orphan_cleanup_completed(failed_id, marked_at)
+    assert not service.repository.mark_generation_orphan_cleanup_completed(success_id, marked_at)
+    assert service.repository.mark_generation_orphan_cleanup_completed(later_failed_id, marked_at)
+    assert service.repository.list_generation_runs_for_asset_reconciliation(cutoff, 100) == ()
+    assert service.repository.list_failed_generation_runs_for_orphan_cleanup(cutoff, 100) == ()
 
 
 def test_stale_recovery_cli_requires_only_database_configuration(engine, monkeypatch, capsys):
@@ -1575,6 +1673,71 @@ def test_postgres_stale_recovery_and_completion_have_one_terminal_winner():
                 result,
                 NOW + timedelta(hours=2),
             )
+    engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_concurrent_metadata_adoption_converges_to_one_ready_asset():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    service = build_service(engine)
+    organization, project, session = create_persisted_session(service)
+    run_id = UUID(int=1941)
+    create_prompt_and_run(service, organization, session, UUID(int=1942), run_id)
+    service.repository.claim_generation_run(
+        session.session_id, run_id, organization.organization_id, NOW
+    )
+    result = GenerationResult(
+        generation_run_id=run_id,
+        provider="test",
+        model="deterministic-image-v1",
+        outputs=(GeneratedOutputDescriptor(ordinal=1, provider_output_id="concurrent-output"),),
+    )
+    service.repository.complete_generation_run(
+        session.session_id, run_id, organization.organization_id, result, NOW
+    )
+    asset_id = generated_asset_id(run_id, 1)
+    request = AssetIngestionRequest(
+        asset_id=asset_id,
+        organization_id=organization.organization_id,
+        project_id=project.project_id,
+        session_id=session.session_id,
+        kind=AssetKind.GENERATED,
+        declared_content_type=AssetContentType.PNG,
+        generation_run_id=run_id,
+        generation_output_ordinal=1,
+        provider_output_id="concurrent-output",
+    )
+    stored = StoredObject(
+        object_key=build_object_key(
+            organization.organization_id, project.project_id, asset_id, AssetContentType.PNG
+        ),
+        content_type=AssetContentType.PNG,
+        content_hash=PNG_HASH,
+        byte_size=len(PNG),
+    )
+    barrier = Barrier(2)
+
+    def adopt():
+        repository = PersistenceRepository(create_session_factory(engine))
+        barrier.wait()
+        return adopt_stored_asset(
+            request=request,
+            stored_metadata=stored,
+            repository=repository,
+            clock=lambda: NOW,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        assets = tuple(pool.map(lambda _: adopt(), range(2)))
+    assert assets[0] == assets[1]
+    assert assets[0].status is AssetStatus.READY
+    with create_session_factory(engine)() as db:
+        assert db.scalar(select(func.count()).select_from(AssetRow)) == 1
     engine.dispose()
 
 

@@ -16,6 +16,12 @@ reads metadata only and accepts the retry only when object name, MIME type, byte
 `jewelai-sha256` metadata all match. It never overwrites, downloads for comparison, changes ACLs,
 creates buckets, or returns a public URL.
 
+The same adapter implements separately typed maintenance capabilities without weakening normal
+callers. Exact-key inspection reads name, content type, size, `jewelai-sha256`, creation time, and GCS
+generation only. Conditional deletion passes that generation as `if_generation_match`; absence is
+idempotent and a precondition mismatch fails closed. It never downloads content, lists blobs, or
+performs prefix deletion.
+
 The signer creates V4 HTTPS `GET` URLs for the exact configured bucket and canonical Asset key. It
 supports two credential modes:
 
@@ -39,6 +45,10 @@ example through Service Account Token Creator or a narrower custom role), and gr
 identity the object-read permission represented by the signed URL. Do not grant public bucket
 access, project Owner, or broad Storage Admin solely for this adapter. Bucket/IAM provisioning is
 outside this package.
+
+Use separate least-privilege runtime identities where possible: reconciliation needs object metadata
+read, while orphan cleanup additionally needs object delete. The normal generation identity should
+not receive delete authority merely because the cleanup command exists.
 
 ```sh
 python -m pip install -e './packages/assets_gcs[test]'
