@@ -191,6 +191,18 @@ class GenerationRunRow(Base):
         ),
         Index("ix_generation_run_session_created", "session_id", "created_at"),
         Index("ix_generation_run_status_started", "status", "started_at"),
+        Index(
+            "ix_generation_run_reconcile_scan",
+            "status",
+            "assets_reconciled_at",
+            "completed_at",
+        ),
+        Index(
+            "ix_generation_run_cleanup_scan",
+            "status",
+            "orphan_cleanup_completed_at",
+            "completed_at",
+        ),
         UniqueConstraint("parent_generation_run_id", name="uq_generation_run_direct_retry_child"),
     )
 
@@ -219,6 +231,12 @@ class GenerationRunRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    assets_reconciled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    orphan_cleanup_completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class GenerationDispatchOutboxRow(Base):

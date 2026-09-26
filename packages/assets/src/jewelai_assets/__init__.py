@@ -11,12 +11,14 @@ from .access import (
     SignedAssetReadAccess,
     issue_asset_read_access,
 )
+from .generated import GENERATED_ASSET_NAMESPACE, generated_asset_id
 from .ingestion import (
     AssetConflictError,
     AssetContentRejectedError,
     AssetIngestionError,
     AssetLineageError,
     AssetMetadataRepository,
+    adopt_stored_asset,
     build_object_key,
     content_metadata,
     detect_content_type,
@@ -34,9 +36,17 @@ from .models import (
     AssetIngestionRequest,
     AssetKind,
     AssetStatus,
+    PrivateObjectMetadata,
     StoredObject,
 )
-from .storage import AssetStorageConflictError, AssetStorageError, PrivateObjectStore
+from .storage import (
+    AssetStorageConflictError,
+    AssetStorageError,
+    PrivateObjectMaintenance,
+    PrivateObjectMetadataReader,
+    PrivateObjectStore,
+    PrivateObjectVersionDeleter,
+)
 
 __all__ = [
     "ASSET_ACCESS_SCHEMA_VERSION",
@@ -60,14 +70,21 @@ __all__ = [
     "AssetStatus",
     "AssetStorageConflictError",
     "AssetStorageError",
+    "GENERATED_ASSET_NAMESPACE",
+    "PrivateObjectMaintenance",
+    "PrivateObjectMetadata",
+    "PrivateObjectMetadataReader",
     "PrivateObjectStore",
+    "PrivateObjectVersionDeleter",
     "PrivateObjectAccessSigner",
     "SignedAssetReadAccess",
     "StoredObject",
+    "adopt_stored_asset",
     "build_object_key",
     "content_metadata",
     "detect_content_type",
     "finalize_staged_asset",
+    "generated_asset_id",
     "ingest_asset",
     "issue_asset_read_access",
     "stage_asset_object",

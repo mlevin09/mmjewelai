@@ -93,6 +93,13 @@ class GenerationRetryCreation:
     created: bool
 
 
+@dataclass(frozen=True)
+class GenerationAssetMaintenanceCandidate:
+    run: GenerationRun
+    organization_id: UUID
+    project_id: UUID
+
+
 class PersistenceRepository:
     def __init__(self, session_factory: sessionmaker[Session]):
         self._session_factory = session_factory
@@ -775,6 +782,56 @@ class PersistenceRepository:
                 )
             return GenerationRetryCreation(run=child_run, dispatch=dispatch, created=created)
 
+    def list_generation_runs_for_asset_reconciliation(
+        self, cutoff: datetime, batch_size: int
+    ) -> tuple[GenerationAssetMaintenanceCandidate, ...]:
+        return self._list_generation_asset_maintenance_candidates(
+            status=GenerationStatus.SUCCEEDED,
+            cutoff=cutoff,
+            progress_column=GenerationRunRow.assets_reconciled_at,
+            batch_size=batch_size,
+        )
+
+    def mark_generation_assets_reconciled(
+        self, generation_run_id: UUID, reconciled_at: datetime
+    ) -> bool:
+        with self._session_factory.begin() as db:
+            result = db.execute(
+                update(GenerationRunRow)
+                .where(
+                    GenerationRunRow.generation_run_id == generation_run_id,
+                    GenerationRunRow.status == GenerationStatus.SUCCEEDED.value,
+                    GenerationRunRow.assets_reconciled_at.is_(None),
+                )
+                .values(assets_reconciled_at=reconciled_at)
+            )
+            return result.rowcount == 1
+
+    def list_failed_generation_runs_for_orphan_cleanup(
+        self, cutoff: datetime, batch_size: int
+    ) -> tuple[GenerationAssetMaintenanceCandidate, ...]:
+        return self._list_generation_asset_maintenance_candidates(
+            status=GenerationStatus.FAILED,
+            cutoff=cutoff,
+            progress_column=GenerationRunRow.orphan_cleanup_completed_at,
+            batch_size=batch_size,
+        )
+
+    def mark_generation_orphan_cleanup_completed(
+        self, generation_run_id: UUID, completed_at: datetime
+    ) -> bool:
+        with self._session_factory.begin() as db:
+            result = db.execute(
+                update(GenerationRunRow)
+                .where(
+                    GenerationRunRow.generation_run_id == generation_run_id,
+                    GenerationRunRow.status == GenerationStatus.FAILED.value,
+                    GenerationRunRow.orphan_cleanup_completed_at.is_(None),
+                )
+                .values(orphan_cleanup_completed_at=completed_at)
+            )
+            return result.rowcount == 1
+
     def get_generation_run(
         self, session_id: UUID, generation_run_id: UUID, organization_id: UUID
     ) -> GenerationRun:
@@ -1246,6 +1303,39 @@ class PersistenceRepository:
         if row.status != AssetStatus.PENDING.value:
             raise AssetConflictError(f"Asset cannot transition from {row.status} status")
         return row
+
+    def _list_generation_asset_maintenance_candidates(
+        self,
+        *,
+        status: GenerationStatus,
+        cutoff: datetime,
+        progress_column,
+        batch_size: int,
+    ) -> tuple[GenerationAssetMaintenanceCandidate, ...]:
+        if isinstance(batch_size, bool) or not 1 <= batch_size <= 100:
+            raise ValueError("batch_size must be between 1 and 100")
+        with self._session_factory() as db:
+            rows = db.execute(
+                select(GenerationRunRow, ProjectRow.organization_id, ProjectRow.project_id)
+                .join(DesignSessionRow, DesignSessionRow.session_id == GenerationRunRow.session_id)
+                .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                .where(
+                    GenerationRunRow.status == status.value,
+                    GenerationRunRow.completed_at.is_not(None),
+                    GenerationRunRow.completed_at <= cutoff,
+                    progress_column.is_(None),
+                )
+                .order_by(GenerationRunRow.completed_at, GenerationRunRow.generation_run_id)
+                .limit(batch_size)
+            ).all()
+            return tuple(
+                GenerationAssetMaintenanceCandidate(
+                    run=self._generation_run(run_row),
+                    organization_id=organization_id,
+                    project_id=project_id,
+                )
+                for run_row, organization_id, project_id in rows
+            )
 
     @staticmethod
     def _scoped_session_ids(organization_id: UUID):

@@ -3,7 +3,7 @@ from hashlib import sha256
 from uuid import UUID
 
 import pytest
-from google.api_core.exceptions import PreconditionFailed
+from google.api_core.exceptions import NotFound, PreconditionFailed
 from google.auth.credentials import Credentials, Signing
 from jewelai_assets import (
     Asset,
@@ -15,6 +15,7 @@ from jewelai_assets import (
     AssetStatus,
     AssetStorageConflictError,
     AssetStorageError,
+    PrivateObjectMetadata,
     StoredObject,
     build_object_key,
     ingest_asset,
@@ -49,6 +50,9 @@ class FakeBlob:
         upload_error=None,
         signed_url="https://storage.googleapis.test/signed?secret=redacted",
         signing_error=None,
+        time_created=NOW,
+        generation=123,
+        delete_error=None,
     ):
         self.name = name
         self.content_type = content_type
@@ -57,9 +61,13 @@ class FakeBlob:
         self.upload_error = upload_error
         self.signed_url = signed_url
         self.signing_error = signing_error
+        self.time_created = time_created
+        self.generation = generation
+        self.delete_error = delete_error
         self.upload_calls = []
         self.sign_calls = []
         self.public_calls = 0
+        self.delete_calls = []
 
     def upload_from_string(self, content, **kwargs):
         self.upload_calls.append((content, kwargs))
@@ -75,6 +83,11 @@ class FakeBlob:
     def make_public(self):
         self.public_calls += 1
         raise AssertionError("Private assets must never be made public")
+
+    def delete(self, **kwargs):
+        self.delete_calls.append(kwargs)
+        if self.delete_error is not None:
+            raise self.delete_error
 
 
 class FakeBucket:
@@ -275,6 +288,122 @@ def test_new_object_write_is_private_create_only_and_carries_integrity_metadata(
         content_hash=CONTENT_HASH,
         byte_size=len(PNG),
     )
+
+
+def test_metadata_inspection_returns_exact_version_without_downloading_or_listing():
+    existing = FakeBlob(
+        OBJECT_KEY,
+        content_type="image/png",
+        size=len(PNG),
+        metadata={JEWELAI_SHA256_METADATA_KEY: CONTENT_HASH},
+        time_created=NOW,
+        generation=123,
+    )
+    bucket = FakeBucket(FakeBlob(OBJECT_KEY), existing)
+    store = GcsPrivateObjectStore(config(), client=FakeClient(bucket))
+    result = store.inspect(OBJECT_KEY)
+    assert result == PrivateObjectMetadata(
+        object_key=OBJECT_KEY,
+        content_type=AssetContentType.PNG,
+        content_hash=CONTENT_HASH,
+        byte_size=len(PNG),
+        created_at=NOW,
+        version_token="123",
+    )
+    assert bucket.get_blob_calls == [OBJECT_KEY]
+    assert not hasattr(existing, "download_as_bytes")
+    assert not hasattr(bucket, "list_blobs")
+
+
+def test_metadata_inspection_absent_returns_none():
+    bucket = FakeBucket(FakeBlob(OBJECT_KEY), None)
+    store = GcsPrivateObjectStore(config(), client=FakeClient(bucket))
+    assert store.inspect(OBJECT_KEY) is None
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"name": build_object_key(ORG_ID, PROJECT_ID, ASSET_ID, AssetContentType.JPEG)},
+        {"content_type": "image/gif"},
+        {"content_type": "image/jpeg"},
+        {"size": 0},
+        {"metadata": {}},
+        {"metadata": {JEWELAI_SHA256_METADATA_KEY: "bad"}},
+        {"time_created": None},
+        {"time_created": datetime(2026, 9, 24, 12, 0)},
+        {"generation": None},
+    ],
+)
+def test_metadata_inspection_rejects_incomplete_or_conflicting_metadata(changes):
+    values = {
+        "name": OBJECT_KEY,
+        "content_type": "image/png",
+        "size": len(PNG),
+        "metadata": {JEWELAI_SHA256_METADATA_KEY: CONTENT_HASH},
+        "time_created": NOW,
+        "generation": 123,
+    }
+    values.update(changes)
+    name = values.pop("name")
+    existing = FakeBlob(name, **values)
+    store = GcsPrivateObjectStore(
+        config(), client=FakeClient(FakeBucket(FakeBlob(OBJECT_KEY), existing))
+    )
+    with pytest.raises(AssetStorageConflictError):
+        store.inspect(OBJECT_KEY)
+
+
+def test_metadata_inspection_maps_google_failure_safely():
+    secret = "google-secret"
+    bucket = FakeBucket(FakeBlob(OBJECT_KEY))
+    bucket.get_blob = lambda _: (_ for _ in ()).throw(PermissionError(secret))
+    store = GcsPrivateObjectStore(config(), client=FakeClient(bucket))
+    with pytest.raises(AssetStorageError, match="inspection") as raised:
+        store.inspect(OBJECT_KEY)
+    assert secret not in str(raised.value)
+
+
+def test_conditional_delete_uses_exact_generation_and_handles_absence():
+    blob = FakeBlob(OBJECT_KEY)
+    store = GcsPrivateObjectStore(config(), client=FakeClient(FakeBucket(blob)))
+    assert store.delete_if_version(OBJECT_KEY, "123") is True
+    assert blob.delete_calls == [{"if_generation_match": 123}]
+
+    missing = FakeBlob(OBJECT_KEY, delete_error=NotFound("missing"))
+    store = GcsPrivateObjectStore(config(), client=FakeClient(FakeBucket(missing)))
+    assert store.delete_if_version(OBJECT_KEY, "123") is False
+
+
+def test_conditional_delete_version_race_is_conflict_and_other_errors_are_safe():
+    changed = FakeBlob(OBJECT_KEY, delete_error=PreconditionFailed("generation changed"))
+    store = GcsPrivateObjectStore(config(), client=FakeClient(FakeBucket(changed)))
+    with pytest.raises(AssetStorageConflictError, match="changed"):
+        store.delete_if_version(OBJECT_KEY, "10")
+
+    secret = "credential-secret"
+    failed = FakeBlob(OBJECT_KEY, delete_error=PermissionError(secret))
+    store = GcsPrivateObjectStore(config(), client=FakeClient(FakeBucket(failed)))
+    with pytest.raises(AssetStorageError, match="conditional delete") as raised:
+        store.delete_if_version(OBJECT_KEY, "10")
+    assert secret not in str(raised.value)
+
+
+@pytest.mark.parametrize("version", ["0", "01", "1/2", ""])
+def test_conditional_delete_rejects_invalid_version_tokens(version):
+    store = GcsPrivateObjectStore(config(), client=FakeClient(FakeBucket(FakeBlob(OBJECT_KEY))))
+    with pytest.raises(AssetStorageError, match="input"):
+        store.delete_if_version(OBJECT_KEY, version)
+
+
+def test_maintenance_rejects_invalid_object_keys_before_gcs_calls():
+    bucket = FakeBucket(FakeBlob(OBJECT_KEY))
+    store = GcsPrivateObjectStore(config(), client=FakeClient(bucket))
+    with pytest.raises(AssetStorageError, match="input"):
+        store.inspect("../bad")
+    with pytest.raises(AssetStorageError, match="input"):
+        store.delete_if_version("../bad", "10")
+    assert bucket.get_blob_calls == bucket.blob_calls == []
 
 
 def test_existing_matching_object_is_idempotent_without_overwrite_or_download():

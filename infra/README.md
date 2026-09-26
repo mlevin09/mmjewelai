@@ -16,3 +16,9 @@ project-wide Owner/Editor or broad Storage Admin roles. These resources are not 
 Operations must also invoke the bounded stale-recovery command, eventually through a private Cloud
 Run Job/Scheduler arrangement. This repository does not provision that job. Recovery uses only
 PostgreSQL, marks old RUNNING rows failed, and never calls the provider or creates retries.
+
+Future private Cloud Run Job/Scheduler invocations may separately run generated-Asset reconciliation
+and failed-run orphan cleanup. Reconciliation needs database access plus object metadata read only;
+cleanup additionally needs narrowly scoped object delete and remains dry-run without `--apply`.
+Normal generation should retain create-only storage authority. No job, schedule, bucket, or IAM
+binding is provisioned by this repository change.

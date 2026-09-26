@@ -1,13 +1,23 @@
+import json
+import sys
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from pathlib import Path
 from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
 from jewelai_assets import (
+    Asset,
+    AssetContentType,
+    AssetIngestionRequest,
+    AssetKind,
     AssetStatus,
+    AssetStorageConflictError,
     AssetStorageError,
+    PrivateObjectMetadata,
     StoredObject,
+    build_object_key,
 )
 from jewelai_domain import DesignRevision, unlock_field
 from jewelai_domain.models import MessageSource
@@ -35,10 +45,12 @@ from jewelai_generation import (
     ExecutorRegistry,
     GatewayRegistry,
     GenerationWorkerSettings,
+    cleanup_failed_generation_orphans,
     create_worker_app,
     execute_generation_run,
     execute_generation_run_with_assets,
     generated_asset_id,
+    reconcile_generated_assets,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -144,6 +156,58 @@ class MemoryObjectStore:
         )
         self.objects[object_key] = content
         return stored
+
+
+class MemoryMaintenance:
+    def __init__(self):
+        self.objects = {}
+        self.inspect_calls = []
+        self.delete_calls = []
+        self.delete_conflict = False
+
+    def inspect(self, object_key):
+        self.inspect_calls.append(object_key)
+        return self.objects.get(object_key)
+
+    def delete_if_version(self, object_key, version_token):
+        self.delete_calls.append((object_key, version_token))
+        if self.delete_conflict:
+            raise AssetStorageConflictError("version changed")
+        current = self.objects.get(object_key)
+        if current is None:
+            return False
+        if current.version_token != version_token:
+            raise AssetStorageConflictError("version changed")
+        del self.objects[object_key]
+        return True
+
+
+def output_result(run_id=RUN_ID):
+    return GenerationResult(
+        generation_run_id=run_id,
+        provider="test",
+        model="deterministic-image-v1",
+        outputs=(
+            GeneratedOutputDescriptor(
+                ordinal=1,
+                provider_output_id=f"{run_id}-1",
+                width=1024,
+                height=1024,
+            ),
+        ),
+    )
+
+
+def durable_metadata(run_id=RUN_ID, *, created_at=NOW):
+    asset_id = generated_asset_id(run_id, 1)
+    return PrivateObjectMetadata(
+        object_key=build_object_key(ORG_ID, PROJECT_ID, asset_id, AssetContentType.PNG),
+        content_type=AssetContentType.PNG,
+        content_hash=sha256(PNG).hexdigest(),
+        byte_size=len(PNG),
+        created_at=created_at,
+        version_token="10",
+    )
 
 
 @pytest.fixture
@@ -337,6 +401,450 @@ def test_recovery_settings_are_strictly_bounded(persisted, stale_after_seconds, 
             batch_size=batch_size,
             clock=lambda: NOW,
         )
+
+
+def test_reconciliation_adopts_succeeded_durable_object_without_provider_or_download(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW + timedelta(seconds=1))
+    repository.complete_generation_run(
+        SESSION_ID,
+        RUN_ID,
+        ORG_ID,
+        output_result(),
+        NOW + timedelta(seconds=2),
+    )
+    maintenance = MemoryMaintenance()
+    metadata = durable_metadata(created_at=NOW + timedelta(seconds=1))
+    maintenance.objects[metadata.object_key] = metadata
+
+    summary = reconcile_generated_assets(
+        repository,
+        object_reader=maintenance,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(minutes=10),
+    )
+    asset = repository.find_asset(generated_asset_id(RUN_ID, 1), ORG_ID)
+    assert summary.model_dump() == {
+        "runs_inspected": 1,
+        "runs_completed": 1,
+        "assets_already_ready": 0,
+        "assets_adopted": 1,
+        "assets_completed_from_pending": 0,
+        "objects_missing": 0,
+        "conflicts": 0,
+        "storage_failures": 0,
+    }
+    assert asset.status is AssetStatus.READY
+    assert asset.provider_output_id == f"{RUN_ID}-1"
+    assert maintenance.delete_calls == []
+    assert len(maintenance.inspect_calls) == 3
+
+
+def test_reconciliation_completes_exact_pending_and_ready_repeat_uses_no_storage(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW + timedelta(seconds=1))
+    repository.complete_generation_run(
+        SESSION_ID, RUN_ID, ORG_ID, output_result(), NOW + timedelta(seconds=2)
+    )
+    metadata = durable_metadata(created_at=NOW + timedelta(seconds=1))
+    request = AssetIngestionRequest(
+        asset_id=generated_asset_id(RUN_ID, 1),
+        organization_id=ORG_ID,
+        project_id=PROJECT_ID,
+        session_id=SESSION_ID,
+        kind=AssetKind.GENERATED,
+        declared_content_type=AssetContentType.PNG,
+        generation_run_id=RUN_ID,
+        generation_output_ordinal=1,
+        provider_output_id=f"{RUN_ID}-1",
+    )
+    repository.create_pending_asset(
+        Asset(
+            asset_id=request.asset_id,
+            organization_id=ORG_ID,
+            project_id=PROJECT_ID,
+            session_id=SESSION_ID,
+            kind=AssetKind.GENERATED,
+            status=AssetStatus.PENDING,
+            object_key=metadata.object_key,
+            content_type=metadata.content_type,
+            content_hash=metadata.content_hash,
+            byte_size=metadata.byte_size,
+            generation_run_id=RUN_ID,
+            generation_output_ordinal=1,
+            provider_output_id=f"{RUN_ID}-1",
+            created_at=NOW,
+        )
+    )
+    maintenance = MemoryMaintenance()
+    maintenance.objects[metadata.object_key] = metadata
+    first = reconcile_generated_assets(
+        repository,
+        object_reader=maintenance,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(minutes=10),
+    )
+    assert first.assets_completed_from_pending == 1
+    assert repository.find_asset(request.asset_id, ORG_ID).status is AssetStatus.READY
+    before = tuple(maintenance.inspect_calls)
+    second = reconcile_generated_assets(
+        repository,
+        object_reader=maintenance,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(minutes=11),
+    )
+    assert second.runs_inspected == 0
+    assert tuple(maintenance.inspect_calls) == before
+
+
+def test_successful_run_is_never_cleanup_target_then_reconciles(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    repository.complete_generation_run(SESSION_ID, RUN_ID, ORG_ID, output_result(), NOW)
+    maintenance = MemoryMaintenance()
+    metadata = durable_metadata(created_at=NOW)
+    maintenance.objects[metadata.object_key] = metadata
+    cleanup = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        apply=True,
+        clock=lambda: NOW + timedelta(days=8),
+    )
+    assert cleanup.runs_inspected == cleanup.objects_deleted == 0
+    assert maintenance.delete_calls == []
+    reconciliation = reconcile_generated_assets(
+        repository,
+        object_reader=maintenance,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(days=8),
+    )
+    assert reconciliation.assets_adopted == 1
+
+
+def test_active_runs_are_never_reconciled_or_cleaned(persisted):
+    repository, _, _ = persisted
+    maintenance = MemoryMaintenance()
+    metadata = durable_metadata(created_at=NOW)
+    maintenance.objects[metadata.object_key] = metadata
+    current = NOW + timedelta(days=8)
+    for operation in (
+        lambda: reconcile_generated_assets(
+            repository,
+            object_reader=maintenance,
+            grace_seconds=300,
+            clock=lambda: current,
+        ),
+        lambda: cleanup_failed_generation_orphans(
+            repository,
+            object_maintenance=maintenance,
+            retention_seconds=86400,
+            apply=True,
+            clock=lambda: current,
+        ),
+    ):
+        assert operation().runs_inspected == 0
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    for operation in (
+        lambda: reconcile_generated_assets(
+            repository,
+            object_reader=maintenance,
+            grace_seconds=300,
+            clock=lambda: current,
+        ),
+        lambda: cleanup_failed_generation_orphans(
+            repository,
+            object_maintenance=maintenance,
+            retention_seconds=86400,
+            apply=True,
+            clock=lambda: current,
+        ),
+    ):
+        assert operation().runs_inspected == 0
+    assert maintenance.inspect_calls == maintenance.delete_calls == []
+
+
+def test_failed_orphan_cleanup_is_dry_run_by_default_then_conditionally_deletes(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    repository.fail_generation_run(
+        SESSION_ID,
+        RUN_ID,
+        ORG_ID,
+        "gateway_unavailable",
+        "safe",
+        NOW + timedelta(seconds=1),
+    )
+    maintenance = MemoryMaintenance()
+    metadata = durable_metadata(created_at=NOW)
+    maintenance.objects[metadata.object_key] = metadata
+    current = NOW + timedelta(days=8)
+    dry = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        clock=lambda: current,
+    )
+    assert dry.objects_would_delete == 1
+    assert dry.runs_completed == 0
+    assert maintenance.delete_calls == []
+    applied = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        apply=True,
+        clock=lambda: current,
+    )
+    assert applied.objects_deleted == applied.runs_completed == 1
+    assert maintenance.delete_calls == [(metadata.object_key, "10")]
+    assert maintenance.objects == {}
+
+
+def test_cleanup_protects_recent_object_and_version_conflict(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    repository.fail_generation_run(SESSION_ID, RUN_ID, ORG_ID, "gateway_unavailable", "safe", NOW)
+    current = NOW + timedelta(days=8)
+    maintenance = MemoryMaintenance()
+    metadata = durable_metadata(created_at=current)
+    maintenance.objects[metadata.object_key] = metadata
+    recent = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        apply=True,
+        clock=lambda: current,
+    )
+    assert recent.objects_too_recent == 1
+    assert recent.runs_completed == 0
+    assert maintenance.delete_calls == []
+
+    maintenance.objects[metadata.object_key] = metadata.model_copy(
+        update={"created_at": NOW, "version_token": "11"}
+    )
+    maintenance.delete_conflict = True
+    conflict = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        apply=True,
+        clock=lambda: current,
+    )
+    assert conflict.conflicts == 1
+    assert conflict.runs_completed == 0
+    assert metadata.object_key in maintenance.objects
+
+
+def test_cleanup_never_deletes_database_referenced_asset(persisted, monkeypatch):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    repository.fail_generation_run(SESSION_ID, RUN_ID, ORG_ID, "gateway_unavailable", "safe", NOW)
+    metadata = durable_metadata(created_at=NOW)
+    referenced = Asset(
+        asset_id=generated_asset_id(RUN_ID, 1),
+        organization_id=ORG_ID,
+        project_id=PROJECT_ID,
+        session_id=SESSION_ID,
+        kind=AssetKind.GENERATED,
+        status=AssetStatus.READY,
+        object_key=metadata.object_key,
+        content_type=metadata.content_type,
+        content_hash=metadata.content_hash,
+        byte_size=metadata.byte_size,
+        generation_run_id=RUN_ID,
+        generation_output_ordinal=1,
+        provider_output_id=f"{RUN_ID}-1",
+        created_at=NOW,
+        ready_at=NOW,
+    )
+    monkeypatch.setattr(
+        repository,
+        "find_asset",
+        lambda asset_id, organization_id: (
+            referenced if (asset_id, organization_id) == (referenced.asset_id, ORG_ID) else None
+        ),
+    )
+    maintenance = MemoryMaintenance()
+    maintenance.objects[metadata.object_key] = metadata
+    summary = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        apply=True,
+        clock=lambda: NOW + timedelta(days=8),
+    )
+    assert summary.objects_referenced == 1
+    assert summary.runs_completed == 0
+    assert maintenance.inspect_calls == maintenance.delete_calls == []
+    assert metadata.object_key in maintenance.objects
+
+
+def test_multiple_mime_candidates_are_conflicts_for_reconcile_and_cleanup(persisted):
+    repository, _, compiled = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    repository.complete_generation_run(SESSION_ID, RUN_ID, ORG_ID, output_result(), NOW)
+    maintenance = MemoryMaintenance()
+    png = durable_metadata(created_at=NOW)
+    jpeg = png.model_copy(
+        update={
+            "object_key": build_object_key(
+                ORG_ID, PROJECT_ID, generated_asset_id(RUN_ID, 1), AssetContentType.JPEG
+            ),
+            "content_type": AssetContentType.JPEG,
+            "version_token": "11",
+        }
+    )
+    maintenance.objects[png.object_key] = png
+    maintenance.objects[jpeg.object_key] = jpeg
+    summary = reconcile_generated_assets(
+        repository,
+        object_reader=maintenance,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(minutes=10),
+    )
+    assert summary.conflicts == 1
+    assert summary.runs_completed == 0
+    assert repository.find_asset(generated_asset_id(RUN_ID, 1), ORG_ID) is None
+    assert maintenance.delete_calls == []
+
+
+def test_multi_output_reconciliation_requires_every_asset_ready(persisted):
+    repository, _, compiled = persisted
+    run = GenerationRun(
+        generation_run_id=SECOND_RUN_ID,
+        session_id=SESSION_ID,
+        prompt_revision_id=PROMPT_ID,
+        prompt_content_hash=compiled.content_hash,
+        profile_id="test_default",
+        profile_version="1.0.0",
+        provider="test",
+        model="deterministic-image-v1",
+        configuration=GenerationConfiguration(output_count=2),
+        status=GenerationStatus.PENDING,
+        created_at=NOW,
+    )
+    repository.create_generation_run(run, ORG_ID)
+    repository.claim_generation_run(SESSION_ID, SECOND_RUN_ID, ORG_ID, NOW)
+    repository.complete_generation_run(
+        SESSION_ID,
+        SECOND_RUN_ID,
+        ORG_ID,
+        GenerationResult(
+            generation_run_id=SECOND_RUN_ID,
+            provider="test",
+            model="deterministic-image-v1",
+            outputs=(
+                GeneratedOutputDescriptor(ordinal=1, provider_output_id="output-1"),
+                GeneratedOutputDescriptor(ordinal=2, provider_output_id="output-2"),
+            ),
+        ),
+        NOW,
+    )
+    maintenance = MemoryMaintenance()
+    first = durable_metadata(SECOND_RUN_ID, created_at=NOW)
+    maintenance.objects[first.object_key] = first
+    summary = reconcile_generated_assets(
+        repository,
+        object_reader=maintenance,
+        grace_seconds=300,
+        clock=lambda: NOW + timedelta(minutes=10),
+    )
+    assert summary.assets_adopted == 1
+    assert summary.objects_missing == 1
+    assert summary.runs_completed == 0
+    assert (
+        repository.find_asset(generated_asset_id(SECOND_RUN_ID, 1), ORG_ID).status
+        is AssetStatus.READY
+    )
+    assert repository.find_asset(generated_asset_id(SECOND_RUN_ID, 2), ORG_ID) is None
+
+
+def test_cleanup_rejects_multiple_mime_candidates(persisted):
+    repository, _, _ = persisted
+    repository.claim_generation_run(SESSION_ID, RUN_ID, ORG_ID, NOW)
+    repository.fail_generation_run(SESSION_ID, RUN_ID, ORG_ID, "gateway_unavailable", "safe", NOW)
+    failed_png = durable_metadata(RUN_ID, created_at=NOW)
+    failed_jpeg = failed_png.model_copy(
+        update={
+            "object_key": build_object_key(
+                ORG_ID,
+                PROJECT_ID,
+                generated_asset_id(RUN_ID, 1),
+                AssetContentType.JPEG,
+            ),
+            "content_type": AssetContentType.JPEG,
+            "version_token": "12",
+        }
+    )
+    maintenance = MemoryMaintenance()
+    maintenance.objects = {
+        failed_png.object_key: failed_png,
+        failed_jpeg.object_key: failed_jpeg,
+    }
+    cleanup = cleanup_failed_generation_orphans(
+        repository,
+        object_maintenance=maintenance,
+        retention_seconds=86400,
+        apply=True,
+        clock=lambda: NOW + timedelta(days=8),
+    )
+    assert cleanup.conflicts == 1
+    assert cleanup.objects_deleted == cleanup.runs_completed == 0
+    assert maintenance.delete_calls == []
+
+
+@pytest.mark.parametrize(
+    "grace,retention,batch",
+    [
+        (59, 86400, 25),
+        (86401, 86400, 25),
+        (300, 86399, 25),
+        (300, 7776001, 25),
+        (300, 86400, 0),
+        (300, 86400, 101),
+    ],
+)
+def test_maintenance_settings_are_strictly_bounded(persisted, grace, retention, batch):
+    repository, _, _ = persisted
+    with pytest.raises(ValueError):
+        if grace != 300 or batch not in range(1, 101):
+            reconcile_generated_assets(
+                repository,
+                object_reader=MemoryMaintenance(),
+                grace_seconds=grace,
+                batch_size=batch,
+                clock=lambda: NOW,
+            )
+        else:
+            cleanup_failed_generation_orphans(
+                repository,
+                object_maintenance=MemoryMaintenance(),
+                retention_seconds=retention,
+                batch_size=batch,
+                clock=lambda: NOW,
+            )
+
+
+def test_maintenance_commands_need_no_openai_configuration(persisted, monkeypatch, capsys):
+    from jewelai_generation import cleanup_orphans, reconcile_assets
+
+    repository, _, _ = persisted
+    maintenance = MemoryMaintenance()
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_IMAGE_ALLOWED_MODELS", raising=False)
+    monkeypatch.setattr(reconcile_assets, "_runtime", lambda: (repository, maintenance))
+    monkeypatch.setattr(cleanup_orphans, "_runtime", lambda: (repository, maintenance))
+
+    monkeypatch.setattr(sys, "argv", ["reconcile_assets"])
+    reconcile_assets.main()
+    reconcile_summary = json.loads(capsys.readouterr().out)
+    assert reconcile_summary["runs_inspected"] == 0
+
+    monkeypatch.setattr(sys, "argv", ["cleanup_orphans"])
+    cleanup_orphans.main()
+    cleanup_summary = json.loads(capsys.readouterr().out)
+    assert cleanup_summary["apply"] is False
+    assert cleanup_summary["runs_inspected"] == 0
 
 
 def test_worker_task_contract_rejects_business_state_before_provider(persisted):
