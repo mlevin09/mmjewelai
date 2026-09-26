@@ -13,6 +13,7 @@ dependencies = [
   "jewelai-auth==1.0.0",
   "jewelai-auth-oidc==1.0.0",
   "jewelai-assets==1.0.0",
+  "jewelai-assets-gcs==1.0.0",
   "jewelai-domain==1.0.0",
   "jewelai-model-gateway==1.0.0",
   "jewelai-parser==1.0.0",

@@ -17,5 +17,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0012 — GCS storage and signed Asset access](0012-gcs-storage-signed-asset-access.md)
 - [0013 — OpenAI image provider output retrieval](0013-openai-image-provider-output-retrieval.md)
 - [0014 — Authentication and organization membership](0014-authentication-organization-membership.md)
+- [0015 — Authenticated signed Asset HTTP access](0015-authenticated-signed-asset-http-access.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

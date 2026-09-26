@@ -4,6 +4,12 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
+from jewelai_assets import (
+    AssetAccessPolicy,
+    PrivateObjectAccessSigner,
+    SignedAssetReadAccess,
+    issue_asset_read_access,
+)
 from jewelai_auth import (
     AuthenticatedPrincipal,
     MembershipRole,
@@ -89,10 +95,12 @@ class RuntimeService:
         repository: PersistenceRepository,
         artifacts: RuntimeArtifacts,
         *,
+        asset_access_signer: PrivateObjectAccessSigner,
         clock: Callable[[], datetime] | None = None,
         uuid_factory: Callable[[], UUID] | None = None,
         before_prompt_persist: Callable[[], None] | None = None,
         generation_profiles: GenerationProfileRegistry | None = None,
+        asset_access_policy: AssetAccessPolicy | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -100,6 +108,8 @@ class RuntimeService:
         self._uuid = uuid_factory or uuid4
         self._before_prompt_persist = before_prompt_persist
         self._generation_profiles = generation_profiles or GenerationProfileRegistry()
+        self._asset_access_signer = asset_access_signer
+        self._asset_access_policy = asset_access_policy or AssetAccessPolicy()
 
     def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
         row = self.repository.get_or_create_principal(identity, self._uuid(), self._clock())
@@ -432,6 +442,22 @@ class RuntimeService:
                 self._asset_response(asset)
                 for asset in self.repository.list_assets(session_id, organization_id)
             )
+        )
+
+    def create_asset_read_access(
+        self,
+        session_id: UUID,
+        asset_id: UUID,
+        organization_id: UUID,
+        requested_ttl_seconds: int | None,
+    ) -> SignedAssetReadAccess:
+        asset = self.repository.get_asset(session_id, asset_id, organization_id)
+        return issue_asset_read_access(
+            asset,
+            self._asset_access_signer,
+            requested_ttl_seconds=requested_ttl_seconds,
+            policy=self._asset_access_policy,
+            clock=self._clock,
         )
 
     def evaluate(

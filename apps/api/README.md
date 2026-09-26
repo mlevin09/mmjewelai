@@ -14,6 +14,7 @@ python -m pip install -e './packages/prompts[test]'
 python -m pip install -e './packages/model_gateway[test]'
 python -m pip install -e './packages/model_gateway_openai[test]'
 python -m pip install -e './packages/assets[test]'
+python -m pip install -e './packages/assets_gcs[test]'
 python -m pip install -e './packages/auth[test]'
 python -m pip install -e './packages/auth_oidc[test]'
 python -m pip install -e './packages/persistence'
@@ -24,6 +25,10 @@ export DATABASE_URL='postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai
 export OIDC_ISSUER='https://identity.example/'
 export OIDC_AUDIENCE='jewelai-api'
 export OIDC_JWKS_URL='https://identity.example/.well-known/jwks.json'
+export GCS_ASSET_BUCKET='jewelai-assets-prod'
+# Optional non-secret signing configuration:
+export GCP_PROJECT_ID='jewelai-prod'
+export GCS_SIGNING_SERVICE_ACCOUNT_EMAIL='signer@jewelai-prod.iam.gserviceaccount.com'
 alembic -c packages/persistence/alembic.ini upgrade head
 uvicorn jewelai_api.app:create_app --factory
 ```
@@ -56,6 +61,7 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
 - `GET /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/assets/{asset_id}`
+- `POST /sessions/{session_id}/assets/{asset_id}/access`
 
 `GET /health` is public. Every product route requires a verified bearer JWT. The JWT establishes an
 external identity, which resolves to a JewelAI principal; current database membership authorizes an
@@ -64,7 +70,10 @@ identity proof. Existing repository scopes remain defense in depth. Conversation
 grant permissions, and JWT role/group/organization claims are ignored.
 
 Production startup fails closed unless `OIDC_ISSUER`, `OIDC_AUDIENCE`, and HTTPS `OIDC_JWKS_URL` are
-configured. The resource server stores no token or raw claims. Existing pre-auth organizations are
+configured. It also requires `GCS_ASSET_BUCKET` unless an Asset access signer is explicitly injected;
+`GCP_PROJECT_ID` and `GCS_SIGNING_SERVICE_ACCOUNT_EMAIL` are optional non-secret settings. Google
+ADC/workload identity supplies credentials—service-account private-key JSON is not application
+configuration. The resource server stores no token or raw claims. Existing pre-auth organizations are
 not automatically claimed; any production backfill requires an explicit trusted process.
 
 Runtime timestamps and IDs are server-owned. Transition message provenance is accepted from the
@@ -92,11 +101,14 @@ does not recompile or compare against a newer current design revision. The OpenA
 constructed by `create_app()` and no API route invokes a provider. Production composition may inject
 it into the worker with environment-managed credentials, bounded timeout, and disabled SDK retries.
 
-Asset endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets, and
-URLs. Asset ingestion and signed-read contracts are internal reusable boundaries in `packages/assets`;
-the production GCS adapter is isolated in `packages/assets_gcs`. This API exposes no binary
-upload/download, registers no object store or signer, and has no route that issues signed URLs.
-Authenticated signed Asset access, retention, and reconciliation remain unimplemented.
+Asset list/get endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets,
+and URLs. The explicit authenticated `POST .../assets/{asset_id}/access` action checks current
+database membership and exact tenant/session/Asset scope, then uses the existing provider-neutral
+contract and production GCS V4 signer to return a temporary HTTPS GET capability for a READY Asset.
+The default TTL is five minutes and maximum is fifteen minutes. The JSON response is never redirected
+or cached (`no-store, private`), and the URL is never persisted. Membership revocation blocks future
+issuance but cannot revoke a capability already issued before its expiration. No binary bytes pass
+through FastAPI; binary upload, retention, and reconciliation remain unimplemented.
 
 ## Verification
 

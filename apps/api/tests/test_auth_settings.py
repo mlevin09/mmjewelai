@@ -1,4 +1,5 @@
 import pytest
+from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from pydantic import ValidationError
 
@@ -9,7 +10,7 @@ def test_runtime_settings_load_valid_oidc_environment(monkeypatch):
     monkeypatch.setenv("OIDC_ISSUER", "https://issuer.test")
     monkeypatch.setenv("OIDC_AUDIENCE", "jewelai-api")
     monkeypatch.setenv("OIDC_JWKS_URL", "https://issuer.test/keys")
-    settings = RuntimeSettings.from_environment()
+    settings = RuntimeSettings.from_environment(require_asset_signer=False)
     assert settings.oidc == OidcJwtConfig(
         issuer="https://issuer.test",
         audience="jewelai-api",
@@ -30,7 +31,7 @@ def test_runtime_settings_require_complete_oidc_environment(monkeypatch, missing
     for name, value in values.items():
         monkeypatch.setenv(name, value)
     with pytest.raises(ValueError, match="required"):
-        RuntimeSettings.from_environment()
+        RuntimeSettings.from_environment(require_asset_signer=False)
 
 
 def test_runtime_settings_reject_insecure_jwks(monkeypatch):
@@ -38,4 +39,46 @@ def test_runtime_settings_reject_insecure_jwks(monkeypatch):
     monkeypatch.setenv("OIDC_AUDIENCE", "jewelai-api")
     monkeypatch.setenv("OIDC_JWKS_URL", "http://issuer.test/keys")
     with pytest.raises(ValidationError, match="HTTPS"):
-        RuntimeSettings.from_environment()
+        RuntimeSettings.from_environment(require_asset_signer=False)
+
+
+def test_runtime_settings_load_valid_gcs_asset_signing_environment(monkeypatch):
+    monkeypatch.setenv("GCS_ASSET_BUCKET", "jewelai-assets-prod")
+    monkeypatch.setenv("GCP_PROJECT_ID", "jewelai-prod")
+    monkeypatch.setenv(
+        "GCS_SIGNING_SERVICE_ACCOUNT_EMAIL",
+        "signer@jewelai-prod.iam.gserviceaccount.com",
+    )
+    settings = RuntimeSettings.from_environment(require_oidc=False)
+    assert settings.asset_signing == GcsAssetStorageConfig(
+        bucket_name="jewelai-assets-prod",
+        project_id="jewelai-prod",
+        signing_service_account_email="signer@jewelai-prod.iam.gserviceaccount.com",
+    )
+
+
+def test_runtime_settings_require_gcs_bucket_for_production_signer(monkeypatch):
+    monkeypatch.delenv("GCS_ASSET_BUCKET", raising=False)
+    with pytest.raises(ValueError, match="GCS_ASSET_BUCKET"):
+        RuntimeSettings.from_environment(require_oidc=False)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("GCS_ASSET_BUCKET", "Invalid Bucket"),
+        ("GCP_PROJECT_ID", "BAD"),
+        ("GCS_SIGNING_SERVICE_ACCOUNT_EMAIL", "not-an-account"),
+    ],
+)
+def test_runtime_settings_delegate_invalid_gcs_values_to_adapter_config(monkeypatch, name, value):
+    monkeypatch.setenv("GCS_ASSET_BUCKET", "jewelai-assets-prod")
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError):
+        RuntimeSettings.from_environment(require_oidc=False)
+
+
+def test_runtime_settings_do_not_require_gcs_when_signer_is_injected(monkeypatch):
+    monkeypatch.delenv("GCS_ASSET_BUCKET", raising=False)
+    settings = RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)
+    assert settings.asset_signing is None
