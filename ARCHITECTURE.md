@@ -111,6 +111,8 @@ session-scoped issuance of short-lived private Asset read capabilities without e
 or proxying bytes.
 See [ADR 0016](docs/adr/0016-durable-generation-cloud-tasks.md) for transactional generation
 dispatch, deterministic Cloud Task identity, and private IAM-authenticated worker delivery.
+See [ADR 0017](docs/adr/0017-generation-recovery-retry-lineage.md) for bounded stale RUNNING
+classification and exact-input explicit retry children.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions
@@ -126,3 +128,8 @@ Before runtime deployment resolve identity-provider provisioning, queue, support
 families/locales, retention policy and experimental assignment unit.
 Exact role question budgets, domain catalogs and manufacturing constraints require product/domain review.
 The reference conversation mentions image/template attachments; they are not treated as authoritative machine-readable specifications in this baseline.
+
+Generation delivery and business retry are separate flows. Cloud Tasks delivers one immutable run;
+an atomic worker claim leads to one terminal outcome. A bounded recovery operation changes an old
+RUNNING row only to `FAILED(execution_stale)`. A later explicit retry creates a new GenerationRun and
+outbox using the exact historical request; no stale run is reset or automatically regenerated.

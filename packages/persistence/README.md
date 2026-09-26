@@ -33,6 +33,11 @@ The `0007_generation_dispatch_outbox` migration adds one minimal durable dispatc
 API-created GenerationRun. Creation is atomic with the run; pending rows contain no task body or
 secret and are marked published idempotently after deterministic Cloud Tasks publication.
 
+The `0008_generation_recovery_retry` migration enforces attempt/parent consistency, one
+direct retry child per parent, and an indexed stale scan. Recovery atomically marks only sufficiently
+old RUNNING rows `FAILED(execution_stale)`. Explicit retry locks a FAILED parent and derives the exact
+child request from persisted history while inserting child and outbox in one transaction.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.
@@ -47,3 +52,13 @@ DATABASE_URL=postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai \
 Authentication is established above this package. Repository methods retain explicit organization
 scope and ownership joins as defense in depth; they do not interpret bearer tokens or authorize from
 IDs alone.
+
+Run one bounded recovery batch with only database configuration:
+
+```sh
+DATABASE_URL=postgresql+psycopg://... \
+  python -m jewelai_persistence.recover_stale --stale-after-seconds 1800 --batch-size 100
+```
+
+`GENERATION_STALE_AFTER_SECONDS` defaults to 1800 and is bounded to 900–86400;
+`GENERATION_RECOVERY_BATCH_SIZE` defaults to 100 and is bounded to 1–100.

@@ -181,10 +181,17 @@ class GenerationRunRow(Base):
     __table_args__ = (
         CheckConstraint("attempt >= 1", name="ck_generation_run_attempt_positive"),
         CheckConstraint(
+            "(attempt = 1 AND parent_generation_run_id IS NULL) OR "
+            "(attempt > 1 AND parent_generation_run_id IS NOT NULL)",
+            name="ck_generation_run_retry_lineage",
+        ),
+        CheckConstraint(
             "status IN ('pending', 'running', 'succeeded', 'failed')",
             name="ck_generation_run_status",
         ),
         Index("ix_generation_run_session_created", "session_id", "created_at"),
+        Index("ix_generation_run_status_started", "status", "started_at"),
+        UniqueConstraint("parent_generation_run_id", name="uq_generation_run_direct_retry_child"),
     )
 
     generation_run_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)

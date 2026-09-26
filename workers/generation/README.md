@@ -18,18 +18,29 @@ and readies Asset metadata without another storage operation.
 Storage failure before success fails the run and creates no Asset rows. A crash after success can
 leave Asset metadata missing, but the original bytes remain durable for future reconciliation. A
 crash before staging may leave a RUNNING run, while partial staging may leave private orphan objects;
-recovery and cleanup remain future work. The core service module imports neither OpenAI nor GCS;
-the separate production runtime composes those adapters.
+bounded timeout recovery is implemented, while reconciliation and cleanup remain future work. The
+core service module imports neither OpenAI nor GCS; the separate production runtime composes those
+adapters.
 
 Production composition now delivers Cloud Tasks to the private
 `POST /internal/generation-tasks/execute` endpoint, which invokes this same core path. Cloud Run IAM
 must reject unauthenticated invocation. Redelivery is not a provider retry: RUNNING and terminal
 duplicates, persisted provider/storage failures, and post-success materialization failures are
-acknowledged without another provider call. Stale RUNNING recovery remains future work.
+acknowledged without another provider call. A separate bounded timeout recovery command marks an
+old RUNNING row `FAILED(execution_stale)` and never reopens it. Explicit retry then creates a new run;
+Cloud Tasks redelivery never changes the business attempt.
 
 Production composition requires `DATABASE_URL`, `GCS_ASSET_BUCKET`, and comma-separated
 `OPENAI_IMAGE_ALLOWED_MODELS`; `GCP_PROJECT_ID` and `OPENAI_IMAGE_TIMEOUT_SECONDS` are optional.
 The OpenAI key remains in the SDK-supported environment/secret mechanism and never enters task data.
+
+Recovery intentionally lives at the persistence boundary and requires no worker/provider/storage
+composition:
+
+```sh
+DATABASE_URL=postgresql+psycopg://... \
+  python -m jewelai_persistence.recover_stale --stale-after-seconds 1800 --batch-size 100
+```
 
 ```sh
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q

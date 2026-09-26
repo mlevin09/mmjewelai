@@ -1,5 +1,6 @@
 import inspect
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
 
@@ -14,9 +15,12 @@ from jewelai_model_gateway import (
     GatewayContractViolationError,
     GeneratedOutputDescriptor,
     GenerationConfiguration,
+    GenerationErrorCode,
     GenerationExecution,
     GenerationRequest,
     GenerationResult,
+    GenerationRun,
+    GenerationStatus,
     ImageGenerationGateway,
     RetrievedImageOutput,
     validate_generation_execution,
@@ -216,6 +220,50 @@ def test_transient_execution_is_excluded_from_published_schema():
     assert "GenerationExecution" not in schema
     assert "RetrievedImageOutput" not in schema
     assert '"content":' not in schema
+
+
+def generation_run(**updates):
+    values = {
+        "generation_run_id": RUN_ID,
+        "session_id": UUID("33333333-3333-4333-8333-333333333333"),
+        "prompt_revision_id": PROMPT_ID,
+        "prompt_content_hash": "0" * 64,
+        "profile_id": "production",
+        "profile_version": "1.0.0",
+        "provider": "test",
+        "model": "image-v1",
+        "configuration": GenerationConfiguration(),
+        "status": GenerationStatus.PENDING,
+        "created_at": datetime(2026, 9, 26, tzinfo=UTC),
+    }
+    values.update(updates)
+    return GenerationRun(**values)
+
+
+def test_generation_run_retry_lineage_is_explicit_and_immediate():
+    parent_id = UUID("44444444-4444-4444-8444-444444444444")
+    assert generation_run().parent_generation_run_id is None
+    retry = generation_run(attempt=2, parent_generation_run_id=parent_id)
+    assert (retry.attempt, retry.parent_generation_run_id) == (2, parent_id)
+    with pytest.raises(ValidationError, match="initial generation run"):
+        generation_run(parent_generation_run_id=parent_id)
+    with pytest.raises(ValidationError, match="requires an immediate parent"):
+        generation_run(attempt=2)
+    with pytest.raises(ValidationError, match="own parent"):
+        generation_run(attempt=2, parent_generation_run_id=RUN_ID)
+
+
+def test_execution_stale_is_a_typed_terminal_failure():
+    started = datetime(2026, 9, 26, 0, 1, tzinfo=UTC)
+    completed = datetime(2026, 9, 26, 0, 31, tzinfo=UTC)
+    run = generation_run(
+        status=GenerationStatus.FAILED,
+        started_at=started,
+        completed_at=completed,
+        error_code=GenerationErrorCode.EXECUTION_STALE,
+        error_detail="Generation execution exceeded the recovery deadline",
+    )
+    assert run.error_code is GenerationErrorCode.EXECUTION_STALE
 
 
 def test_contract_contains_no_domain_mutation_or_provider_secret_fields(generation_request):

@@ -158,6 +158,10 @@ class CreateGenerationRunRequest(ApiModel):
     profile_id: ProfileId
 
 
+class RetryGenerationRunRequest(ApiModel):
+    pass
+
+
 class GenerationRunListResponse(ApiModel):
     generation_runs: tuple[GenerationRun, ...]
 

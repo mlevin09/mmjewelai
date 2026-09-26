@@ -67,6 +67,7 @@ from .schemas import (
     PrincipalMembership,
     PromptRevisionListResponse,
     PromptRevisionResponse,
+    RetryGenerationRunRequest,
     SessionResponse,
     UnlockRevisionRequest,
 )
@@ -427,6 +428,30 @@ class RuntimeService:
             return run
         self.repository.mark_generation_dispatch_published(run.generation_run_id, self._clock())
         return run
+
+    def retry_generation_run(
+        self,
+        session_id: UUID,
+        generation_run_id: UUID,
+        organization_id: UUID,
+        _: RetryGenerationRunRequest,
+    ) -> tuple[GenerationRun, bool]:
+        retry = self.repository.create_generation_retry_with_dispatch(
+            parent_generation_run_id=generation_run_id,
+            session_id=session_id,
+            organization_id=organization_id,
+            new_generation_run_id=self._uuid(),
+            created_at=self._clock(),
+        )
+        if retry.dispatch is not None:
+            try:
+                self._generation_task_publisher.publish(retry.dispatch.task)
+            except GenerationTaskPublishError:
+                return retry.run, retry.created
+            self.repository.mark_generation_dispatch_published(
+                retry.run.generation_run_id, self._clock()
+            )
+        return retry.run, retry.created
 
     def get_generation_run(
         self, session_id: UUID, generation_run_id: UUID, organization_id: UUID

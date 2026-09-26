@@ -12,6 +12,10 @@ successful. `validate_generation_execution` additionally aligns transient ordina
 with those descriptors. The production OpenAI adapter lives in `packages/model_gateway_openai` and
 owns its timeout, response validation, and SDK dependency.
 
+Persisted run contracts encode linear explicit retry lineage: attempt 1 has no parent, attempts above
+1 require an immediate parent, and stale execution recovery is represented as terminal
+`FAILED(execution_stale)` without adding another lifecycle status.
+
 ```sh
 python -m jewelai_model_gateway.schema specs/model-gateway/schema.json
 python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q

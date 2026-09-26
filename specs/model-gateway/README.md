@@ -19,8 +19,9 @@ data/base64 payloads, binary content, and JewelAI asset identifiers are not vali
 
 Generation lifecycle states are `pending`, `running`, `succeeded`, and `failed`, with only
 pending→running and running→succeeded/failed allowed. Lifecycle timestamps are application/worker
-owned. Terminal states are immutable. Retry execution is deferred; v1 records attempt 1 and supports
-a nullable parent lineage field for future explicit retries.
+owned. Terminal states are immutable. `execution_stale` is the typed failure for bounded timeout
+recovery. Attempt 1 has no parent; later explicit retry attempts require an immediate parent and
+create a separate GenerationRun rather than reopening history.
 
 The published [JSON Schema](schema.json) covers request, result, and persisted run read contracts.
 Schema version is `1.0.0`. Test adapters prove contract and orchestration behavior only; they do not

@@ -180,7 +180,8 @@
         "gateway_timeout",
         "provider_rejected",
         "provider_invalid_response",
-        "gateway_contract_violation"
+        "gateway_contract_violation",
+        "execution_stale"
       ],
       "title": "GenerationErrorCode",
       "type": "string"

@@ -43,3 +43,6 @@ visual QA, authentication, and deployment remain deferred.
 
 Durable command delivery is subsequently defined by [ADR 0016](0016-durable-generation-cloud-tasks.md);
 the atomic GenerationRun claim semantics remain unchanged.
+
+[ADR 0017](0017-generation-recovery-retry-lineage.md) activates attempt/immediate-parent lineage for
+explicit retry children while preserving terminal-run immutability.

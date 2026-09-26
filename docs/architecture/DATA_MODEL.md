@@ -3,7 +3,7 @@
 This remains the broader logical model. The runtime physically implements organization, project,
 auth_principal, organization_membership, design_session, message, specification_revision,
 question_event, prompt_revision, generation_run, generation_dispatch_outbox, and asset; see ADRs
-0007–0016 and the Alembic
+0007–0017 and the Alembic
 migrations. Later rows remain plans, not implemented
 claims.
 
@@ -17,7 +17,7 @@ claims.
 | specification_revision | Immutable session revision, parent revision, schema version and field state |
 | question_event | Semantic question ID/version, rule/version, target, answer and decision explanation |
 | prompt_revision | Implemented immutable specification link, template/compiler versions, validated structured prompt, text and hash |
-| generation_run | Implemented immutable prompt/profile/provider/config input, pending/running/succeeded/failed lifecycle, attempt/parent lineage and metadata-only result/error; provider bytes remain transient |
+| generation_run | Implemented immutable prompt/profile/provider/config input, pending/running/succeeded/failed lifecycle, active linear attempt/immediate-parent retry lineage and metadata-only result/error; provider bytes remain transient |
 | generation_dispatch_outbox | One row per API-created GenerationRun; pending until deterministic Cloud Task publication succeeds. Stores no task body or secret and is not a GenerationRun lifecycle state. |
 | asset | Implemented private metadata: organization/project/session, object key, type/hash/size, optional parent and generation-output lineage, pending/ready/failed lifecycle |
 | experiment_assignment / event | Stable assignment, variant, outcome and related run/spec revision |
@@ -37,3 +37,8 @@ its deterministic final private object key before GenerationRun success. Asset m
 afterward without a second storage write. Reconciliation of durable objects with missing metadata is
 future work.
 Local repository data/ contains non-sensitive versioned catalogs only.
+
+Generation attempt 1 requires a NULL parent. Attempts greater than 1 require the immediate failed
+parent, and a unique parent reference permits only one direct retry child. Each child has its own
+atomic dispatch-outbox row. Timeout recovery records `FAILED(execution_stale)` on an old RUNNING row
+without altering its outbox or creating a retry.
