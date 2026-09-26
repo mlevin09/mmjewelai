@@ -1,12 +1,12 @@
 """Activate generation recovery and explicit retry lineage.
 
-Revision ID: 0008_generation_recovery_retry_lineage
+Revision ID: 0008_generation_recovery_retry
 Revises: 0007_generation_dispatch_outbox
 """
 
 from alembic import op
 
-revision = "0008_generation_recovery_retry_lineage"
+revision = "0008_generation_recovery_retry"
 down_revision = "0007_generation_dispatch_outbox"
 branch_labels = None
 depends_on = None

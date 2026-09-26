@@ -33,7 +33,7 @@ The `0007_generation_dispatch_outbox` migration adds one minimal durable dispatc
 API-created GenerationRun. Creation is atomic with the run; pending rows contain no task body or
 secret and are marked published idempotently after deterministic Cloud Tasks publication.
 
-The `0008_generation_recovery_retry_lineage` migration enforces attempt/parent consistency, one
+The `0008_generation_recovery_retry` migration enforces attempt/parent consistency, one
 direct retry child per parent, and an indexed stale scan. Recovery atomically marks only sufficiently
 old RUNNING rows `FAILED(execution_stale)`. Explicit retry locks a FAILED parent and derives the exact
 child request from persisted history while inserting child and outbox in one transaction.
