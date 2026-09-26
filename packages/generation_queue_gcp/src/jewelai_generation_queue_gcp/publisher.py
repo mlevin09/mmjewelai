@@ -63,6 +63,7 @@ class CloudTasksGenerationConfig(BaseModel):
         parsed = urlsplit(value)
         if (
             value != value.strip()
+            or any(character.isspace() for character in value)
             or parsed.scheme != "https"
             or not parsed.hostname
             or parsed.username is not None

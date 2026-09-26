@@ -84,10 +84,12 @@ def test_already_exists_is_success_and_other_google_errors_are_safe():
         {"queue_id": "bad_queue"},
         {"worker_task_url": "http://worker.test/internal/generation-tasks/execute"},
         {"worker_task_url": "https://user@worker.test/internal/generation-tasks/execute"},
+        {"worker_task_url": "https://worker.test /internal/generation-tasks/execute"},
         {"worker_task_url": "https://worker.test/other"},
         {"worker_task_url": "https://worker.test/internal/generation-tasks/execute#x"},
         {"oidc_service_account_email": "not-an-email"},
         {"oidc_audience": "http://worker.test"},
+        {"oidc_audience": "https://worker.test /audience"},
     ],
 )
 def test_invalid_server_configuration_fails_closed(updates):
