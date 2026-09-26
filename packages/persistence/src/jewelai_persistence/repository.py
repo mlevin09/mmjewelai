@@ -554,6 +554,7 @@ class PersistenceRepository:
         run = GenerationRun.model_validate(run)
         with self._session_factory.begin() as db:
             session = self._add_generation_run(db, run, organization_id)
+            db.flush()
             db.add(
                 GenerationDispatchOutboxRow(
                     generation_run_id=run.generation_run_id,
