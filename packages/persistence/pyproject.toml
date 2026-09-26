@@ -11,6 +11,7 @@ dependencies = [
   "jewelai-auth==1.0.0",
   "jewelai-assets==1.0.0",
   "jewelai-domain==1.0.0",
+  "jewelai-generation-queue==1.0.0",
   "jewelai-model-gateway==1.0.0",
   "jewelai-prompts==1.0.0",
   "sqlalchemy>=2.0.43,<3",

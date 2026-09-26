@@ -19,6 +19,7 @@ from jewelai_auth import (
     VerifiedIdentity,
 )
 from jewelai_domain.models import DesignRevision
+from jewelai_generation_queue import GenerationTaskEnvelope, PendingGenerationDispatch
 from jewelai_model_gateway import (
     GenerationErrorCode,
     GenerationRequest,
@@ -36,6 +37,7 @@ from .models import (
     AssetRow,
     AuthPrincipalRow,
     DesignSessionRow,
+    GenerationDispatchOutboxRow,
     GenerationRunRow,
     MessageRow,
     OrganizationMembershipRow,
@@ -541,29 +543,84 @@ class PersistenceRepository:
 
     def create_generation_run(self, run: GenerationRun, organization_id: UUID) -> GenerationRun:
         run = GenerationRun.model_validate(run)
-        if run.status is not GenerationStatus.PENDING:
-            raise ValueError("A new generation run must be pending")
-        if run.attempt != 1 or run.parent_generation_run_id is not None:
-            raise ValueError("Generation Run v1 creates only initial attempt-1 runs")
         with self._session_factory.begin() as db:
-            session = db.scalar(self._scoped_session_query(run.session_id, organization_id))
-            if session is None:
-                raise OwnershipMismatchError("Session not found in organization scope")
-            prompt = db.scalar(
-                select(PromptRevisionRow).where(
-                    PromptRevisionRow.prompt_revision_id == run.prompt_revision_id,
-                    PromptRevisionRow.session_id == run.session_id,
+            self._add_generation_run(db, run, organization_id)
+        return run
+
+    def create_generation_run_with_dispatch(
+        self, run: GenerationRun, organization_id: UUID
+    ) -> PendingGenerationDispatch:
+        """Atomically persist an initial run and its one durable dispatch intent."""
+        run = GenerationRun.model_validate(run)
+        with self._session_factory.begin() as db:
+            session = self._add_generation_run(db, run, organization_id)
+            db.flush()
+            db.add(
+                GenerationDispatchOutboxRow(
+                    generation_run_id=run.generation_run_id,
+                    created_at=run.created_at,
+                    published_at=None,
                 )
             )
-            if prompt is None:
-                raise OwnershipMismatchError(
-                    "Prompt revision does not belong to generation run session"
+            task = GenerationTaskEnvelope(
+                generation_run_id=run.generation_run_id,
+                session_id=session.session_id,
+                organization_id=organization_id,
+            )
+        return PendingGenerationDispatch(task=task, created_at=run.created_at)
+
+    def list_pending_generation_dispatches(
+        self, batch_size: int
+    ) -> tuple[PendingGenerationDispatch, ...]:
+        if isinstance(batch_size, bool) or not 1 <= batch_size <= 100:
+            raise ValueError("batch_size must be between 1 and 100")
+        with self._session_factory() as db:
+            rows = db.execute(
+                select(
+                    GenerationDispatchOutboxRow,
+                    GenerationRunRow.session_id,
+                    ProjectRow.organization_id,
                 )
-            compiled = self._compiled_prompt(prompt)
-            if compiled.content_hash != run.prompt_content_hash:
-                raise ValueError("Generation run prompt hash does not match prompt revision")
-            db.add(self._generation_row(run))
-        return run
+                .join(GenerationRunRow)
+                .join(DesignSessionRow, DesignSessionRow.session_id == GenerationRunRow.session_id)
+                .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                .where(GenerationDispatchOutboxRow.published_at.is_(None))
+                .order_by(
+                    GenerationDispatchOutboxRow.created_at,
+                    GenerationDispatchOutboxRow.generation_run_id,
+                )
+                .limit(batch_size)
+            ).all()
+            return tuple(
+                PendingGenerationDispatch(
+                    task=GenerationTaskEnvelope(
+                        generation_run_id=outbox.generation_run_id,
+                        session_id=session_id,
+                        organization_id=organization_id,
+                    ),
+                    created_at=outbox.created_at,
+                )
+                for outbox, session_id, organization_id in rows
+            )
+
+    def mark_generation_dispatch_published(
+        self, generation_run_id: UUID, published_at: datetime
+    ) -> datetime:
+        with self._session_factory.begin() as db:
+            row = db.get(GenerationDispatchOutboxRow, generation_run_id)
+            if row is None:
+                raise NotFoundError("Generation dispatch not found")
+            if row.published_at is None:
+                row.published_at = published_at
+            return row.published_at
+
+    def get_generation_dispatch(self, generation_run_id: UUID) -> GenerationDispatchOutboxRow:
+        with self._session_factory() as db:
+            row = db.get(GenerationDispatchOutboxRow, generation_run_id)
+            if row is None:
+                raise NotFoundError("Generation dispatch not found")
+            db.expunge(row)
+            return row
 
     def get_generation_run(
         self, session_id: UUID, generation_run_id: UUID, organization_id: UUID
@@ -889,6 +946,32 @@ class PersistenceRepository:
             started_at=None,
             completed_at=None,
         )
+
+    def _add_generation_run(
+        self, db: Session, run: GenerationRun, organization_id: UUID
+    ) -> DesignSessionRow:
+        if run.status is not GenerationStatus.PENDING:
+            raise ValueError("A new generation run must be pending")
+        if run.attempt != 1 or run.parent_generation_run_id is not None:
+            raise ValueError("Generation Run v1 creates only initial attempt-1 runs")
+        session = db.scalar(self._scoped_session_query(run.session_id, organization_id))
+        if session is None:
+            raise OwnershipMismatchError("Session not found in organization scope")
+        prompt = db.scalar(
+            select(PromptRevisionRow).where(
+                PromptRevisionRow.prompt_revision_id == run.prompt_revision_id,
+                PromptRevisionRow.session_id == run.session_id,
+            )
+        )
+        if prompt is None:
+            raise OwnershipMismatchError(
+                "Prompt revision does not belong to generation run session"
+            )
+        compiled = self._compiled_prompt(prompt)
+        if compiled.content_hash != run.prompt_content_hash:
+            raise ValueError("Generation run prompt hash does not match prompt revision")
+        db.add(self._generation_row(run))
+        return session
 
     @staticmethod
     def _generation_run(row: GenerationRunRow) -> GenerationRun:

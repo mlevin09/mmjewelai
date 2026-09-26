@@ -34,7 +34,8 @@ Provider output is an untrusted proposal. Enforce locked constraints in code bef
 
 Python/FastAPI API; PostgreSQL with SQLAlchemy/Alembic for persistent state and lineage.
 GCP Cloud Run for API/workers, Cloud SQL for PostgreSQL, Cloud Storage for binary assets.
-A durable queue is required before generation deployment; Cloud Tasks versus Pub/Sub is an open ADR decision.
+Google Cloud Tasks is the durable generation command-delivery mechanism. PostgreSQL records a
+transactional dispatch outbox before post-commit publication; see ADR 0016.
 Secret Manager holds provider credentials; organization/project ownership must be enforced on all records and asset access.
 Store source files privately and issue time-limited access URLs. A CDN is optional after measured demand.
 Start analytics with PostgreSQL; introduce Parquet exports and pgvector only for demonstrated needs. No dedicated vector database or BigQuery requirement for foundation.
@@ -76,6 +77,8 @@ packages/
   prompts/
   assets/
   assets_gcs/
+  generation_queue/
+  generation_queue_gcp/
   persistence/
   model_gateway/
   model_gateway_openai/
@@ -106,6 +109,8 @@ database-authoritative organization membership, and final-owner protection.
 See [ADR 0015](docs/adr/0015-authenticated-signed-asset-http-access.md) for authenticated,
 session-scoped issuance of short-lived private Asset read capabilities without exposing object keys
 or proxying bytes.
+See [ADR 0016](docs/adr/0016-durable-generation-cloud-tasks.md) for transactional generation
+dispatch, deterministic Cloud Task identity, and private IAM-authenticated worker delivery.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

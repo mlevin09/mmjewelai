@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import UUID
 
 import pytest
+from fastapi.testclient import TestClient
 from jewelai_assets import (
     AssetStatus,
     AssetStorageError,
@@ -32,6 +33,8 @@ from jewelai_prompts import compile_prompt, load_prompt_templates
 from jewelai_generation import (
     ExecutorRegistry,
     GatewayRegistry,
+    GenerationWorkerSettings,
+    create_worker_app,
     execute_generation_run,
     execute_generation_run_with_assets,
     generated_asset_id,
@@ -220,6 +223,111 @@ def advancing_clock():
         return NOW + timedelta(seconds=count)
 
     return tick
+
+
+def test_private_http_delivery_executes_once_and_acknowledges_duplicate(persisted):
+    repository, _, compiled = persisted
+    run = GenerationRun(
+        generation_run_id=SECOND_RUN_ID,
+        session_id=SESSION_ID,
+        prompt_revision_id=PROMPT_ID,
+        prompt_content_hash=compiled.content_hash,
+        profile_id="openai_default",
+        profile_version="1.0.0",
+        provider="openai",
+        model="gpt-image-1",
+        configuration=GenerationConfiguration(output_count=1),
+        status=GenerationStatus.PENDING,
+        created_at=NOW,
+    )
+    repository.create_generation_run(run, ORG_ID)
+    executor = FakeExecutor()
+    store = MemoryObjectStore()
+    app = create_worker_app(
+        GenerationWorkerSettings(
+            database_url="sqlite+pysqlite://",
+            gcs_asset_bucket="unused-bucket",
+            openai_allowed_models=("gpt-image-1",),
+        ),
+        repository=repository,
+        executor=executor,
+        object_store=store,
+        clock=advancing_clock(),
+    )
+    payload = {
+        "schema_version": "1.0.0",
+        "generation_run_id": str(SECOND_RUN_ID),
+        "session_id": str(SESSION_ID),
+        "organization_id": str(ORG_ID),
+    }
+    with TestClient(app) as client:
+        first = client.post("/internal/generation-tasks/execute", json=payload)
+        second = client.post("/internal/generation-tasks/execute", json=payload)
+        poison = client.post(
+            "/internal/generation-tasks/execute",
+            json={**payload, "organization_id": str(UUID(int=999))},
+        )
+    assert first.status_code == second.status_code == 200
+    assert first.json()["disposition"] == "succeeded"
+    assert second.json()["disposition"] == "not_claimed"
+    assert poison.status_code == 204
+    assert executor.calls == 1
+
+
+def test_worker_task_contract_rejects_business_state_before_provider(persisted):
+    repository, _, _ = persisted
+    executor = FakeExecutor()
+    app = create_worker_app(
+        GenerationWorkerSettings(
+            database_url="sqlite+pysqlite://",
+            gcs_asset_bucket="unused-bucket",
+            openai_allowed_models=("gpt-image-1",),
+        ),
+        repository=repository,
+        executor=executor,
+        object_store=MemoryObjectStore(),
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            "/internal/generation-tasks/execute",
+            json={
+                "generation_run_id": str(RUN_ID),
+                "session_id": str(SESSION_ID),
+                "organization_id": str(ORG_ID),
+                "prompt": "injected",
+                "model": "injected",
+            },
+        )
+    assert response.status_code == 422
+    assert executor.calls == 0
+
+
+def test_production_worker_composition_uses_openai_and_gcs_without_network(persisted, monkeypatch):
+    repository, _, _ = persisted
+    executor = FakeExecutor()
+    store = MemoryObjectStore()
+    captured = []
+
+    def fake_executor(config):
+        captured.append(("openai", config))
+        return executor
+
+    def fake_store(config):
+        captured.append(("gcs", config))
+        return store
+
+    monkeypatch.setattr("jewelai_generation.runtime.OpenAIImageGenerationAdapter", fake_executor)
+    monkeypatch.setattr("jewelai_generation.runtime.GcsPrivateObjectStore", fake_store)
+    app = create_worker_app(
+        GenerationWorkerSettings(
+            database_url="sqlite+pysqlite://",
+            gcs_asset_bucket="jewelai-assets-test",
+            openai_allowed_models=("gpt-image-1",),
+        ),
+        repository=repository,
+    )
+    assert app.title == "JewelAI Generation Worker"
+    assert [kind for kind, _ in captured] == ["openai", "gcs"]
 
 
 def test_success_preserves_exact_prompt_locks_hash_and_is_idempotent(persisted):

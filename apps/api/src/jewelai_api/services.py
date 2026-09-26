@@ -32,6 +32,7 @@ from jewelai_domain import (
     unlock_field,
 )
 from jewelai_domain.models import MessageSource, RevisionEvent
+from jewelai_generation_queue import GenerationTaskPublisher, GenerationTaskPublishError
 from jewelai_model_gateway import GenerationRun, GenerationStatus
 from jewelai_parser import ParserProposal, build_parser_proposal
 from jewelai_persistence.models import (
@@ -96,6 +97,7 @@ class RuntimeService:
         artifacts: RuntimeArtifacts,
         *,
         asset_access_signer: PrivateObjectAccessSigner,
+        generation_task_publisher: GenerationTaskPublisher,
         clock: Callable[[], datetime] | None = None,
         uuid_factory: Callable[[], UUID] | None = None,
         before_prompt_persist: Callable[[], None] | None = None,
@@ -110,6 +112,7 @@ class RuntimeService:
         self._generation_profiles = generation_profiles or GenerationProfileRegistry()
         self._asset_access_signer = asset_access_signer
         self._asset_access_policy = asset_access_policy or AssetAccessPolicy()
+        self._generation_task_publisher = generation_task_publisher
 
     def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
         row = self.repository.get_or_create_principal(identity, self._uuid(), self._clock())
@@ -417,7 +420,13 @@ class RuntimeService:
             attempt=1,
             created_at=now,
         )
-        return self.repository.create_generation_run(run, organization_id)
+        dispatch = self.repository.create_generation_run_with_dispatch(run, organization_id)
+        try:
+            self._generation_task_publisher.publish(dispatch.task)
+        except GenerationTaskPublishError:
+            return run
+        self.repository.mark_generation_dispatch_published(run.generation_run_id, self._clock())
+        return run
 
     def get_generation_run(
         self, session_id: UUID, generation_run_id: UUID, organization_id: UUID

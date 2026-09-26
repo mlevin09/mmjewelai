@@ -18,7 +18,18 @@ and readies Asset metadata without another storage operation.
 Storage failure before success fails the run and creates no Asset rows. A crash after success can
 leave Asset metadata missing, but the original bytes remain durable for future reconciliation. A
 crash before staging may leave a RUNNING run, while partial staging may leave private orphan objects;
-recovery and cleanup remain future work. The worker imports neither OpenAI nor GCS.
+recovery and cleanup remain future work. The core service module imports neither OpenAI nor GCS;
+the separate production runtime composes those adapters.
+
+Production composition now delivers Cloud Tasks to the private
+`POST /internal/generation-tasks/execute` endpoint, which invokes this same core path. Cloud Run IAM
+must reject unauthenticated invocation. Redelivery is not a provider retry: RUNNING and terminal
+duplicates, persisted provider/storage failures, and post-success materialization failures are
+acknowledged without another provider call. Stale RUNNING recovery remains future work.
+
+Production composition requires `DATABASE_URL`, `GCS_ASSET_BUCKET`, and comma-separated
+`OPENAI_IMAGE_ALLOWED_MODELS`; `GCP_PROJECT_ID` and `OPENAI_IMAGE_TIMEOUT_SECONDS` are optional.
+The OpenAI key remains in the SDK-supported environment/secret mechanism and never enters task data.
 
 ```sh
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q

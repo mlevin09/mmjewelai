@@ -7,6 +7,8 @@ on:
       - apps/api/**
       - packages/auth/**
       - packages/auth_oidc/**
+      - packages/generation_queue/**
+      - packages/generation_queue_gcp/**
       - packages/persistence/**
       - packages/parser/**
       - packages/prompts/**
@@ -21,6 +23,7 @@ on:
       - specs/model-gateway/**
       - specs/assets/**
       - specs/asset-access/**
+      - specs/generation-queue/**
       - tests/test_openai_generation_pipeline.py
       - data/prompts/**
       - data/roles/**
@@ -34,6 +37,8 @@ on:
       - apps/api/**
       - packages/auth/**
       - packages/auth_oidc/**
+      - packages/generation_queue/**
+      - packages/generation_queue_gcp/**
       - packages/persistence/**
       - packages/parser/**
       - packages/prompts/**
@@ -48,6 +53,7 @@ on:
       - specs/model-gateway/**
       - specs/assets/**
       - specs/asset-access/**
+      - specs/generation-queue/**
       - tests/test_openai_generation_pipeline.py
       - data/prompts/**
       - data/roles/**
@@ -87,13 +93,15 @@ jobs:
       - run: python -m pip install -e './packages/domain[test]'
       - run: python -m pip install -e './packages/auth[test]'
       - run: python -m pip install -e './packages/auth_oidc[test]'
+      - run: python -m pip install -e './packages/generation_queue[test]'
+      - run: python -m pip install -e './packages/generation_queue_gcp[test]'
       - run: python -m pip install -e './packages/prompts[test]'
       - run: python -m pip install -e './packages/model_gateway[test]'
       - run: python -m pip install -e './packages/assets[test]'
       - run: python -m pip install -e './packages/assets_gcs[test]'
       - run: python -m pip install -e './packages/persistence'
-      - run: python -m pip install -e './workers/generation[test]'
       - run: python -m pip install -e './packages/model_gateway_openai[test]'
+      - run: python -m pip install -e './workers/generation[test]'
       - run: python -m pip install -e './packages/parser[test]'
       - run: python -m pip install -e './apps/api[test]'
       - run: alembic -c packages/persistence/alembic.ini upgrade head
@@ -102,6 +110,8 @@ jobs:
       - run: python -m pytest -c packages/domain/pyproject.toml packages/domain/tests -q
       - run: python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
       - run: python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
+      - run: python -m pytest -c packages/generation_queue/pyproject.toml packages/generation_queue/tests -q
+      - run: python -m pytest -c packages/generation_queue_gcp/pyproject.toml packages/generation_queue_gcp/tests -q
       - run: python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
       - run: python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
       - run: python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
@@ -111,5 +121,5 @@ jobs:
       - run: python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
       - run: python -m pytest -c workers/generation/pyproject.toml tests/test_openai_generation_pipeline.py -q
       - run: python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests/test_openai_generation_pipeline.py
-      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests/test_openai_generation_pipeline.py
+      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/generation_queue packages/generation_queue_gcp packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
+      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/generation_queue packages/generation_queue_gcp packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests

@@ -2,6 +2,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from threading import Barrier, Lock
 from uuid import UUID
 
 import pytest
@@ -22,6 +23,7 @@ from jewelai_assets import (
 from jewelai_auth import LastOwnerError, MembershipRole, VerifiedIdentity
 from jewelai_domain import Design, revise_design
 from jewelai_domain.models import MessageSource
+from jewelai_generation_queue import dispatch_pending_generation_tasks, generation_task_id
 from jewelai_model_gateway import (
     GeneratedOutputDescriptor,
     GenerationConfiguration,
@@ -34,6 +36,7 @@ from jewelai_persistence import (
     Base,
     DuplicateRevisionError,
     GenerationStateConflictError,
+    NotFoundError,
     OwnershipMismatchError,
     PersistenceRepository,
     StaleRevisionError,
@@ -44,6 +47,7 @@ from jewelai_persistence.models import AssetRow, AuthPrincipalRow, PromptRevisio
 from jewelai_prompts import compile_prompt
 from pydantic import ValidationError
 from sqlalchemy import func, inspect, select
+from sqlalchemy.exc import IntegrityError
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.schemas import CreateSessionRequest
@@ -81,10 +85,15 @@ def build_service(engine):
         def sign_read(self, object_key, expires_at):
             raise AssertionError("Asset access signer is not used by persistence tests")
 
+    class UnusedGenerationPublisher:
+        def publish(self, task):
+            raise AssertionError("Generation publisher is not used by persistence tests")
+
     return RuntimeService(
         repository,
         artifacts,
         asset_access_signer=UnusedAssetAccessSigner(),
+        generation_task_publisher=UnusedGenerationPublisher(),
         clock=lambda: NOW,
     )
 
@@ -128,7 +137,7 @@ def next_revision(current, shape):
     )
 
 
-def create_prompt_and_run(service, organization, session, prompt_id, run_id):
+def create_prompt_and_run(service, organization, session, prompt_id, run_id, *, dispatch=False):
     current = service.repository.get_current_revision(
         session.session_id, organization.organization_id
     )
@@ -165,8 +174,65 @@ def create_prompt_and_run(service, organization, session, prompt_id, run_id):
         status=GenerationStatus.PENDING,
         created_at=NOW,
     )
-    service.repository.create_generation_run(run, organization.organization_id)
+    if dispatch:
+        service.repository.create_generation_run_with_dispatch(run, organization.organization_id)
+    else:
+        service.repository.create_generation_run(run, organization.organization_id)
     return compiled, run
+
+
+def test_generation_run_and_dispatch_outbox_are_atomic_and_idempotently_published(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    _, run = create_prompt_and_run(
+        service, organization, session, UUID(int=801), UUID(int=802), dispatch=True
+    )
+    pending = service.repository.list_pending_generation_dispatches(100)
+    assert [item.task.generation_run_id for item in pending] == [run.generation_run_id]
+    assert pending[0].task.session_id == session.session_id
+    assert pending[0].task.organization_id == organization.organization_id
+    published_at = NOW + timedelta(seconds=1)
+    assert (
+        service.repository.mark_generation_dispatch_published(
+            run.generation_run_id, published_at
+        ).replace(tzinfo=UTC)
+        == published_at
+    )
+    assert (
+        service.repository.mark_generation_dispatch_published(
+            run.generation_run_id, NOW + timedelta(seconds=2)
+        ).replace(tzinfo=UTC)
+        == published_at
+    )
+    assert service.repository.list_pending_generation_dispatches(100) == ()
+
+    with pytest.raises(IntegrityError):
+        service.repository.create_generation_run_with_dispatch(run, organization.organization_id)
+    assert (
+        service.repository.get_generation_run(
+            session.session_id, run.generation_run_id, organization.organization_id
+        )
+        == run
+    )
+
+
+def test_generation_dispatch_transaction_rolls_back_run_when_lineage_is_invalid(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    _, valid = create_prompt_and_run(service, organization, session, UUID(int=811), UUID(int=812))
+    invalid = valid.model_copy(
+        update={"generation_run_id": UUID(int=813), "prompt_content_hash": "0" * 64}
+    )
+    with pytest.raises(ValueError, match="prompt hash"):
+        service.repository.create_generation_run_with_dispatch(
+            invalid, organization.organization_id
+        )
+    with pytest.raises(NotFoundError):
+        service.repository.get_generation_run(
+            session.session_id, invalid.generation_run_id, organization.organization_id
+        )
+    with pytest.raises(NotFoundError):
+        service.repository.get_generation_dispatch(invalid.generation_run_id)
 
 
 def pending_asset(organization, project, session, asset_id, **changes):
@@ -310,6 +376,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "auth_principal",
         "design_session",
         "generation_run",
+        "generation_dispatch_outbox",
         "message",
         "organization",
         "organization_membership",
@@ -1019,6 +1086,49 @@ def test_postgres_concurrent_generation_claim_allows_exactly_one_worker():
         ).status
         is GenerationStatus.RUNNING
     )
+    engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_concurrent_outbox_redrive_uses_one_logical_task_identity():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    run_id = UUID("17171717-1717-4717-8717-171717171717")
+    create_prompt_and_run(
+        service,
+        organization,
+        session,
+        UUID("18181818-1818-4818-8818-181818181818"),
+        run_id,
+        dispatch=True,
+    )
+    barrier = Barrier(2)
+    lock = Lock()
+    task_ids = []
+
+    class RacingPublisher:
+        def publish(self, task):
+            with lock:
+                task_ids.append(generation_task_id(task.generation_run_id))
+            barrier.wait()
+
+    def redrive():
+        repository = PersistenceRepository(create_session_factory(engine))
+        return dispatch_pending_generation_tasks(
+            repository, RacingPublisher(), batch_size=1, clock=lambda: NOW
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        summaries = tuple(pool.map(lambda _: redrive(), range(2)))
+    assert [summary.published for summary in summaries] == [1, 1]
+    assert task_ids == [generation_task_id(run_id), generation_task_id(run_id)]
+    assert service.repository.list_pending_generation_dispatches(100) == ()
     engine.dispose()
 
 

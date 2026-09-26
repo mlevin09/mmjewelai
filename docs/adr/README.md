@@ -18,5 +18,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0013 — OpenAI image provider output retrieval](0013-openai-image-provider-output-retrieval.md)
 - [0014 — Authentication and organization membership](0014-authentication-organization-membership.md)
 - [0015 — Authenticated signed Asset HTTP access](0015-authenticated-signed-asset-http-access.md)
+- [0016 — Durable generation delivery with Cloud Tasks](0016-durable-generation-cloud-tasks.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

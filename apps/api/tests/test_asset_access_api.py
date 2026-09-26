@@ -290,7 +290,7 @@ def test_asset_access_openapi_is_post_only_and_secured(client):
 
 
 def test_production_composition_builds_gcs_signer_without_gcp_network(
-    monkeypatch, engine, asset_access_signer
+    monkeypatch, engine, asset_access_signer, generation_task_publisher
 ):
     captured = []
 
@@ -313,6 +313,7 @@ def test_production_composition_builds_gcs_signer_without_gcp_network(
         engine=engine,
         clock=lambda: NOW,
         token_verifier=FakeTokenVerifier(),
+        generation_task_publisher=generation_task_publisher,
     )
     assert application.state.service._asset_access_signer is asset_access_signer
     assert captured == [settings.asset_signing]

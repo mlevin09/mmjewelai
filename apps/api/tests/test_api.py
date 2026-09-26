@@ -8,7 +8,7 @@ import pytest
 from conftest import NOW, create_hierarchy
 from fastapi.testclient import TestClient
 from jewelai_assets import Asset, AssetContentType, AssetKind, AssetStatus, build_object_key
-from jewelai_auth import AuthenticationUnavailableError
+from jewelai_auth import AuthenticationUnavailableError, VerifiedIdentity
 from jewelai_domain import Design
 from jewelai_generation import GatewayRegistry, execute_generation_run
 from jewelai_model_gateway import GeneratedOutputDescriptor, GenerationResult
@@ -255,7 +255,7 @@ def test_openapi_marks_business_routes_bearer_protected(client):
 
 
 def test_authentication_infrastructure_failure_is_503_without_principal_mutation(
-    app, asset_access_signer
+    app, asset_access_signer, generation_task_publisher
 ):
     class UnavailableVerifier:
         def verify(self, token):
@@ -270,6 +270,7 @@ def test_authentication_infrastructure_failure_is_503_without_principal_mutation
         clock=lambda: NOW,
         token_verifier=UnavailableVerifier(),
         asset_access_signer=asset_access_signer,
+        generation_task_publisher=generation_task_publisher,
     )
     with TestClient(unavailable) as isolated:
         response = isolated.get("/me", headers=auth("test-any"))
@@ -284,6 +285,44 @@ def test_app_factory_without_verifier_or_oidc_configuration_fails_closed(engine)
 
     with pytest.raises(ValueError, match="OIDC configuration"):
         create_app(RuntimeSettings(repository_root=ROOT), engine=engine)
+
+
+def test_production_app_factory_composes_cloud_tasks_without_network(
+    engine, asset_access_signer, monkeypatch
+):
+    from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
+
+    from jewelai_api import create_app
+    from jewelai_api.settings import RuntimeSettings
+
+    class Verifier:
+        def verify(self, token):
+            return VerifiedIdentity(issuer="https://issuer.test", subject="test")
+
+    captured = []
+    publisher = object()
+
+    def fake_constructor(config):
+        captured.append(config)
+        return publisher
+
+    monkeypatch.setattr("jewelai_api.app.CloudTasksGenerationPublisher", fake_constructor)
+    task_config = CloudTasksGenerationConfig(
+        project_id="jewelai-prod",
+        location="us-central1",
+        queue_id="generation",
+        worker_task_url="https://worker.test/internal/generation-tasks/execute",
+        oidc_service_account_email="tasker@jewelai-prod.iam.gserviceaccount.com",
+        oidc_audience="https://worker.test",
+    )
+    application = create_app(
+        RuntimeSettings(repository_root=ROOT, generation_tasks=task_config),
+        engine=engine,
+        token_verifier=Verifier(),
+        asset_access_signer=asset_access_signer,
+    )
+    assert application.state.service._generation_task_publisher is publisher
+    assert captured == [task_config]
 
 
 def test_membership_role_does_not_replace_conversational_role(client):
@@ -917,7 +956,9 @@ def create_ready_prompt(client):
     return organization_id, project_id, session, edited, prompt.json()
 
 
-def test_generation_run_api_creates_pending_without_inline_provider_and_reads_terminal(client, app):
+def test_generation_run_api_creates_pending_without_inline_provider_and_reads_terminal(
+    client, app, generation_task_publisher
+):
     organization_id, _, session, edited, prompt = create_ready_prompt(client)
     headers = {"X-Organization-ID": organization_id}
     url = f"/sessions/{session['session_id']}/generation-runs"
@@ -937,6 +978,13 @@ def test_generation_run_api_creates_pending_without_inline_provider_and_reads_te
     assert run["configuration"] == {"output_count": 1}
     assert run["prompt_content_hash"] == prompt["compiled_prompt"]["content_hash"]
     assert gateway.calls == 0
+    assert len(generation_task_publisher.calls) == 1
+    task = generation_task_publisher.calls[0]
+    assert str(task.generation_run_id) == run["generation_run_id"]
+    assert str(task.session_id) == session["session_id"]
+    assert str(task.organization_id) == organization_id
+    dispatch = app.state.service.repository.get_generation_dispatch(task.generation_run_id)
+    assert dispatch.published_at is not None
     assert client.get(url, headers=headers).json() == {"generation_runs": [run]}
     assert client.get(f"{url}/{run['generation_run_id']}", headers=headers).json() == run
     assert (
@@ -960,6 +1008,26 @@ def test_generation_run_api_creates_pending_without_inline_provider_and_reads_te
     assert terminal["status"] == "succeeded"
     assert terminal["result"]["provider_request_id"] == "api-test-request"
     assert terminal["result"]["outputs"][0]["provider_output_id"] == "api-test-output"
+
+
+def test_generation_publication_failure_keeps_pending_run_and_outbox(
+    client, app, generation_task_publisher
+):
+    from jewelai_generation_queue import GenerationTaskPublishUnavailableError
+
+    organization_id, _, session, _, prompt = create_ready_prompt(client)
+    generation_task_publisher.error = GenerationTaskPublishUnavailableError("unavailable")
+    created = client.post(
+        f"/sessions/{session['session_id']}/generation-runs",
+        headers={"X-Organization-ID": organization_id},
+        json={"prompt_revision_id": prompt["prompt_revision_id"], "profile_id": "test_default"},
+    )
+    assert created.status_code == 201
+    run = created.json()
+    assert run["status"] == "pending"
+    assert not any(key in run for key in ("outbox", "task", "queue"))
+    dispatch = app.state.service.repository.get_generation_dispatch(UUID(run["generation_run_id"]))
+    assert dispatch.published_at is None
 
 
 def test_generation_run_api_rejects_untrusted_profile_configuration_and_cross_scope(client):
