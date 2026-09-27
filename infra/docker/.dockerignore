@@ -1,0 +1,13 @@
+.git
+.github
+**/.DS_Store
+**/__pycache__
+**/.pytest_cache
+**/node_modules
+**/dist
+**/.terraform
+**/*.tfstate*
+**/*.tfvars
+.env
+.env.*
+!apps/web/.env.example

@@ -1,9 +1,33 @@
 import pytest
 from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_oidc import OidcJwtConfig
+from jewelai_persistence import DatabasePoolConfig
 from pydantic import ValidationError
 
 from jewelai_api.settings import RuntimeSettings
+
+
+def test_database_pool_configuration_is_bounded_and_exact(monkeypatch):
+    monkeypatch.setenv("DB_POOL_SIZE", "4")
+    monkeypatch.setenv("DB_MAX_OVERFLOW", "1")
+    monkeypatch.setenv("DB_POOL_TIMEOUT_SECONDS", "20")
+    monkeypatch.setenv("DB_POOL_RECYCLE_SECONDS", "900")
+    assert DatabasePoolConfig.from_environment() == DatabasePoolConfig(
+        pool_size=4,
+        max_overflow=1,
+        pool_timeout_seconds=20,
+        pool_recycle_seconds=900,
+    )
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [("DB_POOL_SIZE", "0"), ("DB_MAX_OVERFLOW", "-1"), ("DB_POOL_TIMEOUT_SECONDS", " 5")],
+)
+def test_database_pool_configuration_rejects_invalid_values(monkeypatch, name, value):
+    monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError, match=name):
+        DatabasePoolConfig.from_environment()
 
 
 def test_runtime_settings_load_valid_oidc_environment(monkeypatch):
@@ -91,6 +115,29 @@ def test_runtime_settings_load_asset_upload_limit(monkeypatch):
         require_asset_signer=False,
     )
     assert settings.asset_upload_max_bytes == 20 * 1024 * 1024
+    assert settings.http_max_request_bytes == 21 * 1024 * 1024
+
+
+def test_runtime_settings_load_separate_raw_http_limit(monkeypatch):
+    monkeypatch.setenv("ASSET_UPLOAD_MAX_BYTES", "1024")
+    monkeypatch.setenv("HTTP_MAX_REQUEST_BYTES", "66560")
+    settings = RuntimeSettings.from_environment(
+        require_oidc=False,
+        require_asset_signer=False,
+    )
+    assert settings.asset_upload_max_bytes == 1024
+    assert settings.http_max_request_bytes == 66560
+
+
+@pytest.mark.parametrize("value", ["0", "1024", "not-an-integer", " 66560"])
+def test_runtime_settings_reject_invalid_raw_http_limit(monkeypatch, value):
+    monkeypatch.setenv("ASSET_UPLOAD_MAX_BYTES", "1024")
+    monkeypatch.setenv("HTTP_MAX_REQUEST_BYTES", value)
+    with pytest.raises(ValueError, match="HTTP_MAX_REQUEST_BYTES|HTTP request maximum"):
+        RuntimeSettings.from_environment(
+            require_oidc=False,
+            require_asset_signer=False,
+        )
 
 
 @pytest.mark.parametrize(

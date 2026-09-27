@@ -7,6 +7,11 @@ interface ImportMetaEnv {
   readonly VITE_OIDC_REDIRECT_URI: string;
   readonly VITE_OIDC_POST_LOGOUT_REDIRECT_URI: string;
   readonly VITE_OIDC_SCOPE: string;
+  readonly VITE_OIDC_AUDIENCE: string;
+}
+
+interface Window {
+  __JEWELAI_RUNTIME_CONFIG__?: unknown;
 }
 
 interface ImportMeta {

@@ -1,0 +1,1 @@
+window.__JEWELAI_RUNTIME_CONFIG__ = window.__JEWELAI_RUNTIME_CONFIG__;

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import sys
 
 from jewelai_assets_gcs import GcsAssetStorageConfig, GcsPrivateObjectStore
 from jewelai_persistence import (
@@ -47,6 +48,20 @@ def main() -> None:
         object_reader=storage,
         grace_seconds=args.grace_seconds,
         batch_size=args.batch_size,
+    )
+    print(
+        json.dumps(
+            {
+                "severity": "INFO",
+                "message": "asset reconciliation finished",
+                "service": "asset-reconciliation",
+                "environment": os.getenv("JEWELAI_ENVIRONMENT", "development"),
+                "event": "asset_reconciliation_finished",
+                **summary.model_dump(),
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
     )
     print(json.dumps(summary.model_dump(), sort_keys=True))
 

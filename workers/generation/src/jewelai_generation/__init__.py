@@ -7,7 +7,7 @@ from .maintenance import (
     reconcile_generated_assets,
 )
 from .materialization import GENERATED_ASSET_NAMESPACE, generated_asset_id
-from .runtime import GenerationWorkerSettings, create_worker_app
+from .runtime import GenerationWorkerSettings, create_app, create_worker_app
 from .service import (
     ExecutionOutcome,
     ExecutorRegistry,
@@ -26,6 +26,7 @@ __all__ = [
     "OrphanCleanupSummary",
     "cleanup_failed_generation_orphans",
     "create_worker_app",
+    "create_app",
     "execute_generation_run",
     "execute_generation_run_with_assets",
     "generated_asset_id",

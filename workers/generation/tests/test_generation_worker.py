@@ -1,4 +1,6 @@
+import io
 import json
+import logging
 import sys
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -52,6 +54,7 @@ from jewelai_generation import (
     generated_asset_id,
     reconcile_generated_assets,
 )
+from jewelai_generation.logging import JsonLogFormatter
 
 ROOT = Path(__file__).resolve().parents[3]
 NOW = datetime(2026, 9, 24, 12, 0, tzinfo=UTC)
@@ -337,6 +340,51 @@ def test_private_http_delivery_executes_once_and_acknowledges_duplicate(persiste
     assert second.json()["disposition"] == "not_claimed"
     assert poison.status_code == 204
     assert executor.calls == 1
+
+
+def test_worker_structured_events_exclude_prompt_bytes_and_raw_provider_errors(persisted):
+    repository, _, _ = persisted
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(JsonLogFormatter())
+    logger = logging.getLogger("jewelai.generation")
+    logger.addHandler(handler)
+    try:
+        app = create_worker_app(
+            GenerationWorkerSettings(
+                database_url="sqlite+pysqlite://",
+                gcs_asset_bucket="unused-bucket",
+                openai_allowed_models=("gpt-image-1",),
+                environment="test",
+            ),
+            repository=repository,
+            executor=FakeExecutor(mode="failure"),
+            object_store=MemoryObjectStore(),
+            clock=advancing_clock(),
+        )
+        TestClient(app).post(
+            "/internal/generation-tasks/execute",
+            json={
+                "schema_version": "1.0.0",
+                "generation_run_id": str(RUN_ID),
+                "session_id": str(SESSION_ID),
+                "organization_id": str(ORG_ID),
+            },
+        )
+    finally:
+        logger.removeHandler(handler)
+    events = [json.loads(line) for line in stream.getvalue().splitlines()]
+    assert [event["event"] for event in events] == [
+        "generation_task_received",
+        "generation_task_failed",
+    ]
+    assert events[-1]["generation_run_id"] == str(RUN_ID)
+    assert events[-1]["disposition"] == "failed"
+    assert events[-1]["error_code"] == "gateway_unavailable"
+    serialized = json.dumps(events)
+    assert "worker-output" not in serialized
+    assert "iVBOR" not in serialized
+    assert "raw provider" not in serialized
 
 
 def test_stale_recovery_fails_old_run_and_old_task_cannot_invoke_provider(persisted):

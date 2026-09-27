@@ -1,7 +1,9 @@
 """One-shot operator command for stale RUNNING generation recovery."""
 
 import argparse
+import json
 import os
+import sys
 
 from .database import create_database_engine, create_session_factory
 from .recovery import (
@@ -43,6 +45,20 @@ def main() -> None:
         repository,
         stale_after_seconds=args.stale_after_seconds,
         batch_size=args.batch_size,
+    )
+    print(
+        json.dumps(
+            {
+                "severity": "INFO",
+                "message": "stale recovery finished",
+                "service": "stale-recovery",
+                "environment": os.getenv("JEWELAI_ENVIRONMENT", "development"),
+                "event": "stale_recovery_finished",
+                **summary.model_dump(),
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
     )
     print(summary.model_dump_json())
 

@@ -149,3 +149,12 @@ lists the bucket, invokes a provider, or changes GenerationRun status or lineage
 Reference input follows authenticated API → bounded multipart read → create-only private object
 write → READY reference Asset. Generated output remains worker-owned. Both kinds share private Asset
 metadata and authenticated signed-read access, but their creation authorities remain separate.
+
+Production is described by two Terraform stacks under `infra/terraform`: a one-time bootstrap for
+private versioned state, Artifact Registry, and GitHub WIF; and a production stack for Cloud Run,
+Cloud SQL PostgreSQL 16, private GCS, finite Cloud Tasks, Secret Manager, Auth0 resources, external
+HTTPS load balancing, Cloud DNS/managed TLS, isolated IAM, scheduled maintenance, and monitoring.
+Browser and API traffic enter through the load balancer; the worker and jobs are private. Auth0
+proves identity but never replaces database-authoritative organization membership. Production
+images are digest-pinned, and apply remains an exact-SHA manual protected workflow. See
+[ADR 0021](docs/adr/0021-production-gcp-auth0-observability.md) and `infra/RUNBOOK.md`.

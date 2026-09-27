@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import sys
 
 from jewelai_assets_gcs import GcsAssetStorageConfig, GcsPrivateObjectStore
 from jewelai_persistence import (
@@ -51,6 +52,20 @@ def main() -> None:
         retention_seconds=args.retention_seconds,
         batch_size=args.batch_size,
         apply=args.apply,
+    )
+    print(
+        json.dumps(
+            {
+                "severity": "INFO",
+                "message": "orphan cleanup finished",
+                "service": "orphan-cleanup",
+                "environment": os.getenv("JEWELAI_ENVIRONMENT", "development"),
+                "event": "orphan_cleanup_finished",
+                **summary.model_dump(),
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
     )
     print(json.dumps(summary.model_dump(), sort_keys=True))
 

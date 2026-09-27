@@ -1,0 +1,76 @@
+name: Infrastructure
+
+on:
+  pull_request:
+    branches: [jewelai-v2]
+    paths:
+      - infra/**
+      - .github/workflows/infra.yml
+      - .github/workflows/deploy-production.yml
+      - apps/api/src/jewelai_api/middleware.py
+      - apps/api/src/jewelai_api/settings.py
+      - apps/web/src/config.ts
+      - apps/web/src/auth.tsx
+      - packages/persistence/src/jewelai_persistence/database.py
+      - workers/generation/src/jewelai_generation/logging.py
+      - workers/generation/src/jewelai_generation/runtime.py
+  push:
+    branches: [jewelai-v2]
+    paths:
+      - infra/**
+      - .github/workflows/infra.yml
+      - .github/workflows/deploy-production.yml
+      - apps/api/src/jewelai_api/middleware.py
+      - apps/api/src/jewelai_api/settings.py
+      - apps/web/src/config.ts
+      - apps/web/src/auth.tsx
+      - packages/persistence/src/jewelai_persistence/database.py
+      - workers/generation/src/jewelai_generation/logging.py
+      - workers/generation/src/jewelai_generation/runtime.py
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - run: terraform fmt -check -recursive infra/terraform
+      - run: terraform -chdir=infra/terraform/bootstrap init -backend=false
+      - run: terraform -chdir=infra/terraform/bootstrap validate
+      - run: terraform -chdir=infra/terraform/production init -backend=false
+      - run: terraform -chdir=infra/terraform/production validate
+      - name: Assert production safety invariants
+        run: python infra/terraform/check_invariants.py
+
+  containers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build -f infra/docker/api.Dockerfile -t jewelai-api:ci .
+      - run: docker build -f infra/docker/worker.Dockerfile -t jewelai-worker:ci .
+      - run: docker build -f infra/docker/web.Dockerfile -t jewelai-web:ci .
+      - name: Smoke-test production web container
+        run: |
+          docker run --detach --name jewelai-web-smoke --publish 18080:8080 \
+            --env 'JEWELAI_WEB_CONFIG_JSON={"apiBaseUrl":"https://api.example.test","oidcAuthority":"https://identity.example.test","oidcClientId":"web-smoke","oidcRedirectUri":"https://app.example.test/auth/callback","oidcPostLogoutRedirectUri":"https://app.example.test/login","oidcScope":"openid profile email","oidcAudience":"https://api.example.test"}' \
+            jewelai-web:ci
+          for attempt in 1 2 3 4 5; do
+            curl --fail --silent http://127.0.0.1:18080/health && break
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:18080/ >/dev/null
+          curl --fail --silent http://127.0.0.1:18080/spa/fallback >/dev/null
+          curl --fail --silent --dump-header /tmp/runtime-headers \
+            http://127.0.0.1:18080/runtime-config.js >/tmp/runtime-config.js
+          grep -qi 'cache-control: no-store' /tmp/runtime-headers
+          grep -qi 'content-security-policy:' /tmp/runtime-headers
+          grep -qi 'x-content-type-options: nosniff' /tmp/runtime-headers
+          grep -q 'oidcAudience' /tmp/runtime-config.js
+      - if: always()
+        run: docker rm --force jewelai-web-smoke || true

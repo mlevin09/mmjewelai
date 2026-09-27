@@ -1,0 +1,103 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_sha:
+        description: Exact jewelai-v2 commit SHA approved for production
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/jewelai-v2' && github.event.inputs.confirm_sha == github.sha
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ vars.GCP_REGION }}
+      TF_VAR_artifact_registry_repository: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      TF_VAR_asset_bucket_name: ${{ vars.GCS_ASSET_BUCKET }}
+      TF_VAR_web_domain: ${{ vars.WEB_DOMAIN }}
+      TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
+      TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
+      TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
+    steps:
+      - name: Display immutable deployment identity
+        run: |
+          echo "Deploying exact jewelai-v2 SHA: ${GITHUB_SHA}"
+          test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
+          test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - name: Configure Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - name: Build and push immutable commit images
+        run: |
+          registry="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}"
+          docker build -f infra/docker/api.Dockerfile -t "${registry}/jewelai-api:${GITHUB_SHA}" .
+          docker build -f infra/docker/worker.Dockerfile -t "${registry}/jewelai-generation-worker:${GITHUB_SHA}" .
+          docker build -f infra/docker/web.Dockerfile -t "${registry}/jewelai-web:${GITHUB_SHA}" .
+          docker push "${registry}/jewelai-api:${GITHUB_SHA}"
+          docker push "${registry}/jewelai-generation-worker:${GITHUB_SHA}"
+          docker push "${registry}/jewelai-web:${GITHUB_SHA}"
+      - name: Resolve immutable digests
+        run: |
+          registry="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}"
+          api_digest="$(gcloud artifacts docker images describe "${registry}/jewelai-api:${GITHUB_SHA}" --format='value(image_summary.digest)')"
+          worker_digest="$(gcloud artifacts docker images describe "${registry}/jewelai-generation-worker:${GITHUB_SHA}" --format='value(image_summary.digest)')"
+          web_digest="$(gcloud artifacts docker images describe "${registry}/jewelai-web:${GITHUB_SHA}" --format='value(image_summary.digest)')"
+          test -n "${api_digest}" && test -n "${worker_digest}" && test -n "${web_digest}"
+          echo "TF_VAR_api_image=${registry}/jewelai-api@${api_digest}" >> "${GITHUB_ENV}"
+          echo "TF_VAR_worker_image=${registry}/jewelai-generation-worker@${worker_digest}" >> "${GITHUB_ENV}"
+          echo "TF_VAR_web_image=${registry}/jewelai-web@${web_digest}" >> "${GITHUB_ENV}"
+          echo "API digest: ${api_digest}"
+          echo "Worker digest: ${worker_digest}"
+          echo "Web digest: ${web_digest}"
+      - name: Preflight externally seeded OpenAI secret
+        run: |
+          enabled="$(gcloud secrets versions list jewelai-production-openai-api-key --filter='state=ENABLED' --limit=1 --format='value(name)')"
+          test -n "${enabled}"
+      - name: Terraform plan and protected apply
+        run: |
+          terraform -chdir=infra/terraform/production init -backend-config="bucket=${STATE_BUCKET}"
+          terraform -chdir=infra/terraform/production plan -out=production.tfplan
+          terraform -chdir=infra/terraform/production apply -auto-approve production.tfplan
+      - name: Run migration job and wait
+        run: |
+          migration_job="$(terraform -chdir=infra/terraform/production output -raw migration_job_name)"
+          gcloud run jobs execute "${migration_job}" --region "${REGION}" --wait
+      - name: Production smoke checks
+        run: |
+          api_url="$(terraform -chdir=infra/terraform/production output -raw api_url)"
+          web_url="$(terraform -chdir=infra/terraform/production output -raw web_url)"
+          issuer="$(terraform -chdir=infra/terraform/production output -raw oidc_issuer)"
+          curl --fail --silent --show-error "${api_url}/health"
+          curl --fail --silent --show-error "${web_url}/health"
+          curl --fail --silent --show-error "${issuer}.well-known/openid-configuration" >/dev/null
+          echo "API: ${api_url}"
+          echo "Web: ${web_url}"

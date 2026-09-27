@@ -1,6 +1,6 @@
 """Persistence boundary for immutable JewelAI domain revisions."""
 
-from .database import create_database_engine, create_session_factory
+from .database import DatabasePoolConfig, create_database_engine, create_session_factory
 from .models import (
     AssetRow,
     AuthPrincipalRow,
@@ -52,5 +52,6 @@ __all__ = [
     "StaleRevisionError",
     "create_database_engine",
     "create_session_factory",
+    "DatabasePoolConfig",
     "recover_stale_generation_runs",
 ]

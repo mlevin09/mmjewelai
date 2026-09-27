@@ -50,6 +50,15 @@ beforeEach(() => {
   oidc.currentUser = null;
   vi.clearAllMocks();
   vi.stubEnv("VITE_API_BASE_URL", "http://localhost:8000/");
+  vi.stubEnv("VITE_OIDC_AUTHORITY", "https://identity.example.test");
+  vi.stubEnv("VITE_OIDC_CLIENT_ID", "jewelai-web");
+  vi.stubEnv("VITE_OIDC_REDIRECT_URI", "http://localhost:5173/auth/callback");
+  vi.stubEnv(
+    "VITE_OIDC_POST_LOGOUT_REDIRECT_URI",
+    "http://localhost:5173/login",
+  );
+  vi.stubEnv("VITE_OIDC_SCOPE", "openid profile email");
+  vi.stubEnv("VITE_OIDC_AUDIENCE", "https://api.example.test");
 });
 
 describe("authentication shell", () => {

@@ -9,6 +9,8 @@ import {
 } from "react";
 import { User, UserManager, WebStorageStateStore } from "oidc-client-ts";
 
+import { getWebRuntimeConfig } from "./config";
+
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
@@ -22,13 +24,14 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function createUserManager(): UserManager {
+  const config = getWebRuntimeConfig();
   return new UserManager({
-    authority: import.meta.env.VITE_OIDC_AUTHORITY,
-    client_id: import.meta.env.VITE_OIDC_CLIENT_ID,
-    redirect_uri: import.meta.env.VITE_OIDC_REDIRECT_URI,
-    post_logout_redirect_uri: import.meta.env
-      .VITE_OIDC_POST_LOGOUT_REDIRECT_URI,
-    scope: import.meta.env.VITE_OIDC_SCOPE,
+    authority: config.oidcAuthority,
+    client_id: config.oidcClientId,
+    redirect_uri: config.oidcRedirectUri,
+    post_logout_redirect_uri: config.oidcPostLogoutRedirectUri,
+    scope: config.oidcScope,
+    extraQueryParams: { audience: config.oidcAudience },
     response_type: "code",
     userStore: new WebStorageStateStore({ store: window.sessionStorage }),
     stateStore: new WebStorageStateStore({ store: window.sessionStorage }),

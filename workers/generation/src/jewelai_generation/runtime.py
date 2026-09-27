@@ -1,6 +1,7 @@
 """Private HTTP delivery and production composition for generation tasks."""
 
 import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,7 @@ from jewelai_persistence import (
     create_session_factory,
 )
 
+from .logging import configure_worker_logger, log_event
 from .service import ExecutorRegistry, execute_generation_run_with_assets
 
 
@@ -28,6 +30,7 @@ class GenerationWorkerSettings:
     openai_allowed_models: tuple[str, ...]
     gcp_project_id: str | None = None
     openai_timeout_seconds: float = 180
+    environment: str = "development"
 
     @classmethod
     def from_environment(cls) -> "GenerationWorkerSettings":
@@ -48,6 +51,7 @@ class GenerationWorkerSettings:
             openai_allowed_models=models,
             gcp_project_id=os.getenv("GCP_PROJECT_ID"),
             openai_timeout_seconds=float(os.getenv("OPENAI_IMAGE_TIMEOUT_SECONDS", "180")),
+            environment=os.getenv("JEWELAI_ENVIRONMENT", "development"),
         )
 
 
@@ -77,6 +81,7 @@ def create_worker_app(
     )
     executors = ExecutorRegistry({"openai": executor})
     app = FastAPI(title="JewelAI Generation Worker", version="1.0.0")
+    logger = configure_worker_logger()
 
     @app.get("/health")
     def health():
@@ -84,6 +89,15 @@ def create_worker_app(
 
     @app.post("/internal/generation-tasks/execute")
     def execute(task: GenerationTaskEnvelope, response: Response):
+        started = time.perf_counter()
+        run_id = str(task.generation_run_id)
+        log_event(
+            logger,
+            "generation_task_received",
+            service="generation-worker",
+            environment=settings.environment,
+            generation_run_id=run_id,
+        )
         try:
             outcome = execute_generation_run_with_assets(
                 repository,
@@ -95,11 +109,58 @@ def create_worker_app(
                 clock=clock,
             )
         except NotFoundError:
+            log_event(
+                logger,
+                "generation_task_not_claimed",
+                service="generation-worker",
+                environment=settings.environment,
+                generation_run_id=run_id,
+                disposition="not_found",
+                duration_ms=round((time.perf_counter() - started) * 1000, 3),
+            )
             response.status_code = 204
             return None
+        except Exception as exc:
+            log_event(
+                logger,
+                "generation_task_failed",
+                service="generation-worker",
+                environment=settings.environment,
+                generation_run_id=run_id,
+                error_code=type(exc).__name__,
+                duration_ms=round((time.perf_counter() - started) * 1000, 3),
+            )
+            response.status_code = 500
+            return {
+                "generation_run_id": run_id,
+                "disposition": "failed",
+                "error_code": "worker_unavailable",
+            }
+        event = (
+            "generation_task_not_claimed"
+            if outcome.disposition == "not_claimed"
+            else "generation_task_failed"
+            if outcome.disposition in {"failed", "materialization_failed"}
+            else "generation_task_finished"
+        )
+        fields = {
+            "service": "generation-worker",
+            "environment": settings.environment,
+            "generation_run_id": run_id,
+            "disposition": outcome.disposition,
+            "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+        }
+        if event == "generation_task_failed":
+            fields["error_code"] = (
+                outcome.run.error_code.value if outcome.run.error_code else "unknown"
+            )
+        log_event(logger, event, **fields)
         return {
             "generation_run_id": str(task.generation_run_id),
             "disposition": outcome.disposition,
         }
 
     return app
+
+
+create_app = create_worker_app

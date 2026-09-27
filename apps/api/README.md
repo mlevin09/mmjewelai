@@ -28,6 +28,8 @@ export OIDC_JWKS_URL='https://identity.example/.well-known/jwks.json'
 export GCS_ASSET_BUCKET='jewelai-assets-prod'
 # Optional upload limit in bytes; defaults to 20 MiB and cannot exceed 100 MiB:
 export ASSET_UPLOAD_MAX_BYTES='20971520'
+# Independent raw HTTP limit including multipart envelope headroom:
+export HTTP_MAX_REQUEST_BYTES='22020096'
 # Optional non-secret signing configuration:
 export GCP_PROJECT_ID='jewelai-prod'
 export GCS_SIGNING_SERVICE_ACCOUNT_EMAIL='signer@jewelai-prod.iam.gserviceaccount.com'
@@ -38,6 +40,15 @@ export GENERATION_PROFILES_JSON='[{"profile_id":"default","profile_version":"1.0
 alembic -c packages/persistence/alembic.ini upgrade head
 uvicorn jewelai_api.app:create_app --factory
 ```
+
+Production also configures `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, and
+`DB_POOL_RECYCLE_SECONDS`; these apply to non-SQLite engines only. Capacity must leave Cloud SQL
+headroom beyond the combined maximum API, worker, and job pools for operators.
+
+The raw ASGI limit rejects declared or streaming oversized bodies before multipart parsing and is
+separate from the Asset policy limit. Middleware returns a server-generated `X-Request-ID`, safe
+headers, and one JSON completion event with method, route template, status, and latency. It never
+logs Authorization, query strings, request bodies, signed URLs, prompts, or image bytes.
 
 `DATABASE_URL` and explicit artifact versions configure the runtime. Sessions persist their schema,
 role, dictionary, question, rules, and prompt-template versions at creation; they never follow a
