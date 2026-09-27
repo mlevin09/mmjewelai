@@ -5,13 +5,11 @@ Last reviewed: 2026-09-27
 
 ## Policy
 
-This log records only material, durable, explicitly recorded team decisions that affect product direction, architecture across product boundaries, security/data policy, commercial structure, material operational policy, governance, or another durable project constraint.
+This log records material, durable, explicitly recorded team decisions affecting product direction, cross-product architecture, security/data policy, commercial structure, material operational policy, governance, or another durable project constraint.
 
-Routine implementation choices should remain in code, issues, pull requests, ADRs, or technical documentation unless they create a durable project-level constraint.
+Routine implementation choices remain in code, issues, pull requests, ADRs, or technical documentation unless they create a durable project-level constraint.
 
-The Project knowledge corpus has not yet introduced a formal approval lifecycle. Therefore this log does not retroactively label historical Drive/Project statements as Accepted decisions.
-
-Repository ADRs keep their own statuses. An ADR marked `Accepted` in the repository is an accepted engineering decision within its stated scope and does not need to be copied into this log merely to preserve that status.
+Repository ADRs keep their own statuses.
 
 ## Status vocabulary
 
@@ -23,57 +21,13 @@ Repository ADRs keep their own statuses. An ADR marked `Accepted` in the reposit
 - DEPRECATED
 - HISTORICAL / NEEDS CONFIRMATION
 
-## Decision record template
-
-### DEC-XXX — Title
-
-Date:
-Status:
-Scope:
-
-**Decision**
-
-[Explicit decision.]
-
-**Context**
-
-[Why the decision is needed.]
-
-**Rationale**
-
-[Evidence and reasoning.]
-
-**Alternatives considered**
-
-[Material alternatives, if relevant.]
-
-**Consequences**
-
-[Important consequences and constraints.]
-
-**Related sources**
-
-[Links to specifications, ADRs, issues, PRs, research, or other evidence.]
-
-**Supersedes**
-
-[Decision ID or none.]
-
-**Superseded by**
-
-[Decision ID or none.]
-
----
-
 ## Working governance conventions
-
-These conventions describe the current Working governance baseline. They are not labeled Accepted until the team defines Project-level approval authority.
 
 ### GOV-W01 — No implicit Project-document acceptance
 
 Drive/Project documents, specifications, benchmarks, roadmaps, presentations, and research are not Accepted solely because they exist, appear mature, or are currently used.
 
-Repository records with their own explicit lifecycle (for example an ADR marked `Accepted`) retain that status within their scope.
+Repository records with their own explicit lifecycle retain that status within their scope.
 
 ### GOV-W02 — Product priority remains open
 
@@ -87,10 +41,28 @@ Project Sources/Drive may provide a readable mirror or knowledge layer. If a mir
 
 ### GOV-W04 — Live systems retain operational authority
 
-`CURRENT_STATE.md` summarizes and links current state but does not replace the repository, GitHub issues/PRs, deployment configuration, infrastructure state, or other live operational systems.
+`CURRENT_STATE.md` summarizes current state but does not replace the repository, GitHub issues/PRs, deployment configuration, infrastructure state, or other live operational systems.
 
 ### GOV-W05 — Historical MVP decisions are not auto-migrated
 
 Decision cells in historical MVP planning artifacts remain historical evidence unless independently validated against current product strategy and explicitly recorded through the current decision process.
 
 See `reviews/MVP_0_1_DECISION_REVIEW.md`.
+
+### GOV-W06 — Vibe coding is the default development mode
+
+Date: 2026-09-27
+Status: WORKING
+Scope: JewelAI software-development workflow
+
+**Decision**
+
+JewelAI software development should default to an action-oriented vibe-coding workflow.
+
+For routine coding work, the agent should execute through repository inspection, implementation, validation, PR preparation, and requested merge/continuation without repeatedly asking for confirmation.
+
+The agent should resolve technical facts from tools and the repository first, make small reversible assumptions when needed, and ask the user only for genuinely blocking choices, credentials/permissions, irreversible/destructive authorization, or unresolved materially different product behavior.
+
+**Consequence**
+
+Project Instructions and the `jewelai-dev-task` Skill should optimize for low-interruption execution while preserving security, source-of-truth discipline, and risk-proportional verification.
