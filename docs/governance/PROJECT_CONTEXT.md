@@ -35,7 +35,7 @@ The core durable governance records are:
 - `CURRENT_STATE.md` — navigational snapshot of what is true now.
 - `DECISION_LOG.md` — durable, material, explicitly recorded team decisions.
 - `SOURCE_MAP.md` — classification, scope, status, and working authority of important sources.
-- `GLOSSARY.md` — canonical project terminology.
+- `GLOSSARY.md` — canonical project terminology.\n- `PROJECT_INSTRUCTIONS.md` — canonical text for the ChatGPT Project Instructions field.\n- `SKILL_REGISTRY.md` — registry and governance rules for reusable JewelAI Skills.
 
 Supporting governance artifacts may be stored under `docs/governance/reviews/` or other clearly named subdirectories without expanding the core record set.
 
