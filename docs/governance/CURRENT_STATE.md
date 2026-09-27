@@ -22,7 +22,7 @@ Repository: `mlevin09/mmjewelai`
 Current V2 integration branch at review time:
 
 - branch: `jewelai-v2`
-- head: `bbf83ed259604fc288d0df3530ac36a9271b24d1`
+- governance baseline merge commit: `89db1ca07087dc749c92ca2fcaab6e42b93117a5`\n- current head: verify live in GitHub when needed
 
 PR #26 (`feat(infra): add production GCP deployment platform`) is merged into `jewelai-v2`.
 
@@ -38,7 +38,7 @@ Actual production provisioning and operator prerequisites remain operational act
 
 ## Governance work
 
-Governance baseline is being introduced through PR #27 from branch `docs/governance-baseline-v1` into `jewelai-v2`.
+Governance baseline was merged through PR #27 into `jewelai-v2` on 2026-09-27.
 
 Core governance records:
 
