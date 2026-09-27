@@ -46,3 +46,7 @@ class GenerationProfileRegistry:
             raise UnknownGenerationProfileError(
                 f"Unknown or unavailable generation profile: {profile_id}"
             ) from exc
+
+    def list_profiles(self) -> tuple[GenerationProfile, ...]:
+        """Return profiles in stable ID order without exposing mutable registry state."""
+        return tuple(self._profiles[key] for key in sorted(self._profiles))

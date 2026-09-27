@@ -40,6 +40,7 @@ from jewelai_domain import (
     revise_design,
     unlock_field,
 )
+from jewelai_domain.dictionary import DictionaryCategory, DictionaryLocale, EntryLifecycle
 from jewelai_domain.models import MessageSource, RevisionEvent
 from jewelai_generation_queue import GenerationTaskPublisher, GenerationTaskPublishError
 from jewelai_model_gateway import GenerationRun, GenerationStatus
@@ -63,9 +64,12 @@ from .schemas import (
     CreateGenerationRunRequest,
     CreatePromptRevisionRequest,
     CreateSessionRequest,
+    DictionaryOption,
+    DictionaryOptionsResponse,
     EditRevisionRequest,
     EvaluateRequest,
     EvaluationResponse,
+    GenerationProfileSummary,
     GenerationRunListResponse,
     LockRevisionRequest,
     MembershipListResponse,
@@ -74,10 +78,15 @@ from .schemas import (
     MessageResponse,
     ParserProposalRequest,
     PrincipalMembership,
+    ProjectListResponse,
+    ProjectResponse,
     PromptRevisionListResponse,
     PromptRevisionResponse,
     RetryGenerationRunRequest,
+    RoleCatalogItem,
+    SessionListResponse,
     SessionResponse,
+    UiCatalogResponse,
     UnlockRevisionRequest,
 )
 
@@ -219,6 +228,69 @@ class RuntimeService:
 
     def create_project(self, organization_id: UUID, name: str):
         return self.repository.create_project(self._uuid(), organization_id, name, self._clock())
+
+    def list_projects(self, organization_id: UUID) -> ProjectListResponse:
+        return ProjectListResponse(
+            projects=tuple(
+                ProjectResponse.model_validate(row)
+                for row in self.repository.list_projects(organization_id)
+            )
+        )
+
+    def list_sessions(self, project_id: UUID, organization_id: UUID) -> SessionListResponse:
+        return SessionListResponse(
+            sessions=tuple(
+                self._session_response(row)
+                for row in self.repository.list_design_sessions(project_id, organization_id)
+            )
+        )
+
+    def get_ui_catalog(self) -> UiCatalogResponse:
+        profiles = tuple(self.artifacts.roles[role_id] for role_id in self.artifacts.roles)
+        locales = tuple(
+            sorted({locale for profile in profiles for locale in profile.locale_policy.supported})
+        )
+        return UiCatalogResponse(
+            roles_artifact_version=self.artifacts.roles.artifact_version,
+            roles=tuple(RoleCatalogItem(role_id=profile.role_id.value) for profile in profiles),
+            locales=locales,
+            generation_profiles=tuple(
+                GenerationProfileSummary(
+                    profile_id=profile.profile_id,
+                    profile_version=profile.profile_version,
+                    output_count=profile.configuration.output_count,
+                )
+                for profile in self._generation_profiles.list_profiles()
+            ),
+        )
+
+    def get_dictionary_options(
+        self, session_id: UUID, organization_id: UUID
+    ) -> DictionaryOptionsResponse:
+        session = self.repository.get_design_session(session_id, organization_id)
+        self._assert_artifact_pins(session)
+        locale = DictionaryLocale(session.locale)
+        allowed = {
+            DictionaryCategory.STONE_SHAPE,
+            DictionaryCategory.STONE_SETTING,
+            DictionaryCategory.METAL_COLOR,
+        }
+        options = tuple(
+            DictionaryOption(
+                domain_id=entry.domain_id,
+                category=entry.category.value,
+                term=entry.canonical_terms.for_locale(locale),
+            )
+            for entry in self.artifacts.dictionary.values()
+            if entry.lifecycle is EntryLifecycle.ACTIVE and entry.category in allowed
+        )
+        return DictionaryOptionsResponse(
+            artifact_version=self.artifacts.dictionary.artifact_version,
+            locale=locale.value,
+            options=tuple(
+                sorted(options, key=lambda item: (item.category, item.term, item.domain_id))
+            ),
+        )
 
     @staticmethod
     def _membership_response(membership, principal) -> MembershipResponse:

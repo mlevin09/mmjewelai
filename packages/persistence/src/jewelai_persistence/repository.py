@@ -347,6 +347,19 @@ class PersistenceRepository:
             db.expunge(row)
             return row
 
+    def list_projects(self, organization_id: UUID) -> tuple[ProjectRow, ...]:
+        with self._session_factory() as db:
+            if db.get(OrganizationRow, organization_id) is None:
+                raise NotFoundError("Organization not found")
+            rows = db.scalars(
+                select(ProjectRow)
+                .where(ProjectRow.organization_id == organization_id)
+                .order_by(ProjectRow.created_at, ProjectRow.project_id)
+            ).all()
+            for row in rows:
+                db.expunge(row)
+            return tuple(rows)
+
     def create_design_session(
         self,
         row: DesignSessionRow,
@@ -377,6 +390,27 @@ class PersistenceRepository:
                 raise OwnershipMismatchError("Session not found in organization scope")
             db.expunge(row)
             return row
+
+    def list_design_sessions(
+        self, project_id: UUID, organization_id: UUID
+    ) -> tuple[DesignSessionRow, ...]:
+        with self._session_factory() as db:
+            project = db.scalar(
+                select(ProjectRow).where(
+                    ProjectRow.project_id == project_id,
+                    ProjectRow.organization_id == organization_id,
+                )
+            )
+            if project is None:
+                raise OwnershipMismatchError("Project not found in organization scope")
+            rows = db.scalars(
+                select(DesignSessionRow)
+                .where(DesignSessionRow.project_id == project_id)
+                .order_by(DesignSessionRow.created_at, DesignSessionRow.session_id)
+            ).all()
+            for row in rows:
+                db.expunge(row)
+            return tuple(rows)
 
     def get_current_revision(self, session_id: UUID, organization_id: UUID) -> DesignRevision:
         session = self.get_design_session(session_id, organization_id)

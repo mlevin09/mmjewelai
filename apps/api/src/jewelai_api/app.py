@@ -6,6 +6,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, File, Header, Request, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jewelai_assets import (
     AssetAccessContractError,
@@ -59,6 +60,7 @@ from .schemas import (
     CreateProjectRequest,
     CreatePromptRevisionRequest,
     CreateSessionRequest,
+    DictionaryOptionsResponse,
     EvaluateRequest,
     EvaluationResponse,
     GenerationRunListResponse,
@@ -68,13 +70,16 @@ from .schemas import (
     MessageResponse,
     OrganizationResponse,
     ParserProposalRequest,
+    ProjectListResponse,
     ProjectResponse,
     PromptRevisionListResponse,
     PromptRevisionResponse,
     RetryGenerationRunRequest,
     RevisionListResponse,
     RevisionTransitionRequest,
+    SessionListResponse,
     SessionResponse,
+    UiCatalogResponse,
     UpdateMembershipRequest,
 )
 from .services import (
@@ -141,18 +146,29 @@ def create_app(
     engine = engine or create_database_engine(settings.database_url)
     artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
     repository = PersistenceRepository(create_session_factory(engine))
+    configured_profiles = generation_profiles or GenerationProfileRegistry(
+        settings.generation_profiles
+    )
     service = RuntimeService(
         repository,
         artifacts,
         clock=clock,
         uuid_factory=uuid_factory,
-        generation_profiles=generation_profiles,
+        generation_profiles=configured_profiles,
         asset_access_signer=asset_access_signer,
         asset_object_store=asset_object_store,
         asset_ingestion_policy=AssetIngestionPolicy(max_bytes=settings.asset_upload_max_bytes),
         generation_task_publisher=generation_task_publisher,
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
+    if settings.web_allowed_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=list(settings.web_allowed_origins),
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-Organization-ID"],
+        )
     app.state.service = service
     app.state.engine = engine
 
@@ -326,6 +342,10 @@ def create_app(
     def get_me(principal: Authenticated):
         return service.get_me(principal)
 
+    @app.get("/ui/catalog", response_model=UiCatalogResponse)
+    def get_ui_catalog(_: Authenticated):
+        return service.get_ui_catalog()
+
     @app.post("/organizations", response_model=OrganizationResponse, status_code=201)
     def create_organization(request: CreateOrganizationRequest, principal: Authenticated):
         return service.create_organization(request.name, principal.principal_id)
@@ -378,6 +398,11 @@ def create_app(
         service.require_organization_member(organization_id, principal.principal_id)
         return service.create_project(organization_id, request.name)
 
+    @app.get("/organizations/{organization_id}/projects", response_model=ProjectListResponse)
+    def list_projects(organization_id: UUID, principal: Authenticated):
+        service.require_organization_member(organization_id, principal.principal_id)
+        return service.list_projects(organization_id)
+
     @app.post("/projects/{project_id}/sessions", response_model=SessionResponse, status_code=201)
     def create_session(
         project_id: UUID,
@@ -385,6 +410,10 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.create_session(project_id, organization_id, request)
+
+    @app.get("/projects/{project_id}/sessions", response_model=SessionListResponse)
+    def list_sessions(project_id: UUID, organization_id: AuthorizedOrganization):
+        return service.list_sessions(project_id, organization_id)
 
     @app.get("/sessions/{session_id}", response_model=SessionResponse)
     def get_session(
@@ -512,6 +541,13 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.list_assets(session_id, organization_id)
+
+    @app.get(
+        "/sessions/{session_id}/dictionary-options",
+        response_model=DictionaryOptionsResponse,
+    )
+    def get_dictionary_options(session_id: UUID, organization_id: AuthorizedOrganization):
+        return service.get_dictionary_options(session_id, organization_id)
 
     @app.post(
         "/sessions/{session_id}/assets",

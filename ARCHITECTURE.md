@@ -117,6 +117,8 @@ See [ADR 0018](docs/adr/0018-asset-reconciliation-orphan-cleanup.md) for metadat
 durable successful output and delayed version-conditional cleanup of failed-run orphan objects.
 See [ADR 0019](docs/adr/0019-authenticated-reference-asset-upload.md) for bounded authenticated
 multipart reference-image ingestion through the API into the same private Asset store.
+See [ADR 0020](docs/adr/0020-web-oidc-core-workflow.md) for the OIDC public browser client,
+allowlisted question-answer edits, tenant-scoped caching, and ephemeral signed-Asset display.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

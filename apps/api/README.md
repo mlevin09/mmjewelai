@@ -31,6 +31,10 @@ export ASSET_UPLOAD_MAX_BYTES='20971520'
 # Optional non-secret signing configuration:
 export GCP_PROJECT_ID='jewelai-prod'
 export GCS_SIGNING_SERVICE_ACCOUNT_EMAIL='signer@jewelai-prod.iam.gserviceaccount.com'
+# Exact comma-separated browser origins. HTTP is accepted only for localhost development:
+export WEB_ALLOWED_ORIGINS='http://localhost:5173'
+# Optional strict JSON array of non-secret server-side generation profiles:
+export GENERATION_PROFILES_JSON='[{"profile_id":"default","profile_version":"1.0.0","provider":"openai","model":"gpt-image-1","configuration":{"output_count":1}}]'
 alembic -c packages/persistence/alembic.ini upgrade head
 uvicorn jewelai_api.app:create_app --factory
 ```
@@ -47,7 +51,10 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET|POST /organizations/{organization_id}/memberships`
 - `PATCH|DELETE /organizations/{organization_id}/memberships/{principal_id}`
 - `POST /organizations/{organization_id}/projects`
+- `GET /organizations/{organization_id}/projects`
 - `POST /projects/{project_id}/sessions`
+- `GET /projects/{project_id}/sessions`
+- `GET /ui/catalog`
 - `GET /sessions/{session_id}`
 - `POST /sessions/{session_id}/messages`
 - `POST /sessions/{session_id}/parser-proposals`
@@ -63,6 +70,7 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
 - `POST /sessions/{session_id}/generation-runs/{generation_run_id}/retry`
 - `GET /sessions/{session_id}/assets`
+- `GET /sessions/{session_id}/dictionary-options`
 - `POST /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/assets/{asset_id}`
 - `POST /sessions/{session_id}/assets/{asset_id}/access`
@@ -72,6 +80,17 @@ external identity, which resolves to a JewelAI principal; current database membe
 organization. Session routes use `X-Organization-ID` only as the requested tenant selector, never as
 identity proof. Existing repository scopes remain defense in depth. Conversational roles never
 grant permissions, and JWT role/group/organization claims are ignored.
+
+`GET /ui/catalog` exposes only role IDs, supported locales, and safe generation profile summaries;
+provider/model details and credentials are never returned. `GENERATION_PROFILES_JSON` is validated
+as a strict, unique, bounded list at startup. Session dictionary options expose only active
+localized canonical terms for the three v1 answer categories, using the session's pinned artifact
+and locale. Project/session list order is deterministic and every list remains ownership-scoped.
+
+CORS is disabled unless `WEB_ALLOWED_ORIGINS` is configured. Entries must be exact origins;
+wildcards, userinfo, paths, query/fragment text, whitespace, and non-local HTTP origins fail startup.
+The browser contract permits GET/POST/PATCH/DELETE/OPTIONS and Authorization, Content-Type, and
+X-Organization-ID without credentialed CORS.
 
 Production startup fails closed unless `OIDC_ISSUER`, `OIDC_AUDIENCE`, and HTTPS `OIDC_JWKS_URL` are
 configured. It also requires `GCS_ASSET_BUCKET` unless both an Asset access signer and object store

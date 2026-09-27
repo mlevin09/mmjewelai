@@ -99,6 +99,10 @@ class ProjectResponse(ApiModel):
     created_at: datetime
 
 
+class ProjectListResponse(ApiModel):
+    projects: tuple[ProjectResponse, ...]
+
+
 class ArtifactPins(ApiModel):
     design_schema: str
     roles: str
@@ -117,6 +121,39 @@ class SessionResponse(ApiModel):
     updated_at: datetime
     current_revision_id: UUID
     artifacts: ArtifactPins
+
+
+class SessionListResponse(ApiModel):
+    sessions: tuple[SessionResponse, ...]
+
+
+class RoleCatalogItem(ApiModel):
+    role_id: str
+
+
+class GenerationProfileSummary(ApiModel):
+    profile_id: str
+    profile_version: str
+    output_count: int
+
+
+class UiCatalogResponse(ApiModel):
+    roles_artifact_version: str
+    roles: tuple[RoleCatalogItem, ...]
+    locales: tuple[str, ...]
+    generation_profiles: tuple[GenerationProfileSummary, ...]
+
+
+class DictionaryOption(ApiModel):
+    domain_id: str
+    category: Literal["stone_shape", "stone_setting", "metal_color"]
+    term: str
+
+
+class DictionaryOptionsResponse(ApiModel):
+    artifact_version: str
+    locale: Literal["en", "ru"]
+    options: tuple[DictionaryOption, ...]
 
 
 class CreateMessageRequest(ApiModel):

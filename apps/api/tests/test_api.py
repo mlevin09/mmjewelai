@@ -99,6 +99,80 @@ def test_health_organization_project_session_and_scope(client):
     assert response.status_code == 404
 
 
+def test_ui_catalog_projects_sessions_and_dictionary_options_are_scoped(client):
+    catalog = client.get("/ui/catalog")
+    assert catalog.status_code == 200
+    body = catalog.json()
+    assert [item["role_id"] for item in body["roles"]] == [
+        "retail_client",
+        "sales_manager",
+        "buyer",
+        "marketing",
+        "jewelry_designer",
+        "industrial_designer",
+    ]
+    assert body["locales"] == ["en", "ru"]
+    assert body["generation_profiles"] == [
+        {
+            "profile_id": "test_default",
+            "profile_version": "1.0.0",
+            "output_count": 1,
+        }
+    ]
+    assert "provider" not in json.dumps(body)
+    assert client.get("/ui/catalog", headers={"Authorization": ""}).status_code == 401
+
+    organization_id, project_id, session = create_hierarchy(client, locale="ru")
+    headers = {"X-Organization-ID": organization_id}
+    second_project = client.post(
+        f"/organizations/{organization_id}/projects", json={"name": "Project B"}
+    ).json()
+    projects = client.get(f"/organizations/{organization_id}/projects")
+    project_ids = [item["project_id"] for item in projects.json()["projects"]]
+    assert set(project_ids) == {project_id, second_project["project_id"]}
+    assert project_ids == sorted(project_ids)
+    second_session = client.post(
+        f"/projects/{project_id}/sessions",
+        headers=headers,
+        json={"role_id": "buyer", "locale": "en"},
+    ).json()
+    sessions = client.get(f"/projects/{project_id}/sessions", headers=headers)
+    session_ids = [item["session_id"] for item in sessions.json()["sessions"]]
+    assert set(session_ids) == {session.json()["session_id"], second_session["session_id"]}
+    assert session_ids == sorted(session_ids)
+
+    options = client.get(
+        f"/sessions/{session.json()['session_id']}/dictionary-options", headers=headers
+    )
+    assert options.status_code == 200
+    option_body = options.json()
+    assert option_body["artifact_version"] == "1.0.0"
+    assert option_body["locale"] == "ru"
+    assert {item["category"] for item in option_body["options"]} == {
+        "stone_shape",
+        "stone_setting",
+        "metal_color",
+    }
+    assert all(set(item) == {"domain_id", "category", "term"} for item in option_body["options"])
+
+    foreign = client.post("/organizations", json={"name": "Foreign"}).json()
+    foreign_id = foreign["organization_id"]
+    assert (
+        client.get(
+            f"/projects/{project_id}/sessions",
+            headers={"X-Organization-ID": foreign_id},
+        ).status_code
+        == 404
+    )
+    assert (
+        client.get(
+            f"/sessions/{session.json()['session_id']}/dictionary-options",
+            headers={"X-Organization-ID": foreign_id},
+        ).status_code
+        == 404
+    )
+
+
 def test_authentication_is_required_and_health_is_public(client):
     assert client.get("/health", headers={"Authorization": ""}).status_code == 200
     missing = client.get("/me", headers={"Authorization": ""})
@@ -111,6 +185,32 @@ def test_authentication_is_required_and_health_is_public(client):
         headers={"Authorization": "", "X-Organization-ID": str(UUID(int=1))},
     )
     assert header_only.status_code == 401
+
+
+def test_cors_preflight_allows_only_configured_browser_contract(client):
+    response = client.options(
+        "/me",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "Authorization,X-Organization-ID",
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "authorization" in response.headers["access-control-allow-headers"].lower()
+    assert "x-organization-id" in response.headers["access-control-allow-headers"].lower()
+    assert "access-control-allow-credentials" not in response.headers
+
+    denied = client.options(
+        "/me",
+        headers={
+            "Origin": "https://untrusted.example.test",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert denied.status_code == 400
+    assert "access-control-allow-origin" not in denied.headers
 
 
 def test_me_membership_lifecycle_and_cross_tenant_authorization(client):

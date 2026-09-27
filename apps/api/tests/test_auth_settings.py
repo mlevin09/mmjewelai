@@ -131,3 +131,61 @@ def test_runtime_settings_load_cloud_tasks_and_fail_closed_when_required(monkeyp
         require_generation_publisher=True,
     )
     assert settings.generation_tasks.queue_id == "generation"
+
+
+def test_web_origins_and_generation_profiles_are_strict(monkeypatch):
+    monkeypatch.setenv("WEB_ALLOWED_ORIGINS", "https://app.example.test,http://localhost:5173")
+    monkeypatch.setenv(
+        "GENERATION_PROFILES_JSON",
+        '[{"profile_id":"default","profile_version":"1.0.0",'
+        '"provider":"openai","model":"gpt-image-1",'
+        '"configuration":{"output_count":2}}]',
+    )
+    settings = RuntimeSettings.from_environment(
+        require_oidc=False,
+        require_asset_signer=False,
+    )
+    assert settings.web_allowed_origins == (
+        "https://app.example.test",
+        "http://localhost:5173",
+    )
+    assert settings.generation_profiles[0].profile_id == "default"
+    assert settings.generation_profiles[0].configuration.output_count == 2
+
+
+@pytest.mark.parametrize(
+    "origin",
+    [
+        "*",
+        " http://localhost:5173",
+        "https://user@app.example.test",
+        "https://app.example.test/path",
+        "https://app.example.test?query=1",
+        "https://app.example.test#fragment",
+        "http://app.example.test",
+    ],
+)
+def test_web_origin_rejects_non_origin_or_insecure_production_values(monkeypatch, origin):
+    monkeypatch.setenv("WEB_ALLOWED_ORIGINS", origin)
+    with pytest.raises(ValueError):
+        RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)
+
+
+def test_generation_profiles_reject_credentials_and_duplicates(monkeypatch):
+    monkeypatch.setenv(
+        "GENERATION_PROFILES_JSON",
+        '[{"profile_id":"default","profile_version":"1.0.0",'
+        '"provider":"openai","model":"gpt-image-1",'
+        '"configuration":{"output_count":1},"api_key":"secret"}]',
+    )
+    with pytest.raises(ValueError):
+        RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)
+
+    item = (
+        '{"profile_id":"default","profile_version":"1.0.0",'
+        '"provider":"openai","model":"gpt-image-1",'
+        '"configuration":{"output_count":1}}'
+    )
+    monkeypatch.setenv("GENERATION_PROFILES_JSON", f"[{item},{item}]")
+    with pytest.raises(ValueError, match="unique"):
+        RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)

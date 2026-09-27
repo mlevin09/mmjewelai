@@ -1,0 +1,919 @@
+import {
+  QueryClient,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  Link,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import {
+  createContext,
+  type FormEvent,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import { ApiClient, ApiError } from "./api";
+import { useAuth } from "./auth";
+import { applyQuestionAnswer, type QuestionAnswer } from "./designUpdates";
+import { AnswerForm } from "./forms";
+import { clearOrganizationQueries, keys } from "./queryKeys";
+import type {
+  Asset,
+  DesignRevision,
+  DictionaryOption,
+  Evaluation,
+  GenerationRun,
+  Me,
+  MessageSource,
+  Organization,
+  Project,
+  PromptRevision,
+  Session,
+  UiCatalog,
+} from "./types";
+
+const ApiContext = createContext<ApiClient | null>(null);
+
+function useApi(): ApiClient {
+  const api = useContext(ApiContext);
+  if (!api) throw new Error("API provider is required");
+  return api;
+}
+
+function ApiProvider({ children }: { children: React.ReactNode }) {
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const api = useMemo(
+    () =>
+      new ApiClient(
+        import.meta.env.VITE_API_BASE_URL,
+        auth.accessToken,
+        async () => {
+          await auth.clear();
+          void navigate("/login", { replace: true });
+        },
+      ),
+    [auth, navigate],
+  );
+  return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
+}
+
+function Protected() {
+  const auth = useAuth();
+  if (auth.loading)
+    return <main className="centered">Loading secure session…</main>;
+  return auth.user ? <Outlet /> : <Navigate to="/login" replace />;
+}
+
+function Login() {
+  const auth = useAuth();
+  if (auth.user) return <Navigate to="/" replace />;
+  return (
+    <main className="login-page">
+      <div className="brand-mark">J</div>
+      <p className="eyebrow">JewelAI studio</p>
+      <h1>Turn a jewelry idea into a precise design brief.</h1>
+      <p>Sign in with your organization identity to continue.</p>
+      <button className="primary" onClick={() => void auth.login()}>
+        Sign in securely
+      </button>
+    </main>
+  );
+}
+
+function Callback() {
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    void auth
+      .completeLogin()
+      .then(() => navigate("/", { replace: true }))
+      .catch(() =>
+        setError("Sign-in could not be completed. Please try again."),
+      );
+  }, [auth, navigate]);
+  return (
+    <main className="centered">{error ?? "Completing secure sign-in…"}</main>
+  );
+}
+
+function Shell() {
+  const api = useApi();
+  const auth = useAuth();
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { data: me } = useQuery({
+    queryKey: keys.me,
+    queryFn: () => api.request<Me>("/me"),
+  });
+  const currentOrganization =
+    /^\/organizations\/([^/]+)/.exec(location.pathname)?.[1] ?? "";
+  return (
+    <div className="shell">
+      <header>
+        <Link className="wordmark" to="/">
+          JewelAI
+        </Link>
+        <div className="identity">
+          {me?.memberships.length ? (
+            <label className="organization-switcher">
+              <span className="sr-only">Organization</span>
+              <select
+                aria-label="Organization"
+                value={currentOrganization}
+                onChange={(event) => {
+                  if (currentOrganization) {
+                    clearOrganizationQueries(client, currentOrganization);
+                  }
+                  void navigate(`/organizations/${event.target.value}`);
+                }}
+              >
+                <option value="" disabled>
+                  Choose organization
+                </option>
+                {me.memberships.map((membership) => (
+                  <option
+                    key={membership.organization_id}
+                    value={membership.organization_id}
+                  >
+                    {membership.organization_name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <span>{me?.display_name ?? me?.email ?? "Signed in"}</span>
+          <button className="quiet" onClick={() => void auth.logout()}>
+            Log out
+          </button>
+        </div>
+      </header>
+      <Outlet />
+    </div>
+  );
+}
+
+function Dashboard() {
+  const api = useApi();
+  const client = useQueryClient();
+  const navigate = useNavigate();
+  const { data: me, isLoading } = useQuery({
+    queryKey: keys.me,
+    queryFn: () => api.request<Me>("/me"),
+  });
+  const [name, setName] = useState("");
+  useEffect(() => {
+    if (me?.memberships.length === 1 && me.memberships[0]) {
+      void navigate(`/organizations/${me.memberships[0].organization_id}`, {
+        replace: true,
+      });
+    }
+  }, [me, navigate]);
+  const create = useMutation({
+    mutationFn: () =>
+      api.request<Organization>("/organizations", {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: async () => {
+      setName("");
+      await client.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+  if (isLoading) return <main className="page">Loading organizations…</main>;
+  return (
+    <main className="page">
+      <p className="eyebrow">Workspace</p>
+      <h1>Your organizations</h1>
+      {me?.memberships.length === 0 ? (
+        <section className="empty">
+          <h2>Create your first organization</h2>
+          <p>
+            An organization owns every project, design session, and private
+            asset.
+          </p>
+        </section>
+      ) : (
+        <div className="card-grid">
+          {me?.memberships.map((membership) => (
+            <Link
+              className="card"
+              key={membership.organization_id}
+              to={`/organizations/${membership.organization_id}`}
+            >
+              <span className="badge">{membership.role}</span>
+              <h2>{membership.organization_name}</h2>
+              <span>Open projects →</span>
+            </Link>
+          ))}
+        </div>
+      )}
+      <form
+        className="inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          create.mutate();
+        }}
+      >
+        <label>
+          Organization name
+          <input
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <button type="submit">Create organization</button>
+      </form>
+    </main>
+  );
+}
+
+function OrganizationProjects() {
+  const api = useApi();
+  const client = useQueryClient();
+  const { organizationId = "" } = useParams();
+  const [name, setName] = useState("");
+  const { data } = useQuery({
+    queryKey: keys.projects(organizationId),
+    queryFn: () =>
+      api.request<{ projects: Project[] }>(
+        `/organizations/${organizationId}/projects`,
+      ),
+  });
+  const create = useMutation({
+    mutationFn: () =>
+      api.request<Project>(`/organizations/${organizationId}/projects`, {
+        method: "POST",
+        body: JSON.stringify({ name }),
+      }),
+    onSuccess: async () => {
+      setName("");
+      await client.invalidateQueries({
+        queryKey: keys.projects(organizationId),
+      });
+    },
+  });
+  return (
+    <main className="page">
+      <Breadcrumbs organizationId={organizationId} />
+      <h1>Projects</h1>
+      <div className="card-grid">
+        {data?.projects.map((project) => (
+          <Link
+            className="card"
+            key={project.project_id}
+            to={`/organizations/${organizationId}/projects/${project.project_id}`}
+          >
+            <h2>{project.name}</h2>
+            <span>View design sessions →</span>
+          </Link>
+        ))}
+      </div>
+      <form
+        className="inline-form"
+        onSubmit={(event) => submitName(event, create.mutate)}
+      >
+        <label>
+          Project name
+          <input
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+        <button type="submit">Create project</button>
+      </form>
+    </main>
+  );
+}
+
+function ProjectSessions() {
+  const api = useApi();
+  const client = useQueryClient();
+  const { organizationId = "", projectId = "" } = useParams();
+  const catalog = useQuery({
+    queryKey: keys.catalog,
+    queryFn: () => api.request<UiCatalog>("/ui/catalog"),
+  });
+  const sessions = useQuery({
+    queryKey: keys.sessions(organizationId, projectId),
+    queryFn: () =>
+      api.request<{ sessions: Session[] }>(`/projects/${projectId}/sessions`, {
+        organizationId,
+      }),
+  });
+  const [role, setRole] = useState("");
+  const [locale, setLocale] = useState("");
+  useEffect(() => {
+    if (!role && catalog.data?.roles[0]) setRole(catalog.data.roles[0].role_id);
+    if (!locale && catalog.data?.locales[0]) setLocale(catalog.data.locales[0]);
+  }, [catalog.data, locale, role]);
+  const create = useMutation({
+    mutationFn: () =>
+      api.request<Session>(`/projects/${projectId}/sessions`, {
+        organizationId,
+        method: "POST",
+        body: JSON.stringify({ role_id: role, locale }),
+      }),
+    onSuccess: async () => {
+      await client.invalidateQueries({
+        queryKey: keys.sessions(organizationId, projectId),
+      });
+    },
+  });
+  return (
+    <main className="page">
+      <Breadcrumbs organizationId={organizationId} />
+      <h1>Design sessions</h1>
+      <div className="card-grid">
+        {sessions.data?.sessions.map((session) => (
+          <Link
+            className="card"
+            key={session.session_id}
+            to={`/organizations/${organizationId}/sessions/${session.session_id}`}
+          >
+            <span className="badge">{session.locale}</span>
+            <h2>{humanize(session.role_id)}</h2>
+            <span>Revision workspace →</span>
+          </Link>
+        ))}
+      </div>
+      <form
+        className="inline-form"
+        onSubmit={(event) => submitName(event, create.mutate)}
+      >
+        <label>
+          Conversation role
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value)}
+          >
+            {catalog.data?.roles.map((item) => (
+              <option key={item.role_id} value={item.role_id}>
+                {humanize(item.role_id)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Language
+          <select
+            value={locale}
+            onChange={(event) => setLocale(event.target.value)}
+          >
+            {catalog.data?.locales.map((item) => (
+              <option key={item} value={item}>
+                {item.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button disabled={!role || !locale} type="submit">
+          Start session
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function Workspace() {
+  const api = useApi();
+  const client = useQueryClient();
+  const { organizationId = "", sessionId = "" } = useParams();
+  const scoped = { organizationId };
+  const session = useQuery({
+    queryKey: keys.workspace(organizationId, sessionId, "session"),
+    queryFn: () => api.request<Session>(`/sessions/${sessionId}`, scoped),
+  });
+  const revision = useQuery({
+    enabled: Boolean(session.data),
+    queryKey: keys.workspace(
+      organizationId,
+      sessionId,
+      `revision-${session.data?.current_revision_id ?? "pending"}`,
+    ),
+    queryFn: () =>
+      api.request<DesignRevision>(
+        `/sessions/${sessionId}/revisions/${session.data?.current_revision_id ?? ""}`,
+        scoped,
+      ),
+  });
+  const options = useQuery({
+    queryKey: keys.workspace(organizationId, sessionId, "dictionary-options"),
+    queryFn: () =>
+      api.request<{ options: DictionaryOption[] }>(
+        `/sessions/${sessionId}/dictionary-options`,
+        scoped,
+      ),
+  });
+  const assets = useQuery({
+    queryKey: keys.workspace(organizationId, sessionId, "assets"),
+    queryFn: () =>
+      api.request<{ assets: Asset[] }>(`/sessions/${sessionId}/assets`, scoped),
+  });
+  const runs = useQuery({
+    queryKey: keys.workspace(organizationId, sessionId, "runs"),
+    queryFn: () =>
+      api.request<{ generation_runs: GenerationRun[] }>(
+        `/sessions/${sessionId}/generation-runs`,
+        scoped,
+      ),
+  });
+  const catalog = useQuery({
+    queryKey: keys.catalog,
+    queryFn: () => api.request<UiCatalog>("/ui/catalog"),
+  });
+  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeRun, setActiveRun] = useState<string | null>(null);
+  const [pollStarted, setPollStarted] = useState(0);
+  const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const active = useQuery({
+    enabled: Boolean(activeRun),
+    queryKey: keys.workspace(
+      organizationId,
+      sessionId,
+      `run-${activeRun ?? "none"}`,
+    ),
+    queryFn: () =>
+      api.request<GenerationRun>(
+        `/sessions/${sessionId}/generation-runs/${activeRun}`,
+        scoped,
+      ),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && ["succeeded", "failed"].includes(status)
+        ? false
+        : Date.now() - pollStarted >= 300_000
+          ? false
+          : 2_000;
+    },
+  });
+  useEffect(() => {
+    if (
+      activeRun &&
+      active.data &&
+      ["succeeded", "failed"].includes(active.data.status)
+    ) {
+      setActiveRun(null);
+      void runs.refetch();
+      void assets.refetch();
+    }
+  }, [active.data, activeRun, assets, runs]);
+
+  const refreshRevision = async () => {
+    await client.invalidateQueries({
+      queryKey: keys.workspace(organizationId, sessionId, "session"),
+    });
+    await session.refetch();
+    await client.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "organization" &&
+        query.queryKey[1] === organizationId &&
+        query.queryKey[3] === sessionId,
+    });
+  };
+  const evaluate = async () => {
+    setError(null);
+    setEvaluation(
+      await api.request<Evaluation>(`/sessions/${sessionId}/evaluate`, {
+        ...scoped,
+        method: "POST",
+        body: JSON.stringify({}),
+      }),
+    );
+  };
+  const answer = async (value: QuestionAnswer) => {
+    if (!revision.data || !evaluation?.rendered_question) return;
+    setError(null);
+    const message = await api.request<{
+      message_id: string;
+      created_at: string;
+    }>(`/sessions/${sessionId}/messages`, {
+      ...scoped,
+      method: "POST",
+      body: JSON.stringify({
+        content: `${evaluation.rendered_question.question_id}: ${JSON.stringify(value)}`,
+      }),
+    });
+    const source: MessageSource = {
+      kind: "message",
+      message_id: message.message_id,
+      recorded_at: message.created_at,
+    };
+    let proposedDesign;
+    try {
+      proposedDesign = applyQuestionAnswer(
+        revision.data.design,
+        evaluation.decision.concrete_target ??
+          evaluation.rendered_question.target,
+        value,
+        source,
+      );
+    } catch {
+      setError(
+        "This question target is not supported by the v1 answer workflow.",
+      );
+      return;
+    }
+    try {
+      await api.request(`/sessions/${sessionId}/revisions`, {
+        ...scoped,
+        method: "POST",
+        body: JSON.stringify({
+          action: "edit",
+          expected_revision_id: revision.data.revision_id,
+          proposed_design: proposedDesign,
+          source,
+          reason: `Answered ${evaluation.rendered_question.question_id}`,
+        }),
+      });
+      setEvaluation(null);
+      await refreshRevision();
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.code === "stale_revision") {
+        await refreshRevision();
+        setError(
+          "The design changed elsewhere. The latest revision has been loaded.",
+        );
+      } else if (
+        caught instanceof ApiError &&
+        caught.code === "locked_field_conflict"
+      ) {
+        setError("This field is locked and cannot be changed by this answer.");
+      } else throw caught;
+    }
+  };
+  if (!session.data || !revision.data)
+    return <main className="page">Loading workspace…</main>;
+  return (
+    <main className="page workspace">
+      <Breadcrumbs organizationId={organizationId} />
+      <div className="workspace-heading">
+        <div>
+          <p className="eyebrow">{humanize(session.data.role_id)}</p>
+          <h1>Design revision {revision.data.revision}</h1>
+        </div>
+        <span className="badge">{session.data.locale.toUpperCase()}</span>
+      </div>
+      {error && <div className="alert">{error}</div>}
+      <section className="panel question-panel">
+        <div>
+          <p className="eyebrow">Deterministic design check</p>
+          <h2>
+            {evaluation
+              ? humanize(evaluation.decision.decision)
+              : "What should we refine?"}
+          </h2>
+          <p>
+            {evaluation?.rendered_question?.wording ??
+              evaluation?.decision.reason}
+          </p>
+        </div>
+        {!evaluation && (
+          <button onClick={() => void evaluate()}>Evaluate design</button>
+        )}
+        {evaluation?.rendered_question && (
+          <AnswerForm
+            contract={evaluation.rendered_question.answer_contract}
+            options={options.data?.options ?? []}
+            onSubmit={answer}
+          />
+        )}
+        {evaluation?.decision.decision === "ready" && (
+          <ReadyActions
+            api={api}
+            organizationId={organizationId}
+            sessionId={sessionId}
+            revisionId={revision.data.revision_id}
+            profiles={catalog.data?.generation_profiles ?? []}
+            onRun={(runId) => {
+              setActiveRun(runId);
+              setPollStarted(Date.now());
+            }}
+          />
+        )}
+        {evaluation &&
+          evaluation.decision.decision !== "ask" &&
+          evaluation.decision.decision !== "ready" && (
+            <p className="notice">
+              This proposal is informational and has not changed the revision.
+            </p>
+          )}
+      </section>
+      <div className="two-column">
+        <section className="panel">
+          <h2>Design summary</h2>
+          <dl className="summary">
+            <dt>Center stone shape</dt>
+            <dd>{stateValue(revision.data.design.center_stone.shape)}</dd>
+            <dt>Center stone setting</dt>
+            <dd>{stateValue(revision.data.design.center_stone.setting)}</dd>
+            <dt>Metal color</dt>
+            <dd>{stateValue(revision.data.design.metal.color)}</dd>
+          </dl>
+          <details>
+            <summary>Technical JSON</summary>
+            <pre>{JSON.stringify(revision.data.design, null, 2)}</pre>
+          </details>
+        </section>
+        <section className="panel">
+          <h2>Generation runs</h2>
+          {(runs.data?.generation_runs ?? []).map((run) => (
+            <article className="list-row" key={run.generation_run_id}>
+              <div>
+                <strong>{humanize(run.status)}</strong>
+                <small>
+                  Attempt {run.attempt}
+                  {run.parent_generation_run_id ? " · retry" : ""}
+                </small>
+              </div>
+              {run.status === "failed" && (
+                <button
+                  className="quiet"
+                  onClick={() =>
+                    void api
+                      .request<GenerationRun>(
+                        `/sessions/${sessionId}/generation-runs/${run.generation_run_id}/retry`,
+                        { ...scoped, method: "POST", body: JSON.stringify({}) },
+                      )
+                      .then((child) => {
+                        setActiveRun(child.generation_run_id);
+                        setPollStarted(Date.now());
+                        return runs.refetch();
+                      })
+                  }
+                >
+                  Retry
+                </button>
+              )}
+            </article>
+          ))}
+          {activeRun && Date.now() - pollStarted >= 300_000 && (
+            <p className="notice">
+              Live polling paused after five minutes. Refresh to check again.
+            </p>
+          )}
+        </section>
+      </div>
+      <AssetPanel
+        assets={assets.data?.assets ?? []}
+        urls={assetUrls}
+        onUpload={async (file) => {
+          const form = new FormData();
+          form.set("file", file);
+          await api.request(`/sessions/${sessionId}/assets`, {
+            ...scoped,
+            method: "POST",
+            body: form,
+          });
+          await assets.refetch();
+        }}
+        onView={async (assetId) => {
+          const access = await api.request<{ url: string }>(
+            `/sessions/${sessionId}/assets/${assetId}/access`,
+            {
+              ...scoped,
+              method: "POST",
+              body: JSON.stringify({ ttl_seconds: 300 }),
+            },
+          );
+          setAssetUrls((current) => ({ ...current, [assetId]: access.url }));
+        }}
+      />
+    </main>
+  );
+}
+
+function ReadyActions({
+  api,
+  organizationId,
+  sessionId,
+  revisionId,
+  profiles,
+  onRun,
+}: {
+  api: ApiClient;
+  organizationId: string;
+  sessionId: string;
+  revisionId: string;
+  profiles: UiCatalog["generation_profiles"];
+  onRun: (runId: string) => void;
+}) {
+  const [prompt, setPrompt] = useState<PromptRevision | null>(null);
+  const [profile, setProfile] = useState(profiles[0]?.profile_id ?? "");
+  useEffect(() => {
+    if (!profile && profiles[0]) setProfile(profiles[0].profile_id);
+  }, [profile, profiles]);
+  return (
+    <div className="ready-actions">
+      {!prompt ? (
+        <button
+          onClick={() =>
+            void api
+              .request<PromptRevision>(
+                `/sessions/${sessionId}/prompt-revisions`,
+                {
+                  organizationId,
+                  method: "POST",
+                  body: JSON.stringify({ expected_revision_id: revisionId }),
+                },
+              )
+              .then(setPrompt)
+          }
+        >
+          Create generation prompt
+        </button>
+      ) : (
+        <>
+          <label>
+            Generation profile
+            <select
+              value={profile}
+              onChange={(event) => setProfile(event.target.value)}
+            >
+              {profiles.map((item) => (
+                <option key={item.profile_id} value={item.profile_id}>
+                  {item.profile_id} · {item.output_count} output(s)
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            disabled={!profile}
+            onClick={() =>
+              void api
+                .request<GenerationRun>(
+                  `/sessions/${sessionId}/generation-runs`,
+                  {
+                    organizationId,
+                    method: "POST",
+                    body: JSON.stringify({
+                      prompt_revision_id: prompt.prompt_revision_id,
+                      profile_id: profile,
+                    }),
+                  },
+                )
+                .then((run) => onRun(run.generation_run_id))
+            }
+          >
+            Queue generation
+          </button>
+          {!profiles.length && <p>No generation profiles are configured.</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
+function AssetPanel({
+  assets,
+  urls,
+  onUpload,
+  onView,
+}: {
+  assets: Asset[];
+  urls: Record<string, string>;
+  onUpload: (file: File) => Promise<void>;
+  onView: (assetId: string) => Promise<void>;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  return (
+    <section className="panel assets">
+      <h2>Private assets</h2>
+      <form
+        className="inline-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (file) void onUpload(file).then(() => setFile(null));
+        }}
+      >
+        <label>
+          Add reference image
+          <input
+            accept="image/png,image/jpeg,image/webp"
+            type="file"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          />
+        </label>
+        <button disabled={!file} type="submit">
+          Upload reference
+        </button>
+      </form>
+      {(["reference", "generated"] as const).map((kind) => (
+        <div key={kind}>
+          <h3>{humanize(kind)}</h3>
+          <div className="asset-grid">
+            {assets
+              .filter((asset) => asset.kind === kind)
+              .map((asset) => (
+                <article className="asset-card" key={asset.asset_id}>
+                  {urls[asset.asset_id] && (
+                    <img
+                      src={urls[asset.asset_id]}
+                      alt={`${kind} jewelry asset`}
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
+                  <span className="badge">{asset.status}</span>
+                  <small>{Math.ceil(asset.byte_size / 1024)} KB</small>
+                  <button
+                    disabled={asset.status !== "ready"}
+                    onClick={() => void onView(asset.asset_id)}
+                  >
+                    View for 5 minutes
+                  </button>
+                </article>
+              ))}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function Breadcrumbs({ organizationId }: { organizationId: string }) {
+  const client = useQueryClient();
+  return (
+    <nav aria-label="Breadcrumb">
+      <Link
+        to="/"
+        onClick={() => {
+          clearOrganizationQueries(client, organizationId);
+        }}
+      >
+        Organizations
+      </Link>
+      <span> / </span>
+      <Link to={`/organizations/${organizationId}`}>Projects</Link>
+    </nav>
+  );
+}
+
+function submitName(event: FormEvent, submit: () => void): void {
+  event.preventDefault();
+  submit();
+}
+
+function humanize(value: string): string {
+  return value
+    .replaceAll("_", " ")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function stateValue(value: unknown): string {
+  if (typeof value !== "object" || value === null) return "Not provided";
+  const state = value as Record<string, unknown>;
+  if (state.availability === "not_applicable") return "Not applicable";
+  if (state.availability !== "value") return "Not provided";
+  return typeof state.value === "string"
+    ? humanize(state.value)
+    : JSON.stringify(state.value);
+}
+
+export function App() {
+  return (
+    <ApiProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<Callback />} />
+        <Route element={<Protected />}>
+          <Route element={<Shell />}>
+            <Route index element={<Dashboard />} />
+            <Route
+              path="organizations/:organizationId"
+              element={<OrganizationProjects />}
+            />
+            <Route
+              path="organizations/:organizationId/projects/:projectId"
+              element={<ProjectSessions />}
+            />
+            <Route
+              path="organizations/:organizationId/sessions/:sessionId"
+              element={<Workspace />}
+            />
+          </Route>
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ApiProvider>
+  );
+}
+
+export const appQueryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false, staleTime: 15_000 } },
+});
