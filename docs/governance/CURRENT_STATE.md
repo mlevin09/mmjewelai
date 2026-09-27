@@ -24,6 +24,7 @@ Current V2 integration branch:
 - branch: `jewelai-v2`
 - governance baseline merge commit: `89db1ca07087dc749c92ca2fcaab6e42b93117a5`
 - post-merge state update commit: `126ea85732e1a22868235caa05a1270025de5277`
+- governance cleanup commit: `352abc24fa70e6811eae7b43774244eb79dad69f`
 - current head: verify live in GitHub when needed
 
 PR #26 (`feat(infra): add production GCP deployment platform`) is merged into `jewelai-v2`.
@@ -42,7 +43,7 @@ Actual production provisioning and operator prerequisites remain operational act
 
 Governance baseline was merged through PR #27 into `jewelai-v2` on 2026-09-27.
 
-Post-merge Current State cleanup was merged through PR #28 on 2026-09-27.
+Post-merge Current State update was merged through PR #28, and governance cleanup through PR #29, on 2026-09-27.
 
 Core governance records:
 
@@ -51,6 +52,18 @@ Core governance records:
 - Decision Log: Working
 - Source Map: Working
 - Glossary: Working
+
+## ChatGPT Project configuration
+
+Verified on 2026-09-27:
+
+- the JewelAI Project Instructions are active in the project context and correspond to the canonical `docs/governance/PROJECT_INSTRUCTIONS.md`;
+- the governance knowledge mirror is retrievable through Project Sources, including Project Context, Current State, Decision Log, Source Map, Glossary, the historical MVP decision review, and Skill Registry;
+- the original JewelAI/BLNG/Benchmark/Product/Visualization/Competitor source corpus remains available through Project Sources;
+- four JewelAI Skills are installed and discoverable: `jewelai-dev-task`, `jewelai-release-readiness`, `jewelai-visualization-benchmark`, and `jewelai-product-decision`;
+- all four Skills permit implicit invocation and preserve the repository/Project source-of-truth rules relevant to their workflows.
+
+GitHub `docs/governance/` remains canonical; Project Sources are the readable mirror.
 
 ## Product state
 
@@ -94,6 +107,6 @@ See `reviews/MVP_0_1_DECISION_REVIEW.md`.
 
 ## Remaining governance actions
 
-- Mirror the merged canonical governance files into Project Sources/Drive.
 - Define who may assign Project-level `Accepted` status before using that status for Drive/Project documents.
-- Correct the visualization benchmark version mismatch when revising that source.
+- Correct the visualization benchmark filename/internal-version mismatch when revising that source.
+- Refresh the Project Sources/Drive governance mirror after future material governance changes.
