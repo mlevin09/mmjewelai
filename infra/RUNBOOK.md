@@ -7,9 +7,9 @@ Production operations are manual, reviewed, and credential-safe. Never paste tok
 1. Create or select a billed GCP project and choose one primary region.
 2. Create or select an Auth0 tenant. Create a least-privilege Auth0 Management API machine-to-machine client for Terraform; the tenant/account itself is not Terraform-managed.
 3. Copy `infra/terraform/bootstrap/terraform.tfvars.example` outside Git, review the plan, and apply the bootstrap stack with an authorized operator identity.
-4. Configure the protected GitHub `production` Environment. Add non-secret project, region, registry, state bucket, WIF provider, deploy-service-account, domains, DNS zone, and Asset bucket variables. Add `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` as protected secrets.
+4. Configure the protected GitHub `production` Environment. Add non-secret project, region, registry, state bucket, WIF provider, deploy-service-account, domains, optional DNS zone, Asset bucket, `GENERATION_PROFILES_JSON`, and `OPENAI_ALLOWED_MODELS` variables. The profile registry and exact worker allowlist must agree. Add `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` as protected secrets.
 5. For the first deployment only, apply the production OpenAI Secret Manager metadata target after review, then seed a version without Terraform: `gcloud secrets versions add jewelai-production-openai-api-key --data-file=-`. Do not enter the value into tfvars or command history. The normal deploy preflights an enabled version.
-6. Confirm the existing Cloud DNS zone/domain inputs, or plan to create both A records from the `load_balancer_ip` output when DNS management is disabled.
+6. Confirm the existing Cloud DNS zone/domain inputs, or leave `DNS_MANAGED_ZONE` unset/empty and plan to create both A records from the `load_balancer_ip` output when DNS management is external.
 7. Dispatch `Deploy production` from `jewelai-v2`, enter its exact SHA, approve the protected environment, and review the Terraform plan/apply record.
 8. Create the first controlled-alpha Auth0 database user administratively. Terraform never stores users or passwords.
 9. Open the web URL, sign in, and create the first JewelAI organization. Auth0 establishes identity only; PostgreSQL membership remains authorization authority.

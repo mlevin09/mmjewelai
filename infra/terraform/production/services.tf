@@ -132,6 +132,14 @@ resource "google_cloud_run_v2_service" "api" {
       condition     = (var.api_max_instances + var.worker_max_instances + 5) * (var.db_pool_size + var.db_max_overflow) <= var.database_max_connections - 10
       error_message = "API, worker, and five job pool capacity must leave at least ten Cloud SQL connections for operators."
     }
+
+    precondition {
+      condition = alltrue([
+        for profile in local.generation_profiles :
+        try(profile.provider == "openai" && contains(local.openai_allowed_models, profile.model), false)
+      ])
+      error_message = "Every production generation profile must use the OpenAI provider and a model present in openai_allowed_models."
+    }
   }
 
   depends_on = [google_project_service.production]

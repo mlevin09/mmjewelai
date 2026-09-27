@@ -30,6 +30,8 @@ on:
       - data/dictionary/**
       - data/questions/**
       - data/rules/**
+      - infra/terraform/production/**
+      - .github/workflows/deploy-production.yml
       - .github/workflows/runtime-api.yml
   push:
     branches: [jewelai-v2]
@@ -60,6 +62,8 @@ on:
       - data/dictionary/**
       - data/questions/**
       - data/rules/**
+      - infra/terraform/production/**
+      - .github/workflows/deploy-production.yml
       - .github/workflows/runtime-api.yml
 
 permissions:

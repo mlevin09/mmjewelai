@@ -29,21 +29,80 @@ def _resource(text: str, resource_type: str, name: str) -> str:
     return text[start:] if end < 0 else text[start:end]
 
 
+def _variable(text: str, name: str) -> str:
+    marker = f'variable "{name}"'
+    start = text.find(marker)
+    if start < 0:
+        raise SystemExit(f"Missing Terraform variable: {name}")
+    end = text.find('\nvariable "', start + len(marker))
+    return text[start:] if end < 0 else text[start:end]
+
+
 iam = _read("iam.tf")
+locals = _read("locals.tf")
+networking = _read("networking.tf")
 services = _read("services.tf")
 storage = _read("storage.tf")
 tasks = _read("tasks.tf")
+variables = _read("variables.tf")
+deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").read_text(
+    encoding="utf-8"
+)
 
 _require(storage, 'public_access_prevention    = "enforced"', "GCS public access prevention")
 _require(storage, "uniform_bucket_level_access = true", "uniform bucket IAM")
 _require(storage, "enabled = false", "Asset object versioning disabled")
 _require(iam, 'for_each = toset(["api", "worker"])', "create/read limited to API and worker")
 _require(iam, 'runtime["cleanup"].email', "separate cleanup delete authority")
-_require(services, 'ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"', "private worker ingress")
-_require(services, 'member   = "serviceAccount:${google_service_account.runtime["task"].email}"', "task-only worker invoker")
-_forbid(services, 'name     = google_cloud_run_v2_service.worker.name\n  role     = "roles/run.invoker"\n  member   = "allUsers"', "public worker invoker")
+_require(
+    services,
+    'ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"',
+    "private worker ingress",
+)
+_require(
+    services,
+    'member   = "serviceAccount:${google_service_account.runtime["task"].email}"',
+    "task-only worker invoker",
+)
+_forbid(
+    services,
+    "name     = google_cloud_run_v2_service.worker.name\n"
+    '  role     = "roles/run.invoker"\n'
+    '  member   = "allUsers"',
+    "public worker invoker",
+)
 _require(tasks, "max_attempts       = var.task_max_attempts", "finite queue attempts")
 _require(services, "max_instance_count = var.worker_max_instances", "bounded worker instances")
+_require(
+    services,
+    "contains(local.openai_allowed_models, profile.model)",
+    "API generation profiles constrained to worker model allowlist",
+)
+
+generation_profiles = _variable(variables, "generation_profiles_json")
+allowed_models = _variable(variables, "openai_allowed_models")
+stale_recovery = _variable(variables, "stale_recovery_seconds")
+_forbid(generation_profiles, "\n  default", "implicit production generation profile")
+_forbid(allowed_models, "\n  default", "implicit production worker model allowlist")
+_require(stale_recovery, "default = 1800", "accepted 1800-second stale recovery default")
+_require(
+    deploy_workflow,
+    "TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}",
+    "protected generation profile configuration",
+)
+_require(
+    deploy_workflow,
+    "TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}",
+    "protected worker model allowlist configuration",
+)
+
+_require(
+    locals,
+    'var.dns_managed_zone != null && var.dns_managed_zone != ""',
+    "null and empty DNS configuration disable managed records",
+)
+_require(networking, "count        = local.dns_records_enabled ? 1 : 0", "optional DNS records")
+_forbid(networking, "var.dns_managed_zone == null ? 0 : 1", "empty DNS zone treated as enabled")
 
 openai_access = _resource(iam, "google_secret_manager_secret_iam_member", "openai_key")
 _require(openai_access, 'runtime["worker"].email', "OpenAI secret limited to worker")

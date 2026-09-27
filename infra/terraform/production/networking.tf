@@ -168,7 +168,7 @@ resource "google_compute_global_forwarding_rule" "http" {
 }
 
 resource "google_dns_record_set" "web" {
-  count        = var.dns_managed_zone == null ? 0 : 1
+  count        = local.dns_records_enabled ? 1 : 0
   project      = var.project_id
   managed_zone = var.dns_managed_zone
   name         = "${var.web_domain}."
@@ -178,7 +178,7 @@ resource "google_dns_record_set" "web" {
 }
 
 resource "google_dns_record_set" "api" {
-  count        = var.dns_managed_zone == null ? 0 : 1
+  count        = local.dns_records_enabled ? 1 : 0
   project      = var.project_id
   managed_zone = var.dns_managed_zone
   name         = "${var.api_domain}."

@@ -6,7 +6,7 @@ This stack describes the reviewed production topology. It consumes the bootstrap
 
 - Bootstrap stack applied by an authorized operator.
 - An existing Auth0 tenant and a least-privilege Management API machine-to-machine client.
-- Existing Cloud DNS zone when `dns_managed_zone` is set.
+- Existing Cloud DNS zone when `dns_managed_zone` is non-empty. Null or empty selects operator-managed DNS and creates no Terraform DNS records.
 - An enabled billing account and three immutable Artifact Registry image digests.
 - A usable `OPENAI_API_KEY` Secret Manager version, seeded outside Terraform.
 
@@ -32,12 +32,19 @@ terraform -chdir=infra/terraform/production plan -var-file=production.tfvars
 
 Use the protected `Deploy production` workflow for reviewed applies. Never commit `production.tfvars` or plan files.
 
+The protected `production` GitHub Environment must provide `GENERATION_PROFILES_JSON` and
+`OPENAI_ALLOWED_MODELS`. Both are explicit operator configuration: Terraform has no mutable or
+implicit model default, and plan validation rejects any API profile whose provider/model is not
+executable by the production worker allowlist. The example tfvars uses the adapter's currently
+verified model snapshot only as an operator-reviewed example.
+
 ## Guardrails
 
 - API and web accept traffic only through the external load balancer. Worker invocation requires the Cloud Tasks identity.
 - Cloud Run images must end in `@sha256:<digest>`.
 - `(api_max_instances + worker_max_instances + five jobs) × (db_pool_size + db_max_overflow)` must leave at least ten connections below `database_max_connections` for operators.
 - Defaults cap API at 5 instances, worker at 2 with concurrency 1, and queue dispatch at one request/second with five attempts.
+- Stale generation recovery retains the accepted conservative 1800-second default.
 - Cloud SQL defaults to `REGIONAL`, PostgreSQL 16, backups, PITR, deletion protection, and a 100 GiB storage growth cap.
 - Asset storage is private, uniform-access, public-access-prevention enforced, and not versioned. No lifecycle deletes customer Assets.
 - Only the cleanup identity can delete Asset objects. API and worker can only create/read.

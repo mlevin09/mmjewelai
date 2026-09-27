@@ -7,6 +7,8 @@ api_domain             = "api.example.com"
 dns_managed_zone       = "example-com"
 auth0_domain           = "example.us.auth0.com"
 allow_self_signup      = false
+generation_profiles_json = "[{\"profile_id\":\"openai_default\",\"profile_version\":\"1.0.0\",\"provider\":\"openai\",\"model\":\"gpt-image-2.5-sunburst-2026-09-08\",\"configuration\":{\"output_count\":1}}]"
+openai_allowed_models    = "gpt-image-2.5-sunburst-2026-09-08"
 
 # Deployment workflow resolves and passes immutable digests; mutable tags are rejected.
 api_image    = "us-central1-docker.pkg.dev/example-production-project/jewelai-production/jewelai-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -33,6 +35,7 @@ db_max_overflow                 = 2
 asset_upload_max_bytes          = 20971520
 http_max_request_bytes          = 22020096
 worker_request_timeout_seconds  = 300
+stale_recovery_seconds          = 1800
 
 task_max_attempts              = 5
 task_max_dispatches_per_second = 1

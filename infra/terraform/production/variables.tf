@@ -35,9 +35,18 @@ variable "api_domain" {
 
 variable "dns_managed_zone" {
   type        = string
-  description = "Existing Cloud DNS managed-zone name; null leaves records to the operator."
+  description = "Existing Cloud DNS managed-zone name; null or empty leaves records to the operator."
   default     = null
   nullable    = true
+
+  validation {
+    condition = (
+      var.dns_managed_zone == null ||
+      var.dns_managed_zone == "" ||
+      can(regex("^(?:[a-z]|[a-z][a-z0-9-]{0,61}[a-z0-9])$", var.dns_managed_zone))
+    )
+    error_message = "dns_managed_zone must be null, empty, or an exact lower-case Cloud DNS managed-zone name."
+  }
 }
 
 variable "auth0_domain" {
@@ -215,7 +224,7 @@ variable "worker_request_timeout_seconds" {
 
 variable "stale_recovery_seconds" {
   type    = number
-  default = 900
+  default = 1800
 }
 
 variable "orphan_retention_seconds" {
@@ -293,12 +302,26 @@ variable "api_rate_limit_interval_seconds" {
 
 variable "generation_profiles_json" {
   type        = string
-  description = "Non-secret bounded generation profile registry consumed by the API."
-  default     = "[{\"profile_id\":\"openai_default\",\"profile_version\":\"1.0.0\",\"provider\":\"openai\",\"model\":\"gpt-image-1\",\"configuration\":{\"output_count\":1}}]"
+  description = "Required non-secret bounded generation profile registry consumed by the API."
+
+  validation {
+    condition = (
+      can([for profile in jsondecode(var.generation_profiles_json) : tostring(profile.model)]) &&
+      length(try(jsondecode(var.generation_profiles_json), [])) > 0
+    )
+    error_message = "generation_profiles_json must be a non-empty JSON array whose entries contain model identifiers."
+  }
 }
 
 variable "openai_allowed_models" {
   type        = string
-  default     = "gpt-image-1"
-  description = "Comma-separated server-side OpenAI image model allowlist."
+  description = "Required comma-separated server-side OpenAI image model allowlist."
+
+  validation {
+    condition = (
+      can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*(?:,[A-Za-z0-9][A-Za-z0-9._-]*)*$", var.openai_allowed_models)) &&
+      length(split(",", var.openai_allowed_models)) == length(toset(split(",", var.openai_allowed_models)))
+    )
+    error_message = "openai_allowed_models must contain unique comma-separated exact model identifiers without whitespace."
+  }
 }

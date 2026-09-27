@@ -6,6 +6,10 @@ locals {
   oidc_jwks     = "https://${var.auth0_domain}/.well-known/jwks.json"
   oidc_audience = local.api_origin
 
+  dns_records_enabled   = var.dns_managed_zone != null && var.dns_managed_zone != ""
+  generation_profiles   = jsondecode(var.generation_profiles_json)
+  openai_allowed_models = split(",", var.openai_allowed_models)
+
   services = toset([
     "artifactregistry.googleapis.com",
     "cloudresourcemanager.googleapis.com",
