@@ -27,7 +27,10 @@ locals {
     GCS_ASSET_BUCKET             = google_storage_bucket.assets.name
     OPENAI_IMAGE_ALLOWED_MODELS  = var.openai_allowed_models
     OPENAI_IMAGE_TIMEOUT_SECONDS = "180"
-  })
+    }, local.google_generation_enabled ? {
+    GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS  = var.google_generative_language_allowed_models
+    GOOGLE_GENERATIVE_LANGUAGE_TIMEOUT_SECONDS = "180"
+  } : {})
 
   web_runtime_config = jsonencode({
     apiBaseUrl                = local.api_origin
@@ -136,9 +139,13 @@ resource "google_cloud_run_v2_service" "api" {
     precondition {
       condition = alltrue([
         for profile in local.generation_profiles :
-        try(profile.provider == "openai" && contains(local.openai_allowed_models, profile.model), false)
+        try(
+          (profile.provider == "openai" && contains(local.openai_allowed_models, profile.model)) ||
+          (profile.provider == "google" && contains(local.google_allowed_models, profile.model)),
+          false
+        )
       ])
-      error_message = "Every production generation profile must use the OpenAI provider and a model present in openai_allowed_models."
+      error_message = "Every production generation profile must use an enabled provider and an exactly allowlisted model."
     }
   }
 
@@ -202,6 +209,19 @@ resource "google_cloud_run_v2_service" "worker" {
           secret_key_ref {
             secret  = google_secret_manager_secret.openai_api_key.secret_id
             version = "latest"
+          }
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.google_generation_enabled ? [1] : []
+        content {
+          name = "GOOGLE_GENERATIVE_LANGUAGE_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = google_secret_manager_secret.google_generative_language_api_key[0].secret_id
+              version = "latest"
+            }
           }
         }
       }

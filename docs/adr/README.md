@@ -24,5 +24,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0019 — Authenticated reference Asset upload](0019-authenticated-reference-asset-upload.md)
 - [0020 — Web OIDC and core workflow boundary](0020-web-oidc-core-workflow.md)
 - [0021 — Production GCP, Auth0, and observability](0021-production-gcp-auth0-observability.md)
+- [0022 — Google Generative Language image provider](0022-google-generative-language-image-provider.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

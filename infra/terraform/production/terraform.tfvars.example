@@ -7,8 +7,9 @@ api_domain             = "api.example.com"
 dns_managed_zone       = "example-com"
 auth0_domain           = "example.us.auth0.com"
 allow_self_signup      = false
-generation_profiles_json = "[{\"profile_id\":\"openai_default\",\"profile_version\":\"1.0.0\",\"provider\":\"openai\",\"model\":\"gpt-image-2.5-sunburst-2026-09-08\",\"configuration\":{\"output_count\":1}}]"
-openai_allowed_models    = "gpt-image-2.5-sunburst-2026-09-08"
+generation_profiles_json                   = "[{\"profile_id\":\"openai_default\",\"profile_version\":\"1.0.0\",\"provider\":\"openai\",\"model\":\"gpt-image-2.5-sunburst-2026-09-08\",\"configuration\":{\"output_count\":1}},{\"profile_id\":\"google_flash_lite\",\"profile_version\":\"1.0.0\",\"provider\":\"google\",\"model\":\"gemini-3.1-flash-lite-image\",\"configuration\":{\"output_count\":1}}]"
+openai_allowed_models                      = "gpt-image-2.5-sunburst-2026-09-08"
+google_generative_language_allowed_models = "gemini-3.1-flash-lite-image"
 
 # Deployment workflow resolves and passes immutable digests; mutable tags are rejected.
 api_image    = "us-central1-docker.pkg.dev/example-production-project/jewelai-production/jewelai-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

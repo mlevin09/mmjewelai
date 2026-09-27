@@ -91,15 +91,32 @@ _require(tasks, "max_attempts       = var.task_max_attempts", "finite queue atte
 _require(services, "max_instance_count = var.worker_max_instances", "bounded worker instances")
 _require(
     services,
-    "contains(local.openai_allowed_models, profile.model)",
-    "API generation profiles constrained to worker model allowlist",
+    '(profile.provider == "openai" && contains(local.openai_allowed_models, profile.model))',
+    "OpenAI generation profiles constrained to worker model allowlist",
+)
+_require(
+    services,
+    '(profile.provider == "google" && contains(local.google_allowed_models, profile.model))',
+    "Google generation profiles constrained to worker model allowlist",
 )
 
 generation_profiles = _variable(variables, "generation_profiles_json")
 allowed_models = _variable(variables, "openai_allowed_models")
+google_allowed_models = _variable(variables, "google_generative_language_allowed_models")
 stale_recovery = _variable(variables, "stale_recovery_seconds")
 _forbid(generation_profiles, "\n  default", "implicit production generation profile")
 _forbid(allowed_models, "\n  default", "implicit production worker model allowlist")
+_require(
+    google_allowed_models,
+    'default     = ""',
+    "Google provider disabled unless explicitly configured",
+)
+for google_model in (
+    "gemini-3.1-flash-lite-image",
+    "gemini-3.1-flash-image",
+    "gemini-3-pro-image",
+):
+    _require(google_allowed_models, google_model, f"Google model allowlist: {google_model}")
 _require(stale_recovery, "default = 1800", "accepted 1800-second stale recovery default")
 _require(
     deploy_workflow,
@@ -110,6 +127,12 @@ _require(
     deploy_workflow,
     "TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}",
     "protected worker model allowlist configuration",
+)
+_require(
+    deploy_workflow,
+    "TF_VAR_google_generative_language_allowed_models: "
+    "${{ vars.GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS }}",
+    "protected optional Google model allowlist configuration",
 )
 _require(deploy_workflow, "actions: read", "environment protection API permission")
 
@@ -192,6 +215,14 @@ _require(bootstrap, 'public_access_prevention    = "enforced"', "private plan st
 openai_access = _resource(iam, "google_secret_manager_secret_iam_member", "openai_key")
 _require(openai_access, 'runtime["worker"].email', "OpenAI secret limited to worker")
 _forbid(openai_access, 'runtime["api"].email', "API OpenAI secret access")
+
+google_access = _resource(
+    iam,
+    "google_secret_manager_secret_iam_member",
+    "google_generative_language_key",
+)
+_require(google_access, 'runtime["worker"].email', "Google secret limited to worker")
+_forbid(google_access, 'runtime["api"].email', "API Google secret access")
 
 cleanup_access = _resource(iam, "google_storage_bucket_iam_member", "asset_cleanup")
 _require(cleanup_access, 'runtime["cleanup"].email', "cleanup object-delete identity")

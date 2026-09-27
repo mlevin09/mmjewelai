@@ -84,6 +84,14 @@ resource "google_secret_manager_secret_iam_member" "openai_key" {
   member    = "serviceAccount:${google_service_account.runtime["worker"].email}"
 }
 
+resource "google_secret_manager_secret_iam_member" "google_generative_language_key" {
+  count     = local.google_generation_enabled ? 1 : 0
+  project   = var.project_id
+  secret_id = google_secret_manager_secret.google_generative_language_api_key[0].secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.runtime["worker"].email}"
+}
+
 resource "google_service_account_iam_member" "api_signer" {
   service_account_id = google_service_account.runtime["signer"].name
   role               = google_project_iam_custom_role.asset_sign.name

@@ -12,6 +12,7 @@ Python 3.12+ and PostgreSQL are the production-compatible target:
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
 python -m pip install -e './packages/model_gateway[test]'
+python -m pip install -e './packages/model_gateway_google[test]'
 python -m pip install -e './packages/model_gateway_openai[test]'
 python -m pip install -e './packages/assets[test]'
 python -m pip install -e './packages/assets_gcs[test]'
@@ -132,7 +133,7 @@ validates ownership and the stored prompt contract, then creates a pending run; 
 gateway inline. No generation profile or fake provider is registered by default. Tests inject the
 `test_default@1.0.0` profile resolving to `test/deterministic-image-v1` with output count 1. The
 one-shot worker is invoked separately, claims atomically, validates untrusted result metadata, and
-does not recompile or compare against a newer current design revision. The OpenAI adapter is never
+does not recompile or compare against a newer current design revision. Provider adapters are never
 constructed by `create_app()` and no API route invokes a provider. Production composition may inject
 it into the worker with environment-managed credentials, bounded timeout, and disabled SDK retries.
 
@@ -165,13 +166,14 @@ python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
 python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+python -m pytest -c packages/model_gateway_google/pyproject.toml packages/model_gateway_google/tests -q
 python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
 python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
 python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
 python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-python -m ruff check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
-python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
+python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/parser packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation
 ```
 
 Set `TEST_POSTGRES_URL` to run PostgreSQL-only concurrent revision CAS, generation claim,
@@ -180,7 +182,7 @@ uniqueness, principal creation, and final-owner tests. SQLite tests are portable
 are not presented as proof of PostgreSQL locking behavior.
 
 Generation creation atomically commits the PENDING GenerationRun and one dispatch-outbox row. The API
-then attempts immediate Cloud Tasks publication but never executes OpenAI/GCS inline. Publication
+then attempts immediate Cloud Tasks publication but never executes a provider or GCS inline. Publication
 failure leaves the accepted run PENDING and its outbox recoverable. Run a bounded redrive with
 `python -m jewelai_api.dispatch_pending --batch-size 100`.
 

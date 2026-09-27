@@ -325,3 +325,28 @@ variable "openai_allowed_models" {
     error_message = "openai_allowed_models must contain unique comma-separated exact model identifiers without whitespace."
   }
 }
+
+variable "google_generative_language_allowed_models" {
+  type        = string
+  description = "Optional comma-separated exact Google Generative Language image model allowlist; empty disables Google."
+  default     = ""
+
+  validation {
+    condition = (
+      var.google_generative_language_allowed_models == "" ||
+      (
+        can(regex("^[A-Za-z0-9][A-Za-z0-9._-]*(?:,[A-Za-z0-9][A-Za-z0-9._-]*)*$", var.google_generative_language_allowed_models)) &&
+        length(split(",", var.google_generative_language_allowed_models)) == length(toset(split(",", var.google_generative_language_allowed_models))) &&
+        alltrue([
+          for model in split(",", var.google_generative_language_allowed_models) :
+          contains([
+            "gemini-3.1-flash-lite-image",
+            "gemini-3.1-flash-image",
+            "gemini-3-pro-image",
+          ], model)
+        ])
+      )
+    )
+    error_message = "google_generative_language_allowed_models must be empty or unique comma-separated supported exact model identifiers without whitespace."
+  }
+}
