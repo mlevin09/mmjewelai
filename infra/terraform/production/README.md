@@ -30,13 +30,17 @@ terraform -chdir=infra/terraform/production init \
 terraform -chdir=infra/terraform/production plan -var-file=production.tfvars
 ```
 
-Use the protected `Deploy production` workflow for reviewed applies. Never commit `production.tfvars` or plan files.
+Use the protected `Deploy production` workflow for reviewed applies. Its `production-plan` job creates
+a one-day sensitive artifact containing the exact binary plan and a human-readable view. Only after
+that job finishes does the `production` Environment request approval. The apply job verifies the
+artifact checksum, commit SHA, immutable image references, and configuration fingerprint, then
+applies that saved plan without re-planning. Never commit `production.tfvars` or plan files.
 
-The protected `production` GitHub Environment must provide `GENERATION_PROFILES_JSON` and
-`OPENAI_ALLOWED_MODELS`. Both are explicit operator configuration: Terraform has no mutable or
-implicit model default, and plan validation rejects any API profile whose provider/model is not
-executable by the production worker allowlist. The example tfvars uses the adapter's currently
-verified model snapshot only as an operator-reviewed example.
+The `production-plan` and protected `production` GitHub Environments must provide matching
+`GENERATION_PROFILES_JSON` and `OPENAI_ALLOWED_MODELS` values. Both are explicit operator
+configuration: Terraform has no mutable or implicit model default, and plan validation rejects any
+API profile whose provider/model is not executable by the production worker allowlist. The example
+tfvars uses the adapter's currently verified model snapshot only as an operator-reviewed example.
 
 ## Guardrails
 
@@ -51,6 +55,7 @@ verified model snapshot only as an operator-reviewed example.
 - Terraform state contains the generated database password and must be treated as sensitive.
 - No application service receives Auth0 management credentials. Web receives only public runtime configuration.
 - A billing budget is not managed in v1 because billing-account IAM is organization-specific; operators should configure one separately without broadening the deployer.
+- Terraform-managed DNS deployments poll DNS plus managed-certificate readiness for a bounded 60 minutes before public HTTPS smoke checks. External-DNS deployments instead emit `required_dns_a_records` and complete successfully; rerun with `verify_external_dns_https=true` after creating those records to require readiness and smoke verification.
 
 See [../../RUNBOOK.md](../../RUNBOOK.md) for bootstrap, deployment, smoke, rollback, incident, rotation, and recovery procedures.
 

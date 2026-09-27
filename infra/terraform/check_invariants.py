@@ -48,6 +48,12 @@ variables = _read("variables.tf")
 deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").read_text(
     encoding="utf-8"
 )
+plan_job_start = deploy_workflow.find("\n  plan:\n")
+apply_job_start = deploy_workflow.find("\n  apply:\n")
+if plan_job_start < 0 or apply_job_start < 0 or apply_job_start <= plan_job_start:
+    raise SystemExit("Missing split production plan/apply jobs")
+plan_job = deploy_workflow[plan_job_start:apply_job_start]
+apply_job = deploy_workflow[apply_job_start:]
 
 _require(storage, 'public_access_prevention    = "enforced"', "GCS public access prevention")
 _require(storage, "uniform_bucket_level_access = true", "uniform bucket IAM")
@@ -103,6 +109,30 @@ _require(
 )
 _require(networking, "count        = local.dns_records_enabled ? 1 : 0", "optional DNS records")
 _forbid(networking, "var.dns_managed_zone == null ? 0 : 1", "empty DNS zone treated as enabled")
+
+_require(plan_job, "environment: production-plan", "separate production plan environment")
+_require(plan_job, "terraform -chdir=infra/terraform/production plan", "saved Terraform plan")
+_require(plan_job, "actions/upload-artifact@v4", "reviewable exact-plan artifact")
+_require(plan_job, "retention-days: 1", "short-lived sensitive plan artifact")
+_require(plan_job, "deployment-config.sha256", "plan input fingerprint")
+_forbid(
+    plan_job,
+    "terraform -chdir=infra/terraform/production apply",
+    "Terraform apply before protected production approval",
+)
+_require(apply_job, "needs: plan", "apply waits for completed plan")
+_require(apply_job, "environment: production", "protected production apply environment")
+_require(apply_job, "actions/download-artifact@v4", "reviewed plan download")
+_require(
+    apply_job,
+    "apply -input=false -auto-approve plan-artifact/production.tfplan",
+    "exact saved-plan apply",
+)
+_forbid(apply_job, " plan -", "re-planning after protected approval")
+_require(apply_job, "required_dns_a_records", "external DNS record handoff")
+_require(apply_job, '"${dns_managed}" != "true"', "external DNS readiness bypass")
+_require(apply_job, "for attempt in $(seq 1 120)", "bounded HTTPS readiness polling")
+_require(apply_job, 'certificate_status}" == "ACTIVE"', "managed certificate readiness")
 
 openai_access = _resource(iam, "google_secret_manager_secret_iam_member", "openai_key")
 _require(openai_access, 'runtime["worker"].email', "OpenAI secret limited to worker")

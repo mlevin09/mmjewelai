@@ -7,10 +7,10 @@ Production operations are manual, reviewed, and credential-safe. Never paste tok
 1. Create or select a billed GCP project and choose one primary region.
 2. Create or select an Auth0 tenant. Create a least-privilege Auth0 Management API machine-to-machine client for Terraform; the tenant/account itself is not Terraform-managed.
 3. Copy `infra/terraform/bootstrap/terraform.tfvars.example` outside Git, review the plan, and apply the bootstrap stack with an authorized operator identity.
-4. Configure the protected GitHub `production` Environment. Add non-secret project, region, registry, state bucket, WIF provider, deploy-service-account, domains, optional DNS zone, Asset bucket, `GENERATION_PROFILES_JSON`, and `OPENAI_ALLOWED_MODELS` variables. The profile registry and exact worker allowlist must agree. Add `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` as protected secrets.
+4. Configure GitHub Environments named `production-plan` and `production` with identical non-secret project, region, registry, state bucket, WIF provider, deploy-service-account, domains, optional DNS zone, Asset bucket, `GENERATION_PROFILES_JSON`, and `OPENAI_ALLOWED_MODELS` variables. The profile registry and exact worker allowlist must agree. Add identical `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` secrets. Restrict both environments to `jewelai-v2`; require production reviewers on the `production` environment so its approval occurs only after the exact plan artifact exists. A separate plan authorization on `production-plan` is also appropriate where credential policy requires it.
 5. For the first deployment only, apply the production OpenAI Secret Manager metadata target after review, then seed a version without Terraform: `gcloud secrets versions add jewelai-production-openai-api-key --data-file=-`. Do not enter the value into tfvars or command history. The normal deploy preflights an enabled version.
-6. Confirm the existing Cloud DNS zone/domain inputs, or leave `DNS_MANAGED_ZONE` unset/empty and plan to create both A records from the `load_balancer_ip` output when DNS management is external.
-7. Dispatch `Deploy production` from `jewelai-v2`, enter its exact SHA, approve the protected environment, and review the Terraform plan/apply record.
+6. Confirm the existing Cloud DNS zone/domain inputs, or leave `DNS_MANAGED_ZONE` unset/empty. External DNS deployments emit the exact required A-record names and load-balancer IP after apply.
+7. Dispatch `Deploy production` from `jewelai-v2` and enter its exact SHA. Review the one-day `production-plan-<SHA>` artifact and plan job log, then approve the waiting `production` apply job. It verifies the plan checksum, SHA, image digests, and configuration fingerprint, and applies the saved plan without re-planning.
 8. Create the first controlled-alpha Auth0 database user administratively. Terraform never stores users or passwords.
 9. Open the web URL, sign in, and create the first JewelAI organization. Auth0 establishes identity only; PostgreSQL membership remains authorization authority.
 
@@ -19,11 +19,13 @@ No local developer task should apply either stack or mutate Auth0, GCP, DNS, use
 ## Normal deploy
 
 1. Verify Runtime API, Web, and Infrastructure checks are green on the exact `jewelai-v2` SHA.
-2. Dispatch the protected workflow with that SHA. It authenticates through WIF, builds and pushes SHA-tagged images, resolves registry digests, and passes only `@sha256` references to Terraform.
-3. Review the protected environment approval and Terraform plan. Confirm no unexpected IAM, DNS, data-destruction, or secret-version changes.
-4. The workflow applies, executes the migration job, waits, then checks API `/health`, web `/health`, and Auth0 discovery.
+2. Dispatch the protected workflow with that SHA. The `production-plan` job authenticates through WIF, builds and pushes SHA-tagged images, resolves registry digests, and creates a saved Terraform plan using only `@sha256` image references.
+3. Review the plan log and the one-day sensitive plan artifact. Confirm no unexpected IAM, DNS, data-destruction, or secret-version changes, then approve the waiting `production` job. The apply job rejects a changed SHA, plan checksum, image reference, or protected configuration and applies the saved plan without re-planning.
+4. The workflow applies and executes the migration job. With Terraform-managed DNS it polls DNS and managed-certificate state for at most 60 minutes before HTTPS smoke checks. With external DNS it prints the required A records and exits successfully without premature HTTPS checks.
 5. Confirm migration output remains `0009_generation_asset_maint (head)` for this release, queue depth is healthy, worker request events appear, and real PKCE login succeeds.
 6. Validate `/me`, organization selection, one bounded generation, and signed Asset display. Confirm the bearer token is the access token with the exact API audience—not the ID token.
+
+For an external-DNS first deploy, create the emitted A records, wait for public propagation, then dispatch the same exact deployed SHA with `verify_external_dns_https=true`. Review and approve its exact (normally no-op) plan; the apply stage then requires certificate/DNS readiness and executes both HTTPS health checks. A bounded readiness timeout is a failed verification, not an infrastructure rollback signal.
 
 Database migrations must follow expand/contract compatibility so old and new Cloud Run revisions can overlap safely.
 

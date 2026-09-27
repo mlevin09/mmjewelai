@@ -31,4 +31,4 @@ Production deployment becomes reproducible, inspectable, manually approved, and 
 
 ## Validation
 
-CI formats/validates both stacks without credentials, runs focused IAM/storage/queue invariants, and builds all production images. Runtime/API and web workflows verify the application changes. The deploy workflow is manual, branch/SHA gated, protected, WIF-authenticated, digest-based, and runs migration plus smoke checks after apply.
+CI formats/validates both stacks without credentials, runs focused IAM/storage/queue invariants, and builds all production images. Runtime/API and web workflows verify the application changes. The deploy workflow is manual, branch/SHA gated, WIF-authenticated, and digest-based. It persists a short-lived exact plan for review before the separately protected production apply job, applies without re-planning, then runs migration. Managed DNS uses bounded HTTPS-readiness polling; external DNS produces an explicit record handoff and defers required HTTPS smoke verification to a later operator-requested run.

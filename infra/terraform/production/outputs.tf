@@ -13,6 +13,34 @@ output "load_balancer_ip" {
   description = "Create A records for web_domain and api_domain when DNS management is disabled."
 }
 
+output "dns_records_managed" {
+  value       = local.dns_records_enabled
+  description = "True when this stack manages the required public DNS A records."
+}
+
+output "required_dns_a_records" {
+  value = {
+    web = {
+      name    = "${var.web_domain}."
+      type    = "A"
+      ttl     = 300
+      rrdatas = [google_compute_global_address.production.address]
+    }
+    api = {
+      name    = "${var.api_domain}."
+      type    = "A"
+      ttl     = 300
+      rrdatas = [google_compute_global_address.production.address]
+    }
+  }
+  description = "Required public A records for an operator-managed DNS handoff."
+}
+
+output "managed_certificate_name" {
+  value       = google_compute_managed_ssl_certificate.production.name
+  description = "Google-managed certificate polled by the deployment readiness check."
+}
+
 output "worker_service_name" {
   value = google_cloud_run_v2_service.worker.name
 }
