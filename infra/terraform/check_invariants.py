@@ -125,12 +125,31 @@ _require(plan_job, "environment: production-plan", "separate production plan env
 _require(plan_job, "terraform -chdir=infra/terraform/production plan", "saved Terraform plan")
 _require(
     plan_job,
-    "/environments/production-plan",
-    "actual plan-environment protection lookup",
+    "/environments/${environment_name}",
+    "deployment environment protection API lookup",
 )
-_require(plan_job, '.type == "required_reviewers"', "mandatory plan-environment reviewers")
-_require(plan_job, ".prevent_self_review == true", "mandatory plan-environment self-review block")
+_require(
+    plan_job,
+    "\n          verify_environment production-plan\n",
+    "actual plan-environment protection check",
+)
+_require(
+    plan_job,
+    "\n          verify_environment production\n",
+    "actual apply-environment protection check",
+)
+_require(plan_job, '.type == "required_reviewers"', "mandatory deployment reviewers")
+_require(plan_job, "(.reviewers | length) > 0", "at least one deployment reviewer")
+_require(plan_job, ".prevent_self_review == true", "mandatory deployment self-review block")
 _require(plan_job, ".deployment_branch_policy != null", "mandatory deployment branch policy")
+environment_checks_end = plan_job.find("          verify_environment production\n")
+cloud_auth_start = plan_job.find("google-github-actions/auth@v2")
+terraform_plan_start = plan_job.find("terraform -chdir=infra/terraform/production plan")
+if not 0 <= environment_checks_end < cloud_auth_start < terraform_plan_start:
+    raise SystemExit(
+        "Missing production invariant: deployment environment checks before cloud authentication "
+        "and Terraform plan"
+    )
 _require(plan_job, "gcloud storage cp --if-generation-match=0", "create-only private plan upload")
 _require(plan_job, "deployment-plans/", "private per-run plan-object namespace")
 _require(review_upload_step, "actions/upload-artifact@v4", "redacted plan review artifact")

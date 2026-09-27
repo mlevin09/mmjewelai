@@ -47,9 +47,9 @@ tfvars uses the adapter's currently verified model snapshot only as an operator-
 
 Both environments must have a deployment branch policy, require a production reviewer, and prevent
 self-review. The workflow uses the GitHub environment API to verify the actual `production-plan`
-protection rules before cloud authentication, and its exact ref guard remains restricted to
-`jewelai-v2`. Deployment fails closed because that job receives production GCP and Auth0 management
-credentials.
+and `production` protection rules before cloud authentication, and its exact ref guard remains
+restricted to `jewelai-v2`. Deployment fails closed because that job receives production GCP and
+Auth0 management credentials.
 
 ## Guardrails
 
