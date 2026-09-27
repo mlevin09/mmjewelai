@@ -19,26 +19,30 @@ Repository ADRs retain their own explicit engineering statuses. Several V2 ADRs 
 
 Repository: `mlevin09/mmjewelai`
 
-Current V2 integration branch at review time:
+Current V2 integration branch:
 
 - branch: `jewelai-v2`
-- governance baseline merge commit: `89db1ca07087dc749c92ca2fcaab6e42b93117a5`\n- current head: verify live in GitHub when needed
+- governance baseline merge commit: `89db1ca07087dc749c92ca2fcaab6e42b93117a5`
+- post-merge state update commit: `126ea85732e1a22868235caa05a1270025de5277`
+- current head: verify live in GitHub when needed
 
 PR #26 (`feat(infra): add production GCP deployment platform`) is merged into `jewelai-v2`.
 
-The repository now contains implemented V2 foundations including the deterministic jewelry-domain contract, modular-monolith boundaries, persistence/API, parser/prompt/model-gateway boundaries, asset handling, authentication/organization membership, generation queue/worker flows, web/OIDC workflow, and production-platform infrastructure definitions.
+The repository contains implemented V2 foundations including the deterministic jewelry-domain contract, modular-monolith boundaries, persistence/API, parser/prompt/model-gateway boundaries, asset handling, authentication/organization membership, generation queue/worker flows, web/OIDC workflow, and production-platform infrastructure definitions.
 
 For exact current implementation, verify the repository rather than relying on this summary.
 
 ## Production platform
 
-Production infrastructure is described in Terraform and deployment workflows, but acceptance/merge of infrastructure code did not itself provision GCP/Auth0/DNS resources.
+Production infrastructure is described in Terraform and deployment workflows, but merge of infrastructure code did not itself provision GCP/Auth0/DNS resources.
 
 Actual production provisioning and operator prerequisites remain operational actions to be verified against the live environment.
 
 ## Governance work
 
 Governance baseline was merged through PR #27 into `jewelai-v2` on 2026-09-27.
+
+Post-merge Current State cleanup was merged through PR #28 on 2026-09-27.
 
 Core governance records:
 
@@ -78,7 +82,7 @@ Hypotheses contained in research material remain hypotheses unless validated and
 
 BLNG documentation is external reference material. It may inform JewelAI decisions but does not establish JewelAI requirements by itself.
 
-Competitor reviews are evidence/reference material. `Обзор приложения jewelerstusio.ai.docx` is image-based (no extractable document text) and should be treated as visual competitor evidence rather than unreadable text.
+Competitor reviews are evidence/reference material. `Обзор приложения jewelerstusio.ai.docx` is image-based and should be treated as visual competitor evidence rather than missing textual content.
 
 ## Historical MVP map review
 
@@ -90,7 +94,6 @@ See `reviews/MVP_0_1_DECISION_REVIEW.md`.
 
 ## Remaining governance actions
 
-- Merge/review PR #27 when the team is satisfied with the governance baseline.
 - Mirror the merged canonical governance files into Project Sources/Drive.
 - Define who may assign Project-level `Accepted` status before using that status for Drive/Project documents.
 - Correct the visualization benchmark version mismatch when revising that source.
