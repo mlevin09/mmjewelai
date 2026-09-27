@@ -97,4 +97,4 @@ Verify current authoritative external sources when present-day accuracy matters.
 
 - Define who may assign Project-level `Accepted` status before using that status for Drive/Project documents.
 - Correct the visualization benchmark filename/internal-version mismatch when revising that source.
-- Mirror the canonical governance files into Project Sources/Drive after PR review/merge.
+- Refresh the Project Sources/Drive governance mirror after material governance changes.
