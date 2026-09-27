@@ -22,6 +22,7 @@ dependencies = [
   "jewelai-persistence==1.0.0",
   "jewelai-prompts==1.0.0",
   "psycopg[binary]>=3.2,<4",
+  "python-multipart>=0.0.32,<0.1",
   "sqlalchemy>=2.0.43,<3",
   "uvicorn>=0.35,<1",
 ]

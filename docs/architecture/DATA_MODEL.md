@@ -19,7 +19,7 @@ claims.
 | prompt_revision | Implemented immutable specification link, template/compiler versions, validated structured prompt, text and hash |
 | generation_run | Implemented immutable prompt/profile/provider/config input, pending/running/succeeded/failed lifecycle, active linear attempt/immediate-parent retry lineage and metadata-only result/error; provider bytes remain transient |
 | generation_dispatch_outbox | One row per API-created GenerationRun; pending until deterministic Cloud Task publication succeeds. Stores no task body or secret and is not a GenerationRun lifecycle state. |
-| asset | Implemented private metadata: organization/project/session, object key, type/hash/size, optional parent and generation-output lineage, pending/ready/failed lifecycle |
+| asset | Implemented private metadata: organization/project/session, object key, type/hash/size, optional parent, pending/ready/failed lifecycle; reference Assets have no generation lineage, while generated Assets require run/ordinal lineage |
 | experiment_assignment / event | Stable assignment, variant, outcome and related run/spec revision |
 
 Field state separates value origin (explicit/derived/assumed/unknown) from confirmation and lock.

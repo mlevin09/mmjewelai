@@ -272,7 +272,7 @@ def test_openapi_exposes_strict_generation_retry_action(client):
 
 
 def test_authentication_infrastructure_failure_is_503_without_principal_mutation(
-    app, asset_access_signer, generation_task_publisher
+    app, asset_access_signer, asset_object_store, generation_task_publisher
 ):
     class UnavailableVerifier:
         def verify(self, token):
@@ -287,6 +287,7 @@ def test_authentication_infrastructure_failure_is_503_without_principal_mutation
         clock=lambda: NOW,
         token_verifier=UnavailableVerifier(),
         asset_access_signer=asset_access_signer,
+        asset_object_store=asset_object_store,
         generation_task_publisher=generation_task_publisher,
     )
     with TestClient(unavailable) as isolated:
@@ -305,7 +306,7 @@ def test_app_factory_without_verifier_or_oidc_configuration_fails_closed(engine)
 
 
 def test_production_app_factory_composes_cloud_tasks_without_network(
-    engine, asset_access_signer, monkeypatch
+    engine, asset_access_signer, asset_object_store, monkeypatch
 ):
     from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
 
@@ -337,6 +338,7 @@ def test_production_app_factory_composes_cloud_tasks_without_network(
         engine=engine,
         token_verifier=Verifier(),
         asset_access_signer=asset_access_signer,
+        asset_object_store=asset_object_store,
     )
     assert application.state.service._generation_task_publisher is publisher
     assert captured == [task_config]

@@ -6,8 +6,17 @@ from uuid import UUID, uuid4
 
 from jewelai_assets import (
     AssetAccessPolicy,
+    AssetConflictError,
+    AssetContentRejectedError,
+    AssetContentType,
+    AssetIngestionPolicy,
+    AssetIngestionRequest,
+    AssetKind,
+    AssetStatus,
     PrivateObjectAccessSigner,
+    PrivateObjectStore,
     SignedAssetReadAccess,
+    ingest_asset,
     issue_asset_read_access,
 )
 from jewelai_auth import (
@@ -85,6 +94,14 @@ class LockedFieldConflictError(ApplicationError):
     pass
 
 
+class InvalidAssetUploadError(ApplicationError):
+    pass
+
+
+class AssetUploadUnavailableError(ApplicationError):
+    pass
+
+
 class SpecificationNotReadyError(ApplicationError):
     def __init__(self, decision):
         super().__init__("Specification is not ready for prompt compilation")
@@ -98,12 +115,14 @@ class RuntimeService:
         artifacts: RuntimeArtifacts,
         *,
         asset_access_signer: PrivateObjectAccessSigner,
+        asset_object_store: PrivateObjectStore,
         generation_task_publisher: GenerationTaskPublisher,
         clock: Callable[[], datetime] | None = None,
         uuid_factory: Callable[[], UUID] | None = None,
         before_prompt_persist: Callable[[], None] | None = None,
         generation_profiles: GenerationProfileRegistry | None = None,
         asset_access_policy: AssetAccessPolicy | None = None,
+        asset_ingestion_policy: AssetIngestionPolicy | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -113,6 +132,8 @@ class RuntimeService:
         self._generation_profiles = generation_profiles or GenerationProfileRegistry()
         self._asset_access_signer = asset_access_signer
         self._asset_access_policy = asset_access_policy or AssetAccessPolicy()
+        self._asset_object_store = asset_object_store
+        self._asset_ingestion_policy = asset_ingestion_policy or AssetIngestionPolicy()
         self._generation_task_publisher = generation_task_publisher
 
     def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
@@ -477,6 +498,43 @@ class RuntimeService:
                 for asset in self.repository.list_assets(session_id, organization_id)
             )
         )
+
+    def create_reference_asset(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        declared_content_type: AssetContentType,
+        content: bytes,
+    ) -> AssetResponse:
+        session = self.repository.get_design_session(session_id, organization_id)
+        request = AssetIngestionRequest(
+            asset_id=self._uuid(),
+            organization_id=organization_id,
+            project_id=session.project_id,
+            session_id=session_id,
+            kind=AssetKind.REFERENCE,
+            declared_content_type=declared_content_type,
+        )
+        try:
+            asset = ingest_asset(
+                request=request,
+                content=content,
+                repository=self.repository,
+                object_store=self._asset_object_store,
+                policy=self._asset_ingestion_policy,
+                clock=self._clock,
+            )
+        except AssetContentRejectedError as exc:
+            raise InvalidAssetUploadError(
+                "Uploaded content is not a valid supported image"
+            ) from exc
+        except AssetConflictError as exc:
+            raise AssetUploadUnavailableError(
+                "Private Asset storage is temporarily unavailable"
+            ) from exc
+        if asset.status is not AssetStatus.READY:
+            raise AssetUploadUnavailableError("Private Asset storage is temporarily unavailable")
+        return self._asset_response(asset)
 
     def create_asset_read_access(
         self,

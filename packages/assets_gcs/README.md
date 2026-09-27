@@ -16,6 +16,11 @@ reads metadata only and accepts the retry only when object name, MIME type, byte
 `jewelai-sha256` metadata all match. It never overwrites, downloads for comparison, changes ACLs,
 creates buckets, or returns a public URL.
 
+The authenticated reference-upload API composes this same create-only store from the configured
+private Asset bucket. It does not create a public or upload-signed capability. The API runtime needs
+only object-create plus metadata-read permission for exact-key conflict verification; credentials
+continue to come from ADC/workload identity.
+
 The same adapter implements separately typed maintenance capabilities without weakening normal
 callers. Exact-key inspection reads name, content type, size, `jewelai-sha256`, creation time, and GCS
 generation only. Conditional deletion passes that generation as `if_generation_match`; absence is

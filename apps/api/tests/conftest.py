@@ -3,7 +3,11 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from jewelai_assets import AssetAccessUnavailableError
+from jewelai_assets import (
+    AssetAccessUnavailableError,
+    AssetStorageConflictError,
+    StoredObject,
+)
 from jewelai_auth import AuthenticationError, VerifiedIdentity
 from jewelai_model_gateway import GenerationConfiguration
 from jewelai_persistence import Base, create_database_engine
@@ -53,6 +57,30 @@ class FakeGenerationTaskPublisher:
             raise self.error
 
 
+class FakePrivateObjectStore:
+    def __init__(self):
+        self.calls = []
+        self.objects = {}
+        self.error = None
+
+    def put_if_absent(self, object_key, content, *, content_type, content_hash):
+        self.calls.append((object_key, content, content_type, content_hash))
+        if self.error is not None:
+            raise self.error
+        stored = StoredObject(
+            object_key=object_key,
+            content_type=content_type,
+            content_hash=content_hash,
+            byte_size=len(content),
+        )
+        candidate = (bytes(content), stored)
+        existing = self.objects.get(object_key)
+        if existing is not None and existing != candidate:
+            raise AssetStorageConflictError("fake create-only object conflict")
+        self.objects[object_key] = candidate
+        return stored
+
+
 @pytest.fixture
 def engine(tmp_path):
     database = tmp_path / "runtime.db"
@@ -77,7 +105,12 @@ def generation_task_publisher():
 
 
 @pytest.fixture
-def app(engine, asset_access_signer, generation_task_publisher):
+def asset_object_store():
+    return FakePrivateObjectStore()
+
+
+@pytest.fixture
+def app(engine, asset_access_signer, asset_object_store, generation_task_publisher):
     return create_app(
         RuntimeSettings(
             database_url="sqlite+pysqlite://",
@@ -98,6 +131,7 @@ def app(engine, asset_access_signer, generation_task_publisher):
         ),
         token_verifier=FakeTokenVerifier(),
         asset_access_signer=asset_access_signer,
+        asset_object_store=asset_object_store,
         generation_task_publisher=generation_task_publisher,
     )
 

@@ -58,6 +58,10 @@ can be reclaimed without risking referenced or replaced objects. Malformed or am
 requires operator investigation. GCS metadata is trusted only inside the private least-privilege
 maintenance boundary. General customer retention/deletion and cloud scheduling remain future work.
 
+This reconciliation decision remains generation-specific. Reference-Asset PENDING crash recovery
+and general reference/customer retention are not covered here; authenticated reference upload is
+defined separately by [ADR 0019](0019-authenticated-reference-asset-upload.md).
+
 ## Validation
 
 Asset, GCS, persistence, worker, pipeline, and PostgreSQL tests cover metadata-only adoption,
