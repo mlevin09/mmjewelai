@@ -23,5 +23,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0018 — Asset reconciliation and orphan cleanup](0018-asset-reconciliation-orphan-cleanup.md)
 - [0019 — Authenticated reference Asset upload](0019-authenticated-reference-asset-upload.md)
 - [0020 — Web OIDC and core workflow boundary](0020-web-oidc-core-workflow.md)
+- [0021 — Production GCP, Auth0, and observability](0021-production-gcp-auth0-observability.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

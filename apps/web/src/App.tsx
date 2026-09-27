@@ -26,6 +26,7 @@ import {
 
 import { ApiClient, ApiError } from "./api";
 import { useAuth } from "./auth";
+import { getWebRuntimeConfig } from "./config";
 import { applyQuestionAnswer, type QuestionAnswer } from "./designUpdates";
 import { AnswerForm } from "./forms";
 import { clearOrganizationQueries, keys } from "./queryKeys";
@@ -55,17 +56,14 @@ function useApi(): ApiClient {
 function ApiProvider({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const navigate = useNavigate();
+  const config = getWebRuntimeConfig();
   const api = useMemo(
     () =>
-      new ApiClient(
-        import.meta.env.VITE_API_BASE_URL,
-        auth.accessToken,
-        async () => {
-          await auth.clear();
-          void navigate("/login", { replace: true });
-        },
-      ),
-    [auth, navigate],
+      new ApiClient(config.apiBaseUrl, auth.accessToken, async () => {
+        await auth.clear();
+        void navigate("/login", { replace: true });
+      }),
+    [auth, config.apiBaseUrl, navigate],
   );
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
 }

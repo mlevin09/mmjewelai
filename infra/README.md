@@ -1,30 +1,39 @@
-# Infrastructure
+# JewelAI V2 production infrastructure
 
-Reserved for JewelAI V2 deployment and infrastructure-as-code artifacts.
+The V2 production platform is defined in Terraform and dedicated production container definitions. No infrastructure is created by validation or pull-request CI.
 
-No cloud resources are provisioned in Step 2. Future infrastructure work must follow the accepted platform direction and subsequent ADRs for authentication/tenancy, durable queues, persistence, assets, secrets, and deployment.
+## Topology
 
-Never commit credentials, customer assets, or environment secrets here.
+```text
+Internet -> HTTPS load balancer -> web Cloud Run
+Browser  -> HTTPS load balancer -> API Cloud Run -> Cloud SQL / private GCS / Cloud Tasks
+Cloud Tasks -> private generation worker -> OpenAI / private GCS / Cloud SQL
+Cloud Scheduler -> private Cloud Run jobs -> bounded maintenance commands
+```
 
-Durable generation deployment requires a Cloud Tasks queue, private generation Cloud Run service,
-task-delivery OIDC service account, least-privilege IAM bindings, finite retry/backoff plus dispatch
-rate/concurrency configuration, and an operational bounded outbox-redrive invocation. The API runtime
-may create tasks and use the delivery identity; that identity may invoke only the worker; the worker
-has only its database, private GCS, and OpenAI runtime access. Never make the worker public or grant
-project-wide Owner/Editor or broad Storage Admin roles. These resources are not provisioned here.
+The bootstrap stack creates the versioned private state bucket, regional Artifact Registry, exact-repository/exact-branch GitHub Workload Identity Federation, and production deployer. The production stack creates Auth0 resources, Cloud SQL PostgreSQL 16, the private Asset bucket, finite Cloud Tasks queue, isolated service accounts, three Cloud Run services, five Cloud Run jobs, schedules, HTTPS load balancing, managed TLS, optional Cloud DNS records, Cloud Armor, logging metric, dashboard, alerts, and uptime checks.
 
-Operations must also invoke the bounded stale-recovery command, eventually through a private Cloud
-Run Job/Scheduler arrangement. This repository does not provision that job. Recovery uses only
-PostgreSQL, marks old RUNNING rows failed, and never calls the provider or creates retries.
+Runtime service identities are intentionally separate. Web has no Google API permission. API can connect to SQL, create/read Assets, enqueue only on its queue, read only `DATABASE_URL`, and call `signBlob` only on the signing identity. Worker can connect to SQL, create/read Assets, and read `DATABASE_URL` plus `OPENAI_API_KEY`. Reconciliation reads object metadata. Cleanup alone can delete objects. The task-delivery identity can only invoke the private worker; scheduler can only run the maintenance jobs.
 
-Future private Cloud Run Job/Scheduler invocations may separately run generated-Asset reconciliation
-and failed-run orphan cleanup. Reconciliation needs database access plus object metadata read only;
-cleanup additionally needs narrowly scoped object delete and remains dry-run without `--apply`.
-Normal generation should retain create-only storage authority. No job, schedule, bucket, or IAM
-binding is provisioned by this repository change.
+## Directories
 
-The API runtime also performs authenticated bounded reference-Asset writes. Its service account
-needs narrowly scoped `storage.objects.create` and exact-object metadata-read permission in the same
-private Asset bucket, plus the existing signed-read signing permissions. Do not grant Storage Admin,
-Editor, Owner, public access, or browser credentials. This repository does not provision those IAM
-bindings or the bucket.
+- `docker/`: multi-stage non-root API, worker, and static web images.
+- `terraform/bootstrap/`: one-time state, registry, and WIF foundation.
+- `terraform/production/`: reusable production application platform.
+- `RUNBOOK.md`: operator procedures, incidents, rotation, rollback, and recovery.
+
+## Validation
+
+```bash
+terraform fmt -check -recursive infra/terraform
+terraform -chdir=infra/terraform/bootstrap init -backend=false
+terraform -chdir=infra/terraform/bootstrap validate
+terraform -chdir=infra/terraform/production init -backend=false
+terraform -chdir=infra/terraform/production validate
+python infra/terraform/check_invariants.py
+docker build -f infra/docker/api.Dockerfile -t jewelai-api:local .
+docker build -f infra/docker/worker.Dockerfile -t jewelai-worker:local .
+docker build -f infra/docker/web.Dockerfile -t jewelai-web:local .
+```
+
+Never commit tfvars, plans, credentials, customer data, signed URLs, or service-account keys. Pull-request CI performs validation and builds but never pushes images or applies Terraform. Production apply is manual through a protected GitHub `production` environment using WIF and immutable image digests.

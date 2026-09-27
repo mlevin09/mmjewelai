@@ -1,0 +1,4 @@
+project_id          = "example-production-project"
+region              = "us-central1"
+state_bucket_name   = "example-jewelai-production-tfstate"
+operator_members    = ["group:platform-operators@example.com"]

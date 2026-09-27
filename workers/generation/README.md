@@ -34,6 +34,11 @@ Production composition requires `DATABASE_URL`, `GCS_ASSET_BUCKET`, and comma-se
 `OPENAI_IMAGE_ALLOWED_MODELS`; `GCP_PROJECT_ID` and `OPENAI_IMAGE_TIMEOUT_SECONDS` are optional.
 The OpenAI key remains in the SDK-supported environment/secret mechanism and never enters task data.
 
+Production emits structured `generation_task_received`, `generation_task_finished`,
+`generation_task_not_claimed`, and `generation_task_failed` JSON events using only the run ID,
+disposition, safe error code, and duration. Provider exception text, prompts, base64, object keys,
+signed URLs, and bytes are excluded. Maintenance commands emit one summary-count event each.
+
 Recovery intentionally lives at the persistence boundary and requires no worker/provider/storage
 composition:
 

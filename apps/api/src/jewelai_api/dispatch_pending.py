@@ -1,6 +1,9 @@
 """One-shot bounded generation dispatch outbox redrive."""
 
 import argparse
+import json
+import os
+import sys
 
 from jewelai_generation_queue import dispatch_pending_generation_tasks
 from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
@@ -27,6 +30,20 @@ def main() -> None:
         repository,
         CloudTasksGenerationPublisher(settings.generation_tasks),
         batch_size=args.batch_size,
+    )
+    print(
+        json.dumps(
+            {
+                "severity": "INFO",
+                "message": "outbox redrive finished",
+                "service": "outbox-redrive",
+                "environment": os.getenv("JEWELAI_ENVIRONMENT", "development"),
+                "event": "outbox_redrive_finished",
+                **summary.model_dump(),
+            },
+            sort_keys=True,
+        ),
+        file=sys.stderr,
     )
     print(summary.model_dump_json())
 

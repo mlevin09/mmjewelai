@@ -1,0 +1,9 @@
+.git
+**/.DS_Store
+**/__pycache__
+**/.pytest_cache
+apps/web/node_modules
+apps/web/dist
+**/.terraform
+**/*.tfstate*
+**/*.tfvars

@@ -14,6 +14,9 @@ from .generation import GenerationProfile
 
 DEFAULT_ASSET_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 MAX_ASSET_UPLOAD_BYTES = 100 * 1024 * 1024
+DEFAULT_HTTP_MULTIPART_OVERHEAD_BYTES = 1024 * 1024
+MIN_HTTP_MULTIPART_OVERHEAD_BYTES = 64 * 1024
+MAX_HTTP_REQUEST_BYTES = 110 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -33,6 +36,11 @@ class RuntimeSettings:
     oidc: OidcJwtConfig | None = None
     asset_signing: GcsAssetStorageConfig | None = None
     asset_upload_max_bytes: int = DEFAULT_ASSET_UPLOAD_MAX_BYTES
+    http_max_request_bytes: int = (
+        DEFAULT_ASSET_UPLOAD_MAX_BYTES + DEFAULT_HTTP_MULTIPART_OVERHEAD_BYTES
+    )
+    environment: str = "development"
+    gcp_project_id: str | None = None
     generation_tasks: CloudTasksGenerationConfig | None = None
     generation_profiles: tuple[GenerationProfile, ...] = ()
     web_allowed_origins: tuple[str, ...] = ()
@@ -44,6 +52,25 @@ class RuntimeSettings:
             raise ValueError("Asset upload maximum must be an integer")
         if not 1 <= self.asset_upload_max_bytes <= MAX_ASSET_UPLOAD_BYTES:
             raise ValueError("Asset upload maximum must be between 1 and 104857600 bytes")
+        if isinstance(self.http_max_request_bytes, bool) or not isinstance(
+            self.http_max_request_bytes, int
+        ):
+            raise ValueError("HTTP request maximum must be an integer")
+        if not (
+            self.asset_upload_max_bytes + MIN_HTTP_MULTIPART_OVERHEAD_BYTES
+            <= self.http_max_request_bytes
+            <= MAX_HTTP_REQUEST_BYTES
+        ):
+            raise ValueError(
+                "HTTP request maximum must allow Asset payload plus multipart overhead and "
+                f"cannot exceed {MAX_HTTP_REQUEST_BYTES} bytes"
+            )
+        if (
+            not self.environment
+            or self.environment != self.environment.strip()
+            or len(self.environment) > 32
+        ):
+            raise ValueError("Environment must be a non-empty exact string up to 32 characters")
         _validate_generation_profiles(self.generation_profiles)
         _validate_web_origins(self.web_allowed_origins)
 
@@ -85,6 +112,12 @@ class RuntimeSettings:
             maximum=MAX_ASSET_UPLOAD_BYTES,
             name="ASSET_UPLOAD_MAX_BYTES",
         )
+        http_max_request_bytes = _strict_bounded_integer(
+            os.getenv("HTTP_MAX_REQUEST_BYTES"),
+            default=asset_upload_max_bytes + DEFAULT_HTTP_MULTIPART_OVERHEAD_BYTES,
+            maximum=MAX_HTTP_REQUEST_BYTES,
+            name="HTTP_MAX_REQUEST_BYTES",
+        )
         return cls(
             database_url=os.getenv("DATABASE_URL", cls.database_url),
             repository_root=Path(root).resolve() if root else Path(__file__).resolve().parents[4],
@@ -118,6 +151,9 @@ class RuntimeSettings:
                 else None
             ),
             asset_upload_max_bytes=asset_upload_max_bytes,
+            http_max_request_bytes=http_max_request_bytes,
+            environment=os.getenv("JEWELAI_ENVIRONMENT", "development"),
+            gcp_project_id=os.getenv("GCP_PROJECT_ID"),
             generation_tasks=(
                 CloudTasksGenerationConfig(
                     project_id=task_values[0],

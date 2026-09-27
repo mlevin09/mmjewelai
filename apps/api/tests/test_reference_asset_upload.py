@@ -208,6 +208,7 @@ def test_oversized_upload_is_rejected_before_service_and_exact_limit_is_allowed(
             database_url="sqlite+pysqlite://",
             repository_root=ROOT,
             asset_upload_max_bytes=16,
+            http_max_request_bytes=16 + 64 * 1024,
         ),
         engine=engine,
         clock=lambda: NOW,

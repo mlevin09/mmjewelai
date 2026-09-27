@@ -49,6 +49,11 @@ from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
 from .generation import GenerationProfileRegistry, UnknownGenerationProfileError
+from .middleware import (
+    RequestBodyLimitMiddleware,
+    RequestObservabilityMiddleware,
+    configure_json_logger,
+)
 from .schemas import (
     AssetListResponse,
     AssetResponse,
@@ -169,6 +174,15 @@ def create_app(
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type", "X-Organization-ID"],
         )
+    api_logger = configure_json_logger("jewelai.api")
+    app.add_middleware(RequestBodyLimitMiddleware, max_bytes=settings.http_max_request_bytes)
+    app.add_middleware(
+        RequestObservabilityMiddleware,
+        logger=api_logger,
+        service="api",
+        environment=settings.environment,
+        gcp_project_id=settings.gcp_project_id,
+    )
     app.state.service = service
     app.state.engine = engine
 
