@@ -3,67 +3,58 @@
 Status: Working
 Last reviewed: 2026-09-27
 
-> This file is a navigational snapshot, not a replacement for authoritative live systems. Verify volatile repository, CI/CD, deployment, infrastructure, provider, pricing, and external facts at the source when current accuracy matters.
+> Navigational snapshot only. Verify volatile repository, CI/CD, deployment, infrastructure, provider, pricing, and external facts at the source.
 
 ## Executive state
 
 JewelAI is being developed as an AI-native modular ecosystem for the jewelry industry.
 
-Product prioritization remains open. No existing product is designated by this governance baseline as the first development priority, primary product, or default ecosystem entry point.
+Product prioritization remains open. No existing product is designated as the first development priority, primary product, or default ecosystem entry point.
 
-The Drive/Project knowledge corpus is still in a Working governance stage. No Drive/Project document is classified as Accepted by default.
+Repository ADRs retain their own explicit engineering statuses.
 
-Repository ADRs retain their own explicit engineering statuses. Several V2 ADRs are already marked `Accepted` inside the repository and remain authoritative within their technical scope.
+## Development mode
+
+As of 2026-09-27, JewelAI development uses **vibe coding as the default software-development workflow**.
+
+The desired agent behavior is:
+- execute rather than repeatedly ask for routine confirmation;
+- verify repository/tool state directly;
+- use small reversible assumptions for non-blocking uncertainty;
+- inspect only relevant sources first;
+- continue through implementation, tests, PR, and requested merge/next step;
+- ask only for genuine blockers, secrets/permissions, destructive authorization, or unresolved materially different product behavior.
 
 ## Active repository state
 
 Repository: `mlevin09/mmjewelai`
 
 Current V2 integration branch:
-
-- branch: `jewelai-v2`
-- governance baseline merge commit: `89db1ca07087dc749c92ca2fcaab6e42b93117a5`
-- post-merge state update commit: `126ea85732e1a22868235caa05a1270025de5277`
-- governance cleanup commit: `352abc24fa70e6811eae7b43774244eb79dad69f`
+- `jewelai-v2`
 - current head: verify live in GitHub when needed
 
-PR #26 (`feat(infra): add production GCP deployment platform`) is merged into `jewelai-v2`.
-
-The repository contains implemented V2 foundations including the deterministic jewelry-domain contract, modular-monolith boundaries, persistence/API, parser/prompt/model-gateway boundaries, asset handling, authentication/organization membership, generation queue/worker flows, web/OIDC workflow, and production-platform infrastructure definitions.
-
-For exact current implementation, verify the repository rather than relying on this summary.
+The repository contains implemented V2 foundations including deterministic jewelry-domain contracts, modular-monolith boundaries, persistence/API, parser/prompt/model-gateway boundaries, asset handling, authentication/organization membership, generation queue/worker flows, web/OIDC workflow, and production-platform infrastructure definitions.
 
 ## Production platform
 
-Production infrastructure is described in Terraform and deployment workflows, but merge of infrastructure code did not itself provision GCP/Auth0/DNS resources.
+Production infrastructure is described in Terraform and deployment workflows, but merged infrastructure code does not itself prove that GCP/Auth0/DNS resources are provisioned.
 
-Actual production provisioning and operator prerequisites remain operational actions to be verified against the live environment.
-
-## Governance work
-
-Governance baseline was merged through PR #27 into `jewelai-v2` on 2026-09-27.
-
-Post-merge Current State update was merged through PR #28, and governance cleanup through PR #29, on 2026-09-27.
-
-Core governance records:
-
-- Project Context: Working
-- Current State: Working
-- Decision Log: Working
-- Source Map: Working
-- Glossary: Working
+Actual production state must be verified against the live environment.
 
 ## ChatGPT Project configuration
 
-Verified on 2026-09-27:
+Project Instructions, governance sources, and four JewelAI Skills are installed.
 
-- the JewelAI Project Instructions are active in the project context and correspond to the canonical `docs/governance/PROJECT_INSTRUCTIONS.md`;
-- the governance knowledge mirror is retrievable through Project Sources, including Project Context, Current State, Decision Log, Source Map, Glossary, the historical MVP decision review, and Skill Registry;
-- the original JewelAI/BLNG/Benchmark/Product/Visualization/Competitor source corpus remains available through Project Sources;
-- four JewelAI Skills are installed and discoverable: `jewelai-dev-task`, `jewelai-release-readiness`, `jewelai-visualization-benchmark`, and `jewelai-product-decision`;
-- all four Skills permit implicit invocation and preserve the repository/Project source-of-truth rules relevant to their workflows.
+For routine coding, the optimized rule is now:
+**repository first; Project Sources only when product/domain intent or governance is actually needed.**
 
-GitHub `docs/governance/` remains canonical; Project Sources are the readable mirror.
+Installed Skills:
+- `jewelai-dev-task`
+- `jewelai-release-readiness`
+- `jewelai-visualization-benchmark`
+- `jewelai-product-decision`
+
+GitHub `docs/governance/` remains canonical; Project Sources are a readable knowledge mirror.
 
 ## Product state
 
@@ -71,42 +62,31 @@ Multiple JewelAI product concepts and modules exist in project documentation. Th
 
 ## Visualization state
 
-Current visualization knowledge materials represent an evolving Working architecture.
-
-`JewelAI_Vision_Core.pdf` is treated as the primary Working reference within visualization-core scope for the Project knowledge corpus, not as an Accepted project specification.
+`JewelAI_Vision_Core.pdf` is a primary Working reference within visualization-core scope.
 
 `JewelAI_Retail_Vision_Spec.pdf` is a primary Working reference within Retail visualization scope and does not imply Retail product priority.
 
-Repository V2 implementation may contain technical decisions that are more current than these Drive documents for implemented runtime behavior.
+Repository V2 implementation may be more current than Drive documents for implemented runtime behavior.
 
 ## Benchmark state
 
 Visualization benchmark methodology is Working.
 
-`JewelAI_Visualization_Benchmark_Scenarios_v1.3.docx` has a filename/internal-version mismatch that should be corrected when that document is next revised.
+`JewelAI_Visualization_Benchmark_Scenarios_v1.3.docx` has a filename/internal-version mismatch to correct when next revised.
 
 ## Customer discovery
 
-`JewelAI_CustomerDiscovery_опросник.docx` is a primary Working reference for Customer Discovery methodology.
-
-Hypotheses contained in research material remain hypotheses unless validated and explicitly recorded.
-
-## External references
-
-BLNG documentation is external reference material. It may inform JewelAI decisions but does not establish JewelAI requirements by itself.
-
-Competitor reviews are evidence/reference material. `Обзор приложения jewelerstusio.ai.docx` is image-based and should be treated as visual competitor evidence rather than missing textual content.
+`JewelAI_CustomerDiscovery_опросник.docx` is a primary Working methodology reference.
 
 ## Historical MVP map review
 
-The historical MVP spreadsheet contains 87 populated decision cells. These represent earlier planning choices, not current accepted product priorities.
-
-A dedicated review classifies them against current V2 reality without retroactively migrating them into the Decision Log.
+The historical MVP spreadsheet contains 87 populated decision cells. They remain historical planning evidence unless explicitly revisited.
 
 See `reviews/MVP_0_1_DECISION_REVIEW.md`.
 
 ## Remaining governance actions
 
-- Define who may assign Project-level `Accepted` status before using that status for Drive/Project documents.
-- Correct the visualization benchmark filename/internal-version mismatch when revising that source.
-- Refresh the Project Sources/Drive governance mirror after future material governance changes.
+- Replace the current ChatGPT Project Instructions with the vibe-coding optimized canonical version.
+- Reinstall/update `jewelai-dev-task` with the vibe-coding optimized Skill package.
+- Refresh this Current State mirror in Project Sources after those changes.
+- Define who may assign Project-level `Accepted` status.
