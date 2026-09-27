@@ -115,6 +115,7 @@ def app(engine, asset_access_signer, asset_object_store, generation_task_publish
         RuntimeSettings(
             database_url="sqlite+pysqlite://",
             repository_root=ROOT,
+            web_allowed_origins=("http://localhost:5173",),
         ),
         engine=engine,
         clock=lambda: NOW,

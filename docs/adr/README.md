@@ -22,5 +22,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0017 — Generation recovery and explicit retry lineage](0017-generation-recovery-retry-lineage.md)
 - [0018 — Asset reconciliation and orphan cleanup](0018-asset-reconciliation-orphan-cleanup.md)
 - [0019 — Authenticated reference Asset upload](0019-authenticated-reference-asset-upload.md)
+- [0020 — Web OIDC and core workflow boundary](0020-web-oidc-core-workflow.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

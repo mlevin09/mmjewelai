@@ -1,12 +1,16 @@
 """Environment-backed runtime configuration with explicit artifact pins."""
 
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
+
+from .generation import GenerationProfile
 
 DEFAULT_ASSET_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 MAX_ASSET_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -30,6 +34,8 @@ class RuntimeSettings:
     asset_signing: GcsAssetStorageConfig | None = None
     asset_upload_max_bytes: int = DEFAULT_ASSET_UPLOAD_MAX_BYTES
     generation_tasks: CloudTasksGenerationConfig | None = None
+    generation_profiles: tuple[GenerationProfile, ...] = ()
+    web_allowed_origins: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if isinstance(self.asset_upload_max_bytes, bool) or not isinstance(
@@ -38,6 +44,8 @@ class RuntimeSettings:
             raise ValueError("Asset upload maximum must be an integer")
         if not 1 <= self.asset_upload_max_bytes <= MAX_ASSET_UPLOAD_BYTES:
             raise ValueError("Asset upload maximum must be between 1 and 104857600 bytes")
+        _validate_generation_profiles(self.generation_profiles)
+        _validate_web_origins(self.web_allowed_origins)
 
     @classmethod
     def from_environment(
@@ -123,6 +131,8 @@ class RuntimeSettings:
                 if all(task_values)
                 else None
             ),
+            generation_profiles=_parse_generation_profiles(os.getenv("GENERATION_PROFILES_JSON")),
+            web_allowed_origins=_parse_web_allowed_origins(os.getenv("WEB_ALLOWED_ORIGINS")),
         )
 
 
@@ -135,3 +145,64 @@ def _strict_bounded_integer(value: str | None, *, default: int, maximum: int, na
     if not 1 <= parsed <= maximum:
         raise ValueError(f"{name} must be between 1 and {maximum}")
     return parsed
+
+
+def _parse_generation_profiles(value: str | None) -> tuple[GenerationProfile, ...]:
+    if value is None or value == "":
+        return ()
+    try:
+        raw = json.loads(value)
+    except json.JSONDecodeError as exc:
+        raise ValueError("GENERATION_PROFILES_JSON must be valid JSON") from exc
+    if not isinstance(raw, list):
+        raise ValueError("GENERATION_PROFILES_JSON must be a JSON array")
+    if len(raw) > 20:
+        raise ValueError("GENERATION_PROFILES_JSON cannot contain more than 20 profiles")
+    profiles = tuple(GenerationProfile.model_validate(item) for item in raw)
+    _validate_generation_profiles(profiles)
+    return profiles
+
+
+def _validate_generation_profiles(profiles: tuple[GenerationProfile, ...]) -> None:
+    if len(profiles) > 20:
+        raise ValueError("Generation profile registry cannot contain more than 20 profiles")
+    ids = tuple(profile.profile_id for profile in profiles)
+    if len(ids) != len(set(ids)):
+        raise ValueError("Generation profile IDs must be unique")
+
+
+def _parse_web_allowed_origins(value: str | None) -> tuple[str, ...]:
+    if value is None or value == "":
+        return ()
+    origins = tuple(value.split(","))
+    _validate_web_origins(origins)
+    return origins
+
+
+def _validate_web_origins(origins: tuple[str, ...]) -> None:
+    if len(origins) != len(set(origins)):
+        raise ValueError("WEB_ALLOWED_ORIGINS must not contain duplicates")
+    for origin in origins:
+        if (
+            not origin
+            or origin != origin.strip()
+            or any(character.isspace() for character in origin)
+        ):
+            raise ValueError("WEB_ALLOWED_ORIGINS entries must be exact origins without whitespace")
+        if "*" in origin:
+            raise ValueError("WEB_ALLOWED_ORIGINS does not permit wildcards")
+        parsed = urlsplit(origin)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.query
+            or parsed.fragment
+            or origin != f"{parsed.scheme}://{parsed.netloc}"
+        ):
+            raise ValueError("WEB_ALLOWED_ORIGINS entries must be exact HTTP(S) origins")
+        hostname = parsed.hostname
+        if parsed.scheme == "http" and hostname not in {"localhost", "127.0.0.1", "::1"}:
+            raise ValueError("Production WEB_ALLOWED_ORIGINS entries must use HTTPS")
