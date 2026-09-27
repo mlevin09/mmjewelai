@@ -46,6 +46,16 @@ resource "google_storage_bucket" "terraform_state" {
     enabled = true
   }
 
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+    condition {
+      age            = 1
+      matches_prefix = ["deployment-plans/"]
+    }
+  }
+
   depends_on = [google_project_service.bootstrap]
 }
 

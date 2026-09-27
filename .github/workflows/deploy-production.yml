@@ -14,6 +14,7 @@ on:
         type: boolean
 
 permissions:
+  actions: read
   contents: read
   id-token: write
 
@@ -31,6 +32,9 @@ jobs:
       api_image: ${{ steps.images.outputs.api_image }}
       worker_image: ${{ steps.images.outputs.worker_image }}
       web_image: ${{ steps.images.outputs.web_image }}
+      plan_sha256: ${{ steps.terraform_plan.outputs.plan_sha256 }}
+      plan_generation: ${{ steps.terraform_plan.outputs.plan_generation }}
+      deployment_config_sha256: ${{ steps.terraform_plan.outputs.deployment_config_sha256 }}
     env:
       PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       REGION: ${{ vars.GCP_REGION }}
@@ -55,6 +59,31 @@ jobs:
           echo "Planning exact jewelai-v2 SHA: ${GITHUB_SHA}"
           test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
           test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
+      - name: Verify mandatory production-plan protection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          environment_json="$(curl --fail --silent --show-error \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/environments/production-plan")"
+          jq --exit-status '
+            [.protection_rules[]? |
+              select(
+                .type == "required_reviewers" and
+                .prevent_self_review == true and
+                (.reviewers | length) > 0
+              )
+            ] | length == 1
+          ' <<<"${environment_json}" >/dev/null
+          jq --exit-status '
+            .deployment_branch_policy != null and
+            (
+              .deployment_branch_policy.protected_branches == true or
+              .deployment_branch_policy.custom_branch_policies == true
+            )
+          ' <<<"${environment_json}" >/dev/null
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
@@ -104,38 +133,44 @@ jobs:
           enabled="$(gcloud secrets versions list jewelai-production-openai-api-key --filter='state=ENABLED' --limit=1 --format='value(name)')"
           test -n "${enabled}"
       - name: Create exact Terraform plan
+        id: terraform_plan
         run: |
           terraform -chdir=infra/terraform/production init -input=false -backend-config="bucket=${STATE_BUCKET}"
           terraform -chdir=infra/terraform/production plan -input=false -no-color -out=production.tfplan
-          mkdir -p infra/terraform/production/plan-artifact
-          cp infra/terraform/production/production.tfplan infra/terraform/production/plan-artifact/production.tfplan
-          terraform -chdir=infra/terraform/production show -no-color production.tfplan > infra/terraform/production/plan-artifact/production-plan.txt
-          printf '%s\n' "${GITHUB_SHA}" > infra/terraform/production/plan-artifact/github-sha
-          printf '%s\0' \
-            "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${TF_VAR_asset_bucket_name}" \
+          terraform -chdir=infra/terraform/production show -no-color production.tfplan \
+            > infra/terraform/production/production-plan-redacted.txt
+          plan_sha256="$(sha256sum infra/terraform/production/production.tfplan | cut -d ' ' -f 1)"
+          deployment_config_sha256="$(printf '%s\0' \
+            "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
+            "${TF_VAR_asset_bucket_name}" \
             "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
             "${TF_VAR_auth0_domain}" "${TF_VAR_generation_profiles_json}" \
             "${TF_VAR_openai_allowed_models}" "${TF_VAR_api_image}" \
             "${TF_VAR_worker_image}" "${TF_VAR_web_image}" \
-            | sha256sum | cut -d ' ' -f 1 \
-            > infra/terraform/production/plan-artifact/deployment-config.sha256
-          (
-            cd infra/terraform/production/plan-artifact
-            sha256sum production.tfplan > production.tfplan.sha256
-          )
+            | sha256sum | cut -d ' ' -f 1)"
+          plan_object="gs://${STATE_BUCKET}/deployment-plans/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/production.tfplan"
+          gcloud storage cp --if-generation-match=0 \
+            infra/terraform/production/production.tfplan "${plan_object}"
+          plan_generation="$(gcloud storage objects describe "${plan_object}" --format='value(generation)')"
+          test -n "${plan_generation}"
+          echo "plan_sha256=${plan_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "plan_generation=${plan_generation}" >> "${GITHUB_OUTPUT}"
+          echo "deployment_config_sha256=${deployment_config_sha256}" >> "${GITHUB_OUTPUT}"
           {
             echo "### Terraform production plan ready for protected approval"
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Artifact: \`production-plan-${GITHUB_SHA}\`"
+            echo "- Review artifact: \`production-plan-review-${GITHUB_SHA}\` (redacted text only)"
+            echo "- Exact binary plan: private state-bucket object; never uploaded to GitHub artifacts"
+            echo "- Plan SHA-256: \`${plan_sha256}\`"
             echo "- Retention: one day"
-            echo "- Review \`production-plan.txt\` before approving the production apply job."
+            echo "- Review \`production-plan-redacted.txt\` before approving the production apply job."
           } >> "${GITHUB_STEP_SUMMARY}"
-      - name: Upload sensitive exact-plan artifact
+      - name: Upload redacted plan review
         uses: actions/upload-artifact@v4
         with:
-          name: production-plan-${{ github.sha }}
-          path: infra/terraform/production/plan-artifact/
+          name: production-plan-review-${{ github.sha }}
+          path: infra/terraform/production/production-plan-redacted.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -166,6 +201,9 @@ jobs:
       TF_VAR_worker_image: ${{ needs.plan.outputs.worker_image }}
       TF_VAR_web_image: ${{ needs.plan.outputs.web_image }}
       VERIFY_EXTERNAL_DNS_HTTPS: ${{ inputs.verify_external_dns_https }}
+      EXPECTED_PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
+      EXPECTED_PLAN_GENERATION: ${{ needs.plan.outputs.plan_generation }}
+      EXPECTED_DEPLOYMENT_CONFIG_SHA256: ${{ needs.plan.outputs.deployment_config_sha256 }}
     steps:
       - name: Verify protected exact deployment identity
         run: |
@@ -182,33 +220,35 @@ jobs:
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.16.4
-      - name: Download reviewed exact-plan artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: production-plan-${{ github.sha }}
-          path: infra/terraform/production/plan-artifact/
-      - name: Verify plan integrity and bound inputs
+      - name: Download private exact plan and verify bound inputs
         run: |
-          test "$(cat infra/terraform/production/plan-artifact/github-sha)" = "${GITHUB_SHA}"
-          (
-            cd infra/terraform/production/plan-artifact
-            sha256sum -c production.tfplan.sha256
-          )
-          printf '%s\0' \
-            "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${TF_VAR_asset_bucket_name}" \
+          test -n "${EXPECTED_PLAN_SHA256}"
+          test -n "${EXPECTED_PLAN_GENERATION}"
+          test -n "${EXPECTED_DEPLOYMENT_CONFIG_SHA256}"
+          plan_object="gs://${STATE_BUCKET}/deployment-plans/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/production.tfplan"
+          actual_plan_generation="$(gcloud storage objects describe "${plan_object}" --format='value(generation)')"
+          test "${actual_plan_generation}" = "${EXPECTED_PLAN_GENERATION}"
+          gcloud storage cp "${plan_object}" infra/terraform/production/production.tfplan
+          actual_plan_sha256="$(sha256sum infra/terraform/production/production.tfplan | cut -d ' ' -f 1)"
+          test "${actual_plan_sha256}" = "${EXPECTED_PLAN_SHA256}"
+          actual_deployment_config_sha256="$(printf '%s\0' \
+            "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
+            "${TF_VAR_asset_bucket_name}" \
             "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
             "${TF_VAR_auth0_domain}" "${TF_VAR_generation_profiles_json}" \
             "${TF_VAR_openai_allowed_models}" "${TF_VAR_api_image}" \
             "${TF_VAR_worker_image}" "${TF_VAR_web_image}" \
-            | sha256sum | cut -d ' ' -f 1 \
-            > /tmp/current-deployment-config.sha256
-          diff --brief \
-            infra/terraform/production/plan-artifact/deployment-config.sha256 \
-            /tmp/current-deployment-config.sha256
+            | sha256sum | cut -d ' ' -f 1)"
+          test "${actual_deployment_config_sha256}" = "${EXPECTED_DEPLOYMENT_CONFIG_SHA256}"
       - name: Apply reviewed exact Terraform plan
         run: |
           terraform -chdir=infra/terraform/production init -input=false -backend-config="bucket=${STATE_BUCKET}"
-          terraform -chdir=infra/terraform/production apply -input=false -auto-approve plan-artifact/production.tfplan
+          terraform -chdir=infra/terraform/production apply -input=false -auto-approve production.tfplan
+      - name: Delete private exact-plan object
+        if: always()
+        run: |
+          plan_object="gs://${STATE_BUCKET}/deployment-plans/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/production.tfplan"
+          gcloud storage rm "${plan_object}" --if-generation-match="${EXPECTED_PLAN_GENERATION}"
       - name: Run migration job and wait
         run: |
           migration_job="$(terraform -chdir=infra/terraform/production output -raw migration_job_name)"

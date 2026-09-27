@@ -29,5 +29,8 @@ The deployer deliberately has no Owner or Editor role. Its explicit bootstrap gr
 Runtime identities receive none of these administrative roles. The state bucket uses Google-managed
 encryption, uniform access, public-access prevention, versioning, and an authoritative bucket policy
 containing only explicit deployer/operator state access. State contains generated sensitive values
-and must not be shared or logged. The bootstrap operator must include every ongoing operator identity
-in `operator_members` before applying that authoritative policy.
+and must not be shared or logged. Exact deployment plans use a create-only `deployment-plans/`
+object path in this same private bucket, are deleted after the apply attempt, and have a prefix-scoped
+one-day lifecycle to purge versioned copies without affecting Terraform state. The bootstrap operator
+must include every ongoing operator identity in `operator_members` before applying that authoritative
+policy.

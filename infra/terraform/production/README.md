@@ -30,17 +30,26 @@ terraform -chdir=infra/terraform/production init \
 terraform -chdir=infra/terraform/production plan -var-file=production.tfvars
 ```
 
-Use the protected `Deploy production` workflow for reviewed applies. Its `production-plan` job creates
-a one-day sensitive artifact containing the exact binary plan and a human-readable view. Only after
-that job finishes does the `production` Environment request approval. The apply job verifies the
-artifact checksum, commit SHA, immutable image references, and configuration fingerprint, then
-applies that saved plan without re-planning. Never commit `production.tfvars` or plan files.
+Use the protected `Deploy production` workflow for reviewed applies. Its mandatory-protected
+`production-plan` job stores the exact binary plan as a create-only object in the private Terraform
+state bucket and uploads only Terraform's redacted text rendering as a one-day GitHub artifact. Only
+after that job finishes does the `production` Environment request approval. The apply job downloads
+the private plan, verifies its checksum, SHA-derived object path, immutable image references, and
+configuration fingerprint, then applies without re-planning. The live object is deleted after the
+apply attempt and its versioned history is purged by a one-day prefix lifecycle. Never commit
+`production.tfvars` or plan files.
 
-The `production-plan` and protected `production` GitHub Environments must provide matching
+The protected `production-plan` and `production` GitHub Environments must provide matching
 `GENERATION_PROFILES_JSON` and `OPENAI_ALLOWED_MODELS` values. Both are explicit operator
 configuration: Terraform has no mutable or implicit model default, and plan validation rejects any
 API profile whose provider/model is not executable by the production worker allowlist. The example
 tfvars uses the adapter's currently verified model snapshot only as an operator-reviewed example.
+
+Both environments must have a deployment branch policy, require a production reviewer, and prevent
+self-review. The workflow uses the GitHub environment API to verify the actual `production-plan`
+protection rules before cloud authentication, and its exact ref guard remains restricted to
+`jewelai-v2`. Deployment fails closed because that job receives production GCP and Auth0 management
+credentials.
 
 ## Guardrails
 

@@ -4,10 +4,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PRODUCTION = ROOT / "production"
+BOOTSTRAP = ROOT / "bootstrap"
 
 
 def _read(name: str) -> str:
     return (PRODUCTION / name).read_text(encoding="utf-8")
+
+
+def _read_bootstrap(name: str) -> str:
+    return (BOOTSTRAP / name).read_text(encoding="utf-8")
 
 
 def _require(text: str, fragment: str, description: str) -> None:
@@ -54,6 +59,11 @@ if plan_job_start < 0 or apply_job_start < 0 or apply_job_start <= plan_job_star
     raise SystemExit("Missing split production plan/apply jobs")
 plan_job = deploy_workflow[plan_job_start:apply_job_start]
 apply_job = deploy_workflow[apply_job_start:]
+review_upload_start = plan_job.find("- name: Upload redacted plan review")
+if review_upload_start < 0:
+    raise SystemExit("Missing redacted plan review upload")
+review_upload_step = plan_job[review_upload_start:]
+bootstrap = _read_bootstrap("main.tf")
 
 _require(storage, 'public_access_prevention    = "enforced"', "GCS public access prevention")
 _require(storage, "uniform_bucket_level_access = true", "uniform bucket IAM")
@@ -101,6 +111,7 @@ _require(
     "TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}",
     "protected worker model allowlist configuration",
 )
+_require(deploy_workflow, "actions: read", "environment protection API permission")
 
 _require(
     locals,
@@ -112,9 +123,20 @@ _forbid(networking, "var.dns_managed_zone == null ? 0 : 1", "empty DNS zone trea
 
 _require(plan_job, "environment: production-plan", "separate production plan environment")
 _require(plan_job, "terraform -chdir=infra/terraform/production plan", "saved Terraform plan")
-_require(plan_job, "actions/upload-artifact@v4", "reviewable exact-plan artifact")
-_require(plan_job, "retention-days: 1", "short-lived sensitive plan artifact")
-_require(plan_job, "deployment-config.sha256", "plan input fingerprint")
+_require(
+    plan_job,
+    "/environments/production-plan",
+    "actual plan-environment protection lookup",
+)
+_require(plan_job, '.type == "required_reviewers"', "mandatory plan-environment reviewers")
+_require(plan_job, ".prevent_self_review == true", "mandatory plan-environment self-review block")
+_require(plan_job, ".deployment_branch_policy != null", "mandatory deployment branch policy")
+_require(plan_job, "gcloud storage cp --if-generation-match=0", "create-only private plan upload")
+_require(plan_job, "deployment-plans/", "private per-run plan-object namespace")
+_require(review_upload_step, "actions/upload-artifact@v4", "redacted plan review artifact")
+_require(review_upload_step, "production-plan-redacted.txt", "redacted review output only")
+_require(review_upload_step, "retention-days: 1", "short-lived redacted review artifact")
+_forbid(review_upload_step, "production.tfplan", "binary Terraform plan in GitHub artifact")
 _forbid(
     plan_job,
     "terraform -chdir=infra/terraform/production apply",
@@ -122,17 +144,31 @@ _forbid(
 )
 _require(apply_job, "needs: plan", "apply waits for completed plan")
 _require(apply_job, "environment: production", "protected production apply environment")
-_require(apply_job, "actions/download-artifact@v4", "reviewed plan download")
+_forbid(apply_job, "actions/download-artifact", "binary plan download from GitHub artifacts")
+_require(apply_job, 'gcloud storage cp "${plan_object}"', "private exact-plan download")
+_require(apply_job, "EXPECTED_PLAN_SHA256", "exact plan checksum binding")
+_require(apply_job, "EXPECTED_PLAN_GENERATION", "exact private object generation binding")
+_require(apply_job, "EXPECTED_DEPLOYMENT_CONFIG_SHA256", "exact plan configuration binding")
 _require(
     apply_job,
-    "apply -input=false -auto-approve plan-artifact/production.tfplan",
+    "apply -input=false -auto-approve production.tfplan",
     "exact saved-plan apply",
+)
+_require(apply_job, 'gcloud storage rm "${plan_object}"', "private exact-plan cleanup")
+_require(
+    apply_job,
+    '--if-generation-match="${EXPECTED_PLAN_GENERATION}"',
+    "generation-conditional private plan cleanup",
 )
 _forbid(apply_job, " plan -", "re-planning after protected approval")
 _require(apply_job, "required_dns_a_records", "external DNS record handoff")
 _require(apply_job, '"${dns_managed}" != "true"', "external DNS readiness bypass")
 _require(apply_job, "for attempt in $(seq 1 120)", "bounded HTTPS readiness polling")
 _require(apply_job, 'certificate_status}" == "ACTIVE"', "managed certificate readiness")
+
+_require(bootstrap, 'matches_prefix = ["deployment-plans/"]', "plan-object lifecycle isolation")
+_require(bootstrap, "age            = 1", "one-day private plan-object retention")
+_require(bootstrap, 'public_access_prevention    = "enforced"', "private plan storage")
 
 openai_access = _resource(iam, "google_secret_manager_secret_iam_member", "openai_key")
 _require(openai_access, 'runtime["worker"].email', "OpenAI secret limited to worker")
