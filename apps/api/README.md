@@ -26,6 +26,8 @@ export OIDC_ISSUER='https://identity.example/'
 export OIDC_AUDIENCE='jewelai-api'
 export OIDC_JWKS_URL='https://identity.example/.well-known/jwks.json'
 export GCS_ASSET_BUCKET='jewelai-assets-prod'
+# Optional upload limit in bytes; defaults to 20 MiB and cannot exceed 100 MiB:
+export ASSET_UPLOAD_MAX_BYTES='20971520'
 # Optional non-secret signing configuration:
 export GCP_PROJECT_ID='jewelai-prod'
 export GCS_SIGNING_SERVICE_ACCOUNT_EMAIL='signer@jewelai-prod.iam.gserviceaccount.com'
@@ -61,6 +63,7 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
 - `POST /sessions/{session_id}/generation-runs/{generation_run_id}/retry`
 - `GET /sessions/{session_id}/assets`
+- `POST /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/assets/{asset_id}`
 - `POST /sessions/{session_id}/assets/{asset_id}/access`
 
@@ -71,7 +74,8 @@ identity proof. Existing repository scopes remain defense in depth. Conversation
 grant permissions, and JWT role/group/organization claims are ignored.
 
 Production startup fails closed unless `OIDC_ISSUER`, `OIDC_AUDIENCE`, and HTTPS `OIDC_JWKS_URL` are
-configured. It also requires `GCS_ASSET_BUCKET` unless an Asset access signer is explicitly injected;
+configured. It also requires `GCS_ASSET_BUCKET` unless both an Asset access signer and object store
+are explicitly injected;
 `GCP_PROJECT_ID` and `GCS_SIGNING_SERVICE_ACCOUNT_EMAIL` are optional non-secret settings. Google
 ADC/workload identity supplies credentials—service-account private-key JSON is not application
 configuration. The resource server stores no token or raw claims. Existing pre-auth organizations are
@@ -103,13 +107,25 @@ constructed by `create_app()` and no API route invokes a provider. Production co
 it into the worker with environment-managed credentials, bounded timeout, and disabled SDK retries.
 
 Asset list/get endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets,
-and URLs. The explicit authenticated `POST .../assets/{asset_id}/access` action checks current
-database membership and exact tenant/session/Asset scope, then uses the existing provider-neutral
-contract and production GCS V4 signer to return a temporary HTTPS GET capability for a READY Asset.
-The default TTL is five minutes and maximum is fifteen minutes. The JSON response is never redirected
+and URLs. Authenticated `POST /sessions/{session_id}/assets` accepts one multipart field named
+`file` and creates a reference Asset only. PNG, JPEG, and WebP declarations must match the existing
+binary signature validation. The route reads fixed 64 KiB chunks, retaining at most the configured
+limit plus one byte; the default is 20 MiB and the maximum configurable limit is 100 MiB. Session
+scope supplies the project, the server supplies the UUID, and filename is neither trusted nor
+persisted. Repeated successful POSTs create distinct Assets.
+
+Production upload uses the same configured private GCS bucket and create-only object store as other
+Asset flows. Storage errors are redacted. A crash after the durable write but before READY may leave
+PENDING reference metadata; automated reference-PENDING reconciliation remains future work.
+
+The explicit authenticated `POST .../assets/{asset_id}/access` action checks current database
+membership and exact tenant/session/Asset scope, then uses the existing provider-neutral contract
+and production GCS V4 signer to return a temporary HTTPS GET capability for a READY Asset. The
+default TTL is five minutes and maximum is fifteen minutes. The JSON response is never redirected
 or cached (`no-store, private`), and the URL is never persisted. Membership revocation blocks future
-issuance but cannot revoke a capability already issued before its expiration. No binary bytes pass
-through FastAPI; binary upload, retention, and reconciliation remain unimplemented.
+issuance but cannot revoke a capability already issued before its expiration. Upload never returns
+a signed URL; clients request temporary read access separately. General reference retention remains
+unimplemented.
 
 ## Verification
 

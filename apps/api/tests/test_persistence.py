@@ -104,6 +104,7 @@ def build_service(engine):
         repository,
         artifacts,
         asset_access_signer=UnusedAssetAccessSigner(),
+        asset_object_store=MemoryObjectStore(),
         generation_task_publisher=UnusedGenerationPublisher(),
         clock=lambda: NOW,
     )

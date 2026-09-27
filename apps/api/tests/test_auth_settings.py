@@ -84,6 +84,28 @@ def test_runtime_settings_do_not_require_gcs_when_signer_is_injected(monkeypatch
     assert settings.asset_signing is None
 
 
+def test_runtime_settings_load_asset_upload_limit(monkeypatch):
+    monkeypatch.setenv("ASSET_UPLOAD_MAX_BYTES", "20971520")
+    settings = RuntimeSettings.from_environment(
+        require_oidc=False,
+        require_asset_signer=False,
+    )
+    assert settings.asset_upload_max_bytes == 20 * 1024 * 1024
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["0", "-1", "104857601", "not-an-integer", "true", " 16", "16 "],
+)
+def test_runtime_settings_reject_invalid_asset_upload_limit(monkeypatch, value):
+    monkeypatch.setenv("ASSET_UPLOAD_MAX_BYTES", value)
+    with pytest.raises(ValueError, match="ASSET_UPLOAD_MAX_BYTES"):
+        RuntimeSettings.from_environment(
+            require_oidc=False,
+            require_asset_signer=False,
+        )
+
+
 def test_runtime_settings_load_cloud_tasks_and_fail_closed_when_required(monkeypatch):
     names = {
         "CLOUD_TASKS_PROJECT_ID": "jewelai-prod",

@@ -8,6 +8,9 @@ from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
 
+DEFAULT_ASSET_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+MAX_ASSET_UPLOAD_BYTES = 100 * 1024 * 1024
+
 
 @dataclass(frozen=True)
 class ArtifactVersions:
@@ -25,7 +28,16 @@ class RuntimeSettings:
     artifacts: ArtifactVersions = field(default_factory=ArtifactVersions)
     oidc: OidcJwtConfig | None = None
     asset_signing: GcsAssetStorageConfig | None = None
+    asset_upload_max_bytes: int = DEFAULT_ASSET_UPLOAD_MAX_BYTES
     generation_tasks: CloudTasksGenerationConfig | None = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.asset_upload_max_bytes, bool) or not isinstance(
+            self.asset_upload_max_bytes, int
+        ):
+            raise ValueError("Asset upload maximum must be an integer")
+        if not 1 <= self.asset_upload_max_bytes <= MAX_ASSET_UPLOAD_BYTES:
+            raise ValueError("Asset upload maximum must be between 1 and 104857600 bytes")
 
     @classmethod
     def from_environment(
@@ -59,6 +71,12 @@ class RuntimeSettings:
             for item in os.getenv("OIDC_ALLOWED_ALGORITHMS", "RS256").split(",")
             if item.strip()
         )
+        asset_upload_max_bytes = _strict_bounded_integer(
+            os.getenv("ASSET_UPLOAD_MAX_BYTES"),
+            default=DEFAULT_ASSET_UPLOAD_MAX_BYTES,
+            maximum=MAX_ASSET_UPLOAD_BYTES,
+            name="ASSET_UPLOAD_MAX_BYTES",
+        )
         return cls(
             database_url=os.getenv("DATABASE_URL", cls.database_url),
             repository_root=Path(root).resolve() if root else Path(__file__).resolve().parents[4],
@@ -91,6 +109,7 @@ class RuntimeSettings:
                 if asset_bucket
                 else None
             ),
+            asset_upload_max_bytes=asset_upload_max_bytes,
             generation_tasks=(
                 CloudTasksGenerationConfig(
                     project_id=task_values[0],
@@ -105,3 +124,14 @@ class RuntimeSettings:
                 else None
             ),
         )
+
+
+def _strict_bounded_integer(value: str | None, *, default: int, maximum: int, name: str) -> int:
+    if value is None:
+        return default
+    if not value.isascii() or not value.isdecimal():
+        raise ValueError(f"{name} must be an integer")
+    parsed = int(value)
+    if not 1 <= parsed <= maximum:
+        raise ValueError(f"{name} must be between 1 and {maximum}")
+    return parsed

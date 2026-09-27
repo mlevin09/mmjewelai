@@ -18,6 +18,10 @@ final deterministic private key before run success, then call `finalize_staged_a
 to establish READY metadata without a second storage write. Ordinary reference ingestion continues
 to use `ingest_asset` and its existing `pending → storage → ready|failed` behavior.
 
+The authenticated API transport defined by ADR 0019 supplies bounded bytes and a server-owned
+reference request to this unchanged provider-neutral boundary. FastAPI types, filenames,
+authentication, and multipart parsing do not enter this package.
+
 The package depends only on Pydantic and the Python standard library. It has no SQLAlchemy, FastAPI,
 Model Gateway, provider, network, or cloud SDK dependency. The production adapter lives separately in
 `packages/assets_gcs`; core tests use in-memory fakes only. Signed access defaults to 300 seconds,

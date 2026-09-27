@@ -21,5 +21,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0016 — Durable generation delivery with Cloud Tasks](0016-durable-generation-cloud-tasks.md)
 - [0017 — Generation recovery and explicit retry lineage](0017-generation-recovery-retry-lineage.md)
 - [0018 — Asset reconciliation and orphan cleanup](0018-asset-reconciliation-orphan-cleanup.md)
+- [0019 — Authenticated reference Asset upload](0019-authenticated-reference-asset-upload.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

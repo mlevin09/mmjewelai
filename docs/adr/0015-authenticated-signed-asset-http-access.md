@@ -60,3 +60,7 @@ tenant/session/Asset scoping, strict TTLs, READY-only policy, safe signer failur
 redaction/cache headers, no persistence, OpenAPI, and production configuration without GCP network
 access. Existing Asset/GCS, auth, runtime, PostgreSQL concurrency, migration, lint, format, and schema
 drift suites remain required.
+
+The capability applies equally to READY reference and generated Assets. Authenticated reference
+upload is defined by [ADR 0019](0019-authenticated-reference-asset-upload.md); signed read remains a
+separate explicit action and is never returned by upload.

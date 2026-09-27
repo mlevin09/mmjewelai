@@ -22,3 +22,9 @@ and failed-run orphan cleanup. Reconciliation needs database access plus object 
 cleanup additionally needs narrowly scoped object delete and remains dry-run without `--apply`.
 Normal generation should retain create-only storage authority. No job, schedule, bucket, or IAM
 binding is provisioned by this repository change.
+
+The API runtime also performs authenticated bounded reference-Asset writes. Its service account
+needs narrowly scoped `storage.objects.create` and exact-object metadata-read permission in the same
+private Asset bucket, plus the existing signed-read signing permissions. Do not grant Storage Admin,
+Editor, Owner, public access, or browser credentials. This repository does not provision those IAM
+bindings or the bucket.

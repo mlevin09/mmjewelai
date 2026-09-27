@@ -43,3 +43,6 @@ image decoder or malware analysis system.
 Metadata-only generated-output adoption and delayed failed-run object cleanup are subsequently
 defined by [ADR 0018](0018-asset-reconciliation-orphan-cleanup.md); normal ingestion remains
 create-only.
+
+Authenticated bounded HTTP ingestion of reference Assets is subsequently defined by
+[ADR 0019](0019-authenticated-reference-asset-upload.md).

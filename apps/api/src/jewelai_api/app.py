@@ -5,16 +5,19 @@ from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, Request, Response
+from fastapi import Depends, FastAPI, File, Header, Request, Response, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jewelai_assets import (
     AssetAccessContractError,
     AssetAccessUnavailableError,
+    AssetContentType,
+    AssetIngestionPolicy,
     AssetNotReadyError,
     PrivateObjectAccessSigner,
+    PrivateObjectStore,
     SignedAssetReadAccess,
 )
-from jewelai_assets_gcs import GcsPrivateObjectAccessSigner
+from jewelai_assets_gcs import GcsPrivateObjectAccessSigner, GcsPrivateObjectStore
 from jewelai_auth import (
     AuthenticatedPrincipal,
     AuthenticationError,
@@ -75,12 +78,24 @@ from .schemas import (
     UpdateMembershipRequest,
 )
 from .services import (
+    AssetUploadUnavailableError,
+    InvalidAssetUploadError,
     InvalidTransitionError,
     LockedFieldConflictError,
     RuntimeService,
     SpecificationNotReadyError,
 )
 from .settings import RuntimeSettings
+
+UPLOAD_READ_CHUNK_BYTES = 64 * 1024
+
+
+class UnsupportedAssetMediaTypeError(ValueError):
+    pass
+
+
+class AssetTooLargeError(ValueError):
+    pass
 
 
 def create_app(
@@ -92,11 +107,12 @@ def create_app(
     generation_profiles: GenerationProfileRegistry | None = None,
     token_verifier: TokenVerifier | None = None,
     asset_access_signer: PrivateObjectAccessSigner | None = None,
+    asset_object_store: PrivateObjectStore | None = None,
     generation_task_publisher: GenerationTaskPublisher | None = None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
-        require_asset_signer=asset_access_signer is None,
+        require_asset_signer=asset_access_signer is None or asset_object_store is None,
         require_generation_publisher=generation_task_publisher is None,
     )
     if token_verifier is None:
@@ -110,6 +126,12 @@ def create_app(
                 "signer is injected"
             )
         asset_access_signer = GcsPrivateObjectAccessSigner(settings.asset_signing)
+    if asset_object_store is None:
+        if settings.asset_signing is None:
+            raise ValueError(
+                "GCS Asset storage configuration is required when no Asset object store is injected"
+            )
+        asset_object_store = GcsPrivateObjectStore(settings.asset_signing)
     if generation_task_publisher is None:
         if settings.generation_tasks is None:
             raise ValueError(
@@ -126,6 +148,8 @@ def create_app(
         uuid_factory=uuid_factory,
         generation_profiles=generation_profiles,
         asset_access_signer=asset_access_signer,
+        asset_object_store=asset_object_store,
+        asset_ingestion_policy=AssetIngestionPolicy(max_bytes=settings.asset_upload_max_bytes),
         generation_task_publisher=generation_task_publisher,
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
@@ -195,6 +219,38 @@ def create_app(
 
     app.add_exception_handler(AssetAccessUnavailableError, asset_access_unavailable_handler)
     app.add_exception_handler(AssetAccessContractError, asset_access_unavailable_handler)
+
+    @app.exception_handler(UnsupportedAssetMediaTypeError)
+    async def unsupported_asset_media_handler(_, __):
+        return _error_response(
+            415,
+            "unsupported_asset_media_type",
+            "Supported image types are PNG, JPEG, and WebP",
+        )
+
+    @app.exception_handler(AssetTooLargeError)
+    async def asset_too_large_handler(_, __):
+        return _error_response(
+            413,
+            "asset_too_large",
+            "Uploaded Asset exceeds the configured size limit",
+        )
+
+    @app.exception_handler(InvalidAssetUploadError)
+    async def invalid_asset_upload_handler(_, __):
+        return _error_response(
+            422,
+            "invalid_asset_content",
+            "Uploaded content is not a valid supported image",
+        )
+
+    @app.exception_handler(AssetUploadUnavailableError)
+    async def asset_upload_unavailable_handler(_, __):
+        return _error_response(
+            503,
+            "asset_upload_unavailable",
+            "Private Asset storage is temporarily unavailable",
+        )
 
     @app.exception_handler(UnknownGenerationProfileError)
     async def generation_profile_handler(_, exc):
@@ -457,6 +513,31 @@ def create_app(
     ):
         return service.list_assets(session_id, organization_id)
 
+    @app.post(
+        "/sessions/{session_id}/assets",
+        response_model=AssetResponse,
+        status_code=201,
+    )
+    async def create_reference_asset(
+        session_id: UUID,
+        request: Request,
+        organization_id: AuthorizedOrganization,
+        file: Annotated[UploadFile, File()],
+    ):
+        # Resolve tenant/session scope before inspecting untrusted upload details.
+        service.get_session(session_id, organization_id)
+        form = await request.form()
+        if len(form.getlist("file")) != 1:
+            raise InvalidAssetUploadError("Exactly one Asset file is required")
+        declared_content_type = _asset_content_type(file.content_type)
+        content = await _read_bounded_upload(file, settings.asset_upload_max_bytes)
+        return service.create_reference_asset(
+            session_id,
+            organization_id,
+            declared_content_type,
+            content,
+        )
+
     @app.get("/sessions/{session_id}/assets/{asset_id}", response_model=AssetResponse)
     def get_asset(
         session_id: UUID,
@@ -515,3 +596,26 @@ def _error_response(
         content={"error": code, "detail": detail},
         headers=headers,
     )
+
+
+def _asset_content_type(value: str | None) -> AssetContentType:
+    try:
+        return AssetContentType(value)
+    except (TypeError, ValueError) as exc:
+        raise UnsupportedAssetMediaTypeError("Unsupported Asset media type") from exc
+
+
+async def _read_bounded_upload(file: UploadFile, max_bytes: int) -> bytes:
+    content = bytearray()
+    try:
+        while len(content) <= max_bytes:
+            remaining = max_bytes + 1 - len(content)
+            chunk = await file.read(min(UPLOAD_READ_CHUNK_BYTES, remaining))
+            if not chunk:
+                break
+            content.extend(chunk)
+            if len(content) > max_bytes:
+                raise AssetTooLargeError("Asset upload exceeds configured limit")
+    finally:
+        await file.close()
+    return bytes(content)
