@@ -13,6 +13,7 @@ on:
       - packages/parser/**
       - packages/prompts/**
       - packages/model_gateway/**
+      - packages/model_gateway_google/**
       - packages/model_gateway_openai/**
       - packages/assets/**
       - packages/assets_gcs/**
@@ -45,6 +46,7 @@ on:
       - packages/parser/**
       - packages/prompts/**
       - packages/model_gateway/**
+      - packages/model_gateway_google/**
       - packages/model_gateway_openai/**
       - packages/assets/**
       - packages/assets_gcs/**
@@ -104,6 +106,7 @@ jobs:
       - run: python -m pip install -e './packages/assets[test]'
       - run: python -m pip install -e './packages/assets_gcs[test]'
       - run: python -m pip install -e './packages/persistence'
+      - run: python -m pip install -e './packages/model_gateway_google[test]'
       - run: python -m pip install -e './packages/model_gateway_openai[test]'
       - run: python -m pip install -e './workers/generation[test]'
       - run: python -m pip install -e './packages/parser[test]'
@@ -119,11 +122,12 @@ jobs:
       - run: python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
       - run: python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
       - run: python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+      - run: python -m pytest -c packages/model_gateway_google/pyproject.toml packages/model_gateway_google/tests -q
       - run: python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
       - run: python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
       - run: python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
       - run: python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
       - run: python -m pytest -c workers/generation/pyproject.toml tests/test_openai_generation_pipeline.py -q
       - run: python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/generation_queue packages/generation_queue_gcp packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
-      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/generation_queue packages/generation_queue_gcp packages/parser packages/prompts packages/model_gateway packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
+      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/generation_queue packages/generation_queue_gcp packages/parser packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
+      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/generation_queue packages/generation_queue_gcp packages/parser packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests

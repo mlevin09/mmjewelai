@@ -55,6 +55,7 @@ behavior, `packages/parser` owns the provider-neutral candidate/proposal boundar
 `packages/prompts` owns deterministic provider-neutral prompt compilation and lock verification,
 `packages/model_gateway` owns provider-neutral persisted and transient generation contracts,
 `packages/model_gateway_openai` translates those contracts to the production OpenAI Images API,
+`packages/model_gateway_google` translates them to Google's Generative Language REST API,
 `workers/generation` owns the one-shot generation and generated-Asset materialization unit of work,
 `packages/assets` owns private binary-ingestion and temporary
 read-access contracts, `packages/assets_gcs` implements the production Google Cloud storage/signing
@@ -81,6 +82,7 @@ packages/
   generation_queue_gcp/
   persistence/
   model_gateway/
+  model_gateway_google/
   model_gateway_openai/
 data/
 specs/
@@ -104,6 +106,8 @@ See [ADR 0012](docs/adr/0012-gcs-storage-signed-asset-access.md) for create-only
 provider-neutral signed-read boundary. No signed-access HTTP route exists before authentication.
 See [ADR 0013](docs/adr/0013-openai-image-provider-output-retrieval.md) for isolated OpenAI Images API
 translation, transient base64 retrieval, and GenerationRun-to-Asset materialization.
+See [ADR 0022](docs/adr/0022-google-generative-language-image-provider.md) for isolated Google
+Generative Language REST translation with API-key header authentication and no hidden retries.
 See [ADR 0014](docs/adr/0014-authentication-organization-membership.md) for bearer identity,
 database-authoritative organization membership, and final-owner protection.
 See [ADR 0015](docs/adr/0015-authenticated-signed-asset-http-access.md) for authenticated,

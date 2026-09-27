@@ -20,3 +20,13 @@ resource "google_secret_manager_secret" "openai_api_key" {
   }
   depends_on = [google_project_service.production]
 }
+
+resource "google_secret_manager_secret" "google_generative_language_api_key" {
+  count     = local.google_generation_enabled ? 1 : 0
+  project   = var.project_id
+  secret_id = "jewelai-production-google-generative-language-api-key"
+  replication {
+    auto {}
+  }
+  depends_on = [google_project_service.production]
+}

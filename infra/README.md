@@ -7,13 +7,13 @@ The V2 production platform is defined in Terraform and dedicated production cont
 ```text
 Internet -> HTTPS load balancer -> web Cloud Run
 Browser  -> HTTPS load balancer -> API Cloud Run -> Cloud SQL / private GCS / Cloud Tasks
-Cloud Tasks -> private generation worker -> OpenAI / private GCS / Cloud SQL
+Cloud Tasks -> private generation worker -> OpenAI or Google / private GCS / Cloud SQL
 Cloud Scheduler -> private Cloud Run jobs -> bounded maintenance commands
 ```
 
 The bootstrap stack creates the versioned private state bucket, regional Artifact Registry, exact-repository/exact-branch GitHub Workload Identity Federation, and production deployer. The production stack creates Auth0 resources, Cloud SQL PostgreSQL 16, the private Asset bucket, finite Cloud Tasks queue, isolated service accounts, three Cloud Run services, five Cloud Run jobs, schedules, HTTPS load balancing, managed TLS, optional Cloud DNS records, Cloud Armor, logging metric, dashboard, alerts, and uptime checks.
 
-Runtime service identities are intentionally separate. Web has no Google API permission. API can connect to SQL, create/read Assets, enqueue only on its queue, read only `DATABASE_URL`, and call `signBlob` only on the signing identity. Worker can connect to SQL, create/read Assets, and read `DATABASE_URL` plus `OPENAI_API_KEY`. Reconciliation reads object metadata. Cleanup alone can delete objects. The task-delivery identity can only invoke the private worker; scheduler can only run the maintenance jobs.
+Runtime service identities are intentionally separate. Web has no Google API permission. API can connect to SQL, create/read Assets, enqueue only on its queue, read only `DATABASE_URL`, and call `signBlob` only on the signing identity. Worker can connect to SQL, create/read Assets, and read `DATABASE_URL`, `OPENAI_API_KEY`, plus the optional Google Generative Language API key when that provider is enabled. Reconciliation reads object metadata. Cleanup alone can delete objects. The task-delivery identity can only invoke the private worker; scheduler can only run the maintenance jobs.
 
 ## Directories
 

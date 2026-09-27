@@ -13,6 +13,7 @@ dependencies = [
   "jewelai-assets-gcs==1.0.0",
   "jewelai-generation-queue==1.0.0",
   "jewelai-model-gateway==1.0.0",
+  "jewelai-model-gateway-google==1.0.0",
   "jewelai-model-gateway-openai==1.0.0",
   "jewelai-persistence==1.0.0",
   "psycopg[binary]>=3.2,<4",

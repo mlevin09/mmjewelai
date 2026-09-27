@@ -19,8 +19,8 @@ Storage failure before success fails the run and creates no Asset rows. A crash 
 leave Asset metadata missing, but the original bytes remain durable for metadata-only reconciliation.
 A crash before staging may leave a RUNNING run, while partial staging may leave private orphan
 objects; bounded timeout recovery and delayed version-conditional cleanup are implemented. The core
-service module imports neither OpenAI nor GCS; the separate production runtime composes those
-adapters.
+service module imports neither provider adapter nor GCS; the separate production runtime composes
+those adapters.
 
 Production composition now delivers Cloud Tasks to the private
 `POST /internal/generation-tasks/execute` endpoint, which invokes this same core path. Cloud Run IAM
@@ -30,9 +30,13 @@ acknowledged without another provider call. A separate bounded timeout recovery 
 old RUNNING row `FAILED(execution_stale)` and never reopens it. Explicit retry then creates a new run;
 Cloud Tasks redelivery never changes the business attempt.
 
-Production composition requires `DATABASE_URL`, `GCS_ASSET_BUCKET`, and comma-separated
-`OPENAI_IMAGE_ALLOWED_MODELS`; `GCP_PROJECT_ID` and `OPENAI_IMAGE_TIMEOUT_SECONDS` are optional.
-The OpenAI key remains in the SDK-supported environment/secret mechanism and never enters task data.
+Production composition requires `DATABASE_URL`, `GCS_ASSET_BUCKET`, and at least one configured
+provider. OpenAI uses comma-separated `OPENAI_IMAGE_ALLOWED_MODELS`; `GCP_PROJECT_ID` and
+`OPENAI_IMAGE_TIMEOUT_SECONDS` are optional. Google is enabled only when both
+`GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS` and `GOOGLE_GENERATIVE_LANGUAGE_API_KEY` are present;
+`GOOGLE_GENERATIVE_LANGUAGE_TIMEOUT_SECONDS` is optional. The Google key is passed only in the
+`x-goog-api-key` header, while the OpenAI key remains in the SDK-supported environment mechanism.
+Neither credential enters task data, persistence, logs, or errors, and there is no provider fallback.
 
 Production emits structured `generation_task_received`, `generation_task_finished`,
 `generation_task_not_claimed`, and `generation_task_failed` JSON events using only the run ID,
@@ -63,7 +67,7 @@ DATABASE_URL=postgresql+psycopg://... GCS_ASSET_BUCKET=private-bucket \
   python -m jewelai_generation.cleanup_orphans --retention-seconds 604800 --batch-size 25
 ```
 
-Neither command constructs the OpenAI adapter, downloads object bodies, lists the bucket, changes a
+Neither command constructs a provider adapter, downloads object bodies, lists the bucket, changes a
 GenerationRun lifecycle, or deletes an object referenced by any Asset row.
 
 ```sh

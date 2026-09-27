@@ -951,6 +951,85 @@ def test_production_worker_composition_uses_openai_and_gcs_without_network(persi
     assert [kind for kind, _ in captured] == ["openai", "gcs"]
 
 
+def test_worker_selects_google_executor_for_google_run(persisted):
+    repository, _, compiled = persisted
+    run = GenerationRun(
+        generation_run_id=SECOND_RUN_ID,
+        session_id=SESSION_ID,
+        prompt_revision_id=PROMPT_ID,
+        prompt_content_hash=compiled.content_hash,
+        profile_id="google_image",
+        profile_version="1.0.0",
+        provider="google",
+        model="gemini-3.1-flash-lite-image",
+        configuration=GenerationConfiguration(output_count=1),
+        status=GenerationStatus.PENDING,
+        created_at=NOW,
+    )
+    repository.create_generation_run(run, ORG_ID)
+    openai_executor = FakeExecutor()
+    google_executor = FakeExecutor()
+    app = create_worker_app(
+        GenerationWorkerSettings(
+            database_url="sqlite+pysqlite://",
+            gcs_asset_bucket="unused-bucket",
+            openai_allowed_models=("gpt-image-1",),
+            google_allowed_models=("gemini-3.1-flash-lite-image",),
+            google_api_key="test-google-key",
+        ),
+        repository=repository,
+        executor=openai_executor,
+        google_executor=google_executor,
+        object_store=MemoryObjectStore(),
+        clock=advancing_clock(),
+    )
+    response = TestClient(app).post(
+        "/internal/generation-tasks/execute",
+        json={
+            "schema_version": "1.0.0",
+            "generation_run_id": str(SECOND_RUN_ID),
+            "session_id": str(SESSION_ID),
+            "organization_id": str(ORG_ID),
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["disposition"] == "succeeded"
+    assert google_executor.calls == 1
+    assert openai_executor.calls == 0
+
+
+def test_google_configuration_is_optional_for_openai_only_worker(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite://")
+    monkeypatch.setenv("GCS_ASSET_BUCKET", "unused-bucket")
+    monkeypatch.setenv("OPENAI_IMAGE_ALLOWED_MODELS", "gpt-image-1")
+    monkeypatch.delenv("GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS", raising=False)
+    monkeypatch.delenv("GOOGLE_GENERATIVE_LANGUAGE_API_KEY", raising=False)
+    settings = GenerationWorkerSettings.from_environment()
+    assert settings.openai_allowed_models == ("gpt-image-1",)
+    assert settings.google_allowed_models == ()
+    assert settings.google_api_key is None
+
+
+def test_google_configuration_requires_key_only_when_enabled(monkeypatch):
+    monkeypatch.setenv("DATABASE_URL", "sqlite+pysqlite://")
+    monkeypatch.setenv("GCS_ASSET_BUCKET", "unused-bucket")
+    monkeypatch.delenv("OPENAI_IMAGE_ALLOWED_MODELS", raising=False)
+    monkeypatch.setenv("GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS", "gemini-3.1-flash-lite-image")
+    monkeypatch.delenv("GOOGLE_GENERATIVE_LANGUAGE_API_KEY", raising=False)
+    with pytest.raises(ValueError, match="API_KEY is required"):
+        GenerationWorkerSettings.from_environment()
+
+    monkeypatch.setenv("GOOGLE_GENERATIVE_LANGUAGE_API_KEY", "runtime-google-secret")
+    settings = GenerationWorkerSettings.from_environment()
+    assert settings.google_allowed_models == ("gemini-3.1-flash-lite-image",)
+    assert settings.google_api_key == "runtime-google-secret"
+    assert "runtime-google-secret" not in repr(settings)
+
+    monkeypatch.setenv("GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS", " gemini-3.1-flash-lite-image")
+    with pytest.raises(ValueError, match="supported image models"):
+        GenerationWorkerSettings.from_environment()
+
+
 def test_success_preserves_exact_prompt_locks_hash_and_is_idempotent(persisted):
     repository, revision, compiled = persisted
     gateway = FakeGateway()

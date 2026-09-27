@@ -9,6 +9,8 @@ This stack describes the reviewed production topology. It consumes the bootstrap
 - Existing Cloud DNS zone when `dns_managed_zone` is non-empty. Null or empty selects operator-managed DNS and creates no Terraform DNS records.
 - An enabled billing account and three immutable Artifact Registry image digests.
 - A usable `OPENAI_API_KEY` Secret Manager version, seeded outside Terraform.
+- If Google is enabled, a usable `GOOGLE_GENERATIVE_LANGUAGE_API_KEY` Secret Manager version,
+  seeded outside Terraform.
 
 Auth0 provider authentication is supplied only through `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, and `AUTH0_CLIENT_SECRET` in the protected deployment environment. Do not put those values in tfvars.
 
@@ -40,10 +42,12 @@ apply attempt and its versioned history is purged by a one-day prefix lifecycle.
 `production.tfvars` or plan files.
 
 The protected `production-plan` and `production` GitHub Environments must provide matching
-`GENERATION_PROFILES_JSON` and `OPENAI_ALLOWED_MODELS` values. Both are explicit operator
-configuration: Terraform has no mutable or implicit model default, and plan validation rejects any
-API profile whose provider/model is not executable by the production worker allowlist. The example
-tfvars uses the adapter's currently verified model snapshot only as an operator-reviewed example.
+`GENERATION_PROFILES_JSON`, `OPENAI_ALLOWED_MODELS`, and optional
+`GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS` values. These are explicit operator configuration:
+Terraform has no mutable or implicit model default, and plan validation rejects any API profile
+whose provider/model is not executable by the corresponding production worker allowlist. Empty or
+unset Google configuration disables Google without requiring its credential. The example tfvars
+uses adapter-supported model snapshots only as operator-reviewed examples.
 
 Both environments must have a deployment branch policy, require a production reviewer, and prevent
 self-review. The workflow uses the GitHub environment API to verify the actual `production-plan`
@@ -73,7 +77,9 @@ See [../../RUNBOOK.md](../../RUNBOOK.md) for bootstrap, deployment, smoke, rollb
 Terraform assembles these values; this is documentation, not a `.env` file:
 
 - API: secret `DATABASE_URL`; exact `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URL`, `OIDC_ALLOWED_ALGORITHMS=RS256`; private bucket/signer; queue/location/worker URL/task identity; exact web origin; artifact pins; raw/Asset limits; and bounded DB pool settings.
-- Worker: secrets `DATABASE_URL` and `OPENAI_API_KEY`; private bucket/project; server-side model allowlist; provider timeout; bounded DB pool settings.
+- Worker: secrets `DATABASE_URL`, `OPENAI_API_KEY`, and conditionally
+  `GOOGLE_GENERATIVE_LANGUAGE_API_KEY`; private bucket/project; provider-specific server-side model
+  allowlists and bounded timeouts; bounded DB pool settings.
 - Web: the single non-secret `JEWELAI_WEB_CONFIG_JSON` object containing API URL, Auth0 authority/client ID, exact callback/logout URLs, `openid profile email`, and exact API audience.
 - Jobs: only their necessary database secret plus queue or object-store settings. Reconciliation has read authority; cleanup alone has delete authority.
 

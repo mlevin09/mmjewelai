@@ -9,8 +9,9 @@ they are not Pydantic persistence models and are excluded from the published JSO
 `validate_generation_result` treats adapter results as untrusted. It requires exact run/provider/model
 lineage, output count agreement, and canonical ordinal ordering before a result can be persisted as
 successful. `validate_generation_execution` additionally aligns transient ordinals and provider IDs
-with those descriptors. The production OpenAI adapter lives in `packages/model_gateway_openai` and
-owns its timeout, response validation, and SDK dependency.
+with those descriptors. Provider translation stays isolated in `packages/model_gateway_openai` and
+`packages/model_gateway_google`; each adapter owns its timeout, transport, allowlist, response
+validation, and credential boundary.
 
 Persisted run contracts encode linear explicit retry lineage: attempt 1 has no parent, attempts above
 1 require an immediate parent, and stale execution recovery is represented as terminal
