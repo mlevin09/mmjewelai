@@ -20,6 +20,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -439,19 +440,26 @@ function Workspace() {
   });
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [activeRun, setActiveRun] = useState<string | null>(null);
-  const [pollStarted, setPollStarted] = useState(0);
+  const [submittedRun, setSubmittedRun] = useState<GenerationRun | null>(null);
+  const [pollStarted, setPollStarted] = useState(() => Date.now());
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const listedActiveRun = (runs.data?.generation_runs ?? []).find((run) =>
+    ["pending", "running"].includes(run.status),
+  );
+  const activeRunId =
+    submittedRun?.generation_run_id ??
+    listedActiveRun?.generation_run_id ??
+    null;
   const active = useQuery({
-    enabled: Boolean(activeRun),
+    enabled: Boolean(activeRunId),
     queryKey: keys.workspace(
       organizationId,
       sessionId,
-      `run-${activeRun ?? "none"}`,
+      `run-${activeRunId ?? "none"}`,
     ),
     queryFn: () =>
       api.request<GenerationRun>(
-        `/sessions/${sessionId}/generation-runs/${activeRun}`,
+        `/sessions/${sessionId}/generation-runs/${activeRunId}`,
         scoped,
       ),
     refetchInterval: (query) => {
@@ -465,15 +473,16 @@ function Workspace() {
   });
   useEffect(() => {
     if (
-      activeRun &&
+      activeRunId &&
       active.data &&
       ["succeeded", "failed"].includes(active.data.status)
     ) {
-      setActiveRun(null);
+      setSubmittedRun(null);
       void runs.refetch();
       void assets.refetch();
     }
-  }, [active.data, activeRun, assets, runs]);
+  }, [active.data, activeRunId, assets, runs]);
+  const activeRun = active.data ?? submittedRun ?? listedActiveRun ?? null;
 
   const refreshRevision = async () => {
     await client.invalidateQueries({
@@ -601,8 +610,9 @@ function Workspace() {
             sessionId={sessionId}
             revisionId={revision.data.revision_id}
             profiles={catalog.data?.generation_profiles ?? []}
-            onRun={(runId) => {
-              setActiveRun(runId);
+            activeRun={activeRun}
+            onRun={(run) => {
+              setSubmittedRun(run);
               setPollStarted(Date.now());
             }}
           />
@@ -652,7 +662,7 @@ function Workspace() {
                         { ...scoped, method: "POST", body: JSON.stringify({}) },
                       )
                       .then((child) => {
-                        setActiveRun(child.generation_run_id);
+                        setSubmittedRun(child);
                         setPollStarted(Date.now());
                         return runs.refetch();
                       })
@@ -663,7 +673,7 @@ function Workspace() {
               )}
             </article>
           ))}
-          {activeRun && Date.now() - pollStarted >= 300_000 && (
+          {activeRunId && Date.now() - pollStarted >= 300_000 && (
             <p className="notice">
               Live polling paused after five minutes. Refresh to check again.
             </p>
@@ -699,12 +709,13 @@ function Workspace() {
   );
 }
 
-function ReadyActions({
+export function ReadyActions({
   api,
   organizationId,
   sessionId,
   revisionId,
   profiles,
+  activeRun,
   onRun,
 }: {
   api: ApiClient;
@@ -712,13 +723,43 @@ function ReadyActions({
   sessionId: string;
   revisionId: string;
   profiles: UiCatalog["generation_profiles"];
-  onRun: (runId: string) => void;
+  activeRun: GenerationRun | null;
+  onRun: (run: GenerationRun) => void;
 }) {
   const [prompt, setPrompt] = useState<PromptRevision | null>(null);
   const [profile, setProfile] = useState(profiles[0]?.profile_id ?? "");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submissionInFlight = useRef(false);
+  const activeStatus =
+    activeRun && ["pending", "running"].includes(activeRun.status)
+      ? activeRun.status
+      : null;
   useEffect(() => {
     if (!profile && profiles[0]) setProfile(profiles[0].profile_id);
   }, [profile, profiles]);
+  const submitGeneration = async () => {
+    if (!prompt || !profile || submissionInFlight.current || activeStatus)
+      return;
+    submissionInFlight.current = true;
+    setIsSubmitting(true);
+    try {
+      const run = await api.request<GenerationRun>(
+        `/sessions/${sessionId}/generation-runs`,
+        {
+          organizationId,
+          method: "POST",
+          body: JSON.stringify({
+            prompt_revision_id: prompt.prompt_revision_id,
+            profile_id: profile,
+          }),
+        },
+      );
+      onRun(run);
+    } finally {
+      submissionInFlight.current = false;
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="ready-actions">
       {!prompt ? (
@@ -754,25 +795,16 @@ function ReadyActions({
             </select>
           </label>
           <button
-            disabled={!profile}
-            onClick={() =>
-              void api
-                .request<GenerationRun>(
-                  `/sessions/${sessionId}/generation-runs`,
-                  {
-                    organizationId,
-                    method: "POST",
-                    body: JSON.stringify({
-                      prompt_revision_id: prompt.prompt_revision_id,
-                      profile_id: profile,
-                    }),
-                  },
-                )
-                .then((run) => onRun(run.generation_run_id))
-            }
+            disabled={!profile || isSubmitting || Boolean(activeStatus)}
+            onClick={() => void submitGeneration()}
           >
-            Queue generation
+            {isSubmitting ? "Queueing generation…" : "Queue generation"}
           </button>
+          {activeStatus && (
+            <p className="notice">
+              Generation status: {activeStatus.toUpperCase()}
+            </p>
+          )}
           {!profiles.length && <p>No generation profiles are configured.</p>}
         </>
       )}
