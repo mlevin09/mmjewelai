@@ -29,6 +29,7 @@ from jewelai_auth import (
     MembershipNotFoundError,
     TokenVerifier,
 )
+from jewelai_auth_identity_platform import IdentityPlatformTokenVerifier
 from jewelai_auth_oidc import OidcJwtVerifier
 from jewelai_domain import UnknownRoleError, UnsupportedLocaleError
 from jewelai_generation_queue import GenerationTaskPublisher
@@ -126,9 +127,18 @@ def create_app(
         require_generation_publisher=generation_task_publisher is None,
     )
     if token_verifier is None:
-        if settings.oidc is None:
-            raise ValueError("OIDC configuration is required when no token verifier is injected")
-        token_verifier = OidcJwtVerifier(settings.oidc)
+        if settings.auth_provider == "identity_platform":
+            if settings.identity_platform is None:
+                raise ValueError(
+                    "Identity Platform configuration is required when no token verifier is injected"
+                )
+            token_verifier = IdentityPlatformTokenVerifier(settings.identity_platform)
+        else:
+            if settings.oidc is None:
+                raise ValueError(
+                    "OIDC configuration is required when no token verifier is injected"
+                )
+            token_verifier = OidcJwtVerifier(settings.oidc)
     if asset_access_signer is None:
         if settings.asset_signing is None:
             raise ValueError(

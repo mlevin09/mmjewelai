@@ -32,7 +32,9 @@ in `EUROPE-WEST1`.
    prevent-self-review so the agent-owned workflow can complete autonomously. Its configuration
    must include
    `GCP_PROJECT_ID=mmjewellai-preprod` and matching region, registry, state bucket, WIF deployer,
-   domains, Asset bucket, Auth0 credentials, OpenAI allowlist, and generation profiles.
+   domains, Asset bucket, optional OpenAI allowlist, and generation profiles. Identity Platform
+   browser configuration is derived from Terraform-managed Firebase resources and is not a GitHub
+   secret or operator-supplied client credential.
 3. Ensure `GENERATION_PROFILES_JSON` contains at least one Google profile using one of the three
    workflow-pinned Google image models. The workflow rejects a catalog with no executable Google
    profile.
@@ -40,13 +42,18 @@ in `EUROPE-WEST1`.
    with an enabled version. The workflow references this existing secret; it never creates, reads,
    prints, or transports the value. OpenAI is optional in preproduction; an empty
    `OPENAI_ALLOWED_MODELS` omits its secret, IAM, worker environment, and preflight.
-5. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. The plan and apply jobs both use
+5. The first platform apply enables Identity Platform email/password authentication, registers the
+   Firebase Web application, and authorizes the exact preproduction web domain. Create controlled
+   test identities administratively; authentication never creates JewelAI membership or grants
+   organization access.
+6. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. The plan and apply jobs both use
    the single `preprod` Environment. The separate apply stage consumes the
    checksum/configuration-bound plan produced by the plan stage without re-planning.
    Redacted plan output remains available for inspection. State is isolated under
    `preprod/platform`; the workflow fails
    if the configured project is anything other than `mmjewellai-preprod`.
-6. Complete the same managed-DNS readiness or external-DNS handoff used by production, then perform
+7. Complete the same managed-DNS readiness or external-DNS handoff used by production, verify a
+   Firebase ID-token login and membership denial/allow path, then perform
    one bounded Google generation smoke test. Verify the selected provider/model lineage, private
    Asset finalization, and absence of prompt/image/API-key content in logs.
 
@@ -74,6 +81,10 @@ Record the previous API, worker, and web digests before deployment. To roll back
 
 - **API 5xx/high latency:** inspect the request-completion metric/logs by request ID, Cloud Run revision health, SQL saturation, and queue calls. Logs intentionally omit bodies and credentials.
 - **OIDC unavailable:** check Auth0 status, exact issuer/JWKS reachability, SPA callback/origin settings, and access-token audience. Do not weaken issuer/audience checks.
+- **Preproduction Identity Platform unavailable:** check the Identity Toolkit API, email/password
+  provider state, Firebase Web application configuration, authorized web domain, and exact
+  `securetoken.google.com/<project-id>` issuer/project audience. Do not substitute email or Google
+  claims for PostgreSQL membership.
 - **Cloud SQL unavailable:** inspect instance/connection metrics, pool-budget formula, maintenance, backups, and Cloud SQL attachment/IAM. Do not expose an authorized network as a shortcut.
 - **Cloud Tasks backlog:** inspect queue depth/age, finite delivery attempts, worker IAM/health, and outbox. Run the bounded outbox job only after the cause is understood.
 - **Worker/provider failures:** query structured `generation_task_failed` counts and safe error codes. Never log provider raw responses, prompts, or base64.

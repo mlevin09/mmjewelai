@@ -69,6 +69,7 @@ preprod_storage = _read_preprod("storage.tf")
 preprod_tasks = _read_preprod("tasks.tf")
 preprod_variables = _read_preprod("variables.tf")
 preprod_versions = _read_preprod("versions.tf")
+preprod_identity = _read_preprod("identity_platform.tf")
 preprod_tfvars_example = _read_preprod("terraform.tfvars.example")
 deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").read_text(
     encoding="utf-8"
@@ -137,9 +138,7 @@ preprod_openai_allowed_models = _variable(preprod_variables, "openai_allowed_mod
 preprod_google_allowed_models = _variable(
     preprod_variables, "google_generative_language_allowed_models"
 )
-preprod_google_secret_id = _variable(
-    preprod_variables, "google_generative_language_secret_id"
-)
+preprod_google_secret_id = _variable(preprod_variables, "google_generative_language_secret_id")
 stale_recovery = _variable(variables, "stale_recovery_seconds")
 _forbid(generation_profiles, "\n  default", "implicit production generation profile")
 _forbid(allowed_models, "\n  default", "implicit production worker model allowlist")
@@ -187,6 +186,35 @@ _require(
     preprod_openai_allowed_models,
     'default     = ""',
     "OpenAI independently optional in preprod",
+)
+_require(
+    preprod_identity,
+    'resource "google_identity_platform_config" "preprod"',
+    "preprod Identity Platform configuration",
+)
+_require(preprod_identity, "enabled           = true", "preprod email/password sign-in")
+_require(
+    preprod_identity,
+    "authorized_domains = distinct([",
+    "preprod authorized browser domains",
+)
+_forbid(preprod_versions, "auth0/auth0", "Auth0 provider in preprod")
+_forbid(preprod_workflow, "AUTH0_", "Auth0 credentials in preprod workflow")
+_forbid(preprod_workflow, "TF_VAR_auth0_domain", "Auth0 domain in preprod fingerprint")
+_require(
+    preprod_workflow,
+    "Verify Identity Platform configuration",
+    "preprod Identity Platform readiness check",
+)
+_require(
+    preprod_services,
+    'AUTH_PROVIDER                         = "identity_platform"',
+    "preprod API Identity Platform verifier selection",
+)
+_require(
+    preprod_services,
+    'authProvider               = "identity_platform"',
+    "preprod web Identity Platform selection",
 )
 for google_model in (
     "gemini-3.1-flash-lite-image",
@@ -300,7 +328,9 @@ if preprod_review_start < 0:
 preprod_review = preprod_plan[preprod_review_start:]
 
 _require(preprod_workflow, "group: preprod-deployment", "isolated preprod concurrency")
-_require(preprod_workflow, 'test "${PROJECT_ID}" = "mmjewellai-preprod"', "exact preprod project guard")
+_require(
+    preprod_workflow, 'test "${PROJECT_ID}" = "mmjewellai-preprod"', "exact preprod project guard"
+)
 _require(preprod_workflow, "TF_VAR_deployment_environment: preprod", "preprod runtime identity")
 _require(
     preprod_workflow,
@@ -349,7 +379,9 @@ if not 0 <= preprod_environment_checks_end < preprod_cloud_auth_start < preprod_
         "Missing preprod invariant: environment checks before cloud authentication and plan"
     )
 _require(preprod_workflow, '-backend-config="prefix=preprod/platform"', "isolated preprod state")
-_require(preprod_plan, "gcloud storage cp --if-generation-match=0", "create-only preprod plan upload")
+_require(
+    preprod_plan, "gcloud storage cp --if-generation-match=0", "create-only preprod plan upload"
+)
 _require(preprod_plan, "deployment-plans/preprod/", "isolated private preprod plan namespace")
 _require(preprod_review, "actions/upload-artifact@v4", "preprod redacted review artifact")
 _require(preprod_review, "preprod-terraform-plan-redacted.txt", "preprod redacted output only")
@@ -375,10 +407,18 @@ _forbid(
 )
 _forbid(deploy_workflow, "mmjewellai-preprod", "preprod project in production workflow")
 _require(preprod_versions, 'prefix = "preprod/platform"', "preprod backend state prefix")
-_require(preprod_locals, 'prefix        = "jewelai-preprod"', "preprod resource namespace")
-_require(preprod_storage, 'public_access_prevention    = "enforced"', "preprod GCS public access prevention")
+_require(
+    preprod_locals, 'prefix                   = "jewelai-preprod"', "preprod resource namespace"
+)
+_require(
+    preprod_storage,
+    'public_access_prevention    = "enforced"',
+    "preprod GCS public access prevention",
+)
 _require(preprod_storage, "uniform_bucket_level_access = true", "preprod uniform bucket IAM")
-_require(preprod_tasks, "max_attempts       = var.task_max_attempts", "preprod finite queue attempts")
+_require(
+    preprod_tasks, "max_attempts       = var.task_max_attempts", "preprod finite queue attempts"
+)
 _require(
     preprod_services,
     'ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"',
@@ -407,12 +447,8 @@ preprod_bootstrap_asset_bucket = _variable(preprod_bootstrap_variables, "asset_b
 preprod_bootstrap_repository = _variable(
     preprod_bootstrap_variables, "artifact_registry_repository"
 )
-preprod_bootstrap_github_repository = _variable(
-    preprod_bootstrap_variables, "github_repository"
-)
-preprod_bootstrap_github_branch = _variable(
-    preprod_bootstrap_variables, "github_deploy_branch"
-)
+preprod_bootstrap_github_repository = _variable(preprod_bootstrap_variables, "github_repository")
+preprod_bootstrap_github_branch = _variable(preprod_bootstrap_variables, "github_deploy_branch")
 _require(
     preprod_bootstrap_project,
     'default     = "mmjewellai-preprod"',
@@ -445,7 +481,8 @@ _require(
 )
 _require(
     preprod_bootstrap,
-    "assertion.repository == '${var.github_repository}' && assertion.ref == '${var.github_deploy_branch}'",
+    "assertion.repository == '${var.github_repository}' && "
+    "assertion.ref == '${var.github_deploy_branch}'",
     "preprod exact repository and branch federation condition",
 )
 _require(
@@ -481,6 +518,16 @@ _require(
 _forbid(preprod_bootstrap, "jewelai-prod-deployer", "production deployer in preprod bootstrap")
 _forbid(preprod_bootstrap, '"roles/owner"', "Owner role in preprod bootstrap")
 _forbid(preprod_bootstrap, '"roles/editor"', "Editor role in preprod bootstrap")
+_require(
+    preprod_bootstrap,
+    '"roles/firebase.editor"',
+    "preprod deployer Firebase management role",
+)
+_require(
+    preprod_bootstrap,
+    '"roles/identitytoolkit.editor"',
+    "preprod deployer Identity Platform management role",
+)
 _forbid(
     preprod_bootstrap,
     'resource "google_storage_bucket" "assets"',

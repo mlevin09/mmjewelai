@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-auth-identity-platform"
+version = "1.0.0"
+description = "Google Cloud Identity Platform ID-token verifier for JewelAI"
+requires-python = ">=3.12"
+dependencies = [
+  "google-auth[requests]>=2.40,<3",
+  "jewelai-auth==1.0.0",
+  "pydantic>=2.11,<3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jewelai_auth_identity_platform"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

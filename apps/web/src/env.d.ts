@@ -1,6 +1,11 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_AUTH_PROVIDER?: string;
+  readonly VITE_IDENTITY_PLATFORM_API_KEY?: string;
+  readonly VITE_IDENTITY_PLATFORM_AUTH_DOMAIN?: string;
+  readonly VITE_IDENTITY_PLATFORM_PROJECT_ID?: string;
+  readonly VITE_IDENTITY_PLATFORM_APP_ID?: string;
   readonly VITE_API_BASE_URL: string;
   readonly VITE_OIDC_AUTHORITY: string;
   readonly VITE_OIDC_CLIENT_ID: string;

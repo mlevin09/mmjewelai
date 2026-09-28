@@ -45,16 +45,16 @@ output "worker_service_name" {
   value = google_cloud_run_v2_service.worker.name
 }
 
-output "auth0_spa_client_id" {
-  value = auth0_client.jewelai_web.client_id
+output "identity_platform_issuer" {
+  value = local.identity_platform_issuer
 }
 
-output "oidc_issuer" {
-  value = local.oidc_issuer
+output "identity_platform_project_id" {
+  value = var.project_id
 }
 
-output "oidc_audience" {
-  value = local.oidc_audience
+output "identity_platform_web_app_id" {
+  value = google_firebase_web_app.jewelai.app_id
 }
 
 output "asset_bucket_name" {

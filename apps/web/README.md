@@ -1,18 +1,19 @@
 # JewelAI Web v1
 
-React/TypeScript browser application for the authenticated JewelAI core workflow. It is an OAuth
-2.0/OIDC public client using Authorization Code + PKCE. Access tokens are held by `oidc-client-ts`
-in `sessionStorage`; ID tokens are never sent to the API and no client secret belongs in browser
-configuration.
+React/TypeScript browser application for the authenticated JewelAI core workflow. Production keeps
+its OAuth 2.0/OIDC Authorization Code + PKCE client. Preproduction uses the official Firebase Auth
+SDK for Google Cloud Identity Platform, session-only persistence, and email/password sign-in. The
+Firebase ID token is sent to the API as a bearer token. No client or service-account secret belongs
+in browser configuration.
 
 ## Configuration
 
-Copy `.env.example` to `.env.local` and set the public values. The OIDC application must register
-the exact callback and post-logout URIs. The API must include the browser origin in
-`WEB_ALLOWED_ORIGINS`.
+Copy `.env.example` to `.env.local` and set one provider's public values. OIDC registers exact
+callback/logout URIs. Identity Platform requires its public API key, auth domain, project ID, and
+app ID. The API must include the browser origin in `WEB_ALLOWED_ORIGINS`.
 
 Production loads `/runtime-config.js` before the application bundle. The non-root nginx entrypoint
-writes it from `JEWELAI_WEB_CONFIG_JSON`, so the API URL and public Auth0/OIDC values can change
+writes it from `JEWELAI_WEB_CONFIG_JSON`, so the API URL and public identity values can change
 without rebuilding. Runtime values win over Vite development values and are strictly validated:
 production URLs are HTTPS, scope contains `openid`, audience/client ID are non-empty, and unknown
 fields (including secret fields) fail startup. The authorization request includes the API audience.

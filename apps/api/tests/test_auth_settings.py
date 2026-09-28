@@ -1,5 +1,6 @@
 import pytest
 from jewelai_assets_gcs import GcsAssetStorageConfig
+from jewelai_auth_identity_platform import IdentityPlatformConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from jewelai_persistence import DatabasePoolConfig
 from pydantic import ValidationError
@@ -40,6 +41,22 @@ def test_runtime_settings_load_valid_oidc_environment(monkeypatch):
         audience="jewelai-api",
         jwks_url="https://issuer.test/keys",
     )
+
+
+def test_runtime_settings_load_identity_platform_environment(monkeypatch):
+    monkeypatch.setenv("AUTH_PROVIDER", "identity_platform")
+    monkeypatch.setenv("IDENTITY_PLATFORM_PROJECT_ID", "mmjewellai-preprod")
+    settings = RuntimeSettings.from_environment(require_asset_signer=False)
+    assert settings.auth_provider == "identity_platform"
+    assert settings.identity_platform == IdentityPlatformConfig(project_id="mmjewellai-preprod")
+    assert settings.oidc is None
+
+
+def test_runtime_settings_require_identity_platform_project(monkeypatch):
+    monkeypatch.setenv("AUTH_PROVIDER", "identity_platform")
+    monkeypatch.delenv("IDENTITY_PLATFORM_PROJECT_ID", raising=False)
+    with pytest.raises(ValueError, match="IDENTITY_PLATFORM_PROJECT_ID is required"):
+        RuntimeSettings.from_environment(require_asset_signer=False)
 
 
 @pytest.mark.parametrize("missing", ["OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL"])

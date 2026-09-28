@@ -14,6 +14,9 @@ callback/logout/origin values, and a controlled database connection. The browser
 Code + PKCE without a secret. Auth0 identity does not grant JewelAI owner/admin/member authority;
 database membership remains authoritative.
 
+Preproduction uses the separate `jewelai-auth-identity-platform` adapter. This package remains the
+production OIDC/Auth0 path until a separate production identity decision is made.
+
 ```bash
 python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
 ```
