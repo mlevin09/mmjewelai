@@ -70,6 +70,7 @@ preprod_tasks = _read_preprod("tasks.tf")
 preprod_variables = _read_preprod("variables.tf")
 preprod_versions = _read_preprod("versions.tf")
 preprod_identity = _read_preprod("identity_platform.tf")
+preprod_database = _read_preprod("database.tf")
 preprod_tfvars_example = _read_preprod("terraform.tfvars.example")
 deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").read_text(
     encoding="utf-8"
@@ -184,6 +185,11 @@ _require(
     preprod_google_secret_id,
     'default     = "jewelai-preprod-google-generative-language-api-key"',
     "exact existing preprod Google secret ID",
+)
+_require(
+    preprod_database,
+    'edition                     = "ENTERPRISE"',
+    "preprod Cloud SQL custom tier edition",
 )
 _require(
     preprod_openai_allowed_models,
