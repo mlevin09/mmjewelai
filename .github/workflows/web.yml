@@ -12,6 +12,7 @@ on:
       - data/questions/**
       - infra/terraform/production/**
       - .github/workflows/deploy-production.yml
+      - .github/workflows/deploy-preprod.yml
       - .github/workflows/web.yml
   push:
     branches: [jewelai-v2]
@@ -24,6 +25,7 @@ on:
       - data/questions/**
       - infra/terraform/production/**
       - .github/workflows/deploy-production.yml
+      - .github/workflows/deploy-preprod.yml
       - .github/workflows/web.yml
 
 permissions:

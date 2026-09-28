@@ -162,3 +162,9 @@ Browser and API traffic enter through the load balancer; the worker and jobs are
 proves identity but never replaces database-authoritative organization membership. Production
 images are digest-pinned, and apply remains an exact-SHA manual protected workflow. See
 [ADR 0021](docs/adr/0021-production-gcp-auth0-observability.md) and `infra/RUNBOOK.md`.
+
+Preproduction mirrors the same reviewed runtime architecture in `infra/terraform/preprod` for the
+isolated `mmjewellai-preprod` project, with a separate state prefix, resource namespace, protected
+deployment environments, and existing Google API-key secret. It enables the exact Google
+image-model allowlist for controlled smoke testing without changing production. See
+[ADR 0023](docs/adr/0023-preproduction-deployment.md).

@@ -16,6 +16,32 @@ Production operations are manual, reviewed, and credential-safe. Never paste tok
 
 No local developer task should apply either stack or mutate Auth0, GCP, DNS, users, or secrets.
 
+## Preproduction setup and deploy
+
+Preproduction is isolated from production and is deployed only by the manual `Deploy preprod`
+workflow from `jewelai-v2`.
+
+1. Configure GitHub Environments `preprod-plan` and `preprod` with required reviewers,
+   `prevent_self_review=true`, and a non-null deployment branch policy. Both must use
+   `GCP_PROJECT_ID=mmjewellai-preprod` and matching region, registry, state bucket, WIF deployer,
+   domains, Asset bucket, Auth0 credentials, OpenAI allowlist, and generation profiles.
+2. Ensure `GENERATION_PROFILES_JSON` contains at least one Google profile using one of the three
+   workflow-pinned Google image models. The workflow rejects a catalog with no executable Google
+   profile.
+3. Confirm `jewelai-preprod-google-generative-language-api-key` exists in the preproduction project
+   with an enabled version. The workflow references this existing secret; it never creates, reads,
+   prints, or transports the value. OpenAI is optional in preproduction; an empty
+   `OPENAI_ALLOWED_MODELS` omits its secret, IAM, worker environment, and preflight.
+4. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. Review the redacted plan, then
+   approve the separate apply stage. State is isolated under `preprod/platform`; the workflow fails
+   if the configured project is anything other than `mmjewellai-preprod`.
+5. Complete the same managed-DNS readiness or external-DNS handoff used by production, then perform
+   one bounded Google generation smoke test. Verify the selected provider/model lineage, private
+   Asset finalization, and absence of prompt/image/API-key content in logs.
+
+Never reuse the `production-plan` or `production` GitHub Environments, production state prefix,
+production domains, or production secrets for this workflow.
+
 ## Normal deploy
 
 1. Verify Runtime API, Web, and Infrastructure checks are green on the exact `jewelai-v2` SHA.

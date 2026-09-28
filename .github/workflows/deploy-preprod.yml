@@ -1,0 +1,347 @@
+name: Deploy preprod
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_sha:
+        description: Exact jewelai-v2 commit SHA approved for preproduction
+        required: true
+        type: string
+      verify_external_dns_https:
+        description: Require HTTPS readiness after operator-managed DNS records exist
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+
+concurrency:
+  group: preprod-deployment
+  cancel-in-progress: false
+
+env:
+  GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS: gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image
+  TF_VAR_google_generative_language_allowed_models: gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/jewelai-v2' && github.event.inputs.confirm_sha == github.sha
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: preprod-plan
+    outputs:
+      api_image: ${{ steps.images.outputs.api_image }}
+      worker_image: ${{ steps.images.outputs.worker_image }}
+      web_image: ${{ steps.images.outputs.web_image }}
+      plan_sha256: ${{ steps.terraform_plan.outputs.plan_sha256 }}
+      plan_generation: ${{ steps.terraform_plan.outputs.plan_generation }}
+      deployment_config_sha256: ${{ steps.terraform_plan.outputs.deployment_config_sha256 }}
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ vars.GCP_REGION }}
+      TF_VAR_artifact_registry_repository: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      TF_VAR_asset_bucket_name: ${{ vars.GCS_ASSET_BUCKET }}
+      TF_VAR_web_domain: ${{ vars.WEB_DOMAIN }}
+      TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
+      TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
+      TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
+      TF_VAR_deployment_environment: preprod
+      TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
+      TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
+      TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
+    steps:
+      - name: Verify immutable deployment identity
+        run: |
+          echo "Planning exact jewelai-v2 SHA: ${GITHUB_SHA}"
+          test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
+          test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
+          test "${PROJECT_ID}" = "mmjewellai-preprod"
+      - name: Verify mandatory deployment environment protections
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          verify_environment() {
+            environment_name="$1"
+            environment_json="$(curl --fail --silent --show-error \
+              --header "Accept: application/vnd.github+json" \
+              --header "Authorization: Bearer ${GH_TOKEN}" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/environments/${environment_name}")"
+            jq --exit-status '
+              [.protection_rules[]? |
+                select(
+                  .type == "required_reviewers" and
+                  .prevent_self_review == true and
+                  (.reviewers | length) > 0
+                )
+              ] | length == 1
+            ' <<<"${environment_json}" >/dev/null
+            jq --exit-status '
+              .deployment_branch_policy != null and
+              (
+                .deployment_branch_policy.protected_branches == true or
+                .deployment_branch_policy.custom_branch_policies == true
+              )
+            ' <<<"${environment_json}" >/dev/null
+          }
+          verify_environment preprod-plan
+          verify_environment preprod
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - name: Configure Artifact Registry
+        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - name: Build and push immutable commit images
+        run: |
+          registry="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}"
+          docker build -f infra/docker/api.Dockerfile -t "${registry}/jewelai-api:${GITHUB_SHA}" .
+          docker build -f infra/docker/worker.Dockerfile -t "${registry}/jewelai-generation-worker:${GITHUB_SHA}" .
+          docker build -f infra/docker/web.Dockerfile -t "${registry}/jewelai-web:${GITHUB_SHA}" .
+          docker push "${registry}/jewelai-api:${GITHUB_SHA}"
+          docker push "${registry}/jewelai-generation-worker:${GITHUB_SHA}"
+          docker push "${registry}/jewelai-web:${GITHUB_SHA}"
+      - name: Resolve immutable digests
+        id: images
+        run: |
+          registry="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}"
+          api_digest="$(gcloud artifacts docker images describe "${registry}/jewelai-api:${GITHUB_SHA}" --format='value(image_summary.digest)')"
+          worker_digest="$(gcloud artifacts docker images describe "${registry}/jewelai-generation-worker:${GITHUB_SHA}" --format='value(image_summary.digest)')"
+          web_digest="$(gcloud artifacts docker images describe "${registry}/jewelai-web:${GITHUB_SHA}" --format='value(image_summary.digest)')"
+          test -n "${api_digest}" && test -n "${worker_digest}" && test -n "${web_digest}"
+          api_image="${registry}/jewelai-api@${api_digest}"
+          worker_image="${registry}/jewelai-generation-worker@${worker_digest}"
+          web_image="${registry}/jewelai-web@${web_digest}"
+          echo "TF_VAR_api_image=${api_image}" >> "${GITHUB_ENV}"
+          echo "TF_VAR_worker_image=${worker_image}" >> "${GITHUB_ENV}"
+          echo "TF_VAR_web_image=${web_image}" >> "${GITHUB_ENV}"
+          echo "api_image=${api_image}" >> "${GITHUB_OUTPUT}"
+          echo "worker_image=${worker_image}" >> "${GITHUB_OUTPUT}"
+          echo "web_image=${web_image}" >> "${GITHUB_OUTPUT}"
+          echo "API digest: ${api_digest}"
+          echo "Worker digest: ${worker_digest}"
+          echo "Web digest: ${web_digest}"
+      - name: Preflight preproduction inputs and provider secrets
+        run: |
+          test "${PROJECT_ID}" = "mmjewellai-preprod"
+          test -n "${TF_VAR_generation_profiles_json}"
+          test -n "${TF_VAR_google_generative_language_allowed_models}"
+          jq --exit-status --arg models "${TF_VAR_google_generative_language_allowed_models}" '
+            ($models | split(",")) as $allowed |
+            any(.[]; .provider == "google" and (.model as $model | $allowed | index($model) != null))
+          ' <<<"${TF_VAR_generation_profiles_json}" >/dev/null
+          if [ -n "${TF_VAR_openai_allowed_models}" ]; then
+            enabled="$(gcloud secrets versions list jewelai-preprod-openai-api-key --filter='state=ENABLED' --limit=1 --format='value(name)')"
+            test -n "${enabled}"
+          fi
+          google_enabled="$(gcloud secrets versions list jewelai-preprod-google-generative-language-api-key --filter='state=ENABLED' --limit=1 --format='value(name)')"
+          test -n "${google_enabled}"
+      - name: Create exact Terraform plan
+        id: terraform_plan
+        run: |
+          terraform -chdir=infra/terraform/preprod init -input=false \
+            -backend-config="bucket=${STATE_BUCKET}" \
+            -backend-config="prefix=preprod/platform"
+          terraform -chdir=infra/terraform/preprod plan -input=false -no-color -out=preprod.tfplan
+          terraform -chdir=infra/terraform/preprod show -no-color preprod.tfplan \
+            > infra/terraform/preprod/preprod-plan-redacted.txt
+          plan_sha256="$(sha256sum infra/terraform/preprod/preprod.tfplan | cut -d ' ' -f 1)"
+          deployment_config_sha256="$(printf '%s\0' \
+            "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
+            "${TF_VAR_asset_bucket_name}" \
+            "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
+            "${TF_VAR_auth0_domain}" "${TF_VAR_deployment_environment}" \
+            "${TF_VAR_generation_profiles_json}" \
+            "${TF_VAR_openai_allowed_models}" \
+            "${TF_VAR_google_generative_language_allowed_models}" \
+            "${TF_VAR_google_generative_language_secret_id}" "${TF_VAR_api_image}" \
+            "${TF_VAR_worker_image}" "${TF_VAR_web_image}" \
+            | sha256sum | cut -d ' ' -f 1)"
+          plan_object="gs://${STATE_BUCKET}/deployment-plans/preprod/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/preprod.tfplan"
+          gcloud storage cp --if-generation-match=0 \
+            infra/terraform/preprod/preprod.tfplan "${plan_object}"
+          plan_generation="$(gcloud storage objects describe "${plan_object}" --format='value(generation)')"
+          test -n "${plan_generation}"
+          echo "plan_sha256=${plan_sha256}" >> "${GITHUB_OUTPUT}"
+          echo "plan_generation=${plan_generation}" >> "${GITHUB_OUTPUT}"
+          echo "deployment_config_sha256=${deployment_config_sha256}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "### Terraform preproduction plan ready for protected approval"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Review artifact: \`preprod-plan-review-${GITHUB_SHA}\` (redacted text only)"
+            echo "- Exact binary plan: private state-bucket object; never uploaded to GitHub artifacts"
+            echo "- Plan SHA-256: \`${plan_sha256}\`"
+            echo "- Retention: one day"
+            echo "- Review \`preprod-plan-redacted.txt\` before approving the preproduction apply job."
+          } >> "${GITHUB_STEP_SUMMARY}"
+      - name: Upload redacted plan review
+        uses: actions/upload-artifact@v4
+        with:
+          name: preprod-plan-review-${{ github.sha }}
+          path: infra/terraform/preprod/preprod-plan-redacted.txt
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: preprod
+    env:
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+      REGION: ${{ vars.GCP_REGION }}
+      REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
+      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
+      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
+      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
+      TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ vars.GCP_REGION }}
+      TF_VAR_artifact_registry_repository: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
+      TF_VAR_asset_bucket_name: ${{ vars.GCS_ASSET_BUCKET }}
+      TF_VAR_web_domain: ${{ vars.WEB_DOMAIN }}
+      TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
+      TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
+      TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
+      TF_VAR_deployment_environment: preprod
+      TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
+      TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
+      TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
+      TF_VAR_api_image: ${{ needs.plan.outputs.api_image }}
+      TF_VAR_worker_image: ${{ needs.plan.outputs.worker_image }}
+      TF_VAR_web_image: ${{ needs.plan.outputs.web_image }}
+      VERIFY_EXTERNAL_DNS_HTTPS: ${{ inputs.verify_external_dns_https }}
+      EXPECTED_PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
+      EXPECTED_PLAN_GENERATION: ${{ needs.plan.outputs.plan_generation }}
+      EXPECTED_DEPLOYMENT_CONFIG_SHA256: ${{ needs.plan.outputs.deployment_config_sha256 }}
+    steps:
+      - name: Verify protected exact deployment identity
+        run: |
+          test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
+          test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
+          test "${PROJECT_ID}" = "mmjewellai-preprod"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.4
+      - name: Download private exact plan and verify bound inputs
+        run: |
+          test -n "${EXPECTED_PLAN_SHA256}"
+          test -n "${EXPECTED_PLAN_GENERATION}"
+          test -n "${EXPECTED_DEPLOYMENT_CONFIG_SHA256}"
+          plan_object="gs://${STATE_BUCKET}/deployment-plans/preprod/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/preprod.tfplan"
+          actual_plan_generation="$(gcloud storage objects describe "${plan_object}" --format='value(generation)')"
+          test "${actual_plan_generation}" = "${EXPECTED_PLAN_GENERATION}"
+          gcloud storage cp "${plan_object}" infra/terraform/preprod/preprod.tfplan
+          actual_plan_sha256="$(sha256sum infra/terraform/preprod/preprod.tfplan | cut -d ' ' -f 1)"
+          test "${actual_plan_sha256}" = "${EXPECTED_PLAN_SHA256}"
+          actual_deployment_config_sha256="$(printf '%s\0' \
+            "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
+            "${TF_VAR_asset_bucket_name}" \
+            "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
+            "${TF_VAR_auth0_domain}" "${TF_VAR_deployment_environment}" \
+            "${TF_VAR_generation_profiles_json}" \
+            "${TF_VAR_openai_allowed_models}" \
+            "${TF_VAR_google_generative_language_allowed_models}" \
+            "${TF_VAR_google_generative_language_secret_id}" "${TF_VAR_api_image}" \
+            "${TF_VAR_worker_image}" "${TF_VAR_web_image}" \
+            | sha256sum | cut -d ' ' -f 1)"
+          test "${actual_deployment_config_sha256}" = "${EXPECTED_DEPLOYMENT_CONFIG_SHA256}"
+      - name: Apply reviewed exact Terraform plan
+        run: |
+          terraform -chdir=infra/terraform/preprod init -input=false \
+            -backend-config="bucket=${STATE_BUCKET}" \
+            -backend-config="prefix=preprod/platform"
+          terraform -chdir=infra/terraform/preprod apply -input=false -auto-approve preprod.tfplan
+      - name: Delete private exact-plan object
+        if: always()
+        run: |
+          plan_object="gs://${STATE_BUCKET}/deployment-plans/preprod/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/preprod.tfplan"
+          gcloud storage rm "${plan_object}" --if-generation-match="${EXPECTED_PLAN_GENERATION}"
+      - name: Run migration job and wait
+        run: |
+          migration_job="$(terraform -chdir=infra/terraform/preprod output -raw migration_job_name)"
+          gcloud run jobs execute "${migration_job}" --region "${REGION}" --wait
+      - name: Verify identity-provider discovery
+        run: |
+          issuer="$(terraform -chdir=infra/terraform/preprod output -raw oidc_issuer)"
+          curl --fail --silent --show-error --max-time 15 \
+            "${issuer}.well-known/openid-configuration" >/dev/null
+      - name: Wait for HTTPS readiness or provide external-DNS handoff
+        id: https_readiness
+        run: |
+          dns_managed="$(terraform -chdir=infra/terraform/preprod output -raw dns_records_managed)"
+          load_balancer_ip="$(terraform -chdir=infra/terraform/preprod output -raw load_balancer_ip)"
+
+          if [[ "${dns_managed}" != "true" && "${VERIFY_EXTERNAL_DNS_HTTPS}" != "true" ]]; then
+            records="$(terraform -chdir=infra/terraform/preprod output -json required_dns_a_records)"
+            {
+              echo "### External DNS handoff required"
+              echo
+              echo "Infrastructure apply and migration completed successfully. Create these records, wait for propagation and managed-certificate activation, then rerun this workflow with \`verify_external_dns_https=true\`."
+              echo
+              echo '| Name | Type | Value |'
+              echo '| --- | --- | --- |'
+              echo "| $(jq -r '.web.name' <<<"${records}") | A | ${load_balancer_ip} |"
+              echo "| $(jq -r '.api.name' <<<"${records}") | A | ${load_balancer_ip} |"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            echo "https_ready=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          certificate="$(terraform -chdir=infra/terraform/preprod output -raw managed_certificate_name)"
+          ready=false
+          for attempt in $(seq 1 120); do
+            certificate_status="$(gcloud compute ssl-certificates describe "${certificate}" --global --project "${PROJECT_ID}" --format='value(managed.status)' 2>/dev/null || true)"
+            api_dns="$(getent ahostsv4 "${TF_VAR_api_domain}" 2>/dev/null | awk '{print $1}' | sort -u || true)"
+            web_dns="$(getent ahostsv4 "${TF_VAR_web_domain}" 2>/dev/null | awk '{print $1}' | sort -u || true)"
+            if [[ "${certificate_status}" == "ACTIVE" ]] \
+              && grep -Fxq "${load_balancer_ip}" <<<"${api_dns}" \
+              && grep -Fxq "${load_balancer_ip}" <<<"${web_dns}"; then
+              ready=true
+              break
+            fi
+            echo "HTTPS readiness attempt ${attempt}/120: certificate=${certificate_status:-unknown}"
+            if [[ "${attempt}" -lt 120 ]]; then
+              sleep 30
+            fi
+          done
+          if [[ "${ready}" != "true" ]]; then
+            echo "::error::HTTPS readiness did not complete within the bounded 60-minute window"
+            exit 1
+          fi
+          echo "https_ready=true" >> "${GITHUB_OUTPUT}"
+      - name: Preproduction HTTPS smoke checks
+        if: steps.https_readiness.outputs.https_ready == 'true'
+        run: |
+          api_url="$(terraform -chdir=infra/terraform/preprod output -raw api_url)"
+          web_url="$(terraform -chdir=infra/terraform/preprod output -raw web_url)"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 15 "${api_url}/health"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors --max-time 15 "${web_url}/health"
+          echo "API: ${api_url}"
+          echo "Web: ${web_url}"
