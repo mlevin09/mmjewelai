@@ -22,8 +22,11 @@ subset of exactly `gemini-3.1-flash-lite-image`, `gemini-3.1-flash-image`, and
 V1 requires one output and sends the immutable `CompiledPrompt` with image-only response modality.
 Optional image and thinking configuration is omitted because the current persisted provider-neutral
 configuration does not supply deterministic values. The adapter inspects only the first candidate,
-ignores text/thought parts, and requires exactly one bounded strict-base64 PNG inline part with a PNG
-signature. It never fetches URLs, writes temporary files, stores raw responses, or retries HTTP.
+ignores text/thought parts, and requires exactly one bounded strict-base64 inline image.
+Preproduction evidence showed the supported Google model returns JPEG, so the provider-neutral
+transient contract accepts Asset-supported PNG, JPEG, and WebP. The adapter preserves the declared
+type and requires its matching binary signature; it does not relabel or convert content. It never
+fetches URLs, writes temporary files, stores raw responses, or retries HTTP.
 
 Worker composition registers OpenAI and Google independently. Google requires its model allowlist
 and runtime API key; absent Google configuration leaves existing OpenAI-only deployments unchanged.

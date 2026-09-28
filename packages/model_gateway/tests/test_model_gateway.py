@@ -208,9 +208,15 @@ def test_transient_execution_rejects_count_ordinal_and_id_mismatch(generation_re
         validate_generation_execution(generation_request, execution)
 
 
-def test_transient_output_rejects_non_png_or_empty_content():
-    with pytest.raises(ValueError, match="image/png"):
-        RetrievedImageOutput(1, None, "image/jpeg", b"content")
+@pytest.mark.parametrize("content_type", ["image/png", "image/jpeg", "image/webp"])
+def test_transient_output_accepts_asset_supported_image_types(content_type):
+    output = RetrievedImageOutput(1, None, content_type, b"content")
+    assert output.declared_content_type == content_type
+
+
+def test_transient_output_rejects_unsupported_or_empty_content():
+    with pytest.raises(ValueError, match="supported image content type"):
+        RetrievedImageOutput(1, None, "image/gif", b"content")
     with pytest.raises(ValueError, match="non-empty"):
         RetrievedImageOutput(1, None, "image/png", b"")
 

@@ -19,9 +19,11 @@ V1 requires `output_count == 1`, sends only the immutable `CompiledPrompt` text 
 `imageConfig`/`thinkingConfig` fields are omitted because the current provider-neutral persisted
 configuration does not supply them. Responses are accepted only from
 `candidates[0].content.parts[].inlineData`: non-image text/thought parts are ignored, while the one
-image must declare PNG, contain strict bounded base64, decode within the Asset limit, and have the
-PNG signature. URLs, temporary files, MIME relabeling, raw-response persistence, image editing, and
-text enrichment are out of scope.
+image must declare PNG, JPEG, or WebP, contain strict bounded base64, decode within the Asset limit,
+and have the matching binary signature. The provider's supported media type is preserved through
+the transient gateway contract and validated again by Asset ingestion. URLs, temporary files, MIME
+relabeling or conversion, raw-response persistence, image editing, and text enrichment are out of
+scope.
 
 Runtime composition uses:
 
