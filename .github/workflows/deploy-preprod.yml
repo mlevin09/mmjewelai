@@ -39,6 +39,7 @@ jobs:
     timeout-minutes: 60
     environment: preprod
     outputs:
+      verify_external_dns_https: ${{ steps.deployment_request.outputs.verify_external_dns_https }}
       api_image: ${{ steps.images.outputs.api_image }}
       worker_image: ${{ steps.images.outputs.worker_image }}
       web_image: ${{ steps.images.outputs.web_image }}
@@ -66,6 +67,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
       - name: Verify immutable deployment identity
+        id: deployment_request
         run: |
           echo "Planning exact jewelai-v2 SHA: ${GITHUB_SHA}"
           test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
@@ -76,9 +78,14 @@ jobs:
               (keys | sort) == ["environment", "request_id", "verify_external_dns_https"] and
               .environment == "preprod" and
               (.request_id | type == "number" and . >= 1 and floor == .) and
-              .verify_external_dns_https == false
+              (.verify_external_dns_https | type == "boolean")
             ' .github/preprod-deployment-request.json >/dev/null
+            verify_external_dns_https="$(jq -r '.verify_external_dns_https' .github/preprod-deployment-request.json)"
+          else
+            verify_external_dns_https="${{ inputs.verify_external_dns_https }}"
           fi
+          test "${verify_external_dns_https}" = "true" || test "${verify_external_dns_https}" = "false"
+          echo "verify_external_dns_https=${verify_external_dns_https}" >> "${GITHUB_OUTPUT}"
       - name: Verify deployment environment branch policies
         env:
           GH_TOKEN: ${{ github.token }}
@@ -224,7 +231,7 @@ jobs:
       TF_VAR_api_image: ${{ needs.plan.outputs.api_image }}
       TF_VAR_worker_image: ${{ needs.plan.outputs.worker_image }}
       TF_VAR_web_image: ${{ needs.plan.outputs.web_image }}
-      VERIFY_EXTERNAL_DNS_HTTPS: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_external_dns_https || false }}
+      VERIFY_EXTERNAL_DNS_HTTPS: ${{ needs.plan.outputs.verify_external_dns_https }}
       EXPECTED_PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
       EXPECTED_PLAN_GENERATION: ${{ needs.plan.outputs.plan_generation }}
       EXPECTED_DEPLOYMENT_CONFIG_SHA256: ${{ needs.plan.outputs.deployment_config_sha256 }}

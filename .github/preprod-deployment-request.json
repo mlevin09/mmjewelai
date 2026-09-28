@@ -1,5 +1,5 @@
 {
   "environment": "preprod",
-  "request_id": 7,
-  "verify_external_dns_https": false
+  "request_id": 8,
+  "verify_external_dns_https": true
 }
