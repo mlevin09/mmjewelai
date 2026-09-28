@@ -22,13 +22,13 @@ variable "project_id" {
 variable "region" {
   type        = string
   description = "Cloud Run, Cloud SQL, queue, and Artifact Registry region."
-  default     = "us-central1"
+  default     = "europe-west1"
 }
 
 variable "asset_location" {
   type        = string
   description = "Private Asset bucket location."
-  default     = "US-CENTRAL1"
+  default     = "EUROPE-WEST1"
 }
 
 variable "web_domain" {
