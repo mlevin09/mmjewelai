@@ -13,7 +13,12 @@ Cloud Tasks -> private generation worker -> OpenAI or Google / private GCS / Clo
 Cloud Scheduler -> private Cloud Run jobs -> bounded maintenance commands
 ```
 
-The bootstrap stack creates the versioned private state bucket, regional Artifact Registry, exact-repository/exact-branch GitHub Workload Identity Federation, and production deployer. The production stack creates Auth0 resources, Cloud SQL PostgreSQL 16, the private Asset bucket, finite Cloud Tasks queue, isolated service accounts, three Cloud Run services, five Cloud Run jobs, schedules, HTTPS load balancing, managed TLS, optional Cloud DNS records, Cloud Armor, logging metric, dashboard, alerts, and uptime checks.
+Separate production and preproduction bootstrap roots create their own versioned private state
+buckets, regional Artifact Registry repositories, exact-repository/exact-branch GitHub Workload
+Identity Federation providers, and keyless deployers. The production stack creates Auth0 resources,
+Cloud SQL PostgreSQL 16, the private Asset bucket, finite Cloud Tasks queue, isolated service
+accounts, three Cloud Run services, five Cloud Run jobs, schedules, HTTPS load balancing, managed
+TLS, optional Cloud DNS records, Cloud Armor, logging metric, dashboard, alerts, and uptime checks.
 
 The `Deploy preprod` workflow instantiates that architecture in the exact `mmjewellai-preprod`
 project with the `preprod/platform` state prefix and `jewelai-preprod` resource namespace. It uses
@@ -33,6 +38,7 @@ Runtime service identities are intentionally separate. Web has no Google API per
 
 - `docker/`: multi-stage non-root API, worker, and static web images.
 - `terraform/bootstrap/`: one-time state, registry, and WIF foundation.
+- `terraform/preprod-bootstrap/`: isolated preproduction state, registry, WIF, and deployer foundation.
 - `terraform/production/`: reusable production application platform.
 - `terraform/preprod/`: isolated preproduction mirror fixed to `mmjewellai-preprod`.
 - `.github/workflows/deploy-preprod.yml`: protected exact-plan preproduction instantiation.
@@ -44,6 +50,8 @@ Runtime service identities are intentionally separate. Web has no Google API per
 terraform fmt -check -recursive infra/terraform
 terraform -chdir=infra/terraform/bootstrap init -backend=false
 terraform -chdir=infra/terraform/bootstrap validate
+terraform -chdir=infra/terraform/preprod-bootstrap init -backend=false
+terraform -chdir=infra/terraform/preprod-bootstrap validate
 terraform -chdir=infra/terraform/production init -backend=false
 terraform -chdir=infra/terraform/production validate
 terraform -chdir=infra/terraform/preprod init -backend=false

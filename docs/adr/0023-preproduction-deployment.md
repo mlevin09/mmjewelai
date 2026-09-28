@@ -23,6 +23,12 @@ stack. Production configuration remains unchanged. Preproduction fixes its envir
 redundant exact `mmjewellai-preprod` project validation in both Terraform and the workflow.
 Its regional baseline is `europe-west1`, with the private Asset bucket in `EUROPE-WEST1`.
 
+Provision the state bucket, regional Docker repository, repository-and-branch-bound WIF provider,
+and keyless `jewelai-preprod-deployer` from a distinct `infra/terraform/preprod-bootstrap` root.
+The production bootstrap remains unchanged and is never applied to the preproduction project. The
+preproduction bootstrap uses neither Owner nor Editor and reserves, but does not create, the
+deterministic Asset bucket name consumed by the main stack.
+
 The manual `Deploy preprod` workflow preserves separate plan and apply jobs while both use the
 single `preprod` GitHub Environment. That environment must have a deployment branch policy
 restricted to `jewelai-v2`. Preproduction intentionally requires neither reviewers nor self-review
@@ -48,11 +54,12 @@ configuration and must include a Google profile whose model belongs to that allo
 ## Consequences
 
 Preproduction exercises the real architecture and provider composition without modifying or
-deploying production. Its state and resource namespaces are isolated, and static invariants retain
-the security-critical parity requirements. Operators must configure the two protected GitHub Environments,
-their non-secret values/Auth0 credentials, and an explicit Google generation profile before manual
-deployment. OpenAI remains independently optional in preproduction; when its allowlist is empty,
-its secret metadata, IAM grant, worker configuration, and preflight are omitted.
+deploying production. Its bootstrap, state, deployment identity, and resource namespaces are
+isolated, and static invariants retain the security-critical parity requirements. Operators must
+configure the single protected `preprod` GitHub Environment, its non-secret values/Auth0
+credentials, and an explicit Google generation profile before manual deployment. OpenAI remains
+independently optional in preproduction; when its allowlist is empty, its secret metadata, IAM
+grant, worker configuration, and preflight are omitted.
 
 No cloud resource is created by CI, accepting this ADR, or merging the implementation. Deployment is
 a later explicit protected workflow dispatch from an exact `jewelai-v2` commit.

@@ -7,6 +7,9 @@ database, queue, Asset bucket, and monitoring resources. It cannot target produc
 
 The preproduction regional baseline is `europe-west1`. Regional runtime and persistence resources
 use that region, while the private Asset bucket uses the corresponding `EUROPE-WEST1` location.
+Its backend bucket, Docker repository, GitHub WIF provider, and keyless deployer are provisioned by
+the separate [`preprod-bootstrap`](../preprod-bootstrap/README.md) root; production bootstrap
+resources are never reused.
 
 Use only the protected `Deploy preprod` workflow from an exact `jewelai-v2` SHA. The workflow
 uses the single `preprod` GitHub Environment for both its plan and apply jobs, with a deployment
