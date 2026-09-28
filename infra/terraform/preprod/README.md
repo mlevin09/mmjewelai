@@ -21,7 +21,9 @@ Because the legacy default branch does not contain this workflow, GitHub cannot 
 dispatch endpoint. A reviewed change to `.github/preprod-deployment-request.json` is the
 preproduction-only fallback trigger on `jewelai-v2`; the workflow binds deployment to that exact
 pushed SHA and validates the request before cloud authentication. Manual dispatch remains available
-if the workflow is later registered without changing the deployment contract.
+if the workflow is later registered without changing the deployment contract. A reviewed retry
+increments `request_id`; the request remains restricted to preproduction and initial external-DNS
+mode.
 
 ## Authentication
 

@@ -216,8 +216,13 @@ _require(
 )
 _require(
     preprod_workflow,
-    "jq -cS . .github/preprod-deployment-request.json",
+    "jq --exit-status '",
     "validated preprod deployment request",
+)
+_require(
+    preprod_workflow,
+    '["environment", "request_id", "verify_external_dns_https"]',
+    "closed preprod deployment request schema",
 )
 _require(preprod_deployment_request, '"environment": "preprod"', "preprod request environment")
 _require(
@@ -225,6 +230,7 @@ _require(
     '"verify_external_dns_https": false',
     "initial external-DNS deployment request",
 )
+_require(preprod_deployment_request, '"request_id":', "incrementable preprod deployment request")
 _require(
     preprod_workflow,
     "Verify Identity Platform configuration",
@@ -551,6 +557,11 @@ _require(
     preprod_bootstrap,
     '"roles/identitytoolkit.editor"',
     "preprod deployer Identity Platform management role",
+)
+_require(
+    preprod_bootstrap,
+    '"roles/iam.roleAdmin"',
+    "preprod deployer bounded custom-role administration",
 )
 _forbid(
     preprod_bootstrap,
