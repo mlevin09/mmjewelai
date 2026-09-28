@@ -72,7 +72,7 @@ production domains, or production secrets for this workflow.
 5. Confirm migration output remains `0009_generation_asset_maint (head)` for this release, queue depth is healthy, worker request events appear, and real PKCE login succeeds.
 6. Validate `/me`, organization selection, one bounded generation, and signed Asset display. Confirm the bearer token is the access token with the exact API audience—not the ID token.
 
-For an external-DNS first deploy, create the emitted A records, wait for public propagation, then dispatch the same exact deployed SHA with `verify_external_dns_https=true`. Review and approve its exact (normally no-op) plan; the apply stage then requires certificate/DNS readiness and executes both HTTPS health checks. A bounded readiness timeout is a failed verification, not an infrastructure rollback signal.
+For an external-DNS first deploy, create the emitted A records and wait for public propagation. Then increment `.github/preprod-deployment-request.json`, set its validated `verify_external_dns_https` boolean to `true`, and merge that auditable request to `jewelai-v2`. The resulting exact-SHA push deployment creates and applies its exact (normally no-op) plan, then requires certificate/DNS readiness and executes both HTTPS health checks. A bounded readiness timeout is a failed verification, not an infrastructure rollback signal.
 
 Database migrations must follow expand/contract compatibility so old and new Cloud Run revisions can overlap safely.
 

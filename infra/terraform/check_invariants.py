@@ -1,5 +1,6 @@
 """Focused static guardrails for security relationships Terraform cannot validate alone."""
 
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
@@ -82,6 +83,7 @@ preprod_workflow = (ROOT.parents[1] / ".github/workflows/deploy-preprod.yml").re
 preprod_deployment_request = (
     ROOT.parents[1] / ".github/preprod-deployment-request.json"
 ).read_text(encoding="utf-8")
+preprod_deployment_request_data = json.loads(preprod_deployment_request)
 plan_job_start = deploy_workflow.find("\n  plan:\n")
 apply_job_start = deploy_workflow.find("\n  apply:\n")
 if plan_job_start < 0 or apply_job_start < 0 or apply_job_start <= plan_job_start:
@@ -236,13 +238,37 @@ _require(
     '["environment", "request_id", "verify_external_dns_https"]',
     "closed preprod deployment request schema",
 )
-_require(preprod_deployment_request, '"environment": "preprod"', "preprod request environment")
+if set(preprod_deployment_request_data) != {
+    "environment",
+    "request_id",
+    "verify_external_dns_https",
+}:
+    raise SystemExit("Invalid closed preprod deployment request schema")
+if preprod_deployment_request_data["environment"] != "preprod":
+    raise SystemExit("Invalid preprod deployment request environment")
+if not isinstance(preprod_deployment_request_data["request_id"], int) or isinstance(
+    preprod_deployment_request_data["request_id"], bool
+):
+    raise SystemExit("Invalid incrementable preprod deployment request identifier")
+if preprod_deployment_request_data["request_id"] < 1:
+    raise SystemExit("Invalid incrementable preprod deployment request identifier")
+if not isinstance(preprod_deployment_request_data["verify_external_dns_https"], bool):
+    raise SystemExit("Invalid preprod HTTPS verification request boolean")
 _require(
-    preprod_deployment_request,
-    '"verify_external_dns_https": false',
-    "initial external-DNS deployment request",
+    preprod_workflow,
+    '(.verify_external_dns_https | type == "boolean")',
+    "boolean preprod HTTPS verification request validation",
 )
-_require(preprod_deployment_request, '"request_id":', "incrementable preprod deployment request")
+_require(
+    preprod_workflow,
+    "verify_external_dns_https: ${{ steps.deployment_request.outputs.verify_external_dns_https }}",
+    "validated preprod HTTPS verification plan output",
+)
+_require(
+    preprod_workflow,
+    "VERIFY_EXTERNAL_DNS_HTTPS: ${{ needs.plan.outputs.verify_external_dns_https }}",
+    "exact preprod HTTPS verification apply binding",
+)
 _require(
     preprod_workflow,
     "Verify Identity Platform configuration",
