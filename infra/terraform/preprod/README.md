@@ -17,6 +17,12 @@ branch policy restricted to `jewelai-v2`. Reviewer and prevent-self-review gates
 not required for preproduction. It stores only redacted plan text in GitHub; the exact binary plan is
 kept temporarily in the private state bucket and applied without re-planning.
 
+Because the legacy default branch does not contain this workflow, GitHub cannot register its manual
+dispatch endpoint. A reviewed change to `.github/preprod-deployment-request.json` is the
+preproduction-only fallback trigger on `jewelai-v2`; the workflow binds deployment to that exact
+pushed SHA and validates the request before cloud authentication. Manual dispatch remains available
+if the workflow is later registered without changing the deployment contract.
+
 ## Authentication
 
 Preproduction uses Google Cloud Identity Platform with an official Firebase Web SDK client and

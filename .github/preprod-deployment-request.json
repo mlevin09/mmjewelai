@@ -1,0 +1,4 @@
+{
+  "environment": "preprod",
+  "verify_external_dns_https": false
+}

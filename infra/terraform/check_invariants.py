@@ -77,6 +77,9 @@ deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").
 preprod_workflow = (ROOT.parents[1] / ".github/workflows/deploy-preprod.yml").read_text(
     encoding="utf-8"
 )
+preprod_deployment_request = (
+    ROOT.parents[1] / ".github/preprod-deployment-request.json"
+).read_text(encoding="utf-8")
 plan_job_start = deploy_workflow.find("\n  plan:\n")
 apply_job_start = deploy_workflow.find("\n  apply:\n")
 if plan_job_start < 0 or apply_job_start < 0 or apply_job_start <= plan_job_start:
@@ -201,6 +204,27 @@ _require(
 _forbid(preprod_versions, "auth0/auth0", "Auth0 provider in preprod")
 _forbid(preprod_workflow, "AUTH0_", "Auth0 credentials in preprod workflow")
 _forbid(preprod_workflow, "TF_VAR_auth0_domain", "Auth0 domain in preprod fingerprint")
+_require(
+    preprod_workflow,
+    "- .github/preprod-deployment-request.json",
+    "auditable preprod push trigger",
+)
+_require(
+    preprod_workflow,
+    "github.event_name == 'push' || inputs.confirm_sha == github.sha",
+    "exact manual or branch-push deployment SHA guard",
+)
+_require(
+    preprod_workflow,
+    "jq -cS . .github/preprod-deployment-request.json",
+    "validated preprod deployment request",
+)
+_require(preprod_deployment_request, '"environment": "preprod"', "preprod request environment")
+_require(
+    preprod_deployment_request,
+    '"verify_external_dns_https": false',
+    "initial external-DNS deployment request",
+)
 _require(
     preprod_workflow,
     "Verify Identity Platform configuration",

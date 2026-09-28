@@ -36,6 +36,11 @@ prevention so an agent can execute the full delivery lifecycle. Only redacted pl
 to GitHub. The exact binary plan remains in the private state bucket, is
 checksum/configuration/object-generation bound, and is applied without re-planning.
 
+While `main` remains the legacy default branch and therefore cannot register the preproduction
+workflow for manual dispatch, a change to the reviewed preproduction request JSON provides a
+path-filtered `jewelai-v2` push trigger. This fallback is preproduction-only, validates the request
+before cloud authentication, and intrinsically binds execution to the exact pushed commit SHA.
+
 Preproduction enables the exact Google image-model allowlist
 `gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image`. The worker receives it as
 `GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS` and reads the existing API-key secret as
