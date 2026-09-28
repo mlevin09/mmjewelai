@@ -164,7 +164,8 @@ images are digest-pinned, and apply remains an exact-SHA manual protected workfl
 [ADR 0021](docs/adr/0021-production-gcp-auth0-observability.md) and `infra/RUNBOOK.md`.
 
 Preproduction mirrors the same reviewed runtime architecture in `infra/terraform/preprod` for the
-isolated `mmjewellai-preprod` project, with a separate state prefix, resource namespace, protected
-deployment environments, and existing Google API-key secret. It enables the exact Google
+isolated `mmjewellai-preprod` project, with a separate state prefix, resource namespace, one
+protected `preprod` deployment environment, and existing Google API-key secret. Terraform plan and
+apply remain separate workflow stages within that environment. It enables the exact Google
 image-model allowlist for controlled smoke testing without changing production. See
 [ADR 0023](docs/adr/0023-preproduction-deployment.md).

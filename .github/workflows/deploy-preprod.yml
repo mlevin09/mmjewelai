@@ -31,7 +31,7 @@ jobs:
     if: github.ref == 'refs/heads/jewelai-v2' && github.event.inputs.confirm_sha == github.sha
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    environment: preprod-plan
+    environment: preprod
     outputs:
       api_image: ${{ steps.images.outputs.api_image }}
       worker_image: ${{ steps.images.outputs.worker_image }}
@@ -85,7 +85,6 @@ jobs:
               )
             ' <<<"${environment_json}" >/dev/null
           }
-          verify_environment preprod-plan
           verify_environment preprod
       - uses: actions/checkout@v4
         with:
@@ -152,7 +151,7 @@ jobs:
             -backend-config="prefix=preprod/platform"
           terraform -chdir=infra/terraform/preprod plan -input=false -no-color -out=preprod.tfplan
           terraform -chdir=infra/terraform/preprod show -no-color preprod.tfplan \
-            > infra/terraform/preprod/preprod-plan-redacted.txt
+            > infra/terraform/preprod/preprod-terraform-plan-redacted.txt
           plan_sha256="$(sha256sum infra/terraform/preprod/preprod.tfplan | cut -d ' ' -f 1)"
           deployment_config_sha256="$(printf '%s\0' \
             "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
@@ -177,7 +176,7 @@ jobs:
             echo "### Terraform preproduction plan ready for exact apply"
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Review artifact: \`preprod-plan-review-${GITHUB_SHA}\` (redacted text only)"
+            echo "- Review artifact: \`preprod-terraform-plan-review-${GITHUB_SHA}\` (redacted text only)"
             echo "- Exact binary plan: private state-bucket object; never uploaded to GitHub artifacts"
             echo "- Plan SHA-256: \`${plan_sha256}\`"
             echo "- Retention: one day"
@@ -186,8 +185,8 @@ jobs:
       - name: Upload redacted plan review
         uses: actions/upload-artifact@v4
         with:
-          name: preprod-plan-review-${{ github.sha }}
-          path: infra/terraform/preprod/preprod-plan-redacted.txt
+          name: preprod-terraform-plan-review-${{ github.sha }}
+          path: infra/terraform/preprod/preprod-terraform-plan-redacted.txt
           if-no-files-found: error
           retention-days: 1
 
