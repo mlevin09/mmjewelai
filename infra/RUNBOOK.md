@@ -19,7 +19,8 @@ No local developer task should apply either stack or mutate Auth0, GCP, DNS, use
 ## Preproduction setup and deploy
 
 Preproduction is isolated from production and is deployed only by the manual `Deploy preprod`
-workflow from `jewelai-v2`.
+workflow from `jewelai-v2`. Its regional baseline is `europe-west1`, with the private Asset bucket
+in `EUROPE-WEST1`.
 
 1. Configure the single GitHub Environment `preprod` with a non-null deployment branch policy
    restricted to `jewelai-v2`. Preproduction intentionally does not require reviewers or

@@ -21,6 +21,7 @@ stack. Production configuration remains unchanged. Preproduction fixes its envir
 `preprod`, uses `jewelai-preprod` resource names, `JEWELAI_ENVIRONMENT=preprod`, a separate
 `preprod/platform` Terraform backend prefix, a dedicated `preprod` GitHub Environment, and
 redundant exact `mmjewellai-preprod` project validation in both Terraform and the workflow.
+Its regional baseline is `europe-west1`, with the private Asset bucket in `EUROPE-WEST1`.
 
 The manual `Deploy preprod` workflow preserves separate plan and apply jobs while both use the
 single `preprod` GitHub Environment. That environment must have a deployment branch policy

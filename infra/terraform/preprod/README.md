@@ -5,6 +5,9 @@ This root stack mirrors the reviewed production topology while remaining isolate
 `jewelai-preprod` resource names, GitHub Environments, domains, Auth0 resources, runtime identities,
 database, queue, Asset bucket, and monitoring resources. It cannot target production.
 
+The preproduction regional baseline is `europe-west1`. Regional runtime and persistence resources
+use that region, while the private Asset bucket uses the corresponding `EUROPE-WEST1` location.
+
 Use only the protected `Deploy preprod` workflow from an exact `jewelai-v2` SHA. The workflow
 uses the single `preprod` GitHub Environment for both its plan and apply jobs, with a deployment
 branch policy restricted to `jewelai-v2`. Reviewer and prevent-self-review gates are intentionally

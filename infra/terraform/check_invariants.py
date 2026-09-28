@@ -64,6 +64,7 @@ preprod_storage = _read_preprod("storage.tf")
 preprod_tasks = _read_preprod("tasks.tf")
 preprod_variables = _read_preprod("variables.tf")
 preprod_versions = _read_preprod("versions.tf")
+preprod_tfvars_example = _read_preprod("terraform.tfvars.example")
 deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").read_text(
     encoding="utf-8"
 )
@@ -122,6 +123,8 @@ allowed_models = _variable(variables, "openai_allowed_models")
 google_allowed_models = _variable(variables, "google_generative_language_allowed_models")
 preprod_deployment_environment = _variable(preprod_variables, "deployment_environment")
 preprod_project_id = _variable(preprod_variables, "project_id")
+preprod_region = _variable(preprod_variables, "region")
+preprod_asset_location = _variable(preprod_variables, "asset_location")
 preprod_openai_allowed_models = _variable(preprod_variables, "openai_allowed_models")
 preprod_google_allowed_models = _variable(
     preprod_variables, "google_generative_language_allowed_models"
@@ -154,6 +157,19 @@ _require(
     'var.project_id == "mmjewellai-preprod"',
     "Terraform-level exact preprod project guard",
 )
+_require(preprod_region, 'default     = "europe-west1"', "fixed preprod Europe region")
+_require(
+    preprod_asset_location,
+    'default     = "EUROPE-WEST1"',
+    "fixed preprod Europe Asset location",
+)
+_require(
+    preprod_tfvars_example,
+    "europe-west1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/",
+    "preprod Europe Artifact Registry example",
+)
+_forbid(preprod_tfvars_example, "us-central1", "US Central preprod example dependency")
+_forbid(preprod_tfvars_example, "US-CENTRAL1", "US Central preprod Asset dependency")
 _require(
     preprod_google_secret_id,
     'default     = "jewelai-preprod-google-generative-language-api-key"',
