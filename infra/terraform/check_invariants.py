@@ -496,6 +496,16 @@ _require(
     'public_access_prevention    = "enforced"',
     "private preprod state storage",
 )
+_require(
+    preprod_bootstrap,
+    'role = "roles/storage.admin"',
+    "bucket-scoped state IAM administration for repeatable bootstrap plans",
+)
+_forbid(
+    preprod_bootstrap,
+    'role = "roles/storage.legacyBucketReader"',
+    "legacy state bucket IAM role that cannot refresh the authoritative policy",
+)
 _require(preprod_bootstrap, "force_destroy               = false", "durable preprod state bucket")
 for output_name in (
     "state_bucket_name",

@@ -15,7 +15,10 @@ creating that bucket.
 
 Initialize with the local bootstrap state, review a saved plan, and apply that exact plan. Supply the
 authenticated operator identity only through `TF_VAR_operator_members`; never commit it. The state
-bucket output is the remote backend used by the main preproduction platform:
+bucket grants those explicit operators and the deployer bucket-scoped `roles/storage.admin`, which
+is required to refresh the authoritative bucket IAM policy on later bootstrap plans. No operator
+receives a project-scoped storage grant. The state bucket output is the remote backend used by the
+main preproduction platform:
 
 ```bash
 terraform -chdir=infra/terraform/preprod-bootstrap init -backend=false
