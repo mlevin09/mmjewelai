@@ -2,7 +2,7 @@
 
 This root stack mirrors the reviewed production topology while remaining isolated in the exact
 `mmjewellai-preprod` project. It has its own `preprod/platform` GCS backend prefix,
-`jewelai-preprod` resource names, GitHub Environments, domains, Auth0 resources, runtime identities,
+`jewelai-preprod` resource names, GitHub Environments, domains, Identity Platform resources, runtime identities,
 database, queue, Asset bucket, and monitoring resources. It cannot target production.
 
 The preproduction regional baseline is `europe-west1`. Regional runtime and persistence resources
@@ -16,6 +16,16 @@ uses the single `preprod` GitHub Environment for both its plan and apply jobs, w
 branch policy restricted to `jewelai-v2`. Reviewer and prevent-self-review gates are intentionally
 not required for preproduction. It stores only redacted plan text in GitHub; the exact binary plan is
 kept temporarily in the private state bucket and applied without re-planning.
+
+## Authentication
+
+Preproduction uses Google Cloud Identity Platform with an official Firebase Web SDK client and
+email/password sign-in. Terraform initializes Identity Platform, registers the Firebase Web app,
+enables email/password, and authorizes the exact preproduction web domain. The Firebase client
+configuration is public configuration injected at container startup; it contains no server
+credential. The API validates Firebase ID tokens for project `mmjewellai-preprod`, while PostgreSQL
+organization membership remains the sole JewelAI authorization authority. Provider-level account
+creation never grants membership or application permissions.
 
 ## Google provider
 

@@ -3,4 +3,7 @@ provider "google" {
   region  = var.region
 }
 
-provider "auth0" {}
+provider "google-beta" {
+  project = var.project_id
+  region  = var.region
+}

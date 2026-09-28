@@ -18,6 +18,7 @@ python -m pip install -e './packages/assets[test]'
 python -m pip install -e './packages/assets_gcs[test]'
 python -m pip install -e './packages/auth[test]'
 python -m pip install -e './packages/auth_oidc[test]'
+python -m pip install -e './packages/auth_identity_platform[test]'
 python -m pip install -e './packages/persistence'
 python -m pip install -e './workers/generation[test]'
 python -m pip install -e './packages/parser[test]'
@@ -105,7 +106,11 @@ The browser contract permits GET/POST/PATCH/DELETE/OPTIONS and Authorization, Co
 X-Organization-ID without credentialed CORS.
 
 Production startup fails closed unless `OIDC_ISSUER`, `OIDC_AUDIENCE`, and HTTPS `OIDC_JWKS_URL` are
-configured. It also requires `GCS_ASSET_BUCKET` unless both an Asset access signer and object store
+configured when `AUTH_PROVIDER=oidc` (the default, retained for production). Preproduction sets
+`AUTH_PROVIDER=identity_platform` and `IDENTITY_PLATFORM_PROJECT_ID=mmjewellai-preprod`; it verifies
+Firebase/Identity Platform ID tokens with Google's published signing keys and requires the exact
+`securetoken.google.com/<project-id>` issuer and project-ID audience. Neither provider's email or
+custom claims grant JewelAI organization access. The API also requires `GCS_ASSET_BUCKET` unless both an Asset access signer and object store
 are explicitly injected;
 `GCP_PROJECT_ID` and `GCS_SIGNING_SERVICE_ACCOUNT_EMAIL` are optional non-secret settings. Google
 ADC/workload identity supplies credentials—service-account private-key JSON is not application

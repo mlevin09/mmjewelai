@@ -1,10 +1,8 @@
 locals {
-  prefix        = "jewelai-preprod"
-  web_origin    = "https://${var.web_domain}"
-  api_origin    = "https://${var.api_domain}"
-  oidc_issuer   = "https://${var.auth0_domain}/"
-  oidc_jwks     = "https://${var.auth0_domain}/.well-known/jwks.json"
-  oidc_audience = local.api_origin
+  prefix                   = "jewelai-preprod"
+  web_origin               = "https://${var.web_domain}"
+  api_origin               = "https://${var.api_domain}"
+  identity_platform_issuer = "https://securetoken.google.com/${var.project_id}"
 
   dns_records_enabled       = var.dns_managed_zone != null && var.dns_managed_zone != ""
   generation_profiles       = jsondecode(var.generation_profiles_json)
@@ -20,8 +18,10 @@ locals {
     "cloudtasks.googleapis.com",
     "compute.googleapis.com",
     "dns.googleapis.com",
+    "firebase.googleapis.com",
     "iam.googleapis.com",
     "iamcredentials.googleapis.com",
+    "identitytoolkit.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "run.googleapis.com",

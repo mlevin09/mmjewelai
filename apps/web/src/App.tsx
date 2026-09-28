@@ -77,6 +77,9 @@ function Protected() {
 
 function Login() {
   const auth = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
   if (auth.user) return <Navigate to="/" replace />;
   return (
     <main className="login-page">
@@ -84,9 +87,47 @@ function Login() {
       <p className="eyebrow">JewelAI studio</p>
       <h1>Turn a jewelry idea into a precise design brief.</h1>
       <p>Sign in with your organization identity to continue.</p>
-      <button className="primary" onClick={() => void auth.login()}>
-        Sign in securely
-      </button>
+      {auth.provider === "identity_platform" ? (
+        <form
+          className="inline-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            setError(null);
+            void auth
+              .login(email, password)
+              .catch(() => setError("Sign-in failed. Check your credentials."));
+          }}
+        >
+          <label>
+            Email
+            <input
+              required
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+          {error ? <p role="alert">{error}</p> : null}
+          <button className="primary" type="submit">
+            Sign in securely
+          </button>
+        </form>
+      ) : (
+        <button className="primary" onClick={() => void auth.login()}>
+          Sign in securely
+        </button>
+      )}
     </main>
   );
 }

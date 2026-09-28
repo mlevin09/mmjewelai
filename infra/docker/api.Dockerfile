@@ -5,7 +5,8 @@ COPY packages packages
 COPY apps/api apps/api
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip wheel --no-cache-dir --wheel-dir /wheels \
-      ./packages/domain ./packages/auth ./packages/auth_oidc ./packages/assets \
+      ./packages/domain ./packages/auth ./packages/auth_oidc \
+      ./packages/auth_identity_platform ./packages/assets \
       ./packages/assets_gcs ./packages/generation_queue ./packages/generation_queue_gcp \
       ./packages/model_gateway ./packages/parser ./packages/persistence ./packages/prompts \
       ./apps/api

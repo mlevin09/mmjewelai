@@ -5,10 +5,8 @@ locals {
     GCP_PROJECT_ID                        = var.project_id
     GCS_ASSET_BUCKET                      = google_storage_bucket.assets.name
     GCS_SIGNING_SERVICE_ACCOUNT_EMAIL     = google_service_account.runtime["signer"].email
-    OIDC_ISSUER                           = local.oidc_issuer
-    OIDC_AUDIENCE                         = local.oidc_audience
-    OIDC_JWKS_URL                         = local.oidc_jwks
-    OIDC_ALLOWED_ALGORITHMS               = "RS256"
+    AUTH_PROVIDER                         = "identity_platform"
+    IDENTITY_PLATFORM_PROJECT_ID          = var.project_id
     WEB_ALLOWED_ORIGINS                   = local.web_origin
     ASSET_UPLOAD_MAX_BYTES                = tostring(var.asset_upload_max_bytes)
     HTTP_MAX_REQUEST_BYTES                = tostring(var.http_max_request_bytes)
@@ -34,13 +32,12 @@ locals {
   } : {})
 
   web_runtime_config = jsonencode({
-    apiBaseUrl                = local.api_origin
-    oidcAuthority             = local.oidc_issuer
-    oidcClientId              = auth0_client.jewelai_web.client_id
-    oidcRedirectUri           = "${local.web_origin}/auth/callback"
-    oidcPostLogoutRedirectUri = "${local.web_origin}/login"
-    oidcScope                 = "openid profile email"
-    oidcAudience              = local.oidc_audience
+    apiBaseUrl                 = local.api_origin
+    authProvider               = "identity_platform"
+    identityPlatformApiKey     = data.google_firebase_web_app_config.jewelai.api_key
+    identityPlatformAuthDomain = data.google_firebase_web_app_config.jewelai.auth_domain
+    identityPlatformProjectId  = var.project_id
+    identityPlatformAppId      = google_firebase_web_app.jewelai.app_id
   })
 }
 

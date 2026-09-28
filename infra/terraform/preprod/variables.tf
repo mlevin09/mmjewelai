@@ -65,21 +65,6 @@ variable "dns_managed_zone" {
   }
 }
 
-variable "auth0_domain" {
-  type        = string
-  description = "Existing Auth0 tenant domain without scheme. Provider credentials come only from protected environment secrets."
-  validation {
-    condition     = can(regex("^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$", var.auth0_domain)) && !strcontains(var.auth0_domain, "..")
-    error_message = "auth0_domain must be an exact lower-case tenant hostname without scheme, slash, or whitespace."
-  }
-}
-
-variable "allow_self_signup" {
-  type        = bool
-  description = "Enable Auth0 database-connection self-signup. Controlled alpha defaults closed."
-  default     = false
-}
-
 variable "api_image" {
   type        = string
   description = "API Artifact Registry image pinned by sha256 digest."

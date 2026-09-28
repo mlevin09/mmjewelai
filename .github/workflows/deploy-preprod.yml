@@ -44,9 +44,6 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
       STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
       TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
       TF_VAR_region: ${{ vars.GCP_REGION }}
       TF_VAR_artifact_registry_repository: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
@@ -54,7 +51,6 @@ jobs:
       TF_VAR_web_domain: ${{ vars.WEB_DOMAIN }}
       TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
       TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
-      TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
       TF_VAR_deployment_environment: preprod
       TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
@@ -157,7 +153,7 @@ jobs:
             "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
             "${TF_VAR_asset_bucket_name}" \
             "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
-            "${TF_VAR_auth0_domain}" "${TF_VAR_deployment_environment}" \
+            "${TF_VAR_deployment_environment}" \
             "${TF_VAR_generation_profiles_json}" \
             "${TF_VAR_openai_allowed_models}" \
             "${TF_VAR_google_generative_language_allowed_models}" \
@@ -200,9 +196,6 @@ jobs:
       REGION: ${{ vars.GCP_REGION }}
       REPOSITORY: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
       STATE_BUCKET: ${{ vars.TERRAFORM_STATE_BUCKET }}
-      AUTH0_DOMAIN: ${{ secrets.AUTH0_DOMAIN }}
-      AUTH0_CLIENT_ID: ${{ secrets.AUTH0_CLIENT_ID }}
-      AUTH0_CLIENT_SECRET: ${{ secrets.AUTH0_CLIENT_SECRET }}
       TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
       TF_VAR_region: ${{ vars.GCP_REGION }}
       TF_VAR_artifact_registry_repository: ${{ vars.ARTIFACT_REGISTRY_REPOSITORY }}
@@ -210,7 +203,6 @@ jobs:
       TF_VAR_web_domain: ${{ vars.WEB_DOMAIN }}
       TF_VAR_api_domain: ${{ vars.API_DOMAIN }}
       TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
-      TF_VAR_auth0_domain: ${{ secrets.AUTH0_DOMAIN }}
       TF_VAR_deployment_environment: preprod
       TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
@@ -254,7 +246,7 @@ jobs:
             "${PROJECT_ID}" "${REGION}" "${REPOSITORY}" "${STATE_BUCKET}" \
             "${TF_VAR_asset_bucket_name}" \
             "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
-            "${TF_VAR_auth0_domain}" "${TF_VAR_deployment_environment}" \
+            "${TF_VAR_deployment_environment}" \
             "${TF_VAR_generation_profiles_json}" \
             "${TF_VAR_openai_allowed_models}" \
             "${TF_VAR_google_generative_language_allowed_models}" \
@@ -277,11 +269,17 @@ jobs:
         run: |
           migration_job="$(terraform -chdir=infra/terraform/preprod output -raw migration_job_name)"
           gcloud run jobs execute "${migration_job}" --region "${REGION}" --wait
-      - name: Verify identity-provider discovery
+      - name: Verify Identity Platform configuration
         run: |
-          issuer="$(terraform -chdir=infra/terraform/preprod output -raw oidc_issuer)"
+          project_id="$(terraform -chdir=infra/terraform/preprod output -raw identity_platform_project_id)"
+          test "${project_id}" = "${PROJECT_ID}"
+          access_token="$(gcloud auth print-access-token)"
           curl --fail --silent --show-error --max-time 15 \
-            "${issuer}.well-known/openid-configuration" >/dev/null
+            --header "Authorization: Bearer ${access_token}" \
+            "https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config" \
+            | jq --exit-status --arg domain "${TF_VAR_web_domain}" \
+              '.signIn.email.enabled == true and (.authorizedDomains | index($domain) != null)' \
+              >/dev/null
       - name: Wait for HTTPS readiness or provide external-DNS handoff
         id: https_readiness
         run: |

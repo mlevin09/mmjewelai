@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from jewelai_assets_gcs import GcsAssetStorageConfig
+from jewelai_auth_identity_platform import IdentityPlatformConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
 
@@ -34,6 +35,8 @@ class RuntimeSettings:
     repository_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[4])
     artifacts: ArtifactVersions = field(default_factory=ArtifactVersions)
     oidc: OidcJwtConfig | None = None
+    identity_platform: IdentityPlatformConfig | None = None
+    auth_provider: str = "oidc"
     asset_signing: GcsAssetStorageConfig | None = None
     asset_upload_max_bytes: int = DEFAULT_ASSET_UPLOAD_MAX_BYTES
     http_max_request_bytes: int = (
@@ -73,6 +76,8 @@ class RuntimeSettings:
             raise ValueError("Environment must be a non-empty exact string up to 32 characters")
         _validate_generation_profiles(self.generation_profiles)
         _validate_web_origins(self.web_allowed_origins)
+        if self.auth_provider not in {"oidc", "identity_platform"}:
+            raise ValueError("AUTH_PROVIDER must be oidc or identity_platform")
 
     @classmethod
     def from_environment(
@@ -86,8 +91,14 @@ class RuntimeSettings:
         issuer = os.getenv("OIDC_ISSUER")
         audience = os.getenv("OIDC_AUDIENCE")
         jwks_url = os.getenv("OIDC_JWKS_URL")
-        if require_oidc and not all((issuer, audience, jwks_url)):
+        auth_provider = os.getenv("AUTH_PROVIDER", "oidc")
+        identity_platform_project = os.getenv("IDENTITY_PLATFORM_PROJECT_ID")
+        if auth_provider not in {"oidc", "identity_platform"}:
+            raise ValueError("AUTH_PROVIDER must be oidc or identity_platform")
+        if require_oidc and auth_provider == "oidc" and not all((issuer, audience, jwks_url)):
             raise ValueError("OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL are required")
+        if require_oidc and auth_provider == "identity_platform" and not identity_platform_project:
+            raise ValueError("IDENTITY_PLATFORM_PROJECT_ID is required")
         asset_bucket = os.getenv("GCS_ASSET_BUCKET")
         if require_asset_signer and not asset_bucket:
             raise ValueError("GCS_ASSET_BUCKET is required")
@@ -141,6 +152,12 @@ class RuntimeSettings:
                 if all((issuer, audience, jwks_url))
                 else None
             ),
+            identity_platform=(
+                IdentityPlatformConfig(project_id=identity_platform_project)
+                if identity_platform_project
+                else None
+            ),
+            auth_provider=auth_provider,
             asset_signing=(
                 GcsAssetStorageConfig(
                     bucket_name=asset_bucket,
