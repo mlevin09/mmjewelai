@@ -189,3 +189,44 @@ None.
 **Superseded by**
 
 None.
+
+---
+
+### DEC-W04 — Generated-image media types are preserved across the provider boundary
+
+Date: 2026-09-28
+Status: WORKING
+Scope: Provider-neutral generation and Asset ingestion
+
+**Decision**
+
+The transient Model Gateway may carry PNG, JPEG, or WebP—the same bounded media types accepted by
+the Asset contract. Provider adapters must preserve the provider-declared media type and validate
+that it matches the decoded binary signature. JewelAI does not silently relabel or convert provider
+outputs.
+
+**Context**
+
+The first live preproduction Google image call returned a valid bounded JPEG. The initial Google
+adapter rejected it because the transient gateway was restricted to PNG, even though Asset
+ingestion already safely validates and stores JPEG.
+
+**Consequences**
+
+Google output can traverse the normal durable generation and Asset-finalization path without an
+image conversion dependency. Signature mismatches and unsupported media types continue to fail
+closed, and persisted provider/run/Asset lineage is unchanged.
+
+**Related sources**
+
+- ADR 0022: `docs/adr/0022-google-generative-language-image-provider.md`
+- `packages/model_gateway/src/jewelai_model_gateway/runtime.py`
+- `packages/model_gateway_google/`
+
+**Supersedes**
+
+The PNG-only transient image restriction.
+
+**Superseded by**
+
+None.

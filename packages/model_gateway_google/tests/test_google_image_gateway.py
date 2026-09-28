@@ -33,6 +33,8 @@ RUN_ID = UUID("11111111-1111-4111-8111-111111111111")
 PROMPT_ID = UUID("22222222-2222-4222-8222-222222222222")
 API_KEY = "google-secret-key-for-tests"
 PNG = b"\x89PNG\r\n\x1a\ntransient-google-image"
+JPEG = b"\xff\xd8\xfftransient-google-image"
+WEBP = b"RIFF\x10\x00\x00\x00WEBPtransient-google-image"
 
 
 @pytest.fixture(scope="module")
@@ -211,7 +213,19 @@ def test_encoded_and_decoded_size_limits_are_enforced(compiled_prompt):
             ).execute(generation_request(compiled_prompt))
 
 
-@pytest.mark.parametrize("mime_type", ["image/jpeg", "image/webp", "text/plain", None])
+@pytest.mark.parametrize(
+    ("content", "mime_type"),
+    [(PNG, "image/png"), (JPEG, "image/jpeg"), (WEBP, "image/webp")],
+)
+def test_asset_supported_provider_image_types_are_preserved(compiled_prompt, content, mime_type):
+    execution = adapter_for(
+        lambda request: httpx.Response(200, json=response_body(content, mime_type=mime_type))
+    ).execute(generation_request(compiled_prompt))
+    assert execution.outputs[0].declared_content_type == mime_type
+    assert execution.outputs[0].content == content
+
+
+@pytest.mark.parametrize("mime_type", ["image/gif", "text/plain", None])
 def test_wrong_mime_type_is_rejected(compiled_prompt, mime_type):
     body = response_body(PNG, mime_type=mime_type)
     with pytest.raises(InvalidProviderResponseError):
@@ -220,8 +234,12 @@ def test_wrong_mime_type_is_rejected(compiled_prompt, mime_type):
         )
 
 
-def test_non_png_bytes_cannot_be_relabelled_as_png(compiled_prompt):
-    body = response_body(b"\xff\xd8\xffjpeg-data", mime_type="image/png")
+@pytest.mark.parametrize(
+    ("content", "mime_type"),
+    [(JPEG, "image/png"), (PNG, "image/jpeg"), (PNG, "image/webp")],
+)
+def test_mismatched_binary_signature_is_rejected(compiled_prompt, content, mime_type):
+    body = response_body(content, mime_type=mime_type)
     with pytest.raises(InvalidProviderResponseError):
         adapter_for(lambda request: httpx.Response(200, json=body)).execute(
             generation_request(compiled_prompt)

@@ -24,6 +24,8 @@ from .config import (
 )
 
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_JPEG_SIGNATURE = b"\xff\xd8\xff"
+_SUPPORTED_IMAGE_CONTENT_TYPES = frozenset(("image/png", "image/jpeg", "image/webp"))
 
 
 class GoogleGenerativeLanguageImageAdapter:
@@ -120,10 +122,11 @@ class GoogleGenerativeLanguageImageAdapter:
         if len(inline_parts) != 1 or not isinstance(inline_parts[0], dict):
             raise InvalidProviderResponseError
         inline_data = inline_parts[0]
-        if inline_data.get("mimeType") != "image/png":
+        content_type = inline_data.get("mimeType")
+        if content_type not in _SUPPORTED_IMAGE_CONTENT_TYPES:
             raise InvalidProviderResponseError
         image = self._decode_output(inline_data.get("data"))
-        if not image.startswith(_PNG_SIGNATURE):
+        if not self._has_matching_signature(content_type, image):
             raise InvalidProviderResponseError
 
         result = GenerationResult(
@@ -134,8 +137,16 @@ class GoogleGenerativeLanguageImageAdapter:
         )
         return GenerationExecution(
             result=result,
-            outputs=(RetrievedImageOutput(1, None, "image/png", image),),
+            outputs=(RetrievedImageOutput(1, None, content_type, image),),
         )
+
+    @staticmethod
+    def _has_matching_signature(content_type: str, content: bytes) -> bool:
+        if content_type == "image/png":
+            return content.startswith(_PNG_SIGNATURE)
+        if content_type == "image/jpeg":
+            return content.startswith(_JPEG_SIGNATURE)
+        return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
 
     def _decode_output(self, encoded: Any) -> bytes:
         if not isinstance(encoded, str) or not encoded:

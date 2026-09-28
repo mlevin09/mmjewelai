@@ -9,6 +9,7 @@ from .gateway import GatewayContractViolationError, validate_generation_result
 from .models import GenerationRequest, GenerationResult, ProviderOutputId
 
 _PROVIDER_OUTPUT_ID = TypeAdapter(ProviderOutputId)
+_SUPPORTED_IMAGE_CONTENT_TYPES = frozenset(("image/png", "image/jpeg", "image/webp"))
 
 
 @dataclass(frozen=True)
@@ -27,8 +28,8 @@ class RetrievedImageOutput:
             or not 1 <= self.ordinal <= 4
         ):
             raise ValueError("Retrieved output ordinal must be between 1 and 4")
-        if self.declared_content_type != "image/png":
-            raise ValueError("Retrieved image output must declare image/png")
+        if self.declared_content_type not in _SUPPORTED_IMAGE_CONTENT_TYPES:
+            raise ValueError("Retrieved image output must declare a supported image content type")
         if not isinstance(self.content, bytes) or not self.content:
             raise ValueError("Retrieved image output content must be non-empty bytes")
         if self.provider_output_id is not None:
@@ -73,6 +74,9 @@ def validate_generation_execution(
     actual = tuple((output.ordinal, output.provider_output_id) for output in execution.outputs)
     if actual != expected:
         raise GatewayContractViolationError
-    if any(output.declared_content_type != "image/png" for output in execution.outputs):
+    if any(
+        output.declared_content_type not in _SUPPORTED_IMAGE_CONTENT_TYPES
+        for output in execution.outputs
+    ):
         raise GatewayContractViolationError
     return GenerationExecution(result=result, outputs=execution.outputs)
