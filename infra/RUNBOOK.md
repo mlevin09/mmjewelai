@@ -46,7 +46,10 @@ in `EUROPE-WEST1`.
    Firebase Web application, and authorizes the exact preproduction web domain. Create controlled
    test identities administratively; authentication never creates JewelAI membership or grants
    organization access.
-6. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. The plan and apply jobs both use
+6. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. While the legacy default branch
+   prevents GitHub from registering that manual endpoint, merge a reviewed update to
+   `.github/preprod-deployment-request.json`; its path-filtered push trigger validates the request
+   and binds the run to the exact merge SHA. The plan and apply jobs both use
    the single `preprod` Environment. The separate apply stage consumes the
    checksum/configuration-bound plan produced by the plan stage without re-planning.
    Redacted plan output remains available for inspection. State is isolated under

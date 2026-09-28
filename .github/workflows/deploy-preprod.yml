@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+  push:
+    branches:
+      - jewelai-v2
+    paths:
+      - .github/preprod-deployment-request.json
 
 permissions:
   actions: read
@@ -25,10 +30,11 @@ concurrency:
 env:
   GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS: gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image
   TF_VAR_google_generative_language_allowed_models: gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image
+  DEPLOY_CONFIRM_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_sha || github.sha }}
 
 jobs:
   plan:
-    if: github.ref == 'refs/heads/jewelai-v2' && github.event.inputs.confirm_sha == github.sha
+    if: github.ref == 'refs/heads/jewelai-v2' && (github.event_name == 'push' || inputs.confirm_sha == github.sha)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: preprod
@@ -56,12 +62,19 @@ jobs:
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
       TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
       - name: Verify immutable deployment identity
         run: |
           echo "Planning exact jewelai-v2 SHA: ${GITHUB_SHA}"
           test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
-          test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
+          test "${DEPLOY_CONFIRM_SHA}" = "${GITHUB_SHA}"
           test "${PROJECT_ID}" = "mmjewellai-preprod"
+          if test "${GITHUB_EVENT_NAME}" = "push"; then
+            test "$(jq -cS . .github/preprod-deployment-request.json)" = \
+              '{"environment":"preprod","verify_external_dns_https":false}'
+          fi
       - name: Verify deployment environment branch policies
         env:
           GH_TOKEN: ${{ github.token }}
@@ -82,9 +95,6 @@ jobs:
             ' <<<"${environment_json}" >/dev/null
           }
           verify_environment preprod
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -210,7 +220,7 @@ jobs:
       TF_VAR_api_image: ${{ needs.plan.outputs.api_image }}
       TF_VAR_worker_image: ${{ needs.plan.outputs.worker_image }}
       TF_VAR_web_image: ${{ needs.plan.outputs.web_image }}
-      VERIFY_EXTERNAL_DNS_HTTPS: ${{ inputs.verify_external_dns_https }}
+      VERIFY_EXTERNAL_DNS_HTTPS: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_external_dns_https || false }}
       EXPECTED_PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
       EXPECTED_PLAN_GENERATION: ${{ needs.plan.outputs.plan_generation }}
       EXPECTED_DEPLOYMENT_CONFIG_SHA256: ${{ needs.plan.outputs.deployment_config_sha256 }}
@@ -218,7 +228,7 @@ jobs:
       - name: Verify protected exact deployment identity
         run: |
           test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
-          test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
+          test "${DEPLOY_CONFIRM_SHA}" = "${GITHUB_SHA}"
           test "${PROJECT_ID}" = "mmjewellai-preprod"
       - uses: actions/checkout@v4
         with:
