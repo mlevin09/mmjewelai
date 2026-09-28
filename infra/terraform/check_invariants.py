@@ -314,9 +314,9 @@ _require(preprod_plan, "environment: preprod-plan", "protected preprod plan envi
 _require(preprod_apply, "environment: preprod", "protected preprod apply environment")
 _require(preprod_plan, "verify_environment preprod-plan", "actual preprod plan protection check")
 _require(preprod_plan, "verify_environment preprod", "actual preprod apply protection check")
-_require(preprod_plan, '.type == "required_reviewers"', "preprod required reviewers")
-_require(preprod_plan, ".prevent_self_review == true", "preprod self-review prevention")
 _require(preprod_plan, ".deployment_branch_policy != null", "preprod branch policy")
+_forbid(preprod_plan, '.type == "required_reviewers"', "preprod required-reviewer gate")
+_forbid(preprod_plan, ".prevent_self_review", "preprod prevent-self-review gate")
 preprod_environment_checks_end = preprod_plan.find("          verify_environment preprod\n")
 preprod_cloud_auth_start = preprod_plan.find("google-github-actions/auth@v2")
 preprod_plan_start_command = preprod_plan.find("terraform -chdir=infra/terraform/preprod plan")
@@ -340,9 +340,9 @@ _require(
 _require(
     preprod_apply,
     "apply -input=false -auto-approve preprod.tfplan",
-    "exact reviewed preprod plan apply",
+    "exact generated preprod plan apply",
 )
-_forbid(preprod_apply, " plan -", "preprod re-planning after approval")
+_forbid(preprod_apply, " plan -", "preprod re-planning after exact plan generation")
 _forbid(preprod_workflow, "environment: production", "production GitHub Environment use")
 _forbid(
     preprod_workflow,
