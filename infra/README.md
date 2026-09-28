@@ -21,6 +21,12 @@ the existing `jewelai-preprod-google-generative-language-api-key` secret and ena
 reviewed Google image models. It cannot target the production project or production GitHub
 Environments.
 
+The environment lifecycle is **Local development → Preprod → Production**. Preproduction uses one
+protected GitHub Environment named `preprod`; Terraform plan and apply remain separate workflow
+stages that both use that environment. Preproduction has no human-review or prevent-self-review
+gate, while the exact branch, commit, project, plan, and deployment-branch-policy checks remain
+mandatory. Production keeps its independent protection policy.
+
 Runtime service identities are intentionally separate. Web has no Google API permission. API can connect to SQL, create/read Assets, enqueue only on its queue, read only `DATABASE_URL`, and call `signBlob` only on the signing identity. Worker can connect to SQL, create/read Assets, and read `DATABASE_URL`, `OPENAI_API_KEY`, plus the optional Google Generative Language API key when that provider is enabled. Reconciliation reads object metadata. Cleanup alone can delete objects. The task-delivery identity can only invoke the private worker; scheduler can only run the maintenance jobs.
 
 ## Directories

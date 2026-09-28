@@ -19,15 +19,15 @@ must reference that secret without importing its value or attempting to recreate
 Mirror the existing production Terraform architecture in a distinct `infra/terraform/preprod` root
 stack. Production configuration remains unchanged. Preproduction fixes its environment identity to
 `preprod`, uses `jewelai-preprod` resource names, `JEWELAI_ENVIRONMENT=preprod`, a separate
-`preprod/platform` Terraform backend prefix, separate GitHub Environments, and redundant exact
-`mmjewellai-preprod` project validation in both Terraform and the workflow.
+`preprod/platform` Terraform backend prefix, a dedicated `preprod` GitHub Environment, and
+redundant exact `mmjewellai-preprod` project validation in both Terraform and the workflow.
 
-The manual `Deploy preprod` workflow preserves the production plan/apply separation. Both
-`preprod-plan` and `preprod` must have deployment branch policies restricted to `jewelai-v2`.
-Preproduction intentionally requires neither reviewers nor self-review prevention so an agent can
-execute the full delivery lifecycle. Only redacted plan text is uploaded to GitHub. The exact binary
-plan remains in the private state bucket, is checksum/configuration/object-generation bound, and is
-applied without re-planning.
+The manual `Deploy preprod` workflow preserves separate plan and apply jobs while both use the
+single `preprod` GitHub Environment. That environment must have a deployment branch policy
+restricted to `jewelai-v2`. Preproduction intentionally requires neither reviewers nor self-review
+prevention so an agent can execute the full delivery lifecycle. Only redacted plan text is uploaded
+to GitHub. The exact binary plan remains in the private state bucket, is
+checksum/configuration/object-generation bound, and is applied without re-planning.
 
 Preproduction enables the exact Google image-model allowlist
 `gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image`. The worker receives it as

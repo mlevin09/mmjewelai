@@ -6,9 +6,9 @@ This root stack mirrors the reviewed production topology while remaining isolate
 database, queue, Asset bucket, and monitoring resources. It cannot target production.
 
 Use only the protected `Deploy preprod` workflow from an exact `jewelai-v2` SHA. The workflow
-requires both `preprod-plan` and `preprod` to have a deployment branch policy restricted to
-`jewelai-v2`. Reviewer and prevent-self-review gates are intentionally not required for
-preproduction. It stores only redacted plan text in GitHub; the exact binary plan is
+uses the single `preprod` GitHub Environment for both its plan and apply jobs, with a deployment
+branch policy restricted to `jewelai-v2`. Reviewer and prevent-self-review gates are intentionally
+not required for preproduction. It stores only redacted plan text in GitHub; the exact binary plan is
 kept temporarily in the private state bucket and applied without re-planning.
 
 ## Google provider
