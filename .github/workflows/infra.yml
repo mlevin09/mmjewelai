@@ -7,6 +7,7 @@ on:
       - infra/**
       - .github/workflows/infra.yml
       - .github/workflows/deploy-production.yml
+      - .github/workflows/deploy-preprod.yml
       - apps/api/src/jewelai_api/middleware.py
       - apps/api/src/jewelai_api/settings.py
       - apps/web/src/config.ts
@@ -20,6 +21,7 @@ on:
       - infra/**
       - .github/workflows/infra.yml
       - .github/workflows/deploy-production.yml
+      - .github/workflows/deploy-preprod.yml
       - apps/api/src/jewelai_api/middleware.py
       - apps/api/src/jewelai_api/settings.py
       - apps/web/src/config.ts
@@ -44,7 +46,9 @@ jobs:
       - run: terraform -chdir=infra/terraform/bootstrap validate
       - run: terraform -chdir=infra/terraform/production init -backend=false
       - run: terraform -chdir=infra/terraform/production validate
-      - name: Assert production safety invariants
+      - run: terraform -chdir=infra/terraform/preprod init -backend=false
+      - run: terraform -chdir=infra/terraform/preprod validate
+      - name: Assert deployment safety invariants
         run: python infra/terraform/check_invariants.py
 
   containers:

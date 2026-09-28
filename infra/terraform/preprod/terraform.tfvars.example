@@ -1,0 +1,47 @@
+deployment_environment = "preprod"
+project_id             = "mmjewellai-preprod"
+region                 = "us-central1"
+asset_location         = "US-CENTRAL1"
+asset_bucket_name      = "example-jewelai-preprod-assets"
+web_domain             = "preprod.example.com"
+api_domain             = "api-preprod.example.com"
+dns_managed_zone       = "example-com"
+auth0_domain           = "example.us.auth0.com"
+allow_self_signup      = false
+generation_profiles_json                   = "[{\"profile_id\":\"openai_default\",\"profile_version\":\"1.0.0\",\"provider\":\"openai\",\"model\":\"gpt-image-2.5-sunburst-2026-09-08\",\"configuration\":{\"output_count\":1}},{\"profile_id\":\"google_flash_lite\",\"profile_version\":\"1.0.0\",\"provider\":\"google\",\"model\":\"gemini-3.1-flash-lite-image\",\"configuration\":{\"output_count\":1}}]"
+openai_allowed_models                      = "gpt-image-2.5-sunburst-2026-09-08"
+google_generative_language_allowed_models = "gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image"
+google_generative_language_secret_id      = "jewelai-preprod-google-generative-language-api-key"
+
+# Deployment workflow resolves and passes immutable digests; mutable tags are rejected.
+api_image    = "us-central1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/jewelai-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+worker_image = "us-central1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/jewelai-generation-worker@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+web_image    = "us-central1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/jewelai-web@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+
+database_tier                     = "db-custom-2-7680"
+database_availability_type        = "REGIONAL"
+database_disk_size_gb             = 20
+database_disk_autoresize_limit_gb = 100
+database_max_connections          = 100
+
+api_min_instances    = 0
+api_max_instances    = 5
+api_concurrency      = 40
+worker_min_instances = 0
+worker_max_instances = 2
+web_min_instances    = 0
+web_max_instances    = 3
+web_concurrency      = 80
+
+db_pool_size                    = 5
+db_max_overflow                 = 2
+asset_upload_max_bytes          = 20971520
+http_max_request_bytes          = 22020096
+worker_request_timeout_seconds  = 300
+stale_recovery_seconds          = 1800
+
+task_max_attempts              = 5
+task_max_dispatches_per_second = 1
+task_max_concurrent_dispatches = 2
+
+notification_channel_ids = []

@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PRODUCTION = ROOT / "production"
+PREPROD = ROOT / "preprod"
 BOOTSTRAP = ROOT / "bootstrap"
 
 
@@ -13,6 +14,10 @@ def _read(name: str) -> str:
 
 def _read_bootstrap(name: str) -> str:
     return (BOOTSTRAP / name).read_text(encoding="utf-8")
+
+
+def _read_preprod(name: str) -> str:
+    return (PREPROD / name).read_text(encoding="utf-8")
 
 
 def _require(text: str, fragment: str, description: str) -> None:
@@ -47,10 +52,22 @@ iam = _read("iam.tf")
 locals = _read("locals.tf")
 networking = _read("networking.tf")
 services = _read("services.tf")
+secrets = _read("secrets.tf")
 storage = _read("storage.tf")
 tasks = _read("tasks.tf")
 variables = _read("variables.tf")
+preprod_iam = _read_preprod("iam.tf")
+preprod_locals = _read_preprod("locals.tf")
+preprod_services = _read_preprod("services.tf")
+preprod_secrets = _read_preprod("secrets.tf")
+preprod_storage = _read_preprod("storage.tf")
+preprod_tasks = _read_preprod("tasks.tf")
+preprod_variables = _read_preprod("variables.tf")
+preprod_versions = _read_preprod("versions.tf")
 deploy_workflow = (ROOT.parents[1] / ".github/workflows/deploy-production.yml").read_text(
+    encoding="utf-8"
+)
+preprod_workflow = (ROOT.parents[1] / ".github/workflows/deploy-preprod.yml").read_text(
     encoding="utf-8"
 )
 plan_job_start = deploy_workflow.find("\n  plan:\n")
@@ -103,6 +120,15 @@ _require(
 generation_profiles = _variable(variables, "generation_profiles_json")
 allowed_models = _variable(variables, "openai_allowed_models")
 google_allowed_models = _variable(variables, "google_generative_language_allowed_models")
+preprod_deployment_environment = _variable(preprod_variables, "deployment_environment")
+preprod_project_id = _variable(preprod_variables, "project_id")
+preprod_openai_allowed_models = _variable(preprod_variables, "openai_allowed_models")
+preprod_google_allowed_models = _variable(
+    preprod_variables, "google_generative_language_allowed_models"
+)
+preprod_google_secret_id = _variable(
+    preprod_variables, "google_generative_language_secret_id"
+)
 stale_recovery = _variable(variables, "stale_recovery_seconds")
 _forbid(generation_profiles, "\n  default", "implicit production generation profile")
 _forbid(allowed_models, "\n  default", "implicit production worker model allowlist")
@@ -118,6 +144,36 @@ for google_model in (
 ):
     _require(google_allowed_models, google_model, f"Google model allowlist: {google_model}")
 _require(stale_recovery, "default = 1800", "accepted 1800-second stale recovery default")
+_require(
+    preprod_deployment_environment,
+    'default     = "preprod"',
+    "fixed preprod deployment identity",
+)
+_require(
+    preprod_project_id,
+    'var.project_id == "mmjewellai-preprod"',
+    "Terraform-level exact preprod project guard",
+)
+_require(
+    preprod_google_secret_id,
+    'default     = "jewelai-preprod-google-generative-language-api-key"',
+    "exact existing preprod Google secret ID",
+)
+_require(
+    preprod_openai_allowed_models,
+    'default     = ""',
+    "OpenAI independently optional in preprod",
+)
+for google_model in (
+    "gemini-3.1-flash-lite-image",
+    "gemini-3.1-flash-image",
+    "gemini-3-pro-image",
+):
+    _require(
+        preprod_google_allowed_models,
+        google_model,
+        f"preprod Google model allowlist: {google_model}",
+    )
 _require(
     deploy_workflow,
     "TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}",
@@ -208,6 +264,113 @@ _require(apply_job, '"${dns_managed}" != "true"', "external DNS readiness bypass
 _require(apply_job, "for attempt in $(seq 1 120)", "bounded HTTPS readiness polling")
 _require(apply_job, 'certificate_status}" == "ACTIVE"', "managed certificate readiness")
 
+preprod_plan_start = preprod_workflow.find("\n  plan:\n")
+preprod_apply_start = preprod_workflow.find("\n  apply:\n")
+if preprod_plan_start < 0 or preprod_apply_start <= preprod_plan_start:
+    raise SystemExit("Missing split preprod plan/apply jobs")
+preprod_plan = preprod_workflow[preprod_plan_start:preprod_apply_start]
+preprod_apply = preprod_workflow[preprod_apply_start:]
+preprod_review_start = preprod_plan.find("- name: Upload redacted plan review")
+if preprod_review_start < 0:
+    raise SystemExit("Missing preprod redacted plan review upload")
+preprod_review = preprod_plan[preprod_review_start:]
+
+_require(preprod_workflow, "group: preprod-deployment", "isolated preprod concurrency")
+_require(preprod_workflow, 'test "${PROJECT_ID}" = "mmjewellai-preprod"', "exact preprod project guard")
+_require(preprod_workflow, "TF_VAR_deployment_environment: preprod", "preprod runtime identity")
+_require(
+    preprod_workflow,
+    "GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS: "
+    "gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image",
+    "exact preprod Google model allowlist",
+)
+_require(
+    preprod_secrets,
+    'data "google_secret_manager_secret" "google_generative_language_api_key"',
+    "existing Google secret metadata lookup",
+)
+_require(
+    preprod_services,
+    "GOOGLE_GENERATIVE_LANGUAGE_ALLOWED_MODELS  = var.google_generative_language_allowed_models",
+    "Google allowlist passed to the worker",
+)
+_require(
+    preprod_services,
+    "for_each = local.openai_generation_enabled ? [1] : []",
+    "conditional preprod OpenAI secret mount",
+)
+_require(
+    preprod_services,
+    'name = "GOOGLE_GENERATIVE_LANGUAGE_API_KEY"',
+    "Google API key mounted only as worker secret environment",
+)
+_require(
+    preprod_workflow,
+    "TF_VAR_google_generative_language_secret_id: "
+    "jewelai-preprod-google-generative-language-api-key",
+    "existing preprod Google secret ID",
+)
+_require(preprod_plan, "environment: preprod-plan", "protected preprod plan environment")
+_require(preprod_apply, "environment: preprod", "protected preprod apply environment")
+_require(preprod_plan, "verify_environment preprod-plan", "actual preprod plan protection check")
+_require(preprod_plan, "verify_environment preprod", "actual preprod apply protection check")
+_require(preprod_plan, '.type == "required_reviewers"', "preprod required reviewers")
+_require(preprod_plan, ".prevent_self_review == true", "preprod self-review prevention")
+_require(preprod_plan, ".deployment_branch_policy != null", "preprod branch policy")
+preprod_environment_checks_end = preprod_plan.find("          verify_environment preprod\n")
+preprod_cloud_auth_start = preprod_plan.find("google-github-actions/auth@v2")
+preprod_plan_start_command = preprod_plan.find("terraform -chdir=infra/terraform/preprod plan")
+if not 0 <= preprod_environment_checks_end < preprod_cloud_auth_start < preprod_plan_start_command:
+    raise SystemExit(
+        "Missing preprod invariant: environment checks before cloud authentication and plan"
+    )
+_require(preprod_workflow, '-backend-config="prefix=preprod/platform"', "isolated preprod state")
+_require(preprod_plan, "gcloud storage cp --if-generation-match=0", "create-only preprod plan upload")
+_require(preprod_plan, "deployment-plans/preprod/", "isolated private preprod plan namespace")
+_require(preprod_review, "actions/upload-artifact@v4", "preprod redacted review artifact")
+_require(preprod_review, "preprod-plan-redacted.txt", "preprod redacted output only")
+_forbid(preprod_review, "preprod.tfplan", "binary preprod plan in GitHub artifact")
+_require(preprod_apply, "EXPECTED_PLAN_SHA256", "preprod exact-plan checksum binding")
+_require(preprod_apply, "EXPECTED_PLAN_GENERATION", "preprod plan-object generation binding")
+_require(
+    preprod_apply,
+    "EXPECTED_DEPLOYMENT_CONFIG_SHA256",
+    "preprod plan configuration binding",
+)
+_require(
+    preprod_apply,
+    "apply -input=false -auto-approve preprod.tfplan",
+    "exact reviewed preprod plan apply",
+)
+_forbid(preprod_apply, " plan -", "preprod re-planning after approval")
+_forbid(preprod_workflow, "environment: production", "production GitHub Environment use")
+_forbid(
+    preprod_workflow,
+    "jewelai-production-google-generative-language-api-key",
+    "production Google secret use",
+)
+_forbid(deploy_workflow, "mmjewellai-preprod", "preprod project in production workflow")
+_require(preprod_versions, 'prefix = "preprod/platform"', "preprod backend state prefix")
+_require(preprod_locals, 'prefix        = "jewelai-preprod"', "preprod resource namespace")
+_require(preprod_storage, 'public_access_prevention    = "enforced"', "preprod GCS public access prevention")
+_require(preprod_storage, "uniform_bucket_level_access = true", "preprod uniform bucket IAM")
+_require(preprod_tasks, "max_attempts       = var.task_max_attempts", "preprod finite queue attempts")
+_require(
+    preprod_services,
+    'ingress             = "INGRESS_TRAFFIC_INTERNAL_ONLY"',
+    "preprod private worker ingress",
+)
+_require(
+    preprod_iam,
+    'runtime["cleanup"].email',
+    "preprod separate cleanup delete authority",
+)
+_forbid(
+    preprod_secrets,
+    'resource "google_secret_manager_secret" "google_generative_language_api_key"',
+    "preprod recreation of existing Google secret",
+)
+
 _require(bootstrap, 'matches_prefix = ["deployment-plans/"]', "plan-object lifecycle isolation")
 _require(bootstrap, "age            = 1", "one-day private plan-object retention")
 _require(bootstrap, 'public_access_prevention    = "enforced"', "private plan storage")
@@ -224,6 +387,18 @@ google_access = _resource(
 _require(google_access, 'runtime["worker"].email', "Google secret limited to worker")
 _forbid(google_access, 'runtime["api"].email', "API Google secret access")
 
+preprod_google_access = _resource(
+    preprod_iam,
+    "google_secret_manager_secret_iam_member",
+    "google_generative_language_key",
+)
+_require(
+    preprod_google_access,
+    'runtime["worker"].email',
+    "preprod Google secret limited to worker",
+)
+_forbid(preprod_google_access, 'runtime["api"].email', "preprod API Google secret access")
+
 cleanup_access = _resource(iam, "google_storage_bucket_iam_member", "asset_cleanup")
 _require(cleanup_access, 'runtime["cleanup"].email', "cleanup object-delete identity")
 _forbid(cleanup_access, 'runtime["api"].email', "API object delete")
@@ -233,4 +408,4 @@ database_access = _resource(iam, "google_secret_manager_secret_iam_member", "dat
 _forbid(database_access, '"web"', "web Secret Manager access")
 _forbid(database_access, '"task"', "task-delivery Secret Manager access")
 
-print("Production Terraform safety invariants passed")
+print("Production and preprod Terraform safety invariants passed")
