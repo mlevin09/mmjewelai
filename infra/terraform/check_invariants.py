@@ -63,6 +63,7 @@ tasks = _read("tasks.tf")
 variables = _read("variables.tf")
 preprod_iam = _read_preprod("iam.tf")
 preprod_locals = _read_preprod("locals.tf")
+preprod_networking = _read_preprod("networking.tf")
 preprod_services = _read_preprod("services.tf")
 preprod_secrets = _read_preprod("secrets.tf")
 preprod_storage = _read_preprod("storage.tf")
@@ -190,6 +191,11 @@ _require(
     preprod_database,
     'edition                     = "ENTERPRISE"',
     "preprod Cloud SQL custom tier edition",
+)
+_forbid(
+    _resource(preprod_networking, "google_compute_backend_service", "api"),
+    "timeout_sec",
+    "unsupported timeout on preprod serverless API backend",
 )
 _require(
     preprod_openai_allowed_models,

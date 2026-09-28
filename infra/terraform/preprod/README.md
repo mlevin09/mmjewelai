@@ -13,6 +13,8 @@ resources are never reused.
 
 Cloud SQL explicitly uses the `ENTERPRISE` edition because the reviewed `db-custom-*` tier is not
 valid for PostgreSQL 16's default `ENTERPRISE_PLUS` edition.
+The API load-balancer backend uses the serverless NEG default timeout; Google Cloud rejects an
+explicit non-default backend timeout for this backend type.
 
 Use only the protected `Deploy preprod` workflow from an exact `jewelai-v2` SHA. The workflow
 uses the single `preprod` GitHub Environment for both its plan and apply jobs, with a deployment
