@@ -11,6 +11,9 @@ Its backend bucket, Docker repository, GitHub WIF provider, and keyless deployer
 the separate [`preprod-bootstrap`](../preprod-bootstrap/README.md) root; production bootstrap
 resources are never reused.
 
+Cloud SQL explicitly uses the `ENTERPRISE` edition because the reviewed `db-custom-*` tier is not
+valid for PostgreSQL 16's default `ENTERPRISE_PLUS` edition.
+
 Use only the protected `Deploy preprod` workflow from an exact `jewelai-v2` SHA. The workflow
 uses the single `preprod` GitHub Environment for both its plan and apply jobs, with a deployment
 branch policy restricted to `jewelai-v2`. Reviewer and prevent-self-review gates are intentionally
