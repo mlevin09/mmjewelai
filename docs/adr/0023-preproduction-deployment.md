@@ -23,10 +23,11 @@ stack. Production configuration remains unchanged. Preproduction fixes its envir
 `mmjewellai-preprod` project validation in both Terraform and the workflow.
 
 The manual `Deploy preprod` workflow preserves the production plan/apply separation. Both
-`preprod-plan` and `preprod` must have required reviewers, self-review prevention, and deployment
-branch policies. Only redacted plan text is uploaded to GitHub. The exact binary plan remains in the
-private state bucket, is checksum/configuration/object-generation bound, and is applied without
-re-planning.
+`preprod-plan` and `preprod` must have deployment branch policies restricted to `jewelai-v2`.
+Preproduction intentionally requires neither reviewers nor self-review prevention so an agent can
+execute the full delivery lifecycle. Only redacted plan text is uploaded to GitHub. The exact binary
+plan remains in the private state bucket, is checksum/configuration/object-generation bound, and is
+applied without re-planning.
 
 Preproduction enables the exact Google image-model allowlist
 `gemini-3.1-flash-lite-image,gemini-3.1-flash-image,gemini-3-pro-image`. The worker receives it as

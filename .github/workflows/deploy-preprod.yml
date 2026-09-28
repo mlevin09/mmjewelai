@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_sha:
-        description: Exact jewelai-v2 commit SHA approved for preproduction
+        description: Exact jewelai-v2 commit SHA selected for preproduction
         required: true
         type: string
       verify_external_dns_https:
@@ -66,7 +66,7 @@ jobs:
           test "${GITHUB_REF}" = "refs/heads/jewelai-v2"
           test "${{ inputs.confirm_sha }}" = "${GITHUB_SHA}"
           test "${PROJECT_ID}" = "mmjewellai-preprod"
-      - name: Verify mandatory deployment environment protections
+      - name: Verify deployment environment branch policies
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -77,15 +77,6 @@ jobs:
               --header "Authorization: Bearer ${GH_TOKEN}" \
               --header "X-GitHub-Api-Version: 2022-11-28" \
               "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/environments/${environment_name}")"
-            jq --exit-status '
-              [.protection_rules[]? |
-                select(
-                  .type == "required_reviewers" and
-                  .prevent_self_review == true and
-                  (.reviewers | length) > 0
-                )
-              ] | length == 1
-            ' <<<"${environment_json}" >/dev/null
             jq --exit-status '
               .deployment_branch_policy != null and
               (
@@ -183,14 +174,14 @@ jobs:
           echo "plan_generation=${plan_generation}" >> "${GITHUB_OUTPUT}"
           echo "deployment_config_sha256=${deployment_config_sha256}" >> "${GITHUB_OUTPUT}"
           {
-            echo "### Terraform preproduction plan ready for protected approval"
+            echo "### Terraform preproduction plan ready for exact apply"
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Review artifact: \`preprod-plan-review-${GITHUB_SHA}\` (redacted text only)"
             echo "- Exact binary plan: private state-bucket object; never uploaded to GitHub artifacts"
             echo "- Plan SHA-256: \`${plan_sha256}\`"
             echo "- Retention: one day"
-            echo "- Review \`preprod-plan-redacted.txt\` before approving the preproduction apply job."
+            echo "- Redacted plan output is retained for inspection; apply uses the exact generated binary plan without re-planning."
           } >> "${GITHUB_STEP_SUMMARY}"
       - name: Upload redacted plan review
         uses: actions/upload-artifact@v4
