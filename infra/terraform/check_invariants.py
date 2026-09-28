@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parent
 PRODUCTION = ROOT / "production"
 PREPROD = ROOT / "preprod"
 BOOTSTRAP = ROOT / "bootstrap"
+PREPROD_BOOTSTRAP = ROOT / "preprod-bootstrap"
 
 
 def _read(name: str) -> str:
@@ -18,6 +19,10 @@ def _read_bootstrap(name: str) -> str:
 
 def _read_preprod(name: str) -> str:
     return (PREPROD / name).read_text(encoding="utf-8")
+
+
+def _read_preprod_bootstrap(name: str) -> str:
+    return (PREPROD_BOOTSTRAP / name).read_text(encoding="utf-8")
 
 
 def _require(text: str, fragment: str, description: str) -> None:
@@ -82,6 +87,9 @@ if review_upload_start < 0:
     raise SystemExit("Missing redacted plan review upload")
 review_upload_step = plan_job[review_upload_start:]
 bootstrap = _read_bootstrap("main.tf")
+preprod_bootstrap = _read_preprod_bootstrap("main.tf")
+preprod_bootstrap_variables = _read_preprod_bootstrap("variables.tf")
+preprod_bootstrap_outputs = _read_preprod_bootstrap("outputs.tf")
 
 _require(storage, 'public_access_prevention    = "enforced"', "GCS public access prevention")
 _require(storage, "uniform_bucket_level_access = true", "uniform bucket IAM")
@@ -390,6 +398,117 @@ _forbid(
 _require(bootstrap, 'matches_prefix = ["deployment-plans/"]', "plan-object lifecycle isolation")
 _require(bootstrap, "age            = 1", "one-day private plan-object retention")
 _require(bootstrap, 'public_access_prevention    = "enforced"', "private plan storage")
+_forbid(bootstrap, "mmjewellai-preprod", "preprod identity in production bootstrap")
+
+preprod_bootstrap_project = _variable(preprod_bootstrap_variables, "project_id")
+preprod_bootstrap_region = _variable(preprod_bootstrap_variables, "region")
+preprod_bootstrap_state_bucket = _variable(preprod_bootstrap_variables, "state_bucket_name")
+preprod_bootstrap_asset_bucket = _variable(preprod_bootstrap_variables, "asset_bucket_name")
+preprod_bootstrap_repository = _variable(
+    preprod_bootstrap_variables, "artifact_registry_repository"
+)
+preprod_bootstrap_github_repository = _variable(
+    preprod_bootstrap_variables, "github_repository"
+)
+preprod_bootstrap_github_branch = _variable(
+    preprod_bootstrap_variables, "github_deploy_branch"
+)
+_require(
+    preprod_bootstrap_project,
+    'default     = "mmjewellai-preprod"',
+    "hard-bound preprod bootstrap project default",
+)
+_require(
+    preprod_bootstrap_project,
+    'var.project_id == "mmjewellai-preprod"',
+    "hard-bound preprod bootstrap project validation",
+)
+_require(
+    preprod_bootstrap_region,
+    'default     = "europe-west1"',
+    "hard-bound preprod bootstrap region default",
+)
+_require(
+    preprod_bootstrap_region,
+    'var.region == "europe-west1"',
+    "hard-bound preprod bootstrap region validation",
+)
+_require(
+    preprod_bootstrap,
+    'workload_identity_pool_id = "jewelai-preprod-github"',
+    "isolated preprod WIF pool",
+)
+_require(
+    preprod_bootstrap,
+    'workload_identity_pool_provider_id = "github-oidc"',
+    "preprod GitHub OIDC provider",
+)
+_require(
+    preprod_bootstrap,
+    "assertion.repository == '${var.github_repository}' && assertion.ref == '${var.github_deploy_branch}'",
+    "preprod exact repository and branch federation condition",
+)
+_require(
+    preprod_bootstrap_state_bucket,
+    'default     = "mmjewellai-preprod-tfstate"',
+    "preferred deterministic preprod state bucket",
+)
+_require(
+    preprod_bootstrap_asset_bucket,
+    'default     = "mmjewellai-preprod-assets"',
+    "preferred deterministic preprod Asset bucket",
+)
+_require(
+    preprod_bootstrap_repository,
+    'default     = "jewelai-preprod"',
+    "exact preprod Artifact Registry repository",
+)
+_require(
+    preprod_bootstrap_github_repository,
+    'default     = "mlevin09/mmjewelai"',
+    "preprod exact GitHub repository",
+)
+_require(
+    preprod_bootstrap_github_branch,
+    'default     = "refs/heads/jewelai-v2"',
+    "preprod exact deployment branch",
+)
+_require(
+    preprod_bootstrap,
+    'account_id   = "jewelai-preprod-deployer"',
+    "isolated preprod deployer",
+)
+_forbid(preprod_bootstrap, "jewelai-prod-deployer", "production deployer in preprod bootstrap")
+_forbid(preprod_bootstrap, '"roles/owner"', "Owner role in preprod bootstrap")
+_forbid(preprod_bootstrap, '"roles/editor"', "Editor role in preprod bootstrap")
+_forbid(
+    preprod_bootstrap,
+    'resource "google_storage_bucket" "assets"',
+    "Asset bucket creation outside main preprod stack",
+)
+_require(
+    preprod_bootstrap,
+    'matches_prefix = ["deployment-plans/"]',
+    "preprod exact-plan lifecycle isolation",
+)
+_require(
+    preprod_bootstrap,
+    'public_access_prevention    = "enforced"',
+    "private preprod state storage",
+)
+_require(preprod_bootstrap, "force_destroy               = false", "durable preprod state bucket")
+for output_name in (
+    "state_bucket_name",
+    "artifact_registry_repository",
+    "workload_identity_provider",
+    "deployment_service_account",
+    "asset_bucket_name",
+):
+    _require(
+        preprod_bootstrap_outputs,
+        f'output "{output_name}"',
+        f"preprod bootstrap {output_name} output",
+    )
 
 openai_access = _resource(iam, "google_secret_manager_secret_iam_member", "openai_key")
 _require(openai_access, 'runtime["worker"].email', "OpenAI secret limited to worker")
@@ -424,4 +543,4 @@ database_access = _resource(iam, "google_secret_manager_secret_iam_member", "dat
 _forbid(database_access, '"web"', "web Secret Manager access")
 _forbid(database_access, '"task"', "task-delivery Secret Manager access")
 
-print("Production and preprod Terraform safety invariants passed")
+print("Production, preprod bootstrap, and preprod Terraform safety invariants passed")

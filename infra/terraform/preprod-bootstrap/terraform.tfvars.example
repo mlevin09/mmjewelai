@@ -1,0 +1,3 @@
+# Defaults are deliberately hard-bound to the isolated JewelAI preproduction environment.
+# Set operator_members only in an untracked tfvars file or TF_VAR_operator_members.
+operator_members = ["user:operator@example.com"]

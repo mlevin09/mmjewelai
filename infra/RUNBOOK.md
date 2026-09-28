@@ -22,26 +22,31 @@ Preproduction is isolated from production and is deployed only by the manual `De
 workflow from `jewelai-v2`. Its regional baseline is `europe-west1`, with the private Asset bucket
 in `EUROPE-WEST1`.
 
-1. Configure the single GitHub Environment `preprod` with a non-null deployment branch policy
+1. Apply `infra/terraform/preprod-bootstrap` once with an authorized operator identity after
+   reviewing its saved plan. Supply the operator IAM member outside Git. The stack creates the
+   isolated state bucket, `jewelai-preprod` repository, branch-bound WIF provider, and
+   `jewelai-preprod-deployer`. Keep its ignored local bootstrap state with the operator; the main
+   preproduction platform uses the created bucket's private `preprod/platform` prefix.
+2. Configure the single GitHub Environment `preprod` with a non-null deployment branch policy
    restricted to `jewelai-v2`. Preproduction intentionally does not require reviewers or
    prevent-self-review so the agent-owned workflow can complete autonomously. Its configuration
    must include
    `GCP_PROJECT_ID=mmjewellai-preprod` and matching region, registry, state bucket, WIF deployer,
    domains, Asset bucket, Auth0 credentials, OpenAI allowlist, and generation profiles.
-2. Ensure `GENERATION_PROFILES_JSON` contains at least one Google profile using one of the three
+3. Ensure `GENERATION_PROFILES_JSON` contains at least one Google profile using one of the three
    workflow-pinned Google image models. The workflow rejects a catalog with no executable Google
    profile.
-3. Confirm `jewelai-preprod-google-generative-language-api-key` exists in the preproduction project
+4. Confirm `jewelai-preprod-google-generative-language-api-key` exists in the preproduction project
    with an enabled version. The workflow references this existing secret; it never creates, reads,
    prints, or transports the value. OpenAI is optional in preproduction; an empty
    `OPENAI_ALLOWED_MODELS` omits its secret, IAM, worker environment, and preflight.
-4. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. The plan and apply jobs both use
+5. Dispatch `Deploy preprod` from the exact green `jewelai-v2` SHA. The plan and apply jobs both use
    the single `preprod` Environment. The separate apply stage consumes the
    checksum/configuration-bound plan produced by the plan stage without re-planning.
    Redacted plan output remains available for inspection. State is isolated under
    `preprod/platform`; the workflow fails
    if the configured project is anything other than `mmjewellai-preprod`.
-5. Complete the same managed-DNS readiness or external-DNS handoff used by production, then perform
+6. Complete the same managed-DNS readiness or external-DNS handoff used by production, then perform
    one bounded Google generation smoke test. Verify the selected provider/model lineage, private
    Asset finalization, and absence of prompt/image/API-key content in logs.
 
