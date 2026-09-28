@@ -122,14 +122,9 @@ resource "google_project_iam_member" "deployer" {
 
 data "google_iam_policy" "terraform_state" {
   binding {
-    role = "roles/storage.objectAdmin"
-    members = concat(
-      ["serviceAccount:${google_service_account.preprod_deployer.email}"],
-      tolist(var.operator_members),
-    )
-  }
-  binding {
-    role = "roles/storage.legacyBucketReader"
+    # Bootstrap operators must be able to refresh this authoritative IAM policy
+    # on later plans. Keep that authority scoped to this state bucket.
+    role = "roles/storage.admin"
     members = concat(
       ["serviceAccount:${google_service_account.preprod_deployer.email}"],
       tolist(var.operator_members),
