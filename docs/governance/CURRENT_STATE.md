@@ -31,12 +31,15 @@ Repository: `mlevin09/mmjewelai`
 
 Current V2 integration branch:
 - `jewelai-v2`
-- deployed preproduction SHA: `7c6195cd17c6a14f44ce8b462fb5504abf8b4f12`
+- deployed preproduction SHA: `55ce94eb2f5f2e286341e7144a26b359bf076fc4`
 - current head: verify live in GitHub after this governance refresh
 
 PR #39 replaced the unprovisioned preproduction Auth0 dependency with Google Cloud Identity Platform while preserving the provider-neutral production OIDC path.
 
-The first real preproduction deployment then required corrective PRs #40-#46 before reaching a successful applied state. These corrections are part of current implementation reality and must remain visible in handoff context.
+The first real preproduction deployment then required corrective PRs #40-#46 before reaching a
+successful applied state. PRs #48-#49 completed push-triggered HTTPS verification and corrected the
+live Google output media-type contract. These corrections are part of current implementation
+reality and must remain visible in handoff context.
 
 ## Preproduction platform
 
@@ -54,9 +57,16 @@ Current baseline:
 
 The isolated preproduction bootstrap provides the dedicated Terraform state bucket, regional Artifact Registry repository, branch-bound GitHub Workload Identity Federation provider, and keyless `jewelai-preprod-deployer` service account.
 
-The final deployment verified on GitHub is `Deploy preprod` run `36426056821` on exact SHA `7c6195cd17c6a14f44ce8b462fb5504abf8b4f12`. Both plan and apply completed successfully. Exact saved-plan binding checks passed, Terraform apply completed, the database migration job completed, and Identity Platform readiness verification passed. HTTPS smoke checks were skipped by design because external DNS had not yet been created.
+The final deployment verified on GitHub is `Deploy preprod` run `36437152477` on exact SHA
+`55ce94eb2f5f2e286341e7144a26b359bf076fc4`. Both plan and apply completed successfully. Exact
+saved-plan binding checks passed, Terraform apply completed, the database migration job completed,
+Identity Platform readiness verification passed, the managed certificate was `ACTIVE`, and both
+public HTTPS health checks passed.
 
-Infrastructure CI also passed on the same final SHA in run `36426056908`. For the Identity Platform implementation itself, PR #39 and its merge commit both had successful Runtime API, Web, and Infrastructure workflows.
+PR #48 passed Runtime API, Web, Terraform, and container checks before merge. PR #49 passed the
+Runtime API workflow in run `36436828196` before merge. For the Identity Platform implementation
+itself, PR #39 and its merge commit both had successful Runtime API, Web, and Infrastructure
+workflows.
 
 ### Preproduction identity
 
@@ -85,7 +95,17 @@ Reviewed Google image-model allowlist:
 - `gemini-3.1-flash-image`
 - `gemini-3-pro-image`
 
-The Google API key remains in GCP Secret Manager under `jewelai-preprod-google-generative-language-api-key`; it is not stored in GitHub variables or browser/runtime configuration. PR #43 records creation of corrected enabled secret version 2, and the successful final deployment preflight independently verified that an enabled secret version was available.
+The Google API key remains in GCP Secret Manager under
+`jewelai-preprod-google-generative-language-api-key`; it is not stored in GitHub variables or
+browser/runtime configuration. PR #43 records creation of corrected enabled secret version 2, and
+the successful final deployment preflight independently verified that an enabled secret version
+was available.
+
+The bounded live generation smoke selected provider `google` and model
+`gemini-3.1-flash-lite-image`, completed successfully, and finalized a private generated Asset as
+`ready`. Live evidence showed that this Google model returns `image/jpeg`; PR #49 preserves that
+declared type, verifies its JPEG signature, and carries it through the existing Asset boundary
+without relabeling or conversion.
 
 ### First-deployment corrective sequence
 
@@ -97,6 +117,10 @@ The successful deployment depended on these merged corrections after PR #39:
 - PR #44 — repaired/retried the worker deployment after the initial worker startup failure.
 - PR #45 — finalized deployment after first-run provider dependency expansion produced a concrete worker URI.
 - PR #46 — removed unsupported explicit backend timeout configuration for the API serverless NEG path.
+- PR #48 — made the audited push trigger carry a validated `verify_external_dns_https` boolean from
+  plan to apply.
+- PR #49 — preserved signature-validated PNG/JPEG/WebP across the transient provider boundary after
+  the live Google model returned JPEG.
 
 ### External DNS handoff
 
@@ -105,18 +129,33 @@ The successful deployment emitted these required A records:
 - `api.preprod.jewellai.online` -> `8.233.118.174`
 - TTL: 300 seconds
 
-At the 2026-09-28 review, an independent DNS lookup returned no IPv4 resolution for either hostname. DNS creation/propagation remains incomplete.
+Public DNS now resolves both hostnames to `8.233.118.174`. Independent checks against public DNS
+confirmed the web and API records, and the deployment readiness check confirmed both names resolve
+to the load balancer.
 
-After the records resolve, the Google-managed certificate must become `ACTIVE` before public HTTPS smoke checks and browser authentication smoke tests can complete.
+The Google-managed certificate `jewelai-preprod-managed` is `ACTIVE`. Both
+`https://preprod.jewellai.online/health` and `https://api.preprod.jewellai.online/health` return HTTP
+200 with the expected healthy response.
 
-### Verification-trigger gap discovered during review
+### Live identity, authorization, and generation verification
 
-The current fallback deployment trigger has one remaining technical inconsistency:
-- the `jewelai-v2` push path is currently the usable trigger because GitHub does not register this workflow for manual dispatch while the workflow exists only on the non-default branch;
-- `.github/preprod-deployment-request.json` is currently validated on push with `verify_external_dns_https == false`;
-- therefore the documented post-DNS rerun with `verify_external_dns_https=true` cannot currently be exercised through that push fallback.
+PR #48 closed the push-trigger gap. The closed request schema accepts a boolean
+`verify_external_dns_https`, the plan job emits the validated value, and apply consumes that exact
+job output while retaining exact-SHA and project guards.
 
-This is a small workflow defect to fix before autonomous post-DNS HTTPS verification.
+A bounded live smoke on deployed SHA `55ce94eb2f5f2e286341e7144a26b359bf076fc4`
+confirmed:
+- Firebase email/password sign-in and logout;
+- valid Firebase ID-token acceptance by the API;
+- stable `/me` principal resolution;
+- an authenticated principal without membership received the scoped 404 denial;
+- explicit PostgreSQL membership enabled the approved organization path;
+- one normal Google generation succeeded through queue, worker, provider, private object staging,
+  GenerationRun completion, and Asset finalization;
+- the generated Asset reached `ready` with validated `image/jpeg` content.
+
+Temporary Identity Platform smoke users were deleted after the test. No credential, bearer token,
+prompt, image payload, API key, or signed URL was recorded in this governance snapshot.
 
 ## Production platform
 
@@ -171,10 +210,5 @@ See `reviews/MVP_0_1_DECISION_REVIEW.md`.
 
 ## Next operational actions
 
-1. Create the two external DNS A records for `preprod.jewellai.online` and `api.preprod.jewellai.online` pointing to `8.233.118.174`.
-2. Fix the preproduction request/verification trigger so post-DNS HTTPS verification can be requested through the usable `jewelai-v2` path.
-3. Wait for DNS propagation and Google-managed certificate activation, then run HTTPS readiness and health checks.
-4. Run bounded Identity Platform smoke tests: sign-in, bearer authentication, `/me`, denial without membership, approved membership, and logout.
-5. Run one bounded Google generation smoke test through the normal JewelAI path and verify Asset finalization without exposing prompt/image/key data.
-6. Define who may assign Project-level `Accepted` status.
-7. Refresh the Project Sources governance mirror after canonical governance updates.
+1. Define who may assign Project-level `Accepted` status.
+2. Refresh the Project Sources governance mirror after canonical governance updates.
