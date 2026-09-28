@@ -17,6 +17,7 @@ locals {
     "roles/dns.admin",
     "roles/firebase.editor",
     "roles/iam.securityAdmin",
+    "roles/iam.roleAdmin",
     "roles/iam.serviceAccountAdmin",
     "roles/iam.serviceAccountUser",
     "roles/identitytoolkit.editor",

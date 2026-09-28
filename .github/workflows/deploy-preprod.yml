@@ -72,8 +72,12 @@ jobs:
           test "${DEPLOY_CONFIRM_SHA}" = "${GITHUB_SHA}"
           test "${PROJECT_ID}" = "mmjewellai-preprod"
           if test "${GITHUB_EVENT_NAME}" = "push"; then
-            test "$(jq -cS . .github/preprod-deployment-request.json)" = \
-              '{"environment":"preprod","verify_external_dns_https":false}'
+            jq --exit-status '
+              (keys | sort) == ["environment", "request_id", "verify_external_dns_https"] and
+              .environment == "preprod" and
+              (.request_id | type == "number" and . >= 1 and floor == .) and
+              .verify_external_dns_https == false
+            ' .github/preprod-deployment-request.json >/dev/null
           fi
       - name: Verify deployment environment branch policies
         env:

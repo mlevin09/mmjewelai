@@ -11,7 +11,8 @@ This isolated root creates only the foundation required by `Deploy preprod` in t
 The OIDC provider accepts only `mlevin09/mmjewelai` tokens from `refs/heads/jewelai-v2`. It does not
 accept pull-request or fork refs. Firebase Editor permits Firebase project/Web application
 management, while Identity Toolkit Editor permits Identity Platform configuration; the deployer
-receives neither primitive Owner nor Editor. The stack also
+also receives IAM Role Admin solely to manage the stack's bounded project custom roles. It receives
+neither primitive Owner nor Editor. The stack also
 validates and outputs the deterministic Asset bucket name for the main preproduction stack without
 creating that bucket.
 
