@@ -32,13 +32,13 @@ supports two credential modes:
 
 - credentials implementing `google.auth.credentials.Signing` sign locally and are passed directly
   to the Storage SDK without an OAuth refresh;
-- non-signing workload/metadata ADC credentials are refreshed for a short-lived OAuth token, then
-  the Storage SDK receives that token and a validated service-account email so its supported IAM
-  `signBlob` path performs signing without a downloaded private key.
+- non-signing workload/metadata ADC credentials are wrapped by Google Auth's IAM `Signer`, which
+  refreshes the caller credential and invokes `signBlob` for the validated service-account email;
+  the resulting signing credential is passed to the Storage SDK without a downloaded private key.
 
 For keyless signing, the explicit `signing_service_account_email` takes precedence over an identity
-exposed by refreshed credentials. If neither provides a valid `*.iam.gserviceaccount.com` identity,
-signing fails closed. The OAuth token authorizes `signBlob`; it is not included in the resulting URL.
+exposed by ADC. If neither provides a valid `*.iam.gserviceaccount.com` identity, signing fails
+closed. The transient OAuth token authorizes `signBlob`; it is not included in the resulting URL.
 Signed URLs are ephemeral bearer secrets and must not be logged or persisted. The authenticated API
 integration defined by ADR 0015 now issues them only after current database membership and exact
 session/Asset scope checks; ordinary Asset metadata endpoints remain URL-free.

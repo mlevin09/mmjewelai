@@ -30,11 +30,11 @@ The GCS adapter produces V4 HTTPS `GET` signed URLs. Signed URLs are ephemeral b
 persist, log, cache as durable state, or expose them through HTTP before authentication and
 membership authorization exist. Credentials that implement `google.auth.credentials.Signing` use
 the Storage SDK's local signing path without an unnecessary token refresh. Non-signing
-workload/metadata ADC credentials use a refreshed short-lived OAuth token plus an explicitly
-configured or credential-exposed, validated service-account email; passing both to the Storage SDK
-selects its IAM `signBlob` signing path without private-key material. The explicit signing identity
-takes precedence, and missing identity, token-refresh, IAM, or signing failures remain private and
-fail closed.
+workload/metadata ADC credentials are adapted through Google Auth's IAM `Signer` with an explicitly
+configured or credential-exposed, validated service-account email. Google Auth refreshes the caller
+credential and invokes IAM `signBlob`; the resulting signing interface is passed to the Storage SDK
+without private-key material. The explicit signing identity takes precedence, and missing identity,
+token-refresh, IAM, or signing failures remain private and fail closed.
 
 ## Alternatives
 

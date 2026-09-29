@@ -5,6 +5,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from google.api_core.exceptions import NotFound, PreconditionFailed
+from google.auth import iam
 from google.auth.credentials import Credentials, Signing
 from google.auth.transport.requests import Request
 from google.cloud import storage
@@ -187,13 +188,13 @@ class GcsPrivateObjectAccessSigner:
             object_key = _OBJECT_KEY.validate_python(object_key)
             if expires_at.tzinfo is None or expires_at.utcoffset() is None:
                 raise ValueError("expiration must be timezone-aware")
-            signing_arguments = self._signing_arguments()
+            signing_credentials = self._signing_credentials()
             url = self._bucket.blob(object_key).generate_signed_url(
                 version="v4",
                 expiration=expires_at,
                 method="GET",
                 scheme="https",
-                **signing_arguments,
+                credentials=signing_credentials,
             )
         except Exception as exc:
             raise AssetAccessUnavailableError("Google Cloud asset signing is unavailable") from exc
@@ -207,15 +208,10 @@ class GcsPrivateObjectAccessSigner:
             raise AssetAccessUnavailableError("Google Cloud asset signer returned an invalid URL")
         return url
 
-    def _signing_arguments(self) -> dict[str, Any]:
+    def _signing_credentials(self) -> Signing:
         credentials = self._credentials
         if isinstance(credentials, Signing):
-            return {"credentials": credentials}
-
-        credentials.refresh(self._auth_request if self._auth_request is not None else Request())
-        access_token = credentials.token
-        if not isinstance(access_token, str) or not access_token.strip():
-            raise ValueError("refreshed credentials did not provide an access token")
+            return credentials
 
         service_account_email = self.config.signing_service_account_email or getattr(
             credentials, "service_account_email", None
@@ -223,11 +219,27 @@ class GcsPrivateObjectAccessSigner:
         if not isinstance(service_account_email, str):
             raise ValueError("signing service-account email is unavailable")
         validate_signing_service_account_email(service_account_email)
-        return {
-            "credentials": credentials,
-            "service_account_email": service_account_email,
-            "access_token": access_token,
-        }
+        request = self._auth_request if self._auth_request is not None else Request()
+        return _IamSigningCredentials(request, credentials, service_account_email)
+
+
+class _IamSigningCredentials(Signing):
+    """Adapt keyless ADC to Storage's signing interface via IAM signBlob."""
+
+    def __init__(self, request: Any, credentials: Credentials, service_account_email: str):
+        self._signer = iam.Signer(request, credentials, service_account_email)
+        self._service_account_email = service_account_email
+
+    def sign_bytes(self, message: bytes) -> bytes:
+        return self._signer.sign(message)
+
+    @property
+    def signer(self):
+        return self._signer
+
+    @property
+    def signer_email(self) -> str:
+        return self._service_account_email
 
 
 def _client_credentials(client: Any) -> Credentials:
