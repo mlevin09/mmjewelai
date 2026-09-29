@@ -471,11 +471,28 @@ _require(
     preprod_plan, "gcloud storage cp --if-generation-match=0", "create-only preprod plan upload"
 )
 _require(preprod_plan, "deployment-plans/preprod/", "isolated private preprod plan namespace")
+_require(preprod_plan, 'echo "plan_object=${plan_object}"', "exact preprod plan-object output")
 _require(preprod_review, "actions/upload-artifact@v4", "preprod redacted review artifact")
 _require(preprod_review, "preprod-terraform-plan-redacted.txt", "preprod redacted output only")
 _forbid(preprod_review, "preprod.tfplan", "binary preprod plan in GitHub artifact")
 _require(preprod_apply, "EXPECTED_PLAN_SHA256", "preprod exact-plan checksum binding")
 _require(preprod_apply, "EXPECTED_PLAN_GENERATION", "preprod plan-object generation binding")
+_require(preprod_apply, "EXPECTED_PLAN_OBJECT", "preprod exact plan-object binding")
+_require(
+    preprod_apply,
+    'gcloud storage cp "${EXPECTED_PLAN_OBJECT}"',
+    "preprod exact-plan download",
+)
+_require(
+    preprod_apply,
+    'gcloud storage rm "${EXPECTED_PLAN_OBJECT}"',
+    "preprod exact-plan cleanup",
+)
+_forbid(
+    preprod_apply,
+    "GITHUB_RUN_ATTEMPT",
+    "preprod apply-time plan path reconstruction that breaks failed-job retries",
+)
 _require(
     preprod_apply,
     "EXPECTED_DEPLOYMENT_CONFIG_SHA256",

@@ -43,6 +43,7 @@ jobs:
       api_image: ${{ steps.images.outputs.api_image }}
       worker_image: ${{ steps.images.outputs.worker_image }}
       web_image: ${{ steps.images.outputs.web_image }}
+      plan_object: ${{ steps.terraform_plan.outputs.plan_object }}
       plan_sha256: ${{ steps.terraform_plan.outputs.plan_sha256 }}
       plan_generation: ${{ steps.terraform_plan.outputs.plan_generation }}
       deployment_config_sha256: ${{ steps.terraform_plan.outputs.deployment_config_sha256 }}
@@ -186,6 +187,7 @@ jobs:
             infra/terraform/preprod/preprod.tfplan "${plan_object}"
           plan_generation="$(gcloud storage objects describe "${plan_object}" --format='value(generation)')"
           test -n "${plan_generation}"
+          echo "plan_object=${plan_object}" >> "${GITHUB_OUTPUT}"
           echo "plan_sha256=${plan_sha256}" >> "${GITHUB_OUTPUT}"
           echo "plan_generation=${plan_generation}" >> "${GITHUB_OUTPUT}"
           echo "deployment_config_sha256=${deployment_config_sha256}" >> "${GITHUB_OUTPUT}"
@@ -232,6 +234,7 @@ jobs:
       TF_VAR_worker_image: ${{ needs.plan.outputs.worker_image }}
       TF_VAR_web_image: ${{ needs.plan.outputs.web_image }}
       VERIFY_EXTERNAL_DNS_HTTPS: ${{ needs.plan.outputs.verify_external_dns_https }}
+      EXPECTED_PLAN_OBJECT: ${{ needs.plan.outputs.plan_object }}
       EXPECTED_PLAN_SHA256: ${{ needs.plan.outputs.plan_sha256 }}
       EXPECTED_PLAN_GENERATION: ${{ needs.plan.outputs.plan_generation }}
       EXPECTED_DEPLOYMENT_CONFIG_SHA256: ${{ needs.plan.outputs.deployment_config_sha256 }}
@@ -254,13 +257,13 @@ jobs:
           terraform_version: 1.16.4
       - name: Download private exact plan and verify bound inputs
         run: |
+          test -n "${EXPECTED_PLAN_OBJECT}"
           test -n "${EXPECTED_PLAN_SHA256}"
           test -n "${EXPECTED_PLAN_GENERATION}"
           test -n "${EXPECTED_DEPLOYMENT_CONFIG_SHA256}"
-          plan_object="gs://${STATE_BUCKET}/deployment-plans/preprod/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/preprod.tfplan"
-          actual_plan_generation="$(gcloud storage objects describe "${plan_object}" --format='value(generation)')"
+          actual_plan_generation="$(gcloud storage objects describe "${EXPECTED_PLAN_OBJECT}" --format='value(generation)')"
           test "${actual_plan_generation}" = "${EXPECTED_PLAN_GENERATION}"
-          gcloud storage cp "${plan_object}" infra/terraform/preprod/preprod.tfplan
+          gcloud storage cp "${EXPECTED_PLAN_OBJECT}" infra/terraform/preprod/preprod.tfplan
           actual_plan_sha256="$(sha256sum infra/terraform/preprod/preprod.tfplan | cut -d ' ' -f 1)"
           test "${actual_plan_sha256}" = "${EXPECTED_PLAN_SHA256}"
           actual_deployment_config_sha256="$(printf '%s\0' \
@@ -284,8 +287,7 @@ jobs:
       - name: Delete private exact-plan object
         if: always()
         run: |
-          plan_object="gs://${STATE_BUCKET}/deployment-plans/preprod/${GITHUB_REPOSITORY_ID}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}/${GITHUB_SHA}/preprod.tfplan"
-          gcloud storage rm "${plan_object}" --if-generation-match="${EXPECTED_PLAN_GENERATION}"
+          gcloud storage rm "${EXPECTED_PLAN_OBJECT}" --if-generation-match="${EXPECTED_PLAN_GENERATION}"
       - name: Run migration job and wait
         run: |
           migration_job="$(terraform -chdir=infra/terraform/preprod output -raw migration_job_name)"
