@@ -794,6 +794,8 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "prompt_revision",
         "question_event",
         "specification_revision",
+        "visualization_iteration",
+        "visualization_selection",
     }
     assert "prompt_artifact_version" in {
         column["name"] for column in inspect(engine).get_columns("design_session")

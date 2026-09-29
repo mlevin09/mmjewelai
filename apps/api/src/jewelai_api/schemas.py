@@ -215,6 +215,56 @@ class GenerationRunListResponse(ApiModel):
     generation_runs: tuple[GenerationRun, ...]
 
 
+class CreateVisualizationIterationRequest(ApiModel):
+    prompt_revision_id: UUID
+
+
+class VisualizationResult(ApiModel):
+    generation_run_id: UUID
+    asset: "AssetResponse"
+    provider: str
+    model: str
+
+
+class VisualizationSelection(ApiModel):
+    decision: Literal["selected", "rejected"]
+    asset_id: UUID | None = None
+    selected_by_principal_id: UUID
+    created_at: datetime
+
+
+class VisualizationIterationResponse(ApiModel):
+    iteration_id: UUID
+    session_id: UUID
+    prompt_revision_id: UUID
+    prompt_content_hash: str
+    status: Literal["pending", "succeeded", "partial", "failed"]
+    runs: tuple[GenerationRun, ...]
+    results: tuple[VisualizationResult, ...]
+    selection: VisualizationSelection | None = None
+    current_visual_asset_id: UUID | None = None
+    created_at: datetime
+
+
+class VisualizationIterationListResponse(ApiModel):
+    iterations: tuple[VisualizationIterationResponse, ...]
+
+
+class SelectVisualizationResultRequest(ApiModel):
+    decision: Literal["select"]
+    asset_id: UUID
+
+
+class RejectVisualizationResultsRequest(ApiModel):
+    decision: Literal["reject_all"]
+
+
+VisualizationDecisionRequest = Annotated[
+    SelectVisualizationResultRequest | RejectVisualizationResultsRequest,
+    Field(discriminator="decision"),
+]
+
+
 class AssetResponse(ApiModel):
     schema_version: Literal["1.0.0"]
     asset_id: UUID
@@ -236,6 +286,10 @@ class AssetResponse(ApiModel):
 
 class AssetListResponse(ApiModel):
     assets: tuple[AssetResponse, ...]
+
+
+VisualizationResult.model_rebuild()
+VisualizationIterationResponse.model_rebuild()
 
 
 class CreateAssetAccessRequest(ApiModel):

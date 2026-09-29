@@ -26,9 +26,14 @@ class GenerationProfile(BaseModel):
     provider: ProfileId
     model: ProfileId
     configuration: GenerationConfiguration
+    iteration_enabled: bool = True
 
 
 class UnknownGenerationProfileError(LookupError):
+    pass
+
+
+class NoVisualizationProfilesError(LookupError):
     pass
 
 
@@ -50,3 +55,6 @@ class GenerationProfileRegistry:
     def list_profiles(self) -> tuple[GenerationProfile, ...]:
         """Return profiles in stable ID order without exposing mutable registry state."""
         return tuple(self._profiles[key] for key in sorted(self._profiles))
+
+    def list_iteration_profiles(self) -> tuple[GenerationProfile, ...]:
+        return tuple(profile for profile in self.list_profiles() if profile.iteration_enabled)

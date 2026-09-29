@@ -43,6 +43,7 @@ import type {
   PromptRevision,
   Session,
   UiCatalog,
+  VisualizationIteration,
   TextIntakeResponse,
 } from "./types";
 
@@ -474,6 +475,22 @@ function Workspace() {
         scoped,
       ),
   });
+  const iterations = useQuery({
+    queryKey: keys.workspace(
+      organizationId,
+      sessionId,
+      "visualization-iterations",
+    ),
+    queryFn: () =>
+      api.request<{ iterations: VisualizationIteration[] }>(
+        `/sessions/${sessionId}/visualization-iterations`,
+        scoped,
+      ),
+    refetchInterval: (query) =>
+      query.state.data?.iterations.some((item) => item.status === "pending")
+        ? 2_000
+        : false,
+  });
   const catalog = useQuery({
     queryKey: keys.catalog,
     queryFn: () => api.request<UiCatalog>("/ui/catalog"),
@@ -485,6 +502,8 @@ function Workspace() {
   const [intakeIssues, setIntakeIssues] = useState<string[]>([]);
   const intakeInFlight = useRef(false);
   const [submittedRun, setSubmittedRun] = useState<GenerationRun | null>(null);
+  const [submittedIteration, setSubmittedIteration] =
+    useState<VisualizationIteration | null>(null);
   const [pollStarted, setPollStarted] = useState(() => Date.now());
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const listedActiveRun = (runs.data?.generation_runs ?? []).find((run) =>
@@ -526,7 +545,20 @@ function Workspace() {
       void assets.refetch();
     }
   }, [active.data, activeRunId, assets, runs]);
-  const activeRun = active.data ?? submittedRun ?? listedActiveRun ?? null;
+  const listedActiveIteration = (iterations.data?.iterations ?? []).find(
+    (item) => item.status === "pending",
+  );
+  const activeIteration = submittedIteration ?? listedActiveIteration ?? null;
+  useEffect(() => {
+    const latest = iterations.data?.iterations.find(
+      (item) => item.iteration_id === submittedIteration?.iteration_id,
+    );
+    if (latest && latest.status !== "pending") {
+      setSubmittedIteration(null);
+      void assets.refetch();
+      void runs.refetch();
+    }
+  }, [assets, iterations.data, runs, submittedIteration?.iteration_id]);
 
   const refreshRevision = async () => {
     await client.invalidateQueries({
@@ -758,10 +790,10 @@ function Workspace() {
             sessionId={sessionId}
             revisionId={revision.data.revision_id}
             profiles={catalog.data?.generation_profiles ?? []}
-            activeRun={activeRun}
-            onRun={(run) => {
-              setSubmittedRun(run);
-              setPollStarted(Date.now());
+            activeIteration={activeIteration}
+            onIteration={(iteration) => {
+              setSubmittedIteration(iteration);
+              void iterations.refetch();
             }}
           />
         )}
@@ -828,6 +860,26 @@ function Workspace() {
           )}
         </section>
       </div>
+      <VisualizationIterationPanel
+        api={api}
+        organizationId={organizationId}
+        sessionId={sessionId}
+        locale={session.data.locale}
+        iterations={iterations.data?.iterations ?? []}
+        urls={assetUrls}
+        onView={async (assetId) => {
+          const access = await api.request<{ url: string }>(
+            `/sessions/${sessionId}/assets/${assetId}/access`,
+            {
+              ...scoped,
+              method: "POST",
+              body: JSON.stringify({ ttl_seconds: 300 }),
+            },
+          );
+          setAssetUrls((current) => ({ ...current, [assetId]: access.url }));
+        }}
+        onChanged={() => iterations.refetch()}
+      />
       <AssetPanel
         assets={assets.data?.assets ?? []}
         urls={assetUrls}
@@ -863,46 +915,37 @@ export function ReadyActions({
   sessionId,
   revisionId,
   profiles,
-  activeRun,
-  onRun,
+  activeIteration,
+  onIteration,
 }: {
   api: ApiClient;
   organizationId: string;
   sessionId: string;
   revisionId: string;
   profiles: UiCatalog["generation_profiles"];
-  activeRun: GenerationRun | null;
-  onRun: (run: GenerationRun) => void;
+  activeIteration: VisualizationIteration | null;
+  onIteration: (iteration: VisualizationIteration) => void;
 }) {
   const [prompt, setPrompt] = useState<PromptRevision | null>(null);
-  const [profile, setProfile] = useState(profiles[0]?.profile_id ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submissionInFlight = useRef(false);
-  const activeStatus =
-    activeRun && ["pending", "running"].includes(activeRun.status)
-      ? activeRun.status
-      : null;
-  useEffect(() => {
-    if (!profile && profiles[0]) setProfile(profiles[0].profile_id);
-  }, [profile, profiles]);
+  const activeStatus = activeIteration?.status === "pending" ? "pending" : null;
   const submitGeneration = async () => {
-    if (!prompt || !profile || submissionInFlight.current || activeStatus)
-      return;
+    if (!prompt || submissionInFlight.current || activeStatus) return;
     submissionInFlight.current = true;
     setIsSubmitting(true);
     try {
-      const run = await api.request<GenerationRun>(
-        `/sessions/${sessionId}/generation-runs`,
+      const iteration = await api.request<VisualizationIteration>(
+        `/sessions/${sessionId}/visualization-iterations`,
         {
           organizationId,
           method: "POST",
           body: JSON.stringify({
             prompt_revision_id: prompt.prompt_revision_id,
-            profile_id: profile,
           }),
         },
       );
-      onRun(run);
+      onIteration(iteration);
     } finally {
       submissionInFlight.current = false;
       setIsSubmitting(false);
@@ -929,34 +972,147 @@ export function ReadyActions({
         </button>
       ) : (
         <>
-          <label>
-            Generation profile
-            <select
-              value={profile}
-              onChange={(event) => setProfile(event.target.value)}
-            >
-              {profiles.map((item) => (
-                <option key={item.profile_id} value={item.profile_id}>
-                  {item.profile_id} · {item.output_count} output(s)
-                </option>
-              ))}
-            </select>
-          </label>
           <button
-            disabled={!profile || isSubmitting || Boolean(activeStatus)}
+            disabled={!profiles.length || isSubmitting || Boolean(activeStatus)}
             onClick={() => void submitGeneration()}
           >
-            {isSubmitting ? "Queueing generation…" : "Queue generation"}
+            {isSubmitting ? "Queueing providers…" : "Generate provider results"}
           </button>
           {activeStatus && (
             <p className="notice">
-              Generation status: {activeStatus.toUpperCase()}
+              Visualization iteration: {activeStatus.toUpperCase()}
             </p>
           )}
           {!profiles.length && <p>No generation profiles are configured.</p>}
         </>
       )}
     </div>
+  );
+}
+
+export function VisualizationIterationPanel({
+  api,
+  organizationId,
+  sessionId,
+  locale,
+  iterations,
+  urls,
+  onView,
+  onChanged,
+}: {
+  api: ApiClient;
+  organizationId: string;
+  sessionId: string;
+  locale: string;
+  iterations: VisualizationIteration[];
+  urls: Record<string, string>;
+  onView: (assetId: string) => Promise<void>;
+  onChanged: () => Promise<unknown>;
+}) {
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const decide = async (
+    iterationId: string,
+    decision:
+      { decision: "select"; asset_id: string } | { decision: "reject_all" },
+  ) => {
+    setDecisionError(null);
+    try {
+      await api.request(
+        `/sessions/${sessionId}/visualization-iterations/${iterationId}/decision`,
+        {
+          organizationId,
+          method: "POST",
+          body: JSON.stringify(decision),
+        },
+      );
+      await onChanged();
+    } catch (caught) {
+      setDecisionError(
+        caught instanceof ApiError
+          ? caught.message
+          : locale === "ru"
+            ? "Не удалось сохранить выбор."
+            : "The selection could not be saved.",
+      );
+    }
+  };
+  return (
+    <section className="panel assets">
+      <p className="eyebrow">
+        {locale === "ru" ? "Варианты визуализации" : "Visualization results"}
+      </p>
+      <h2>{locale === "ru" ? "Выберите результат" : "Choose a result"}</h2>
+      {decisionError && <div className="alert">{decisionError}</div>}
+      {[...iterations].reverse().map((iteration) => (
+        <article className="iteration" key={iteration.iteration_id}>
+          <div className="list-row">
+            <strong>{humanize(iteration.status)}</strong>
+            <small>{iteration.runs.length} provider run(s)</small>
+          </div>
+          {iteration.status === "failed" && (
+            <p className="notice">
+              {locale === "ru"
+                ? "Все поставщики не смогли создать результат."
+                : "All providers failed to create a result."}
+            </p>
+          )}
+          <div className="asset-grid">
+            {iteration.results.map((result) => {
+              const selected =
+                iteration.selection?.asset_id === result.asset.asset_id;
+              return (
+                <article className="asset-card" key={result.asset.asset_id}>
+                  {urls[result.asset.asset_id] && (
+                    <img
+                      src={urls[result.asset.asset_id]}
+                      alt={`${result.provider} jewelry result`}
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
+                  <span className="badge">{result.provider}</span>
+                  {selected && <strong>Current visual</strong>}
+                  <button onClick={() => void onView(result.asset.asset_id)}>
+                    {locale === "ru" ? "Показать" : "View"}
+                  </button>
+                  <button
+                    disabled={Boolean(iteration.selection)}
+                    onClick={() =>
+                      void decide(iteration.iteration_id, {
+                        decision: "select",
+                        asset_id: result.asset.asset_id,
+                      })
+                    }
+                  >
+                    {locale === "ru" ? "Выбрать" : "Select"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+          {iteration.results.length > 0 && (
+            <button
+              className="quiet"
+              disabled={Boolean(iteration.selection)}
+              onClick={() =>
+                void decide(iteration.iteration_id, { decision: "reject_all" })
+              }
+            >
+              {locale === "ru" ? "Отклонить все" : "Reject all"}
+            </button>
+          )}
+          {iteration.selection?.decision === "rejected" && (
+            <p className="notice">
+              {locale === "ru"
+                ? "Все результаты отклонены."
+                : "All results rejected."}
+            </p>
+          )}
+        </article>
+      ))}
+      {!iterations.length && (
+        <p>{locale === "ru" ? "Результатов пока нет." : "No results yet."}</p>
+      )}
+    </section>
   );
 }
 

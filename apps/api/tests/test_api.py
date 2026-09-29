@@ -1553,6 +1553,182 @@ def test_generation_run_api_rejects_untrusted_profile_configuration_and_cross_sc
     assert historical.json()["status"] == "pending"
 
 
+def iteration_profiles():
+    return GenerationProfileRegistry(
+        (
+            GenerationProfile(
+                profile_id="google_test",
+                profile_version="1.0.0",
+                provider="google",
+                model="gemini-image-test",
+                configuration=GenerationConfiguration(output_count=1),
+            ),
+            GenerationProfile(
+                profile_id="openai_test",
+                profile_version="1.0.0",
+                provider="openai",
+                model="gpt-image-test",
+                configuration=GenerationConfiguration(output_count=1),
+            ),
+        )
+    )
+
+
+def complete_iteration_run(repository, run, organization_id, *, succeed):
+    session_id = UUID(run["session_id"])
+    run_id = UUID(run["generation_run_id"])
+    repository.claim_generation_run(session_id, run_id, UUID(organization_id), NOW)
+    if not succeed:
+        repository.fail_generation_run(
+            session_id,
+            run_id,
+            UUID(organization_id),
+            GenerationErrorCode.GATEWAY_UNAVAILABLE,
+            "Provider unavailable",
+            NOW + timedelta(seconds=1),
+        )
+        return
+    repository.complete_generation_run(
+        session_id,
+        run_id,
+        UUID(organization_id),
+        GenerationResult(
+            generation_run_id=run_id,
+            provider=run["provider"],
+            model=run["model"],
+            provider_request_id=f"{run['provider']}-request",
+            outputs=(
+                GeneratedOutputDescriptor(
+                    ordinal=1, provider_output_id=f"{run['provider']}-output"
+                ),
+            ),
+        ),
+        NOW + timedelta(seconds=1),
+    )
+
+
+def add_iteration_asset(repository, run, organization_id, project_id, session_id):
+    asset_id = UUID("51515151-5151-4151-8151-515151515151")
+    asset = Asset(
+        asset_id=asset_id,
+        organization_id=UUID(organization_id),
+        project_id=UUID(project_id),
+        session_id=UUID(session_id),
+        kind=AssetKind.GENERATED,
+        status=AssetStatus.PENDING,
+        object_key=build_object_key(
+            UUID(organization_id), UUID(project_id), asset_id, AssetContentType.PNG
+        ),
+        content_type=AssetContentType.PNG,
+        content_hash="5" * 64,
+        byte_size=32,
+        generation_run_id=UUID(run["generation_run_id"]),
+        generation_output_ordinal=1,
+        provider_output_id=f"{run['provider']}-output",
+        created_at=NOW + timedelta(seconds=2),
+    )
+    repository.create_pending_asset(asset)
+    repository.mark_asset_ready(asset_id, UUID(organization_id), NOW + timedelta(seconds=3))
+    return asset_id
+
+
+def test_parallel_iteration_groups_same_prompt_allows_partial_success_and_selection(
+    client, app, generation_task_publisher
+):
+    organization_id, project_id, session, _, prompt = create_ready_prompt(client)
+    app.state.service._generation_profiles = iteration_profiles()
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/visualization-iterations"
+    created = client.post(
+        url, headers=headers, json={"prompt_revision_id": prompt["prompt_revision_id"]}
+    )
+    assert created.status_code == 201
+    iteration = created.json()
+    assert iteration["status"] == "pending"
+    assert {run["provider"] for run in iteration["runs"]} == {"google", "openai"}
+    assert {run["prompt_content_hash"] for run in iteration["runs"]} == {
+        prompt["compiled_prompt"]["content_hash"]
+    }
+    assert len(generation_task_publisher.calls) == 2
+
+    google = next(run for run in iteration["runs"] if run["provider"] == "google")
+    openai = next(run for run in iteration["runs"] if run["provider"] == "openai")
+    repository = app.state.service.repository
+    complete_iteration_run(repository, google, organization_id, succeed=True)
+    complete_iteration_run(repository, openai, organization_id, succeed=False)
+    asset_id = add_iteration_asset(
+        repository, google, organization_id, project_id, session["session_id"]
+    )
+
+    grouped = client.get(f"{url}/{iteration['iteration_id']}", headers=headers)
+    assert grouped.status_code == 200
+    payload = grouped.json()
+    assert payload["status"] == "partial"
+    assert [item["asset"]["asset_id"] for item in payload["results"]] == [str(asset_id)]
+    assert payload["results"][0]["provider"] == "google"
+
+    decision_url = f"{url}/{iteration['iteration_id']}/decision"
+    outside = client.post(
+        decision_url,
+        headers=headers,
+        json={
+            "decision": "select",
+            "asset_id": "61616161-6161-4161-8161-616161616161",
+        },
+    )
+    assert outside.status_code == 404
+    selected = client.post(
+        decision_url,
+        headers=headers,
+        json={"decision": "select", "asset_id": str(asset_id)},
+    )
+    assert selected.status_code == 200
+    assert selected.json()["selection"]["decision"] == "selected"
+    assert selected.json()["current_visual_asset_id"] == str(asset_id)
+    repeated = client.post(
+        decision_url,
+        headers=headers,
+        json={"decision": "select", "asset_id": str(asset_id)},
+    )
+    assert repeated.status_code == 200
+    assert (
+        client.post(decision_url, headers=headers, json={"decision": "reject_all"}).status_code
+        == 409
+    )
+
+    foreign = client.post("/organizations", json={"name": "Foreign iteration"}).json()
+    assert (
+        client.get(
+            f"{url}/{iteration['iteration_id']}",
+            headers={"X-Organization-ID": foreign["organization_id"]},
+        ).status_code
+        == 404
+    )
+
+
+def test_all_provider_failure_and_reject_all_are_persisted_without_assets(client, app):
+    organization_id, _, session, _, prompt = create_ready_prompt(client)
+    app.state.service._generation_profiles = iteration_profiles()
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/visualization-iterations"
+    iteration = client.post(
+        url, headers=headers, json={"prompt_revision_id": prompt["prompt_revision_id"]}
+    ).json()
+    for run in iteration["runs"]:
+        complete_iteration_run(app.state.service.repository, run, organization_id, succeed=False)
+    failed = client.get(f"{url}/{iteration['iteration_id']}", headers=headers).json()
+    assert failed["status"] == "failed"
+    assert failed["results"] == []
+    rejected = client.post(
+        f"{url}/{iteration['iteration_id']}/decision",
+        headers=headers,
+        json={"decision": "reject_all"},
+    )
+    assert rejected.status_code == 200
+    assert rejected.json()["selection"]["decision"] == "rejected"
+    assert rejected.json()["current_visual_asset_id"] is None
+
+
 def test_asset_metadata_api_is_scoped_ordered_and_redacts_storage_details(client, app):
     organization_id, project_id, response = create_hierarchy(client)
     session = response.json()

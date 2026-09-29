@@ -51,12 +51,16 @@ from jewelai_persistence.models import (
     PromptRevisionRow,
     QuestionEventRow,
 )
-from jewelai_persistence.repository import PersistenceRepository, StaleRevisionError
+from jewelai_persistence.repository import (
+    PersistenceRepository,
+    StaleRevisionError,
+    VisualizationIterationRecord,
+)
 from jewelai_prompts import compile_prompt, validate_compiled_prompt
 from jewelai_text_understanding_google import TextUnderstandingUnavailableError
 
 from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
-from .generation import GenerationProfileRegistry
+from .generation import GenerationProfileRegistry, NoVisualizationProfilesError
 from .schemas import (
     ArtifactPins,
     AssetListResponse,
@@ -65,6 +69,7 @@ from .schemas import (
     CreateGenerationRunRequest,
     CreatePromptRevisionRequest,
     CreateSessionRequest,
+    CreateVisualizationIterationRequest,
     DictionaryOption,
     DictionaryOptionsResponse,
     EditRevisionRequest,
@@ -91,6 +96,11 @@ from .schemas import (
     TextIntakeResponse,
     UiCatalogResponse,
     UnlockRevisionRequest,
+    VisualizationDecisionRequest,
+    VisualizationIterationListResponse,
+    VisualizationIterationResponse,
+    VisualizationResult,
+    VisualizationSelection,
 )
 from .text_understanding import TextUnderstandingProvider
 
@@ -573,6 +583,100 @@ class RuntimeService:
         self.repository.mark_generation_dispatch_published(run.generation_run_id, self._clock())
         return run
 
+    def create_visualization_iteration(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: CreateVisualizationIterationRequest,
+    ) -> VisualizationIterationResponse:
+        prompt_row, compiled = self.repository.get_prompt_revision(
+            session_id, request.prompt_revision_id, organization_id
+        )
+        profiles = self._generation_profiles.list_iteration_profiles()
+        if not profiles:
+            raise NoVisualizationProfilesError("No visualization providers are configured")
+        now = self._clock()
+        iteration_id = self._uuid()
+        runs = tuple(
+            GenerationRun(
+                generation_run_id=self._uuid(),
+                session_id=session_id,
+                prompt_revision_id=prompt_row.prompt_revision_id,
+                prompt_content_hash=compiled.content_hash,
+                profile_id=profile.profile_id,
+                profile_version=profile.profile_version,
+                provider=profile.provider,
+                model=profile.model,
+                configuration=profile.configuration,
+                status=GenerationStatus.PENDING,
+                attempt=1,
+                created_at=now,
+            )
+            for profile in profiles
+        )
+        dispatches = self.repository.create_visualization_iteration_with_dispatches(
+            iteration_id=iteration_id,
+            session_id=session_id,
+            prompt_revision_id=prompt_row.prompt_revision_id,
+            prompt_content_hash=compiled.content_hash,
+            runs=runs,
+            organization_id=organization_id,
+            created_at=now,
+        )
+        for dispatch in dispatches:
+            try:
+                self._generation_task_publisher.publish(dispatch.task)
+            except GenerationTaskPublishError:
+                continue
+            self.repository.mark_generation_dispatch_published(
+                dispatch.task.generation_run_id, self._clock()
+            )
+        record = self.repository.get_visualization_iteration(
+            session_id, iteration_id, organization_id
+        )
+        return self._visualization_response(record, organization_id)
+
+    def get_visualization_iteration(
+        self, session_id: UUID, iteration_id: UUID, organization_id: UUID
+    ) -> VisualizationIterationResponse:
+        return self._visualization_response(
+            self.repository.get_visualization_iteration(session_id, iteration_id, organization_id),
+            organization_id,
+        )
+
+    def list_visualization_iterations(
+        self, session_id: UUID, organization_id: UUID
+    ) -> VisualizationIterationListResponse:
+        return VisualizationIterationListResponse(
+            iterations=tuple(
+                self._visualization_response(record, organization_id)
+                for record in self.repository.list_visualization_iterations(
+                    session_id, organization_id
+                )
+            )
+        )
+
+    def decide_visualization_iteration(
+        self,
+        session_id: UUID,
+        iteration_id: UUID,
+        organization_id: UUID,
+        principal_id: UUID,
+        request: VisualizationDecisionRequest,
+    ) -> VisualizationIterationResponse:
+        decision = "selected" if request.decision == "select" else "rejected"
+        asset_id = request.asset_id if request.decision == "select" else None
+        record = self.repository.decide_visualization_iteration(
+            session_id=session_id,
+            iteration_id=iteration_id,
+            organization_id=organization_id,
+            principal_id=principal_id,
+            decision=decision,
+            asset_id=asset_id,
+            created_at=self._clock(),
+        )
+        return self._visualization_response(record, organization_id)
+
     def retry_generation_run(
         self,
         session_id: UUID,
@@ -793,6 +897,56 @@ class RuntimeService:
             failed_at=asset.failed_at,
             error_code=asset.error_code,
             error_detail=asset.error_detail,
+        )
+
+    def _visualization_response(
+        self, record: VisualizationIterationRecord, organization_id: UUID
+    ) -> VisualizationIterationResponse:
+        terminal = all(
+            run.status in {GenerationStatus.SUCCEEDED, GenerationStatus.FAILED}
+            for run in record.runs
+        )
+        successes = [run for run in record.runs if run.status is GenerationStatus.SUCCEEDED]
+        if not terminal:
+            status = "pending"
+        elif not successes:
+            status = "failed"
+        elif len(successes) == len(record.runs):
+            status = "succeeded"
+        else:
+            status = "partial"
+        runs_by_id = {run.generation_run_id: run for run in record.runs}
+        results = tuple(
+            VisualizationResult(
+                generation_run_id=asset.generation_run_id,
+                asset=self._asset_response(asset),
+                provider=runs_by_id[asset.generation_run_id].provider,
+                model=runs_by_id[asset.generation_run_id].model,
+            )
+            for asset in record.assets
+            if asset.status is AssetStatus.READY and asset.generation_run_id in runs_by_id
+        )
+        selection = None
+        if record.decision is not None:
+            selection = VisualizationSelection(
+                decision=record.decision,
+                asset_id=record.selected_asset_id,
+                selected_by_principal_id=record.selected_by_principal_id,
+                created_at=record.selected_at,
+            )
+        return VisualizationIterationResponse(
+            iteration_id=record.iteration_id,
+            session_id=record.session_id,
+            prompt_revision_id=record.prompt_revision_id,
+            prompt_content_hash=record.prompt_content_hash,
+            status=status,
+            runs=record.runs,
+            results=results,
+            selection=selection,
+            current_visual_asset_id=self.repository.get_current_visual_asset_id(
+                record.session_id, organization_id
+            ),
+            created_at=record.created_at,
         )
 
     @staticmethod

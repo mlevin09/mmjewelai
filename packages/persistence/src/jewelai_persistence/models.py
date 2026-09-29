@@ -176,6 +176,23 @@ class PromptRevisionRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class VisualizationIterationRow(Base):
+    __tablename__ = "visualization_iteration"
+    __table_args__ = (
+        Index("ix_visualization_iteration_session_created", "session_id", "created_at"),
+    )
+
+    iteration_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    prompt_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("prompt_revision.prompt_revision_id", ondelete="RESTRICT"), index=True
+    )
+    prompt_content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class GenerationRunRow(Base):
     __tablename__ = "generation_run"
     __table_args__ = (
@@ -207,6 +224,11 @@ class GenerationRunRow(Base):
     )
 
     generation_run_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    iteration_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("visualization_iteration.iteration_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     session_id: Mapped[UUID] = mapped_column(
         ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
     )
@@ -237,6 +259,36 @@ class GenerationRunRow(Base):
     orphan_cleanup_completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class VisualizationSelectionRow(Base):
+    __tablename__ = "visualization_selection"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('selected', 'rejected')", name="ck_visual_selection_decision"
+        ),
+        CheckConstraint(
+            "(decision = 'selected' AND asset_id IS NOT NULL) OR "
+            "(decision = 'rejected' AND asset_id IS NULL)",
+            name="ck_visual_selection_asset",
+        ),
+        Index("ix_visual_selection_session_created", "session_id", "created_at"),
+    )
+
+    iteration_id: Mapped[UUID] = mapped_column(
+        ForeignKey("visualization_iteration.iteration_id", ondelete="RESTRICT"), primary_key=True
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    asset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("asset.asset_id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    decision: Mapped[str] = mapped_column(String(16))
+    selected_by_principal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("auth_principal.principal_id", ondelete="RESTRICT"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class GenerationDispatchOutboxRow(Base):
