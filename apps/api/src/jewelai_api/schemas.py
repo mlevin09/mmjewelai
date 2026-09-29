@@ -20,7 +20,7 @@ from jewelai_domain import (
 )
 from jewelai_domain.models import MessageSource
 from jewelai_model_gateway import GenerationRun
-from jewelai_parser import ParserCandidate
+from jewelai_parser import ParserCandidate, ParserProposal
 from jewelai_prompts import CompiledPrompt
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
@@ -172,6 +172,18 @@ class ParserProposalRequest(ApiModel):
     expected_revision_id: UUID
     message_id: UUID
     candidate: ParserCandidate
+
+
+class TextIntakeRequest(ApiModel):
+    expected_revision_id: UUID
+    content: MessageContent
+
+
+class TextIntakeResponse(ApiModel):
+    message: MessageResponse
+    proposal: ParserProposal
+    revision: DesignRevision
+    evaluation: "EvaluationResponse"
 
 
 class CreatePromptRevisionRequest(ApiModel):

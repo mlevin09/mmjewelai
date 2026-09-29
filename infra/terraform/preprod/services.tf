@@ -17,7 +17,11 @@ locals {
     GENERATION_TASK_SERVICE_ACCOUNT_EMAIL = google_service_account.runtime["task"].email
     GENERATION_TASK_OIDC_AUDIENCE         = google_cloud_run_v2_service.worker.uri
     GENERATION_PROFILES_JSON              = var.generation_profiles_json
-  })
+    }, local.google_generation_enabled ? {
+    TEXT_UNDERSTANDING_PROVIDER               = "google"
+    GOOGLE_TEXT_UNDERSTANDING_MODEL           = "gemini-3.1-flash-lite"
+    GOOGLE_TEXT_UNDERSTANDING_TIMEOUT_SECONDS = "30"
+  } : {})
 
   worker_environment = merge(local.database_env, {
     JEWELAI_ENVIRONMENT = var.deployment_environment
@@ -89,6 +93,19 @@ resource "google_cloud_run_v2_service" "api" {
           secret_key_ref {
             secret  = google_secret_manager_secret.database_url.secret_id
             version = "latest"
+          }
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.google_generation_enabled ? [1] : []
+        content {
+          name = "GOOGLE_GENERATIVE_LANGUAGE_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = local.google_generative_language_secret_resource_id
+              version = "latest"
+            }
           }
         }
       }

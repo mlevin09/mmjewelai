@@ -190,6 +190,26 @@ _require(
     "exact existing preprod Google secret ID",
 )
 _require(
+    preprod_services,
+    'TEXT_UNDERSTANDING_PROVIDER               = "google"',
+    "explicit preprod text-understanding provider",
+)
+_require(
+    preprod_services,
+    'GOOGLE_TEXT_UNDERSTANDING_MODEL           = "gemini-3.1-flash-lite"',
+    "explicit preprod text-understanding model",
+)
+_require(
+    preprod_services,
+    'name = "GOOGLE_GENERATIVE_LANGUAGE_API_KEY"',
+    "API receives the existing Google secret through Secret Manager",
+)
+_require(
+    preprod_iam,
+    'toset(["api", "worker"])',
+    "Google secret access is limited to the API and generation worker",
+)
+_require(
     preprod_database,
     'edition                     = "ENTERPRISE"',
     "preprod Cloud SQL custom tier edition",
@@ -659,10 +679,14 @@ preprod_google_access = _resource(
 )
 _require(
     preprod_google_access,
-    'runtime["worker"].email',
-    "preprod Google secret limited to worker",
+    'toset(["api", "worker"])',
+    "preprod Google secret limited to API text intake and generation worker",
 )
-_forbid(preprod_google_access, 'runtime["api"].email', "preprod API Google secret access")
+_require(
+    preprod_google_access,
+    'runtime[each.value].email',
+    "preprod Google secret binds only enumerated runtime identities",
+)
 
 cleanup_access = _resource(iam, "google_storage_bucket_iam_member", "asset_cleanup")
 _require(cleanup_access, 'runtime["cleanup"].email', "cleanup object-delete identity")

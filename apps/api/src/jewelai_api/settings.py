@@ -10,6 +10,7 @@ from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_identity_platform import IdentityPlatformConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
+from jewelai_text_understanding_google import GoogleTextUnderstandingConfig
 
 from .generation import GenerationProfile
 
@@ -47,6 +48,7 @@ class RuntimeSettings:
     generation_tasks: CloudTasksGenerationConfig | None = None
     generation_profiles: tuple[GenerationProfile, ...] = ()
     web_allowed_origins: tuple[str, ...] = ()
+    text_understanding: GoogleTextUnderstandingConfig | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.asset_upload_max_bytes, bool) or not isinstance(
@@ -129,6 +131,15 @@ class RuntimeSettings:
             maximum=MAX_HTTP_REQUEST_BYTES,
             name="HTTP_MAX_REQUEST_BYTES",
         )
+        text_understanding_provider = os.getenv("TEXT_UNDERSTANDING_PROVIDER")
+        text_understanding_model = os.getenv("GOOGLE_TEXT_UNDERSTANDING_MODEL")
+        if (text_understanding_provider is None) != (text_understanding_model is None):
+            raise ValueError(
+                "TEXT_UNDERSTANDING_PROVIDER and GOOGLE_TEXT_UNDERSTANDING_MODEL "
+                "must be configured together"
+            )
+        if text_understanding_provider not in {None, "google"}:
+            raise ValueError("TEXT_UNDERSTANDING_PROVIDER must be google when configured")
         return cls(
             database_url=os.getenv("DATABASE_URL", cls.database_url),
             repository_root=Path(root).resolve() if root else Path(__file__).resolve().parents[4],
@@ -186,6 +197,16 @@ class RuntimeSettings:
             ),
             generation_profiles=_parse_generation_profiles(os.getenv("GENERATION_PROFILES_JSON")),
             web_allowed_origins=_parse_web_allowed_origins(os.getenv("WEB_ALLOWED_ORIGINS")),
+            text_understanding=(
+                GoogleTextUnderstandingConfig(
+                    model=os.environ["GOOGLE_TEXT_UNDERSTANDING_MODEL"],
+                    timeout_seconds=float(
+                        os.getenv("GOOGLE_TEXT_UNDERSTANDING_TIMEOUT_SECONDS", "30")
+                    ),
+                )
+                if text_understanding_model
+                else None
+            ),
         )
 
 

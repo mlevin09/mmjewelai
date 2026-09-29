@@ -121,6 +121,25 @@ export interface Evaluation {
   };
 }
 
+export interface TextIntakeResponse {
+  message: {
+    message_id: string;
+    content: string;
+    created_at: string;
+  };
+  proposal: {
+    has_changes: boolean;
+    accepted_updates: Array<{ concrete_target: string }>;
+    issues: Array<{
+      code: string;
+      concrete_target: string;
+      detail: string;
+    }>;
+  };
+  revision: DesignRevision;
+  evaluation: Evaluation;
+}
+
 export interface DictionaryOption {
   domain_id: string;
   category: "stone_shape" | "stone_setting" | "metal_color";
