@@ -807,6 +807,20 @@ class PersistenceRepository:
                 raise OwnershipMismatchError(
                     "Visualization iteration not found in organization scope"
                 )
+            nonterminal_run = db.scalar(
+                select(GenerationRunRow.generation_run_id)
+                .where(
+                    GenerationRunRow.iteration_id == iteration_id,
+                    GenerationRunRow.status.in_(
+                        (GenerationStatus.PENDING.value, GenerationStatus.RUNNING.value)
+                    ),
+                )
+                .limit(1)
+            )
+            if nonterminal_run is not None:
+                raise VisualizationSelectionConflictError(
+                    "Visualization iteration is not ready for a decision"
+                )
             existing = db.get(VisualizationSelectionRow, iteration_id)
             if existing is not None:
                 if existing.decision != decision or existing.asset_id != asset_id:

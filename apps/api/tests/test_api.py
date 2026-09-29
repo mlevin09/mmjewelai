@@ -1607,8 +1607,15 @@ def complete_iteration_run(repository, run, organization_id, *, succeed):
     )
 
 
-def add_iteration_asset(repository, run, organization_id, project_id, session_id):
-    asset_id = UUID("51515151-5151-4151-8151-515151515151")
+def add_iteration_asset(
+    repository,
+    run,
+    organization_id,
+    project_id,
+    session_id,
+    asset_id=None,
+):
+    asset_id = asset_id or UUID("51515151-5151-4151-8151-515151515151")
     asset = Asset(
         asset_id=asset_id,
         organization_id=UUID(organization_id),
@@ -1706,6 +1713,83 @@ def test_parallel_iteration_groups_same_prompt_allows_partial_success_and_select
     )
 
 
+@pytest.mark.parametrize("sibling_status", ["pending", "running"])
+def test_visualization_decision_rejects_nonterminal_sibling_run(client, app, sibling_status):
+    organization_id, project_id, session, _, prompt = create_ready_prompt(client)
+    app.state.service._generation_profiles = iteration_profiles()
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/visualization-iterations"
+    iteration = client.post(
+        url, headers=headers, json={"prompt_revision_id": prompt["prompt_revision_id"]}
+    ).json()
+    google = next(run for run in iteration["runs"] if run["provider"] == "google")
+    sibling = next(run for run in iteration["runs"] if run["provider"] == "openai")
+    repository = app.state.service.repository
+    complete_iteration_run(repository, google, organization_id, succeed=True)
+    asset_id = add_iteration_asset(
+        repository, google, organization_id, project_id, session["session_id"]
+    )
+    if sibling_status == "running":
+        repository.claim_generation_run(
+            UUID(session["session_id"]),
+            UUID(sibling["generation_run_id"]),
+            UUID(organization_id),
+            NOW,
+        )
+
+    grouped = client.get(f"{url}/{iteration['iteration_id']}", headers=headers)
+    assert grouped.status_code == 200
+    assert grouped.json()["status"] == "pending"
+    decision = client.post(
+        f"{url}/{iteration['iteration_id']}/decision",
+        headers=headers,
+        json={"decision": "select", "asset_id": str(asset_id)},
+    )
+    assert decision.status_code == 409
+    assert decision.json()["error"] == "visualization_selection_conflict"
+    rejected = client.post(
+        f"{url}/{iteration['iteration_id']}/decision",
+        headers=headers,
+        json={"decision": "reject_all"},
+    )
+    assert rejected.status_code == 409
+    assert rejected.json()["error"] == "visualization_selection_conflict"
+
+
+def test_visualization_selection_succeeds_after_all_providers_succeed(client, app):
+    organization_id, project_id, session, _, prompt = create_ready_prompt(client)
+    app.state.service._generation_profiles = iteration_profiles()
+    headers = {"X-Organization-ID": organization_id}
+    url = f"/sessions/{session['session_id']}/visualization-iterations"
+    iteration = client.post(
+        url, headers=headers, json={"prompt_revision_id": prompt["prompt_revision_id"]}
+    ).json()
+    repository = app.state.service.repository
+    asset_id = None
+    for index, run in enumerate(iteration["runs"], start=1):
+        complete_iteration_run(repository, run, organization_id, succeed=True)
+        created_asset_id = add_iteration_asset(
+            repository,
+            run,
+            organization_id,
+            project_id,
+            session["session_id"],
+            UUID(f"51515151-5151-4151-8151-{index:012d}"),
+        )
+        asset_id = asset_id or created_asset_id
+
+    grouped = client.get(f"{url}/{iteration['iteration_id']}", headers=headers)
+    assert grouped.status_code == 200
+    assert grouped.json()["status"] == "succeeded"
+    selected = client.post(
+        f"{url}/{iteration['iteration_id']}/decision",
+        headers=headers,
+        json={"decision": "select", "asset_id": str(asset_id)},
+    )
+    assert selected.status_code == 200
+    assert selected.json()["selection"]["decision"] == "selected"
+
+
 def test_all_provider_failure_and_reject_all_are_persisted_without_assets(client, app):
     organization_id, _, session, _, prompt = create_ready_prompt(client)
     app.state.service._generation_profiles = iteration_profiles()
@@ -1719,6 +1803,15 @@ def test_all_provider_failure_and_reject_all_are_persisted_without_assets(client
     failed = client.get(f"{url}/{iteration['iteration_id']}", headers=headers).json()
     assert failed["status"] == "failed"
     assert failed["results"] == []
+    selected = client.post(
+        f"{url}/{iteration['iteration_id']}/decision",
+        headers=headers,
+        json={
+            "decision": "select",
+            "asset_id": "61616161-6161-4161-8161-616161616161",
+        },
+    )
+    assert selected.status_code == 404
     rejected = client.post(
         f"{url}/{iteration['iteration_id']}/decision",
         headers=headers,

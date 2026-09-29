@@ -211,6 +211,66 @@ describe("parallel visualization submission", () => {
 });
 
 describe("visualization result selection", () => {
+  it("waits for all provider runs to finish before enabling decisions", () => {
+    const api = new ApiClient(
+      "http://localhost:8000/",
+      async () => "access-token",
+      async () => undefined,
+    );
+    const pending: VisualizationIteration = {
+      iteration_id: "iteration-pending",
+      session_id: "session-one",
+      prompt_revision_id: "prompt-one",
+      prompt_content_hash: "a".repeat(64),
+      status: "pending",
+      runs: [],
+      results: [
+        {
+          generation_run_id: "run-google",
+          provider: "google",
+          model: "gemini-image",
+          asset: {
+            asset_id: "asset-google",
+            kind: "generated",
+            status: "ready",
+            content_type: "image/png",
+            byte_size: 100,
+            generation_run_id: "run-google",
+            created_at: "2026-09-27T00:00:00Z",
+          },
+        },
+      ],
+      selection: null,
+      current_visual_asset_id: null,
+      created_at: "2026-09-27T00:00:00Z",
+    };
+    const props = {
+      api,
+      organizationId: "organization-one",
+      sessionId: "session-one",
+      locale: "en",
+      urls: {},
+      onView: vi.fn(async () => undefined),
+      onChanged: vi.fn(async () => undefined),
+    };
+    const view = render(
+      <VisualizationIterationPanel {...props} iterations={[pending]} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Select" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject all" })).toBeDisabled();
+
+    view.rerender(
+      <VisualizationIterationPanel
+        {...props}
+        iterations={[{ ...pending, status: "partial" }]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Select" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reject all" })).toBeEnabled();
+    view.unmount();
+  });
+
   it("shows grouped provider results and persists one selected Asset", async () => {
     const decisions: unknown[] = [];
     server.use(

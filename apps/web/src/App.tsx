@@ -1075,7 +1075,10 @@ export function VisualizationIterationPanel({
                     {locale === "ru" ? "Показать" : "View"}
                   </button>
                   <button
-                    disabled={Boolean(iteration.selection)}
+                    disabled={
+                      iteration.status === "pending" ||
+                      Boolean(iteration.selection)
+                    }
                     onClick={() =>
                       void decide(iteration.iteration_id, {
                         decision: "select",
@@ -1092,7 +1095,9 @@ export function VisualizationIterationPanel({
           {iteration.results.length > 0 && (
             <button
               className="quiet"
-              disabled={Boolean(iteration.selection)}
+              disabled={
+                iteration.status === "pending" || Boolean(iteration.selection)
+              }
               onClick={() =>
                 void decide(iteration.iteration_id, { decision: "reject_all" })
               }
