@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit
 
+import google.auth
 from google.api_core.exceptions import NotFound, PreconditionFailed
 from google.auth import iam
 from google.auth.credentials import Credentials, Signing
@@ -21,6 +22,8 @@ from jewelai_assets.models import ContentHash, ObjectKey, ObjectVersionToken
 from pydantic import TypeAdapter, ValidationError
 
 from .config import GcsAssetStorageConfig, validate_signing_service_account_email
+
+_CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform"
 
 JEWELAI_SHA256_METADATA_KEY = "jewelai-sha256"
 _OBJECT_KEY = TypeAdapter(ObjectKey)
@@ -166,6 +169,7 @@ class GcsPrivateObjectAccessSigner:
         *,
         client: Any | None = None,
         credentials: Credentials | None = None,
+        iam_credentials: Credentials | None = None,
         auth_request: Any | None = None,
     ):
         self.config = config
@@ -179,6 +183,7 @@ class GcsPrivateObjectAccessSigner:
             self._credentials = (
                 credentials if credentials is not None else _client_credentials(self._client)
             )
+            self._iam_credentials = iam_credentials
             self._auth_request = auth_request
         except Exception as exc:
             raise AssetAccessUnavailableError("Google Cloud asset signing is unavailable") from exc
@@ -213,14 +218,26 @@ class GcsPrivateObjectAccessSigner:
         if isinstance(credentials, Signing):
             return credentials
 
+        iam_credentials = self._resolve_iam_credentials()
         service_account_email = self.config.signing_service_account_email or getattr(
-            credentials, "service_account_email", None
+            iam_credentials, "service_account_email", None
         )
         if not isinstance(service_account_email, str):
             raise ValueError("signing service-account email is unavailable")
         validate_signing_service_account_email(service_account_email)
         request = self._auth_request if self._auth_request is not None else Request()
-        return _IamSigningCredentials(request, credentials, service_account_email)
+        return _IamSigningCredentials(request, iam_credentials, service_account_email)
+
+    def _resolve_iam_credentials(self) -> Credentials:
+        if self._iam_credentials is not None:
+            return self._iam_credentials
+        credentials, project_id = google.auth.default(scopes=(_CLOUD_PLATFORM_SCOPE,))
+        if not isinstance(credentials, Credentials):
+            raise ValueError("IAM signing credentials are unavailable")
+        if self.config.project_id is not None and project_id not in (None, self.config.project_id):
+            raise ValueError("IAM signing credential project does not match configuration")
+        self._iam_credentials = credentials
+        return credentials
 
 
 class _IamSigningCredentials(Signing):

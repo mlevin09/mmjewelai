@@ -538,7 +538,11 @@ def test_ingestion_uses_gcs_store_without_changing_provider_neutral_semantics():
     assert blob.upload_calls[0][1]["if_generation_match"] == 0
 
 
-def test_v4_get_signing_uses_configured_bucket_exact_key_and_expiration():
+def test_v4_get_signing_uses_configured_bucket_exact_key_and_expiration(monkeypatch):
+    monkeypatch.setattr(
+        "jewelai_assets_gcs.adapters.google.auth.default",
+        lambda **_: (_ for _ in ()).throw(AssertionError("local signing must not acquire ADC")),
+    )
     blob = FakeBlob(OBJECT_KEY)
     bucket = FakeBucket(blob)
     credentials = FakeSigningCredentials()
@@ -566,7 +570,8 @@ def test_v4_get_signing_uses_configured_bucket_exact_key_and_expiration():
 
 
 def test_keyless_adc_uses_google_auth_iam_signer_with_configured_identity():
-    credentials = FakeKeylessCredentials()
+    storage_credentials = FakeKeylessCredentials(refreshed_token="storage-token")
+    iam_credentials = FakeKeylessCredentials()
     request = FakeIamRequest()
     blob = ExercisingSigningBlob(OBJECT_KEY)
     config_with_signer = GcsAssetStorageConfig(
@@ -576,15 +581,17 @@ def test_keyless_adc_uses_google_auth_iam_signer_with_configured_identity():
     )
     signer = GcsPrivateObjectAccessSigner(
         config_with_signer,
-        client=FakeClient(FakeBucket(blob), credentials),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        iam_credentials=iam_credentials,
         auth_request=request,
     )
     expires_at = NOW + timedelta(minutes=5)
 
     result = signer.sign_read(OBJECT_KEY, expires_at)
 
-    assert not isinstance(credentials, Signing)
-    assert credentials.refresh_calls == [request]
+    assert not isinstance(storage_credentials, Signing)
+    assert storage_credentials.refresh_calls == []
+    assert iam_credentials.refresh_calls == [request]
     assert blob.sign_calls == [
         {
             "version": "v4",
@@ -607,17 +614,52 @@ def test_keyless_adc_uses_google_auth_iam_signer_with_configured_identity():
     assert request.calls[0]["headers"]["authorization"] == ("Bearer short-lived-oauth-token")
     assert result.startswith("https://")
     assert "short-lived-oauth-token" not in result
-    assert not hasattr(credentials, "private_key")
-    assert not hasattr(credentials, "private_key_id")
+    assert not hasattr(iam_credentials, "private_key")
+    assert not hasattr(iam_credentials, "private_key_id")
+
+
+def test_keyless_adc_acquires_distinct_cloud_platform_credentials(monkeypatch):
+    storage_credentials = FakeKeylessCredentials(refreshed_token="storage-token")
+    iam_credentials = FakeKeylessCredentials()
+    calls = []
+
+    def fake_default(*, scopes):
+        calls.append(scopes)
+        return iam_credentials, "jewelai-prod"
+
+    monkeypatch.setattr("jewelai_assets_gcs.adapters.google.auth.default", fake_default)
+    request = FakeIamRequest()
+    blob = ExercisingSigningBlob(OBJECT_KEY)
+    signer = GcsPrivateObjectAccessSigner(
+        GcsAssetStorageConfig(
+            bucket_name="jewelai-private-assets",
+            project_id="jewelai-prod",
+            signing_service_account_email=("jewelai-assets@jewelai-prod.iam.gserviceaccount.com"),
+        ),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        auth_request=request,
+    )
+
+    result = signer.sign_read(OBJECT_KEY, NOW + timedelta(minutes=5))
+
+    assert calls == [("https://www.googleapis.com/auth/cloud-platform",)]
+    assert storage_credentials.refresh_calls == []
+    assert iam_credentials.refresh_calls == [request]
+    assert request.calls[0]["headers"]["authorization"] == "Bearer short-lived-oauth-token"
+    assert "short-lived-oauth-token" not in result
 
 
 def test_keyless_adc_can_discover_service_account_email():
-    credentials = FakeKeylessCredentials(
+    storage_credentials = FakeKeylessCredentials()
+    iam_credentials = FakeKeylessCredentials(
         service_account_email="runtime@jewelai-prod.iam.gserviceaccount.com"
     )
     blob = FakeBlob(OBJECT_KEY)
     signer = GcsPrivateObjectAccessSigner(
-        config(), client=FakeClient(FakeBucket(blob), credentials), auth_request=object()
+        config(),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        iam_credentials=iam_credentials,
+        auth_request=object(),
     )
 
     signer.sign_read(OBJECT_KEY, NOW + timedelta(minutes=5))
@@ -628,7 +670,8 @@ def test_keyless_adc_can_discover_service_account_email():
 
 
 def test_explicit_signing_identity_overrides_credential_discovery():
-    credentials = FakeKeylessCredentials(
+    storage_credentials = FakeKeylessCredentials()
+    iam_credentials = FakeKeylessCredentials(
         service_account_email="runtime@jewelai-prod.iam.gserviceaccount.com"
     )
     blob = FakeBlob(OBJECT_KEY)
@@ -638,7 +681,8 @@ def test_explicit_signing_identity_overrides_credential_discovery():
             bucket_name="jewelai-private-assets",
             signing_service_account_email=configured_email,
         ),
-        client=FakeClient(FakeBucket(blob), credentials),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        iam_credentials=iam_credentials,
         auth_request=object(),
     )
 
@@ -650,12 +694,16 @@ def test_explicit_signing_identity_overrides_credential_discovery():
 @pytest.mark.parametrize("credential_email", [None, "", "default"])
 def test_keyless_adc_rejects_missing_or_invalid_signing_identity(credential_email):
     token = "short-lived-oauth-token"
-    credentials = FakeKeylessCredentials(
+    storage_credentials = FakeKeylessCredentials()
+    iam_credentials = FakeKeylessCredentials(
         refreshed_token=token, service_account_email=credential_email
     )
     blob = FakeBlob(OBJECT_KEY)
     signer = GcsPrivateObjectAccessSigner(
-        config(), client=FakeClient(FakeBucket(blob), credentials), auth_request=object()
+        config(),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        iam_credentials=iam_credentials,
+        auth_request=object(),
     )
 
     with pytest.raises(AssetAccessUnavailableError, match="unavailable") as raised:
@@ -667,10 +715,40 @@ def test_keyless_adc_rejects_missing_or_invalid_signing_identity(credential_emai
 
 def test_keyless_adc_refresh_failure_is_safe_and_does_not_sign():
     secret = "token-secret-provider-response"
-    credentials = FakeKeylessCredentials(refresh_error=RuntimeError(secret))
+    storage_credentials = FakeKeylessCredentials()
+    iam_credentials = FakeKeylessCredentials(refresh_error=RuntimeError(secret))
     blob = ExercisingSigningBlob(OBJECT_KEY)
     signer = GcsPrivateObjectAccessSigner(
-        config(), client=FakeClient(FakeBucket(blob), credentials), auth_request=object()
+        config(),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        iam_credentials=iam_credentials,
+        auth_request=object(),
+    )
+
+    with pytest.raises(AssetAccessUnavailableError, match="unavailable") as raised:
+        signer.sign_read(OBJECT_KEY, NOW + timedelta(minutes=5))
+
+    assert blob.sign_calls == []
+    assert secret not in str(raised.value)
+
+
+def test_keyless_iam_credential_acquisition_failure_is_safe(monkeypatch):
+    secret = "adc-provider-secret"
+
+    def fail_default(*, scopes):
+        assert scopes == ("https://www.googleapis.com/auth/cloud-platform",)
+        raise RuntimeError(secret)
+
+    monkeypatch.setattr("jewelai_assets_gcs.adapters.google.auth.default", fail_default)
+    blob = ExercisingSigningBlob(OBJECT_KEY)
+    signer = GcsPrivateObjectAccessSigner(
+        GcsAssetStorageConfig(
+            bucket_name="jewelai-private-assets",
+            project_id="jewelai-prod",
+            signing_service_account_email=("jewelai-assets@jewelai-prod.iam.gserviceaccount.com"),
+        ),
+        client=FakeClient(FakeBucket(blob), FakeKeylessCredentials()),
+        auth_request=object(),
     )
 
     with pytest.raises(AssetAccessUnavailableError, match="unavailable") as raised:
@@ -683,7 +761,8 @@ def test_keyless_adc_refresh_failure_is_safe_and_does_not_sign():
 def test_keyless_iam_signing_failure_does_not_expose_token_or_provider_error():
     token = "short-lived-oauth-token"
     provider_error = "iam-secret-provider-response"
-    credentials = FakeKeylessCredentials(
+    storage_credentials = FakeKeylessCredentials()
+    iam_credentials = FakeKeylessCredentials(
         refreshed_token=token,
         service_account_email="runtime@jewelai-prod.iam.gserviceaccount.com",
     )
@@ -694,7 +773,10 @@ def test_keyless_iam_signing_failure_does_not_expose_token_or_provider_error():
 
     blob = ExercisingSigningBlob(OBJECT_KEY)
     signer = GcsPrivateObjectAccessSigner(
-        config(), client=FakeClient(FakeBucket(blob), credentials), auth_request=FailingIamRequest()
+        config(),
+        client=FakeClient(FakeBucket(blob), storage_credentials),
+        iam_credentials=iam_credentials,
+        auth_request=FailingIamRequest(),
     )
 
     with pytest.raises(AssetAccessUnavailableError, match="unavailable") as raised:

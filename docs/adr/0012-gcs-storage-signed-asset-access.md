@@ -31,10 +31,13 @@ persist, log, cache as durable state, or expose them through HTTP before authent
 membership authorization exist. Credentials that implement `google.auth.credentials.Signing` use
 the Storage SDK's local signing path without an unnecessary token refresh. Non-signing
 workload/metadata ADC credentials are adapted through Google Auth's IAM `Signer` with an explicitly
-configured or credential-exposed, validated service-account email. Google Auth refreshes the caller
-credential and invokes IAM `signBlob`; the resulting signing interface is passed to the Storage SDK
-without private-key material. The explicit signing identity takes precedence, and missing identity,
-token-refresh, IAM, or signing failures remain private and fail closed.
+configured or credential-exposed, validated service-account email. Storage client credentials and
+IAM signing caller credentials are distinct concerns: the adapter acquires separate caller
+credentials with the `cloud-platform` scope for IAM `signBlob` rather than reusing credentials
+scoped by the Storage SDK. Google Auth refreshes that IAM-capable caller credential and invokes IAM
+`signBlob`; the resulting signing interface is passed to the Storage SDK without private-key
+material. The explicit signing identity takes precedence, and missing identity, token-refresh, IAM,
+or signing failures remain private and fail closed.
 
 ## Alternatives
 
