@@ -22,6 +22,7 @@ python -m pip install -e './packages/auth_identity_platform[test]'
 python -m pip install -e './packages/persistence'
 python -m pip install -e './workers/generation[test]'
 python -m pip install -e './packages/parser[test]'
+python -m pip install -e './packages/text_understanding_google[test]'
 python -m pip install -e './apps/api[test]'
 export DATABASE_URL='postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai'
 export OIDC_ISSUER='https://identity.example/'
@@ -37,6 +38,10 @@ export GCP_PROJECT_ID='jewelai-prod'
 export GCS_SIGNING_SERVICE_ACCOUNT_EMAIL='signer@jewelai-prod.iam.gserviceaccount.com'
 # Exact comma-separated browser origins. HTTP is accepted only for localhost development:
 export WEB_ALLOWED_ORIGINS='http://localhost:5173'
+# Optional Text Intake v1 provider. The key remains server-side:
+export TEXT_UNDERSTANDING_PROVIDER='google'
+export GOOGLE_TEXT_UNDERSTANDING_MODEL='gemini-3.1-flash-lite'
+export GOOGLE_GENERATIVE_LANGUAGE_API_KEY='<runtime-secret>'
 # Optional strict JSON array of non-secret server-side generation profiles:
 export GENERATION_PROFILES_JSON='[{"profile_id":"default","profile_version":"1.0.0","provider":"openai","model":"gpt-image-1","configuration":{"output_count":1}}]'
 alembic -c packages/persistence/alembic.ini upgrade head
@@ -71,6 +76,7 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET /sessions/{session_id}`
 - `POST /sessions/{session_id}/messages`
 - `POST /sessions/{session_id}/parser-proposals`
+- `POST /sessions/{session_id}/text-intake`
 - `GET /sessions/{session_id}/revisions`
 - `GET /sessions/{session_id}/revisions/{revision_id}`
 - `POST /sessions/{session_id}/revisions`
@@ -122,10 +128,13 @@ caller and checked by the existing domain model against the server revision time
 persists ASK lineage but never applies DERIVE/ASSUME proposals or mutates a revision.
 
 Parser candidates are untrusted structured inputs. The API binds them to a persisted user message,
-the session's resolved locale and pinned dictionary, then returns a deterministic proposal. Proposal
-creation does not persist a design revision. Clients explicitly submit the proposed design through
-the existing EDIT endpoint, where domain validation and database CAS remain authoritative. There is
-no provider SDK, LLM call, parser prompt, or automatic acceptance in this slice.
+the session's resolved locale and pinned dictionary, then returns a deterministic proposal. The
+manual parser-proposal endpoint remains non-mutating. Text Intake v1 first persists the original
+message, calls one bounded server-side Google understanding adapter, validates the returned
+`ParserCandidate`, and automatically applies only accepted proposal changes through the existing
+EDIT/domain/CAS boundary. It then invokes the existing Rules Engine and Question Catalog. The model
+cannot select questions, write revisions, confirm/lock fields, infer dimensions, compile prompts, or
+start generation. Provider failures are typed and redacted.
 
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,
@@ -167,6 +176,7 @@ unimplemented.
 
 ```sh
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
+python -m pytest -c packages/text_understanding_google/pyproject.toml packages/text_understanding_google/tests -q
 python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
 python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q

@@ -17,8 +17,10 @@ from jewelai_model_gateway import (
     GenerationErrorCode,
     GenerationResult,
 )
+from jewelai_parser import ParserCandidate
 from jewelai_persistence import create_session_factory
 from jewelai_persistence.models import AuthPrincipalRow
+from jewelai_text_understanding_google import TextUnderstandingInvalidResponseError
 from sqlalchemy import select
 
 from jewelai_api.artifacts import ArtifactConfigurationError, load_runtime_artifacts
@@ -742,6 +744,196 @@ def test_message_parser_proposal_apply_and_evaluate_flow(client, app):
         UUID(session["session_id"]), UUID(message.json()["message_id"]), UUID(organization_id)
     )
     assert stored.content == "I want a ring with a 3 ct emerald."
+
+
+def test_text_intake_persists_applies_supported_facts_and_returns_clarification(
+    client, app, text_understanding_provider
+):
+    organization_id, _, session_response = create_hierarchy(client)
+    session = session_response.json()
+    headers = {"X-Organization-ID": organization_id}
+    text_understanding_provider.candidate = ParserCandidate.model_validate(
+        {
+            "updates": [
+                {"target": "jewelry_type", "value": {"kind": "term", "text": "ring"}},
+                {
+                    "target": "metal.color",
+                    "value": {"kind": "term", "text": "white gold"},
+                },
+                {
+                    "target": "center_stone.shape",
+                    "value": {"kind": "term", "text": "oval"},
+                },
+                {
+                    "target": "center_stone.setting",
+                    "value": {"kind": "term", "text": "four prong"},
+                },
+            ]
+        }
+    )
+    content = "I want a white-gold ring with an oval center stone in a four-prong setting."
+
+    response = client.post(
+        f"/sessions/{session['session_id']}/text-intake",
+        headers=headers,
+        json={"expected_revision_id": session["current_revision_id"], "content": content},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["message"]["content"] == content
+    assert text_understanding_provider.calls == [(content, "en")]
+    assert body["proposal"]["has_changes"]
+    assert body["revision"]["revision_id"] != session["current_revision_id"]
+    assert body["revision"]["design"]["center_stone"]["dimensions"] is None
+    assert body["evaluation"]["decision"]["decision"] == "ask"
+    assert body["evaluation"]["rendered_question"]["locale"] == "en"
+    assert (
+        body["revision"]["design"]["center_stone"]["shape"]["source"]["message_id"]
+        == body["message"]["message_id"]
+    )
+    current = client.get(f"/sessions/{session['session_id']}", headers=headers).json()
+    assert current["current_revision_id"] == body["revision"]["revision_id"]
+
+
+def test_text_intake_unsupported_term_does_not_become_canonical_state(
+    client, text_understanding_provider
+):
+    organization_id, _, session_response = create_hierarchy(client, locale="ru")
+    session = session_response.json()
+    headers = {"X-Organization-ID": organization_id}
+    text_understanding_provider.candidate = ParserCandidate.model_validate(
+        {
+            "updates": [
+                {
+                    "target": "center_stone.shape",
+                    "value": {"kind": "term", "text": "несуществующая форма"},
+                }
+            ]
+        }
+    )
+
+    response = client.post(
+        f"/sessions/{session['session_id']}/text-intake",
+        headers=headers,
+        json={
+            "expected_revision_id": session["current_revision_id"],
+            "content": "Хочу несуществующую форму.",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert not body["proposal"]["has_changes"]
+    assert body["proposal"]["issues"][0]["code"] == "UNSUPPORTED_TERM"
+    assert body["revision"]["revision_id"] == session["current_revision_id"]
+    assert body["revision"]["design"]["center_stone"]["shape"] is None
+    assert body["evaluation"]["rendered_question"]["locale"] == "ru"
+
+
+def test_text_intake_scope_stale_and_provider_failures_are_safe(
+    client, text_understanding_provider
+):
+    organization_id, _, session_response = create_hierarchy(client)
+    session = session_response.json()
+    foreign = client.post("/organizations", json={"name": "Foreign"}).json()
+    url = f"/sessions/{session['session_id']}/text-intake"
+    payload = {"expected_revision_id": session["current_revision_id"], "content": "A ring"}
+
+    denied = client.post(
+        url,
+        headers={"X-Organization-ID": foreign["organization_id"]},
+        json=payload,
+    )
+    assert denied.status_code == 404
+    assert text_understanding_provider.calls == []
+
+    changed_design = Design().model_dump(mode="json")
+    changed_design["jewelry_type"] = explicit("stale-change", "ring")
+    stale = client.post(
+        f"/sessions/{session['session_id']}/revisions",
+        headers={"X-Organization-ID": organization_id},
+        json=transition(
+            "edit",
+            session["current_revision_id"],
+            design=changed_design,
+        ),
+    )
+    assert stale.status_code == 200
+    conflict = client.post(
+        url,
+        headers={"X-Organization-ID": organization_id},
+        json=payload,
+    )
+    assert conflict.status_code == 409
+    assert text_understanding_provider.calls == []
+
+    current = client.get(
+        f"/sessions/{session['session_id']}",
+        headers={"X-Organization-ID": organization_id},
+    ).json()
+    text_understanding_provider.error = TextUnderstandingInvalidResponseError("raw secret")
+    invalid = client.post(
+        url,
+        headers={"X-Organization-ID": organization_id},
+        json={"expected_revision_id": current["current_revision_id"], "content": "A ring"},
+    )
+    assert invalid.status_code == 502
+    assert invalid.json() == {
+        "error": "text_understanding_invalid_response",
+        "detail": "Text understanding returned invalid data",
+    }
+
+
+def test_text_intake_cannot_replace_a_locked_field(client, text_understanding_provider):
+    organization_id, _, session_response = create_hierarchy(client)
+    session = session_response.json()
+    headers = {"X-Organization-ID": organization_id}
+    design = Design().model_dump(mode="json")
+    design["center_stone"]["shape"] = explicit("initial-shape", "oval")
+    edited = client.post(
+        f"/sessions/{session['session_id']}/revisions",
+        headers=headers,
+        json=transition("edit", session["current_revision_id"], design=design),
+    ).json()
+    confirmed = client.post(
+        f"/sessions/{session['session_id']}/revisions",
+        headers=headers,
+        json=transition("confirm", edited["revision_id"], target="center_stone.shape"),
+    )
+    assert confirmed.status_code == 200
+    locked = client.post(
+        f"/sessions/{session['session_id']}/revisions",
+        headers=headers,
+        json=transition("lock", confirmed.json()["revision_id"], target="center_stone.shape"),
+    ).json()
+    text_understanding_provider.candidate = ParserCandidate.model_validate(
+        {
+            "updates": [
+                {
+                    "target": "center_stone.shape",
+                    "value": {"kind": "term", "text": "emerald cut"},
+                }
+            ]
+        }
+    )
+
+    response = client.post(
+        f"/sessions/{session['session_id']}/text-intake",
+        headers=headers,
+        json={
+            "expected_revision_id": locked["revision_id"],
+            "content": "Make it emerald cut.",
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["proposal"]["issues"][0]["code"] == "LOCKED_FIELD_CONFLICT"
+    assert body["revision"]["revision_id"] == locked["revision_id"]
+    shape = body["revision"]["design"]["center_stone"]["shape"]
+    assert shape["value"] == "oval"
+    assert shape["locked"] is True
 
 
 def test_parser_proposal_scope_cross_session_message_and_staleness(client):

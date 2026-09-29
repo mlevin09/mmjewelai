@@ -86,11 +86,11 @@ resource "google_secret_manager_secret_iam_member" "openai_key" {
 }
 
 resource "google_secret_manager_secret_iam_member" "google_generative_language_key" {
-  count     = local.google_generation_enabled ? 1 : 0
+  for_each  = local.google_generation_enabled ? toset(["api", "worker"]) : toset([])
   project   = var.project_id
   secret_id = local.google_generative_language_secret_resource_id
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.runtime["worker"].email}"
+  member    = "serviceAccount:${google_service_account.runtime[each.value].email}"
 }
 
 resource "google_service_account_iam_member" "api_signer" {

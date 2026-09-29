@@ -9,6 +9,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
       ./packages/auth_identity_platform ./packages/assets \
       ./packages/assets_gcs ./packages/generation_queue ./packages/generation_queue_gcp \
       ./packages/model_gateway ./packages/parser ./packages/persistence ./packages/prompts \
+      ./packages/text_understanding_google \
       ./apps/api
 
 FROM python:3.12.14-slim-bookworm AS runtime

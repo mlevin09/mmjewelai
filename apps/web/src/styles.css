@@ -198,6 +198,23 @@ header {
   align-items: end;
   gap: 2rem;
 }
+
+.intake-panel {
+  display: grid;
+  gap: 1rem;
+}
+
+.intake-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.intake-form textarea {
+  box-sizing: border-box;
+  min-height: 7rem;
+  width: 100%;
+  resize: vertical;
+}
 .question-panel .answer-form,
 .question-panel .ready-actions,
 .question-panel .notice {

@@ -53,6 +53,7 @@ from jewelai_persistence.models import (
 )
 from jewelai_persistence.repository import PersistenceRepository, StaleRevisionError
 from jewelai_prompts import compile_prompt, validate_compiled_prompt
+from jewelai_text_understanding_google import TextUnderstandingUnavailableError
 
 from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
 from .generation import GenerationProfileRegistry
@@ -86,9 +87,12 @@ from .schemas import (
     RoleCatalogItem,
     SessionListResponse,
     SessionResponse,
+    TextIntakeRequest,
+    TextIntakeResponse,
     UiCatalogResponse,
     UnlockRevisionRequest,
 )
+from .text_understanding import TextUnderstandingProvider
 
 
 class ApplicationError(RuntimeError):
@@ -132,6 +136,7 @@ class RuntimeService:
         generation_profiles: GenerationProfileRegistry | None = None,
         asset_access_policy: AssetAccessPolicy | None = None,
         asset_ingestion_policy: AssetIngestionPolicy | None = None,
+        text_understanding_provider: TextUnderstandingProvider | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -144,6 +149,7 @@ class RuntimeService:
         self._asset_object_store = asset_object_store
         self._asset_ingestion_policy = asset_ingestion_policy or AssetIngestionPolicy()
         self._generation_task_publisher = generation_task_publisher
+        self._text_understanding_provider = text_understanding_provider
 
     def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
         row = self.repository.get_or_create_principal(identity, self._uuid(), self._clock())
@@ -396,6 +402,51 @@ class RuntimeService:
         if latest.current_revision_id != request.expected_revision_id:
             raise StaleRevisionError("Current revision changed during parser proposal creation")
         return proposal
+
+    def create_text_intake(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: TextIntakeRequest,
+    ) -> TextIntakeResponse:
+        session = self.repository.get_design_session(session_id, organization_id)
+        self._assert_artifact_pins(session)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before text intake")
+        if self._text_understanding_provider is None:
+            raise TextUnderstandingUnavailableError("Text understanding is unavailable")
+        message = self.create_message(session_id, organization_id, request.content)
+        candidate = self._text_understanding_provider.understand(message.content, session.locale)
+        proposal = self.create_parser_proposal(
+            session_id,
+            organization_id,
+            ParserProposalRequest(
+                expected_revision_id=request.expected_revision_id,
+                message_id=message.message_id,
+                candidate=candidate,
+            ),
+        )
+        if proposal.has_changes:
+            revision = self.transition_revision(
+                session_id,
+                organization_id,
+                EditRevisionRequest(
+                    action="edit",
+                    expected_revision_id=request.expected_revision_id,
+                    proposed_design=proposal.proposed_design,
+                    source=proposal.source,
+                    reason="Applied supported facts from natural-language intake",
+                ),
+            )
+        else:
+            revision = self.repository.get_current_revision(session_id, organization_id)
+        evaluation = self.evaluate(session_id, organization_id, EvaluateRequest())
+        return TextIntakeResponse(
+            message=message,
+            proposal=proposal,
+            revision=revision,
+            evaluation=evaluation,
+        )
 
     def transition_revision(self, session_id: UUID, organization_id: UUID, request):
         current = self.repository.get_current_revision(session_id, organization_id)

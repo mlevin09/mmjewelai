@@ -1,5 +1,6 @@
 """FastAPI app factory and thin HTTP routing boundary."""
 
+import os
 from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated
@@ -45,6 +46,13 @@ from jewelai_persistence import (
     create_session_factory,
 )
 from jewelai_persistence.repository import PersistenceRepository
+from jewelai_text_understanding_google import (
+    GoogleTextUnderstandingAdapter,
+    TextUnderstandingInvalidResponseError,
+    TextUnderstandingRejectedError,
+    TextUnderstandingTimeoutError,
+    TextUnderstandingUnavailableError,
+)
 from pydantic import ValidationError
 from sqlalchemy import Engine
 
@@ -85,6 +93,8 @@ from .schemas import (
     RevisionTransitionRequest,
     SessionListResponse,
     SessionResponse,
+    TextIntakeRequest,
+    TextIntakeResponse,
     UiCatalogResponse,
     UpdateMembershipRequest,
 )
@@ -97,6 +107,7 @@ from .services import (
     SpecificationNotReadyError,
 )
 from .settings import RuntimeSettings
+from .text_understanding import TextUnderstandingProvider
 
 UPLOAD_READ_CHUNK_BYTES = 64 * 1024
 
@@ -120,6 +131,7 @@ def create_app(
     asset_access_signer: PrivateObjectAccessSigner | None = None,
     asset_object_store: PrivateObjectStore | None = None,
     generation_task_publisher: GenerationTaskPublisher | None = None,
+    text_understanding_provider: TextUnderstandingProvider | None = None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
@@ -164,6 +176,16 @@ def create_app(
     configured_profiles = generation_profiles or GenerationProfileRegistry(
         settings.generation_profiles
     )
+    if text_understanding_provider is None and settings.text_understanding is not None:
+        api_key = os.getenv("GOOGLE_GENERATIVE_LANGUAGE_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "GOOGLE_GENERATIVE_LANGUAGE_API_KEY is required when text understanding is enabled"
+            )
+        text_understanding_provider = GoogleTextUnderstandingAdapter(
+            settings.text_understanding,
+            api_key=api_key,
+        )
     service = RuntimeService(
         repository,
         artifacts,
@@ -174,6 +196,7 @@ def create_app(
         asset_object_store=asset_object_store,
         asset_ingestion_policy=AssetIngestionPolicy(max_bytes=settings.asset_upload_max_bytes),
         generation_task_publisher=generation_task_publisher,
+        text_understanding_provider=text_understanding_provider,
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
     if settings.web_allowed_origins:
@@ -229,6 +252,34 @@ def create_app(
     @app.exception_handler(StaleRevisionError)
     async def stale_handler(_, exc):
         return _error_response(409, "stale_revision", str(exc))
+
+    async def text_understanding_unavailable_handler(_, __):
+        return _error_response(
+            503,
+            "text_understanding_unavailable",
+            "Text understanding is temporarily unavailable",
+        )
+
+    app.add_exception_handler(TextUnderstandingTimeoutError, text_understanding_unavailable_handler)
+    app.add_exception_handler(
+        TextUnderstandingUnavailableError, text_understanding_unavailable_handler
+    )
+
+    @app.exception_handler(TextUnderstandingRejectedError)
+    async def text_understanding_rejected_handler(_, __):
+        return _error_response(
+            422,
+            "text_understanding_rejected",
+            "The request could not be understood",
+        )
+
+    @app.exception_handler(TextUnderstandingInvalidResponseError)
+    async def text_understanding_invalid_handler(_, __):
+        return _error_response(
+            502,
+            "text_understanding_invalid_response",
+            "Text understanding returned invalid data",
+        )
 
     @app.exception_handler(GenerationStateConflictError)
     async def generation_state_handler(_, exc):
@@ -461,6 +512,18 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.create_parser_proposal(session_id, organization_id, request)
+
+    @app.post(
+        "/sessions/{session_id}/text-intake",
+        response_model=TextIntakeResponse,
+        status_code=201,
+    )
+    def create_text_intake(
+        session_id: UUID,
+        request: TextIntakeRequest,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.create_text_intake(session_id, organization_id, request)
 
     @app.get("/sessions/{session_id}/revisions", response_model=RevisionListResponse)
     def list_revisions(

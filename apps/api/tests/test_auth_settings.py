@@ -3,6 +3,7 @@ from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_identity_platform import IdentityPlatformConfig
 from jewelai_auth_oidc import OidcJwtConfig
 from jewelai_persistence import DatabasePoolConfig
+from jewelai_text_understanding_google import GoogleTextUnderstandingConfig
 from pydantic import ValidationError
 
 from jewelai_api.settings import RuntimeSettings
@@ -50,6 +51,44 @@ def test_runtime_settings_load_identity_platform_environment(monkeypatch):
     assert settings.auth_provider == "identity_platform"
     assert settings.identity_platform == IdentityPlatformConfig(project_id="mmjewellai-preprod")
     assert settings.oidc is None
+
+
+def test_runtime_settings_load_exact_optional_text_understanding_model(monkeypatch):
+    monkeypatch.setenv("TEXT_UNDERSTANDING_PROVIDER", "google")
+    monkeypatch.setenv("GOOGLE_TEXT_UNDERSTANDING_MODEL", "gemini-3.1-flash-lite")
+    monkeypatch.setenv("GOOGLE_TEXT_UNDERSTANDING_TIMEOUT_SECONDS", "25")
+    settings = RuntimeSettings.from_environment(
+        require_oidc=False,
+        require_asset_signer=False,
+    )
+    assert settings.text_understanding == GoogleTextUnderstandingConfig(
+        model="gemini-3.1-flash-lite",
+        timeout_seconds=25,
+    )
+
+
+def test_runtime_settings_reject_normalized_text_understanding_model(monkeypatch):
+    monkeypatch.setenv("TEXT_UNDERSTANDING_PROVIDER", "google")
+    monkeypatch.setenv("GOOGLE_TEXT_UNDERSTANDING_MODEL", " gemini-3.1-flash-lite")
+    with pytest.raises(ValueError, match="exact bounded model ID"):
+        RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)
+
+
+@pytest.mark.parametrize(
+    ("provider", "model"),
+    [("google", None), (None, "gemini-3.1-flash-lite"), ("openai", "model")],
+)
+def test_runtime_settings_reject_incomplete_or_unknown_text_provider(monkeypatch, provider, model):
+    for name, value in (
+        ("TEXT_UNDERSTANDING_PROVIDER", provider),
+        ("GOOGLE_TEXT_UNDERSTANDING_MODEL", model),
+    ):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    with pytest.raises(ValueError, match="TEXT_UNDERSTANDING_PROVIDER"):
+        RuntimeSettings.from_environment(require_oidc=False, require_asset_signer=False)
 
 
 def test_runtime_settings_require_identity_platform_project(monkeypatch):

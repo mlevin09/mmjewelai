@@ -10,6 +10,7 @@ from jewelai_assets import (
 )
 from jewelai_auth import AuthenticationError, VerifiedIdentity
 from jewelai_model_gateway import GenerationConfiguration
+from jewelai_parser import ParserCandidate
 from jewelai_persistence import Base, create_database_engine
 
 from jewelai_api import create_app
@@ -81,6 +82,19 @@ class FakePrivateObjectStore:
         return stored
 
 
+class FakeTextUnderstandingProvider:
+    def __init__(self):
+        self.calls = []
+        self.candidate = ParserCandidate()
+        self.error = None
+
+    def understand(self, message, locale):
+        self.calls.append((message, locale))
+        if self.error is not None:
+            raise self.error
+        return self.candidate
+
+
 @pytest.fixture
 def engine(tmp_path):
     database = tmp_path / "runtime.db"
@@ -110,7 +124,18 @@ def asset_object_store():
 
 
 @pytest.fixture
-def app(engine, asset_access_signer, asset_object_store, generation_task_publisher):
+def text_understanding_provider():
+    return FakeTextUnderstandingProvider()
+
+
+@pytest.fixture
+def app(
+    engine,
+    asset_access_signer,
+    asset_object_store,
+    generation_task_publisher,
+    text_understanding_provider,
+):
     return create_app(
         RuntimeSettings(
             database_url="sqlite+pysqlite://",
@@ -134,6 +159,7 @@ def app(engine, asset_access_signer, asset_object_store, generation_task_publish
         asset_access_signer=asset_access_signer,
         asset_object_store=asset_object_store,
         generation_task_publisher=generation_task_publisher,
+        text_understanding_provider=text_understanding_provider,
     )
 
 

@@ -56,6 +56,8 @@ behavior, `packages/parser` owns the provider-neutral candidate/proposal boundar
 `packages/model_gateway` owns provider-neutral persisted and transient generation contracts,
 `packages/model_gateway_openai` translates those contracts to the production OpenAI Images API,
 `packages/model_gateway_google` translates them to Google's Generative Language REST API,
+`packages/text_understanding_google` converts persisted RU/EN text into an untrusted parser
+candidate through one bounded Google Generative Language call,
 `workers/generation` owns the one-shot generation and generated-Asset materialization unit of work,
 `packages/assets` owns private binary-ingestion and temporary
 read-access contracts, `packages/assets_gcs` implements the production Google Cloud storage/signing
@@ -84,6 +86,7 @@ packages/
   model_gateway/
   model_gateway_google/
   model_gateway_openai/
+  text_understanding_google/
 data/
 specs/
 docs/
@@ -123,6 +126,8 @@ See [ADR 0019](docs/adr/0019-authenticated-reference-asset-upload.md) for bounde
 multipart reference-image ingestion through the API into the same private Asset store.
 See [ADR 0020](docs/adr/0020-web-oidc-core-workflow.md) for the OIDC public browser client,
 allowlisted question-answer edits, tenant-scoped caching, and ephemeral signed-Asset display.
+See [ADR 0024](docs/adr/0024-mvp-text-intake-boundary.md) for the natural-language extraction trust
+boundary and deterministic parser/revision/rules authority chain.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

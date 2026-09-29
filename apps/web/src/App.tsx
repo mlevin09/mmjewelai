@@ -43,6 +43,7 @@ import type {
   PromptRevision,
   Session,
   UiCatalog,
+  TextIntakeResponse,
 } from "./types";
 
 const ApiContext = createContext<ApiClient | null>(null);
@@ -479,6 +480,10 @@ function Workspace() {
   });
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [intakeText, setIntakeText] = useState("");
+  const [intakeLoading, setIntakeLoading] = useState(false);
+  const [intakeIssues, setIntakeIssues] = useState<string[]>([]);
+  const intakeInFlight = useRef(false);
   const [submittedRun, setSubmittedRun] = useState<GenerationRun | null>(null);
   const [pollStarted, setPollStarted] = useState(() => Date.now());
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
@@ -544,6 +549,53 @@ function Workspace() {
         body: JSON.stringify({}),
       }),
     );
+  };
+  const submitTextIntake = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!revision.data || !intakeText.trim() || intakeInFlight.current) return;
+    intakeInFlight.current = true;
+    setError(null);
+    setIntakeIssues([]);
+    setIntakeLoading(true);
+    try {
+      const result = await api.request<TextIntakeResponse>(
+        `/sessions/${sessionId}/text-intake`,
+        {
+          ...scoped,
+          method: "POST",
+          body: JSON.stringify({
+            expected_revision_id: revision.data.revision_id,
+            content: intakeText.trim(),
+          }),
+        },
+      );
+      setIntakeText("");
+      setEvaluation(result.evaluation);
+      setIntakeIssues(result.proposal.issues.map((issue) => issue.detail));
+      await refreshRevision();
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.code === "stale_revision") {
+        await refreshRevision();
+        setError(
+          "The design changed elsewhere. The latest revision has been loaded.",
+        );
+      } else if (
+        caught instanceof ApiError &&
+        [
+          "text_understanding_unavailable",
+          "text_understanding_invalid_response",
+        ].includes(caught.code)
+      ) {
+        setError("Text understanding is temporarily unavailable. Try again.");
+      } else if (caught instanceof ApiError) {
+        setError(caught.message);
+      } else {
+        setError("The request could not be understood. Try again.");
+      }
+    } finally {
+      intakeInFlight.current = false;
+      setIntakeLoading(false);
+    }
   };
   const answer = async (value: QuestionAnswer) => {
     if (!revision.data || !evaluation?.rendered_question) return;
@@ -619,6 +671,63 @@ function Workspace() {
         <span className="badge">{session.data.locale.toUpperCase()}</span>
       </div>
       {error && <div className="alert">{error}</div>}
+      <section className="panel intake-panel">
+        <div>
+          <p className="eyebrow">
+            {session.data.locale === "ru" ? "Текстовый запрос" : "Text request"}
+          </p>
+          <h2>
+            {session.data.locale === "ru"
+              ? "Опишите желаемое украшение"
+              : "Describe the jewelry you want"}
+          </h2>
+        </div>
+        <form
+          className="intake-form"
+          onSubmit={(event) => void submitTextIntake(event)}
+        >
+          <label>
+            <span className="sr-only">
+              {session.data.locale === "ru"
+                ? "Описание украшения"
+                : "Jewelry description"}
+            </span>
+            <textarea
+              maxLength={4000}
+              value={intakeText}
+              onChange={(event) => setIntakeText(event.target.value)}
+              placeholder={
+                session.data.locale === "ru"
+                  ? "Например: Хочу кольцо из белого золота с овальным центральным камнем."
+                  : "For example: I want a white-gold ring with an oval center stone."
+              }
+            />
+          </label>
+          <button disabled={intakeLoading || !intakeText.trim()} type="submit">
+            {intakeLoading
+              ? session.data.locale === "ru"
+                ? "Анализируем…"
+                : "Understanding…"
+              : session.data.locale === "ru"
+                ? "Понять запрос"
+                : "Understand request"}
+          </button>
+        </form>
+        {intakeIssues.length > 0 && (
+          <div className="notice" role="status">
+            <strong>
+              {session.data.locale === "ru"
+                ? "Нужно уточнение:"
+                : "Needs clarification:"}
+            </strong>
+            <ul>
+              {intakeIssues.map((issue, index) => (
+                <li key={`${index}-${issue}`}>{issue}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </section>
       <section className="panel question-panel">
         <div>
           <p className="eyebrow">Deterministic design check</p>
