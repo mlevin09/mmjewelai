@@ -31,7 +31,7 @@ Repository: `mlevin09/mmjewelai`
 
 Current V2 integration branch:
 - `jewelai-v2`
-- deployed preproduction SHA: `55ce94eb2f5f2e286341e7144a26b359bf076fc4`
+- deployed preproduction SHA: `8d7a48a3a1b5158bb8cb3a66d0f20af3977eb393`
 - current head: verify live in GitHub after this governance refresh
 
 PR #39 replaced the unprovisioned preproduction Auth0 dependency with Google Cloud Identity Platform while preserving the provider-neutral production OIDC path.
@@ -57,8 +57,8 @@ Current baseline:
 
 The isolated preproduction bootstrap provides the dedicated Terraform state bucket, regional Artifact Registry repository, branch-bound GitHub Workload Identity Federation provider, and keyless `jewelai-preprod-deployer` service account.
 
-The final deployment verified on GitHub is `Deploy preprod` run `36437152477` on exact SHA
-`55ce94eb2f5f2e286341e7144a26b359bf076fc4`. Both plan and apply completed successfully. Exact
+The latest deployment verified on GitHub is `Deploy preprod` run `36593355997` on exact SHA
+`8d7a48a3a1b5158bb8cb3a66d0f20af3977eb393`. Both plan and apply completed successfully. Exact
 saved-plan binding checks passed, Terraform apply completed, the database migration job completed,
 Identity Platform readiness verification passed, the managed certificate was `ACTIVE`, and both
 public HTTPS health checks passed.
@@ -156,6 +156,33 @@ confirmed:
 
 Temporary Identity Platform smoke users were deleted after the test. No credential, bearer token,
 prompt, image payload, API key, or signed URL was recorded in this governance snapshot.
+
+### MVP Text Intake v1 live verification
+
+PR #52 added the natural-language intake boundary. A Google Generative Language adapter returns
+only an untrusted `ParserCandidate`; the existing deterministic Parser Proposal, revision/CAS,
+Rules Engine, Question Catalog, Prompt Compiler, generation, and Asset boundaries retain authority.
+PR #54 subsequently bound failed deployment-job retries to the exact private plan-object output,
+preventing `GITHUB_RUN_ATTEMPT` path reconstruction from losing the reviewed plan.
+
+The bounded live smoke on deployed SHA `8d7a48a3a1b5158bb8cb3a66d0f20af3977eb393`
+confirmed:
+- temporary Identity Platform email/password sign-in and stable `/me` resolution;
+- scoped denial before PostgreSQL membership and successful access after explicit membership;
+- persistence of the original English jewelry request;
+- untrusted candidate normalization/application through Parser Proposal and revision CAS;
+- deterministic clarification followed by the existing READY decision;
+- immutable prompt compilation and one Google generation through the normal queue/worker path;
+- successful GenerationRun completion and generated Asset finalization as `ready`.
+
+The final short-lived signed-read request returned the redacted `asset_access_unavailable` 503, so
+browser image-view verification is not claimed. Live configuration and IAM inspection found the
+expected dedicated signer identity, exact `iam.serviceAccounts.signBlob` custom permission, binding
+from the API identity to the signer, enabled IAM Credentials API, and correct API runtime identity.
+Resolving this existing preproduction signing failure is the remaining operational blocker before
+Text Intake v1 can be called fully live-verified. Temporary Identity Platform smoke users were
+deleted, and the temporary organization membership was removed. No token, credential, prompt,
+image payload, API key, or signed URL was recorded.
 
 ## Production platform
 
