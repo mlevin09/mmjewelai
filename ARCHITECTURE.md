@@ -130,6 +130,9 @@ See [ADR 0024](docs/adr/0024-mvp-text-intake-boundary.md) for the natural-langua
 boundary and deterministic parser/revision/rules authority chain.
 See [ADR 0025](docs/adr/0025-parallel-provider-visualization-iterations.md) for shared-prompt
 multi-provider iteration lineage, partial success, and contextual result selection.
+See [ADR 0026](docs/adr/0026-iterative-editing-current-visual-lineage.md) for the provider-neutral
+iterative-edit boundary, deterministic delta application, exact private reference-image loading,
+and immutable Current Visual lineage.
 Root V1 packaging, Docker files and README are preserved and must be migrated explicitly rather than silently reinterpreted as V2. See [ADR 0006](docs/adr/0006-modular-monolith-repository-layout.md).
 
 ## Delivery order and unresolved decisions

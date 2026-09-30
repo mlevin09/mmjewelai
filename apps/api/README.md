@@ -91,6 +91,8 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `POST|GET /sessions/{session_id}/visualization-iterations`
 - `GET /sessions/{session_id}/visualization-iterations/{iteration_id}`
 - `POST /sessions/{session_id}/visualization-iterations/{iteration_id}/decision`
+- `POST /sessions/{session_id}/iterative-edits`
+- `POST /sessions/{session_id}/iterative-edits/{edit_id}/messages`
 - `GET /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/dictionary-options`
 - `POST /sessions/{session_id}/assets`

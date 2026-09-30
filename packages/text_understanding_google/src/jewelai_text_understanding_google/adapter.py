@@ -22,6 +22,8 @@ Never infer or fabricate missing dimensions, weight, purity, quantity, style, ma
 or defaults.
 Never add confirmation, lock, authorization, question-selection, derived, or assumed state.
 Never create a side-stone group. Omit every fact that is not explicit in the message.
+For an explicit relative resize of the center stone (for example, 20% larger), emit only
+center_stone.dimensions with kind dimensions_scale and factor 1.2. Never calculate dimensions.
 The result is untrusted and will be validated and normalized deterministically."""
 _SUPPORTED_JSON_SCHEMA_KEYS = frozenset(
     {

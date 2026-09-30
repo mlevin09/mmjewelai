@@ -176,6 +176,26 @@ class PromptRevisionRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class IterativeEditRow(Base):
+    __tablename__ = "iterative_edit"
+    __table_args__ = (Index("ix_iterative_edit_session_created", "session_id", "created_at"),)
+
+    edit_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    source_asset_id: Mapped[UUID] = mapped_column(
+        ForeignKey("asset.asset_id", ondelete="RESTRICT"), index=True
+    )
+    starting_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"), index=True
+    )
+    initial_message_id: Mapped[UUID] = mapped_column(
+        ForeignKey("message.message_id", ondelete="RESTRICT"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class VisualizationIterationRow(Base):
     __tablename__ = "visualization_iteration"
     __table_args__ = (
@@ -183,6 +203,17 @@ class VisualizationIterationRow(Base):
     )
 
     iteration_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    iterative_edit_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey(
+            "iterative_edit.edit_id",
+            name="fk_visualization_iteration_iterative_edit",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
+        nullable=True,
+        unique=True,
+        index=True,
+    )
     session_id: Mapped[UUID] = mapped_column(
         ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
     )

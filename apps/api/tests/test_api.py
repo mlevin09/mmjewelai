@@ -1822,6 +1822,131 @@ def test_all_provider_failure_and_reject_all_are_persisted_without_assets(client
     assert rejected.json()["current_visual_asset_id"] is None
 
 
+def test_iterative_edit_preserves_state_and_creates_source_asset_lineage(
+    client, app, text_understanding_provider
+):
+    organization_id, project_id, session, edited, prompt = create_ready_prompt(client)
+    app.state.service._generation_profiles = iteration_profiles()
+    headers = {"X-Organization-ID": organization_id}
+    iterations_url = f"/sessions/{session['session_id']}/visualization-iterations"
+    first = client.post(
+        iterations_url,
+        headers=headers,
+        json={"prompt_revision_id": prompt["prompt_revision_id"]},
+    ).json()
+    repository = app.state.service.repository
+    selected_run = next(run for run in first["runs"] if run["provider"] == "google")
+    for run in first["runs"]:
+        complete_iteration_run(
+            repository,
+            run,
+            organization_id,
+            succeed=run["generation_run_id"] == selected_run["generation_run_id"],
+        )
+    asset_id = add_iteration_asset(
+        repository, selected_run, organization_id, project_id, session["session_id"]
+    )
+    selected = client.post(
+        f"{iterations_url}/{first['iteration_id']}/decision",
+        headers=headers,
+        json={"decision": "select", "asset_id": str(asset_id)},
+    )
+    assert selected.status_code == 200
+
+    text_understanding_provider.candidate = ParserCandidate.model_validate(
+        {
+            "updates": [
+                {
+                    "target": "center_stone.dimensions",
+                    "value": {"kind": "dimensions_scale", "factor": 1.2},
+                }
+            ]
+        }
+    )
+    response = client.post(
+        f"/sessions/{session['session_id']}/iterative-edits",
+        headers=headers,
+        json={
+            "expected_revision_id": edited["revision_id"],
+            "content": (
+                "Increase the center stone by about 20%, but keep everything else unchanged."
+            ),
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["source_asset_id"] == str(asset_id)
+    assert body["starting_revision_id"] == edited["revision_id"]
+    assert (
+        body["revision"]["design"]["center_stone"]["shape"]
+        == edited["design"]["center_stone"]["shape"]
+    )
+    dimensions = body["revision"]["design"]["center_stone"]["dimensions"]["value"]
+    assert dimensions == {
+        "length": {"value": 10.92, "unit": "mm"},
+        "width": {"value": 8.64, "unit": "mm"},
+        "depth": {"value": 5.76, "unit": "mm"},
+    }
+    second = body["iteration"]
+    assert second["iterative_edit_id"] == body["edit_id"]
+    assert second["source_asset_id"] == str(asset_id)
+    assert second["starting_revision_id"] == edited["revision_id"]
+    assert second["change_message_id"] == body["initial_message_id"]
+    assert {run["provider"] for run in second["runs"]} == {"google", "openai"}
+    context = repository.get_generation_edit_context(
+        UUID(session["session_id"]),
+        UUID(second["runs"][0]["generation_run_id"]),
+        UUID(organization_id),
+    )
+    assert context.source_asset.asset_id == asset_id
+    assert context.change_request.startswith("Increase the center stone")
+
+    second_google = next(run for run in second["runs"] if run["provider"] == "google")
+    for run in second["runs"]:
+        complete_iteration_run(
+            repository,
+            run,
+            organization_id,
+            succeed=run["generation_run_id"] == second_google["generation_run_id"],
+        )
+    next_asset_id = add_iteration_asset(
+        repository,
+        second_google,
+        organization_id,
+        project_id,
+        session["session_id"],
+        UUID("71717171-7171-4171-8171-717171717171"),
+    )
+    app.state.service._clock = lambda: NOW + timedelta(seconds=1)
+    next_selection = client.post(
+        f"{iterations_url}/{second['iteration_id']}/decision",
+        headers=headers,
+        json={"decision": "select", "asset_id": str(next_asset_id)},
+    )
+    assert next_selection.status_code == 200
+    assert next_selection.json()["current_visual_asset_id"] == str(next_asset_id)
+    assert repository.find_asset(asset_id, UUID(organization_id)).status == AssetStatus.READY
+
+
+def test_iterative_edit_requires_current_visual_and_keeps_scope(client, app):
+    organization_id, _, session, edited, _ = create_ready_prompt(client)
+    url = f"/sessions/{session['session_id']}/iterative-edits"
+    missing = client.post(
+        url,
+        headers={"X-Organization-ID": organization_id},
+        json={"expected_revision_id": edited["revision_id"], "content": "Make it larger."},
+    )
+    assert missing.status_code == 409
+    assert missing.json()["error"] == "iterative_edit_conflict"
+    foreign = client.post("/organizations", json={"name": "Foreign edit"}).json()
+    denied = client.post(
+        url,
+        headers={"X-Organization-ID": foreign["organization_id"]},
+        json={"expected_revision_id": edited["revision_id"], "content": "Make it larger."},
+    )
+    assert denied.status_code == 404
+
+
 def test_asset_metadata_api_is_scoped_ordered_and_redacts_storage_details(client, app):
     organization_id, project_id, response = create_hierarchy(client)
     session = response.json()

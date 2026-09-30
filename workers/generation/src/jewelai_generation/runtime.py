@@ -154,6 +154,7 @@ def create_worker_app(
                 organization_id=task.organization_id,
                 executors=executors,
                 object_store=object_store,
+                object_reader=object_store,
                 clock=clock,
             )
         except NotFoundError:

@@ -17,6 +17,8 @@ from jewelai_domain.dictionary import (
 from jewelai_domain.models import (
     Design,
     DesignRevision,
+    Dimensions,
+    Explicit,
     MessageSource,
     NotApplicable,
     RevisionEvent,
@@ -215,6 +217,71 @@ def test_locked_values_are_preserved_and_equal_values_are_noops(dictionary):
     assert not same.issues
     assert not same.has_changes
     assert same.proposed_design == current.design
+
+
+def test_relative_dimension_change_preserves_unmentioned_state_and_respects_locks(dictionary):
+    dimensions = Dimensions(
+        length={"value": 10.0, "unit": "mm"},
+        width={"value": 8.0, "unit": "mm"},
+        depth={"value": 5.0, "unit": "mm"},
+    )
+    shape = Explicit(value="oval", source=SOURCE, confirmed=False, locked=False)
+    current = revision(
+        Design(
+            center_stone={
+                "shape": shape,
+                "dimensions": Explicit(
+                    value=dimensions, source=SOURCE, confirmed=False, locked=False
+                ),
+            }
+        )
+    )
+    update = {
+        "target": "center_stone.dimensions",
+        "value": {"kind": "dimensions_scale", "factor": 1.2},
+    }
+    result = proposal(current, [update], dictionary)
+    assert result.proposed_design.center_stone.dimensions.value == Dimensions(
+        length={"value": 12.0, "unit": "mm"},
+        width={"value": 9.6, "unit": "mm"},
+        depth={"value": 6.0, "unit": "mm"},
+    )
+    assert result.proposed_design.center_stone.shape == shape
+    assert [item.concrete_target for item in result.accepted_updates] == ["center_stone.dimensions"]
+
+    locked = current.model_copy(
+        update={
+            "design": current.design.model_copy(
+                update={
+                    "center_stone": current.design.center_stone.model_copy(
+                        update={
+                            "dimensions": Explicit(
+                                value=dimensions, source=SOURCE, confirmed=True, locked=True
+                            )
+                        }
+                    )
+                }
+            )
+        }
+    )
+    blocked = proposal(locked, [update], dictionary)
+    assert blocked.issues[0].code == ParserIssueCode.LOCKED_FIELD_CONFLICT
+    assert blocked.proposed_design == locked.design
+
+
+def test_relative_dimension_change_requires_existing_dimensions(dictionary):
+    result = proposal(
+        revision(),
+        [
+            {
+                "target": "center_stone.dimensions",
+                "value": {"kind": "dimensions_scale", "factor": 1.2},
+            }
+        ],
+        dictionary,
+    )
+    assert result.issues[0].code == ParserIssueCode.RELATIVE_CHANGE_REQUIRES_EXISTING_VALUE
+    assert not result.has_changes
 
 
 def test_not_applicable_field_cannot_be_silently_replaced(dictionary):

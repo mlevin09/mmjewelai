@@ -26,5 +26,8 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0021 — Production GCP, Auth0, and observability](0021-production-gcp-auth0-observability.md)
 - [0022 — Google Generative Language image provider](0022-google-generative-language-image-provider.md)
 - [0023 — Isolated preproduction deployment](0023-preproduction-deployment.md)
+- [0024 — MVP text intake trust boundary](0024-mvp-text-intake-boundary.md)
+- [0025 — Parallel-provider visualization iterations](0025-parallel-provider-visualization-iterations.md)
+- [0026 — Iterative editing and Current Visual lineage](0026-iterative-editing-current-visual-lineage.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.

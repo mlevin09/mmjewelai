@@ -31,6 +31,19 @@ class PrivateObjectStore(Protocol):
     ) -> StoredObject: ...
 
 
+class PrivateObjectReader(Protocol):
+    """Exact-object byte-read authority used only for image-conditioned generation."""
+
+    def read_exact(
+        self,
+        object_key: ObjectKey,
+        *,
+        content_type: AssetContentType,
+        content_hash: ContentHash,
+        byte_size: int,
+    ) -> bytes: ...
+
+
 class PrivateObjectMetadataReader(Protocol):
     """Metadata-read authority for exact canonical object keys only."""
 

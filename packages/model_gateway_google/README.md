@@ -22,8 +22,10 @@ configuration does not supply them. Responses are accepted only from
 image must declare PNG, JPEG, or WebP, contain strict bounded base64, decode within the Asset limit,
 and have the matching binary signature. The provider's supported media type is preserved through
 the transient gateway contract and validated again by Asset ingestion. URLs, temporary files, MIME
-relabeling or conversion, raw-response persistence, image editing, and text enrichment are out of
-scope.
+relabeling or conversion, and raw-response persistence remain out of scope. Iterative Editing v1
+sends the selected private source image as an `inlineData` part with the persisted semantic change
+request. The worker loads and verifies the exact private Asset; no signed source URL is created or
+persisted. Masked/regional editing and text enrichment remain out of scope.
 
 Runtime composition uses:
 

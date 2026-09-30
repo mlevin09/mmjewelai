@@ -140,6 +140,15 @@ export interface TextIntakeResponse {
   evaluation: Evaluation;
 }
 
+export interface IterativeEditResponse extends TextIntakeResponse {
+  edit_id: string;
+  source_asset_id: string;
+  starting_revision_id: string;
+  initial_message_id: string;
+  iteration: VisualizationIteration | null;
+  created_at: string;
+}
+
 export interface DictionaryOption {
   domain_id: string;
   category: "stone_shape" | "stone_setting" | "metal_color";
@@ -199,6 +208,10 @@ export interface VisualizationIteration {
     created_at: string;
   } | null;
   current_visual_asset_id: string | null;
+  iterative_edit_id: string | null;
+  source_asset_id: string | null;
+  starting_revision_id: string | null;
+  change_message_id: string | null;
   created_at: string;
 }
 

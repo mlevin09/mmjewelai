@@ -1,6 +1,7 @@
 """Google Cloud Storage implementations of private Asset storage and signing ports."""
 
 from datetime import datetime
+from hashlib import sha256
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -138,6 +139,41 @@ class GcsPrivateObjectStore:
         if inspected.object_key != object_key:
             raise AssetStorageConflictError("Private object metadata key does not match request")
         return inspected
+
+    def read_exact(
+        self,
+        object_key: ObjectKey,
+        *,
+        content_type: AssetContentType,
+        content_hash: ContentHash,
+        byte_size: int,
+    ) -> bytes:
+        """Download one known Asset and verify all persisted metadata before use."""
+        try:
+            object_key = _OBJECT_KEY.validate_python(object_key)
+            content_hash = _CONTENT_HASH.validate_python(content_hash)
+            content_type = AssetContentType(content_type)
+            if isinstance(byte_size, bool) or not 0 < byte_size <= 100 * 1024 * 1024:
+                raise ValueError("invalid byte size")
+            blob = self._bucket.get_blob(object_key)
+            if blob is None:
+                raise AssetStorageConflictError("Private source Asset is unavailable")
+            metadata = blob.metadata or {}
+            if (
+                blob.name != object_key
+                or blob.content_type != content_type.value
+                or blob.size != byte_size
+                or metadata.get(JEWELAI_SHA256_METADATA_KEY) != content_hash
+            ):
+                raise AssetStorageConflictError("Private source Asset metadata does not match")
+            content = blob.download_as_bytes()
+            if len(content) != byte_size or sha256(content).hexdigest() != content_hash:
+                raise AssetStorageConflictError("Private source Asset content does not match")
+            return content
+        except AssetStorageConflictError:
+            raise
+        except Exception as exc:
+            raise AssetStorageError("Google Cloud Storage exact read failed") from exc
 
     def delete_if_version(self, object_key: ObjectKey, version_token: ObjectVersionToken) -> bool:
         """Delete one exact GCS generation; never delete a replacement object."""

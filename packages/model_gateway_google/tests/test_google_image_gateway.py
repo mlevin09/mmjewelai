@@ -12,6 +12,7 @@ from jewelai_model_gateway import (
     GatewayUnavailableError,
     GenerationConfiguration,
     GenerationRequest,
+    ImageGenerationEditInput,
     ImageGenerationExecutor,
     InvalidProviderResponseError,
     ProviderRejectedError,
@@ -117,6 +118,32 @@ def test_exact_endpoint_header_and_request_shape(compiled_prompt):
     assert execution.result.model == MODEL
     assert execution.outputs[0].content == PNG
     assert execution.outputs[0].declared_content_type == "image/png"
+
+
+def test_edit_request_includes_exact_inline_source_and_change_semantics(compiled_prompt):
+    captured = []
+
+    def handler(request):
+        captured.append(request)
+        return httpx.Response(200, json=response_body())
+
+    edit = ImageGenerationEditInput(
+        source_asset_id=UUID("33333333-3333-4333-8333-333333333333"),
+        declared_content_type="image/png",
+        content_hash="a" * 64,
+        change_request="Increase the center stone by 20%, but keep everything else unchanged.",
+        content=PNG,
+    )
+    adapter_for(handler).execute(generation_request(compiled_prompt), edit_input=edit)
+    parts = json.loads(captured[0].content)["contents"][0]["parts"]
+    assert edit.change_request in parts[0]["text"]
+    assert compiled_prompt.prompt_text in parts[0]["text"]
+    assert parts[1] == {
+        "inlineData": {
+            "mimeType": "image/png",
+            "data": base64.b64encode(PNG).decode("ascii"),
+        }
+    }
 
 
 def test_text_and_thought_parts_are_ignored(compiled_prompt):

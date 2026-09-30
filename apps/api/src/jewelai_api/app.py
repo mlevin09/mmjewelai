@@ -84,6 +84,8 @@ from .schemas import (
     EvaluateRequest,
     EvaluationResponse,
     GenerationRunListResponse,
+    IterativeEditRequest,
+    IterativeEditResponse,
     MembershipListResponse,
     MembershipResponse,
     MeResponse,
@@ -111,6 +113,7 @@ from .services import (
     AssetUploadUnavailableError,
     InvalidAssetUploadError,
     InvalidTransitionError,
+    IterativeEditConflictError,
     LockedFieldConflictError,
     RuntimeService,
     SpecificationNotReadyError,
@@ -293,6 +296,10 @@ def create_app(
     @app.exception_handler(GenerationStateConflictError)
     async def generation_state_handler(_, exc):
         return _error_response(409, "generation_state_conflict", str(exc))
+
+    @app.exception_handler(IterativeEditConflictError)
+    async def iterative_edit_conflict_handler(_, exc):
+        return _error_response(409, "iterative_edit_conflict", str(exc))
 
     @app.exception_handler(GenerationRetryNotAllowedError)
     async def generation_retry_handler(_, __):
@@ -541,6 +548,30 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.create_text_intake(session_id, organization_id, request)
+
+    @app.post(
+        "/sessions/{session_id}/iterative-edits",
+        response_model=IterativeEditResponse,
+        status_code=201,
+    )
+    def create_iterative_edit(
+        session_id: UUID,
+        request: IterativeEditRequest,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.create_iterative_edit(session_id, organization_id, request)
+
+    @app.post(
+        "/sessions/{session_id}/iterative-edits/{edit_id}/messages",
+        response_model=IterativeEditResponse,
+    )
+    def continue_iterative_edit(
+        session_id: UUID,
+        edit_id: UUID,
+        request: IterativeEditRequest,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.continue_iterative_edit(session_id, edit_id, organization_id, request)
 
     @app.get("/sessions/{session_id}/revisions", response_model=RevisionListResponse)
     def list_revisions(

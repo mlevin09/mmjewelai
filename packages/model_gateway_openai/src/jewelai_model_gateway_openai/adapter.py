@@ -13,6 +13,7 @@ from jewelai_model_gateway import (
     GenerationExecution,
     GenerationRequest,
     GenerationResult,
+    ImageGenerationEditInput,
     InvalidProviderResponseError,
     ProviderRejectedError,
     RetrievedImageOutput,
@@ -38,9 +39,16 @@ class OpenAIImageGenerationAdapter:
             )
         )
 
-    def execute(self, request: GenerationRequest) -> GenerationExecution:
+    def execute(
+        self,
+        request: GenerationRequest,
+        *,
+        edit_input: ImageGenerationEditInput | None = None,
+    ) -> GenerationExecution:
         request = GenerationRequest.model_validate(request)
         self._validate_request(request)
+        if edit_input is not None:
+            raise ProviderRejectedError
         try:
             response = self._client.images.generate(
                 model=request.model,

@@ -942,6 +942,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "design_session",
         "generation_run",
         "generation_dispatch_outbox",
+        "iterative_edit",
         "message",
         "organization",
         "organization_membership",
