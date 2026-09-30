@@ -175,6 +175,31 @@ export interface GenerationRun {
   attempt: number;
   parent_generation_run_id: string | null;
   error?: { code: string; detail: string } | null;
+  provider?: string;
+  model?: string;
+}
+
+export interface VisualizationIteration {
+  iteration_id: string;
+  session_id: string;
+  prompt_revision_id: string;
+  prompt_content_hash: string;
+  status: "pending" | "succeeded" | "partial" | "failed";
+  runs: GenerationRun[];
+  results: Array<{
+    generation_run_id: string;
+    provider: string;
+    model: string;
+    asset: Asset;
+  }>;
+  selection: {
+    decision: "selected" | "rejected";
+    asset_id: string | null;
+    selected_by_principal_id: string;
+    created_at: string;
+  } | null;
+  current_visual_asset_id: string | null;
+  created_at: string;
 }
 
 export interface PromptRevision {

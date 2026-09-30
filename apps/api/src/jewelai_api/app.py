@@ -42,6 +42,7 @@ from jewelai_persistence import (
     GenerationStateConflictError,
     NotFoundError,
     StaleRevisionError,
+    VisualizationSelectionConflictError,
     create_database_engine,
     create_session_factory,
 )
@@ -57,7 +58,11 @@ from pydantic import ValidationError
 from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
-from .generation import GenerationProfileRegistry, UnknownGenerationProfileError
+from .generation import (
+    GenerationProfileRegistry,
+    NoVisualizationProfilesError,
+    UnknownGenerationProfileError,
+)
 from .middleware import (
     RequestBodyLimitMiddleware,
     RequestObservabilityMiddleware,
@@ -74,6 +79,7 @@ from .schemas import (
     CreateProjectRequest,
     CreatePromptRevisionRequest,
     CreateSessionRequest,
+    CreateVisualizationIterationRequest,
     DictionaryOptionsResponse,
     EvaluateRequest,
     EvaluationResponse,
@@ -97,6 +103,9 @@ from .schemas import (
     TextIntakeResponse,
     UiCatalogResponse,
     UpdateMembershipRequest,
+    VisualizationDecisionRequest,
+    VisualizationIterationListResponse,
+    VisualizationIterationResponse,
 )
 from .services import (
     AssetUploadUnavailableError,
@@ -346,6 +355,14 @@ def create_app(
     @app.exception_handler(UnknownGenerationProfileError)
     async def generation_profile_handler(_, exc):
         return _error_response(422, "unknown_generation_profile", str(exc))
+
+    @app.exception_handler(NoVisualizationProfilesError)
+    async def visualization_profile_handler(_, exc):
+        return _error_response(422, "no_visualization_profiles", str(exc))
+
+    @app.exception_handler(VisualizationSelectionConflictError)
+    async def visualization_selection_handler(_, exc):
+        return _error_response(409, "visualization_selection_conflict", str(exc))
 
     @app.exception_handler(LockedFieldConflictError)
     async def locked_handler(_, exc):
@@ -621,6 +638,55 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.get_generation_run(session_id, generation_run_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/visualization-iterations",
+        response_model=VisualizationIterationResponse,
+        status_code=201,
+    )
+    def create_visualization_iteration(
+        session_id: UUID,
+        request: CreateVisualizationIterationRequest,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.create_visualization_iteration(session_id, organization_id, request)
+
+    @app.get(
+        "/sessions/{session_id}/visualization-iterations",
+        response_model=VisualizationIterationListResponse,
+    )
+    def list_visualization_iterations(session_id: UUID, organization_id: AuthorizedOrganization):
+        return service.list_visualization_iterations(session_id, organization_id)
+
+    @app.get(
+        "/sessions/{session_id}/visualization-iterations/{iteration_id}",
+        response_model=VisualizationIterationResponse,
+    )
+    def get_visualization_iteration(
+        session_id: UUID,
+        iteration_id: UUID,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.get_visualization_iteration(session_id, iteration_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/visualization-iterations/{iteration_id}/decision",
+        response_model=VisualizationIterationResponse,
+    )
+    def decide_visualization_iteration(
+        session_id: UUID,
+        iteration_id: UUID,
+        request: VisualizationDecisionRequest,
+        organization_id: AuthorizedOrganization,
+        principal: Authenticated,
+    ):
+        return service.decide_visualization_iteration(
+            session_id,
+            iteration_id,
+            organization_id,
+            principal.principal_id,
+            request,
+        )
 
     @app.get("/sessions/{session_id}/assets", response_model=AssetListResponse)
     def list_assets(

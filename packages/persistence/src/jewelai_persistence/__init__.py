@@ -27,6 +27,8 @@ from .repository import (
     PersistenceRepository,
     StaleGenerationRunCandidate,
     StaleRevisionError,
+    VisualizationIterationRecord,
+    VisualizationSelectionConflictError,
 )
 
 __all__ = [
@@ -38,6 +40,8 @@ __all__ = [
     "GenerationRetryCreation",
     "GenerationRetryNotAllowedError",
     "GenerationStateConflictError",
+    "VisualizationIterationRecord",
+    "VisualizationSelectionConflictError",
     "GenerationAssetMaintenanceCandidate",
     "GenerationDispatchOutboxRow",
     "NotFoundError",

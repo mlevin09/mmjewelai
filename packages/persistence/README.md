@@ -43,6 +43,11 @@ completion timestamps plus bounded-scan indexes. Repository scans select only ol
 runs in deterministic batches. Guarded updates can mark reconciliation only on SUCCEEDED runs and
 cleanup only on FAILED runs. These timestamps are not exposed by the Model Gateway contract or API.
 
+The `0010_visualization_iterations` migration groups independent provider GenerationRuns under one
+immutable prompt revision and adds one immutable selected/rejected decision per iteration. Existing
+single GenerationRuns remain valid with a null iteration link. Current Visual State is derived from
+the latest selected Asset; rejected Assets are retained.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.

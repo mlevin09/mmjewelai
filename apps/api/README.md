@@ -88,6 +88,9 @@ role, dictionary, question, rules, and prompt-template versions at creation; the
 - `GET /sessions/{session_id}/generation-runs`
 - `GET /sessions/{session_id}/generation-runs/{generation_run_id}`
 - `POST /sessions/{session_id}/generation-runs/{generation_run_id}/retry`
+- `POST|GET /sessions/{session_id}/visualization-iterations`
+- `GET /sessions/{session_id}/visualization-iterations/{iteration_id}`
+- `POST /sessions/{session_id}/visualization-iterations/{iteration_id}/decision`
 - `GET /sessions/{session_id}/assets`
 - `GET /sessions/{session_id}/dictionary-options`
 - `POST /sessions/{session_id}/assets`
@@ -150,6 +153,13 @@ one-shot worker is invoked separately, claims atomically, validates untrusted re
 does not recompile or compare against a newer current design revision. Provider adapters are never
 constructed by `create_app()` and no API route invokes a provider. Production composition may inject
 it into the worker with environment-managed credentials, bounded timeout, and disabled SDK retries.
+
+Visualization iteration POST accepts one existing prompt revision and creates one independent
+GenerationRun plus durable dispatch for every `iteration_enabled` runtime profile. All runs pin the
+same prompt revision and content hash. Provider execution remains asynchronous and independent;
+terminal mixed success is returned as `partial`, and successful READY Assets remain selectable.
+Selection is organization/session/iteration scoped, persists one immutable contextual decision,
+and derives Current Visual State without ranking providers or deleting rejected results.
 
 Asset list/get endpoints expose scoped metadata only. They omit internal object keys, bytes, buckets,
 and URLs. Authenticated `POST /sessions/{session_id}/assets` accepts one multipart field named

@@ -47,6 +47,8 @@ from .models import (
     PromptRevisionRow,
     QuestionEventRow,
     SpecificationRevisionRow,
+    VisualizationIterationRow,
+    VisualizationSelectionRow,
 )
 
 
@@ -78,6 +80,10 @@ class GenerationRetryNotAllowedError(GenerationStateConflictError):
     pass
 
 
+class VisualizationSelectionConflictError(GenerationStateConflictError):
+    pass
+
+
 @dataclass(frozen=True)
 class StaleGenerationRunCandidate:
     generation_run_id: UUID
@@ -98,6 +104,21 @@ class GenerationAssetMaintenanceCandidate:
     run: GenerationRun
     organization_id: UUID
     project_id: UUID
+
+
+@dataclass(frozen=True)
+class VisualizationIterationRecord:
+    iteration_id: UUID
+    session_id: UUID
+    prompt_revision_id: UUID
+    prompt_content_hash: str
+    created_at: datetime
+    runs: tuple[GenerationRun, ...]
+    assets: tuple[Asset, ...]
+    decision: str | None
+    selected_asset_id: UUID | None
+    selected_by_principal_id: UUID | None
+    selected_at: datetime | None
 
 
 class PersistenceRepository:
@@ -614,7 +635,7 @@ class PersistenceRepository:
         """Atomically persist an initial run and its one durable dispatch intent."""
         run = GenerationRun.model_validate(run)
         with self._session_factory.begin() as db:
-            session = self._add_generation_run(db, run, organization_id)
+            session, _ = self._add_generation_run(db, run, organization_id)
             db.flush()
             db.add(
                 GenerationDispatchOutboxRow(
@@ -629,6 +650,230 @@ class PersistenceRepository:
                 organization_id=organization_id,
             )
         return PendingGenerationDispatch(task=task, created_at=run.created_at)
+
+    def create_visualization_iteration_with_dispatches(
+        self,
+        *,
+        iteration_id: UUID,
+        session_id: UUID,
+        prompt_revision_id: UUID,
+        prompt_content_hash: str,
+        runs: tuple[GenerationRun, ...],
+        organization_id: UUID,
+        created_at: datetime,
+    ) -> tuple[PendingGenerationDispatch, ...]:
+        if not runs:
+            raise ValueError("A visualization iteration requires at least one generation run")
+        if any(
+            run.session_id != session_id
+            or run.prompt_revision_id != prompt_revision_id
+            or run.prompt_content_hash != prompt_content_hash
+            for run in runs
+        ):
+            raise ValueError("Iteration runs must share the exact session and prompt")
+        with self._session_factory.begin() as db:
+            scoped = db.scalar(self._scoped_session_query(session_id, organization_id))
+            prompt = db.scalar(
+                select(PromptRevisionRow).where(
+                    PromptRevisionRow.prompt_revision_id == prompt_revision_id,
+                    PromptRevisionRow.session_id == session_id,
+                )
+            )
+            if scoped is None or prompt is None or prompt.content_hash != prompt_content_hash:
+                raise OwnershipMismatchError("Prompt revision does not belong to iteration scope")
+            db.add(
+                VisualizationIterationRow(
+                    iteration_id=iteration_id,
+                    session_id=session_id,
+                    prompt_revision_id=prompt_revision_id,
+                    prompt_content_hash=prompt_content_hash,
+                    created_at=created_at,
+                )
+            )
+            dispatches = []
+            for run in runs:
+                _, row = self._add_generation_run(db, run, organization_id)
+                row.iteration_id = iteration_id
+                db.add(
+                    GenerationDispatchOutboxRow(
+                        generation_run_id=run.generation_run_id,
+                        created_at=created_at,
+                        published_at=None,
+                    )
+                )
+                dispatches.append(
+                    PendingGenerationDispatch(
+                        task=GenerationTaskEnvelope(
+                            generation_run_id=run.generation_run_id,
+                            session_id=session_id,
+                            organization_id=organization_id,
+                        ),
+                        created_at=created_at,
+                    )
+                )
+        return tuple(dispatches)
+
+    def get_visualization_iteration(
+        self, session_id: UUID, iteration_id: UUID, organization_id: UUID
+    ) -> VisualizationIterationRecord:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            iteration = db.scalar(
+                select(VisualizationIterationRow).where(
+                    VisualizationIterationRow.iteration_id == iteration_id,
+                    VisualizationIterationRow.session_id == session_id,
+                )
+            )
+            if iteration is None:
+                raise NotFoundError("Visualization iteration not found")
+            run_rows = db.scalars(
+                select(GenerationRunRow)
+                .where(GenerationRunRow.iteration_id == iteration_id)
+                .order_by(GenerationRunRow.provider, GenerationRunRow.generation_run_id)
+            ).all()
+            asset_rows = db.scalars(
+                select(AssetRow)
+                .join(
+                    GenerationRunRow,
+                    GenerationRunRow.generation_run_id == AssetRow.generation_run_id,
+                )
+                .where(
+                    GenerationRunRow.iteration_id == iteration_id,
+                    AssetRow.session_id == session_id,
+                )
+                .order_by(GenerationRunRow.provider, AssetRow.asset_id)
+            ).all()
+            selection = db.get(VisualizationSelectionRow, iteration_id)
+            return VisualizationIterationRecord(
+                iteration_id=iteration.iteration_id,
+                session_id=iteration.session_id,
+                prompt_revision_id=iteration.prompt_revision_id,
+                prompt_content_hash=iteration.prompt_content_hash,
+                created_at=self._utc(iteration.created_at),
+                runs=tuple(self._generation_run(row) for row in run_rows),
+                assets=tuple(self._asset(row) for row in asset_rows),
+                decision=selection.decision if selection else None,
+                selected_asset_id=selection.asset_id if selection else None,
+                selected_by_principal_id=selection.selected_by_principal_id if selection else None,
+                selected_at=self._utc(selection.created_at) if selection else None,
+            )
+
+    def list_visualization_iterations(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[VisualizationIterationRecord, ...]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            ids = db.scalars(
+                select(VisualizationIterationRow.iteration_id)
+                .where(VisualizationIterationRow.session_id == session_id)
+                .order_by(
+                    VisualizationIterationRow.created_at,
+                    VisualizationIterationRow.iteration_id,
+                )
+            ).all()
+        return tuple(
+            self.get_visualization_iteration(session_id, iteration_id, organization_id)
+            for iteration_id in ids
+        )
+
+    def decide_visualization_iteration(
+        self,
+        *,
+        session_id: UUID,
+        iteration_id: UUID,
+        organization_id: UUID,
+        principal_id: UUID,
+        decision: str,
+        asset_id: UUID | None,
+        created_at: datetime,
+    ) -> VisualizationIterationRecord:
+        if decision not in {"selected", "rejected"} or (
+            (asset_id is not None) != (decision == "selected")
+        ):
+            raise ValueError("Visualization decision is invalid")
+        with self._session_factory.begin() as db:
+            iteration = db.scalar(
+                select(VisualizationIterationRow)
+                .where(
+                    VisualizationIterationRow.iteration_id == iteration_id,
+                    VisualizationIterationRow.session_id == session_id,
+                    VisualizationIterationRow.session_id.in_(
+                        self._scoped_session_ids(organization_id)
+                    ),
+                )
+                .with_for_update()
+            )
+            if iteration is None:
+                raise OwnershipMismatchError(
+                    "Visualization iteration not found in organization scope"
+                )
+            nonterminal_run = db.scalar(
+                select(GenerationRunRow.generation_run_id)
+                .where(
+                    GenerationRunRow.iteration_id == iteration_id,
+                    GenerationRunRow.status.in_(
+                        (GenerationStatus.PENDING.value, GenerationStatus.RUNNING.value)
+                    ),
+                )
+                .limit(1)
+            )
+            if nonterminal_run is not None:
+                raise VisualizationSelectionConflictError(
+                    "Visualization iteration is not ready for a decision"
+                )
+            existing = db.get(VisualizationSelectionRow, iteration_id)
+            if existing is not None:
+                if existing.decision != decision or existing.asset_id != asset_id:
+                    raise VisualizationSelectionConflictError(
+                        "Visualization iteration already has a different decision"
+                    )
+            else:
+                if asset_id is not None:
+                    asset = db.scalar(
+                        select(AssetRow)
+                        .join(
+                            GenerationRunRow,
+                            GenerationRunRow.generation_run_id == AssetRow.generation_run_id,
+                        )
+                        .where(
+                            AssetRow.asset_id == asset_id,
+                            AssetRow.session_id == session_id,
+                            AssetRow.organization_id == organization_id,
+                            AssetRow.status == AssetStatus.READY.value,
+                            GenerationRunRow.iteration_id == iteration_id,
+                        )
+                    )
+                    if asset is None:
+                        raise OwnershipMismatchError(
+                            "Asset not found in visualization iteration scope"
+                        )
+                db.add(
+                    VisualizationSelectionRow(
+                        iteration_id=iteration_id,
+                        session_id=session_id,
+                        asset_id=asset_id,
+                        decision=decision,
+                        selected_by_principal_id=principal_id,
+                        created_at=created_at,
+                    )
+                )
+        return self.get_visualization_iteration(session_id, iteration_id, organization_id)
+
+    def get_current_visual_asset_id(self, session_id: UUID, organization_id: UUID) -> UUID | None:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            return db.scalar(
+                select(VisualizationSelectionRow.asset_id)
+                .where(
+                    VisualizationSelectionRow.session_id == session_id,
+                    VisualizationSelectionRow.decision == "selected",
+                )
+                .order_by(
+                    VisualizationSelectionRow.created_at.desc(),
+                    VisualizationSelectionRow.iteration_id.desc(),
+                )
+                .limit(1)
+            )
 
     def list_pending_generation_dispatches(
         self, batch_size: int
@@ -790,6 +1035,7 @@ class PersistenceRepository:
                     created_at=created_at,
                 )
                 child = self._generation_row(child_run)
+                child.iteration_id = parent.iteration_id
                 db.add(child)
                 db.flush()
                 outbox = GenerationDispatchOutboxRow(
@@ -1193,7 +1439,7 @@ class PersistenceRepository:
 
     def _add_generation_run(
         self, db: Session, run: GenerationRun, organization_id: UUID
-    ) -> DesignSessionRow:
+    ) -> tuple[DesignSessionRow, GenerationRunRow]:
         if run.status is not GenerationStatus.PENDING:
             raise ValueError("A new generation run must be pending")
         if run.attempt != 1 or run.parent_generation_run_id is not None:
@@ -1214,8 +1460,9 @@ class PersistenceRepository:
         compiled = self._compiled_prompt(prompt)
         if compiled.content_hash != run.prompt_content_hash:
             raise ValueError("Generation run prompt hash does not match prompt revision")
-        db.add(self._generation_row(run))
-        return session
+        row = self._generation_row(run)
+        db.add(row)
+        return session, row
 
     @staticmethod
     def _generation_run(row: GenerationRunRow) -> GenerationRun:

@@ -6,11 +6,11 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { App, ReadyActions } from "./App";
+import { App, ReadyActions, VisualizationIterationPanel } from "./App";
 import { ApiClient } from "./api";
 import { AuthProvider } from "./auth";
 import { server } from "./test/server";
-import type { GenerationRun } from "./types";
+import type { VisualizationIteration } from "./types";
 
 const oidc = vi.hoisted(() => ({
   currentUser: null as null | { access_token: string },
@@ -93,8 +93,8 @@ describe("authentication shell", () => {
   });
 });
 
-describe("generation submission", () => {
-  it("keeps generation creation single-flight until the active run is terminal", async () => {
+describe("parallel visualization submission", () => {
+  it("keeps iteration creation single-flight until provider runs are terminal", async () => {
     let generationPosts = 0;
     let releaseGeneration!: () => void;
     const generationResponse = new Promise<void>((resolve) => {
@@ -112,17 +112,21 @@ describe("generation submission", () => {
           }),
       ),
       http.post(
-        "http://localhost:8000/sessions/session-one/generation-runs",
+        "http://localhost:8000/sessions/session-one/visualization-iterations",
         async () => {
           generationPosts += 1;
           await generationResponse;
           return HttpResponse.json({
-            generation_run_id: `run-${generationPosts}`,
+            iteration_id: `iteration-${generationPosts}`,
+            session_id: "session-one",
             prompt_revision_id: "prompt-one",
-            profile_id: "standard",
+            prompt_content_hash: "a".repeat(64),
             status: "pending",
-            attempt: 1,
-            parent_generation_run_id: null,
+            runs: [],
+            results: [],
+            selection: null,
+            current_visual_asset_id: null,
+            created_at: "2026-09-27T00:00:00Z",
           });
         },
       ),
@@ -134,7 +138,8 @@ describe("generation submission", () => {
     );
 
     function Harness() {
-      const [activeRun, setActiveRun] = useState<GenerationRun | null>(null);
+      const [activeIteration, setActiveIteration] =
+        useState<VisualizationIteration | null>(null);
       return (
         <>
           <ReadyActions
@@ -149,23 +154,22 @@ describe("generation submission", () => {
                 output_count: 1,
               },
             ]}
-            activeRun={activeRun}
-            onRun={setActiveRun}
+            activeIteration={activeIteration}
+            onIteration={setActiveIteration}
           />
           <button
             onClick={() =>
-              setActiveRun((run) =>
-                run
+              setActiveIteration((iteration) =>
+                iteration
                   ? {
-                      ...run,
-                      status:
-                        run.status === "pending" ? "running" : "succeeded",
+                      ...iteration,
+                      status: "succeeded",
                     }
                   : null,
               )
             }
           >
-            Advance active run
+            Complete iteration
           </button>
         </>
       );
@@ -176,43 +180,177 @@ describe("generation submission", () => {
       screen.getByRole("button", { name: "Create generation prompt" }),
     );
     const queue = await screen.findByRole("button", {
-      name: "Queue generation",
+      name: "Generate provider results",
     });
     fireEvent.click(queue);
     fireEvent.click(queue);
     fireEvent.click(queue);
     await waitFor(() => expect(generationPosts).toBe(1));
     expect(
-      screen.getByRole("button", { name: "Queueing generation…" }),
+      screen.getByRole("button", { name: "Queueing providers…" }),
     ).toBeDisabled();
 
     releaseGeneration();
     expect(
-      await screen.findByText("Generation status: PENDING"),
+      await screen.findByText("Visualization iteration: PENDING"),
     ).toBeInTheDocument();
     const pendingButton = screen.getByRole("button", {
-      name: "Queue generation",
+      name: "Generate provider results",
     });
     expect(pendingButton).toBeDisabled();
     fireEvent.click(pendingButton);
     expect(generationPosts).toBe(1);
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Advance active run" }),
-    );
-    expect(
-      await screen.findByText("Generation status: RUNNING"),
-    ).toBeInTheDocument();
-    expect(pendingButton).toBeDisabled();
-    fireEvent.click(pendingButton);
-    expect(generationPosts).toBe(1);
-
-    await userEvent.click(
-      screen.getByRole("button", { name: "Advance active run" }),
+      screen.getByRole("button", { name: "Complete iteration" }),
     );
     await waitFor(() => expect(pendingButton).toBeEnabled());
     await userEvent.click(pendingButton);
     await waitFor(() => expect(generationPosts).toBe(2));
+  });
+});
+
+describe("visualization result selection", () => {
+  it("waits for all provider runs to finish before enabling decisions", () => {
+    const api = new ApiClient(
+      "http://localhost:8000/",
+      async () => "access-token",
+      async () => undefined,
+    );
+    const pending: VisualizationIteration = {
+      iteration_id: "iteration-pending",
+      session_id: "session-one",
+      prompt_revision_id: "prompt-one",
+      prompt_content_hash: "a".repeat(64),
+      status: "pending",
+      runs: [],
+      results: [
+        {
+          generation_run_id: "run-google",
+          provider: "google",
+          model: "gemini-image",
+          asset: {
+            asset_id: "asset-google",
+            kind: "generated",
+            status: "ready",
+            content_type: "image/png",
+            byte_size: 100,
+            generation_run_id: "run-google",
+            created_at: "2026-09-27T00:00:00Z",
+          },
+        },
+      ],
+      selection: null,
+      current_visual_asset_id: null,
+      created_at: "2026-09-27T00:00:00Z",
+    };
+    const props = {
+      api,
+      organizationId: "organization-one",
+      sessionId: "session-one",
+      locale: "en",
+      urls: {},
+      onView: vi.fn(async () => undefined),
+      onChanged: vi.fn(async () => undefined),
+    };
+    const view = render(
+      <VisualizationIterationPanel {...props} iterations={[pending]} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Select" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Reject all" })).toBeDisabled();
+
+    view.rerender(
+      <VisualizationIterationPanel
+        {...props}
+        iterations={[{ ...pending, status: "partial" }]}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Select" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Reject all" })).toBeEnabled();
+    view.unmount();
+  });
+
+  it("shows grouped provider results and persists one selected Asset", async () => {
+    const decisions: unknown[] = [];
+    server.use(
+      http.post(
+        "http://localhost:8000/sessions/session-one/visualization-iterations/iteration-one/decision",
+        async ({ request }) => {
+          decisions.push(await request.json());
+          return HttpResponse.json({});
+        },
+      ),
+    );
+    const api = new ApiClient(
+      "http://localhost:8000/",
+      async () => "access-token",
+      async () => undefined,
+    );
+    const iteration: VisualizationIteration = {
+      iteration_id: "iteration-one",
+      session_id: "session-one",
+      prompt_revision_id: "prompt-one",
+      prompt_content_hash: "a".repeat(64),
+      status: "succeeded",
+      runs: [],
+      results: [
+        {
+          generation_run_id: "run-google",
+          provider: "google",
+          model: "gemini-image",
+          asset: {
+            asset_id: "asset-google",
+            kind: "generated",
+            status: "ready",
+            content_type: "image/png",
+            byte_size: 100,
+            generation_run_id: "run-google",
+            created_at: "2026-09-27T00:00:00Z",
+          },
+        },
+        {
+          generation_run_id: "run-openai",
+          provider: "openai",
+          model: "gpt-image",
+          asset: {
+            asset_id: "asset-openai",
+            kind: "generated",
+            status: "ready",
+            content_type: "image/png",
+            byte_size: 100,
+            generation_run_id: "run-openai",
+            created_at: "2026-09-27T00:00:00Z",
+          },
+        },
+      ],
+      selection: null,
+      current_visual_asset_id: null,
+      created_at: "2026-09-27T00:00:00Z",
+    };
+    render(
+      <VisualizationIterationPanel
+        api={api}
+        organizationId="organization-one"
+        sessionId="session-one"
+        locale="en"
+        iterations={[iteration]}
+        urls={{}}
+        onView={vi.fn(async () => undefined)}
+        onChanged={vi.fn(async () => undefined)}
+      />,
+    );
+
+    expect(screen.getByText("google")).toBeInTheDocument();
+    expect(screen.getByText("openai")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Select" })[0]!,
+    );
+    await waitFor(() =>
+      expect(decisions).toEqual([
+        { decision: "select", asset_id: "asset-google" },
+      ]),
+    );
   });
 });
 
