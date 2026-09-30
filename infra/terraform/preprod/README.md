@@ -54,7 +54,9 @@ resource and mounts its latest enabled version as `GOOGLE_GENERATIVE_LANGUAGE_AP
 does not create the secret, read its value into state, or expose it in a plan. The protected
 `GENERATION_PROFILES_JSON` configuration must contain at least one Google profile whose model is in
 the exact allowlist. OpenAI configuration is independent and optional: leaving
-`OPENAI_ALLOWED_MODELS` empty creates no OpenAI secret metadata or worker credential mount.
+`OPENAI_ALLOWED_MODELS` empty omits the OpenAI secret lookup, IAM binding, and worker credential
+mount. When enabled, the stack looks up the existing `jewelai-preprod-openai-api-key` secret and
+mounts its latest enabled version as `OPENAI_API_KEY`; Terraform never reads the value into state.
 
 ## Credential-free validation
 
