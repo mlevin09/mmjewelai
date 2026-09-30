@@ -204,7 +204,12 @@ class VisualizationIterationRow(Base):
 
     iteration_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     iterative_edit_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("iterative_edit.edit_id", ondelete="RESTRICT"),
+        ForeignKey(
+            "iterative_edit.edit_id",
+            name="fk_visualization_iteration_iterative_edit",
+            ondelete="RESTRICT",
+            use_alter=True,
+        ),
         nullable=True,
         unique=True,
         index=True,
