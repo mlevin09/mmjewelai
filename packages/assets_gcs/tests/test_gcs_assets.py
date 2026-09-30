@@ -55,6 +55,7 @@ class FakeBlob:
         time_created=NOW,
         generation=123,
         delete_error=None,
+        content=PNG,
     ):
         self.name = name
         self.content_type = content_type
@@ -66,6 +67,7 @@ class FakeBlob:
         self.time_created = time_created
         self.generation = generation
         self.delete_error = delete_error
+        self.content = content
         self.upload_calls = []
         self.sign_calls = []
         self.public_calls = 0
@@ -168,6 +170,11 @@ class ExercisingSigningBlob(FakeBlob):
     def generate_signed_url(self, **kwargs):
         kwargs["credentials"].sign_bytes(b"bounded-canonical-request")
         return super().generate_signed_url(**kwargs)
+
+
+class DownloadingFakeBlob(FakeBlob):
+    def download_as_bytes(self):
+        return self.content
 
 
 class FakeClient:
@@ -341,6 +348,58 @@ def test_metadata_inspection_absent_returns_none():
     bucket = FakeBucket(FakeBlob(OBJECT_KEY), None)
     store = GcsPrivateObjectStore(config(), client=FakeClient(bucket))
     assert store.inspect(OBJECT_KEY) is None
+
+
+def test_exact_read_verifies_persisted_asset_metadata_and_content():
+    existing = DownloadingFakeBlob(
+        OBJECT_KEY,
+        content_type="image/png",
+        size=len(PNG),
+        metadata={JEWELAI_SHA256_METADATA_KEY: CONTENT_HASH},
+        content=PNG,
+    )
+    bucket = FakeBucket(FakeBlob(OBJECT_KEY), existing)
+    store = GcsPrivateObjectStore(config(), client=FakeClient(bucket))
+
+    result = store.read_exact(
+        OBJECT_KEY,
+        content_type=AssetContentType.PNG,
+        content_hash=CONTENT_HASH,
+        byte_size=len(PNG),
+    )
+
+    assert result == PNG
+    assert bucket.get_blob_calls == [OBJECT_KEY]
+
+
+@pytest.mark.parametrize(
+    ("changes", "content"),
+    [
+        ({"content_type": "image/jpeg"}, PNG),
+        ({"size": len(PNG) + 1}, PNG),
+        ({"metadata": {JEWELAI_SHA256_METADATA_KEY: "0" * 64}}, PNG),
+        ({}, PNG + b"tampered"),
+    ],
+)
+def test_exact_read_fails_closed_on_metadata_or_content_mismatch(changes, content):
+    values = {
+        "content_type": "image/png",
+        "size": len(PNG),
+        "metadata": {JEWELAI_SHA256_METADATA_KEY: CONTENT_HASH},
+    }
+    values.update(changes)
+    existing = DownloadingFakeBlob(OBJECT_KEY, content=content, **values)
+    store = GcsPrivateObjectStore(
+        config(), client=FakeClient(FakeBucket(FakeBlob(OBJECT_KEY), existing))
+    )
+
+    with pytest.raises(AssetStorageConflictError, match="source Asset"):
+        store.read_exact(
+            OBJECT_KEY,
+            content_type=AssetContentType.PNG,
+            content_hash=CONTENT_HASH,
+            byte_size=len(PNG),
+        )
 
 
 @pytest.mark.parametrize(

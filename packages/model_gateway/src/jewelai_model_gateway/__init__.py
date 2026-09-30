@@ -22,6 +22,7 @@ from .models import (
 )
 from .runtime import (
     GenerationExecution,
+    ImageGenerationEditInput,
     ImageGenerationExecutor,
     RetrievedImageOutput,
     validate_generation_execution,
@@ -37,6 +38,7 @@ __all__ = [
     "GenerationConfiguration",
     "GenerationErrorCode",
     "GenerationExecution",
+    "ImageGenerationEditInput",
     "GenerationRequest",
     "GenerationResult",
     "GenerationRun",

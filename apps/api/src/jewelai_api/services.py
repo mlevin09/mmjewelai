@@ -55,6 +55,7 @@ from jewelai_persistence.repository import (
     PersistenceRepository,
     StaleRevisionError,
     VisualizationIterationRecord,
+    VisualizationSelectionConflictError,
 )
 from jewelai_prompts import compile_prompt, validate_compiled_prompt
 from jewelai_text_understanding_google import TextUnderstandingUnavailableError
@@ -77,6 +78,8 @@ from .schemas import (
     EvaluationResponse,
     GenerationProfileSummary,
     GenerationRunListResponse,
+    IterativeEditRequest,
+    IterativeEditResponse,
     LockRevisionRequest,
     MembershipListResponse,
     MembershipResponse,
@@ -129,6 +132,10 @@ class SpecificationNotReadyError(ApplicationError):
     def __init__(self, decision):
         super().__init__("Specification is not ready for prompt compilation")
         self.decision = decision
+
+
+class IterativeEditConflictError(ApplicationError):
+    pass
 
 
 class RuntimeService:
@@ -458,6 +465,112 @@ class RuntimeService:
             evaluation=evaluation,
         )
 
+    def create_iterative_edit(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: IterativeEditRequest,
+    ) -> IterativeEditResponse:
+        session = self.repository.get_design_session(session_id, organization_id)
+        self._assert_artifact_pins(session)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before iterative edit")
+        if self._text_understanding_provider is None:
+            raise TextUnderstandingUnavailableError("Text understanding is unavailable")
+        message = self.create_message(session_id, organization_id, request.content)
+        try:
+            edit = self.repository.create_iterative_edit(
+                edit_id=self._uuid(),
+                session_id=session_id,
+                organization_id=organization_id,
+                starting_revision_id=request.expected_revision_id,
+                initial_message_id=message.message_id,
+                created_at=self._clock(),
+            )
+        except VisualizationSelectionConflictError as exc:
+            raise IterativeEditConflictError(str(exc)) from exc
+        return self._apply_iterative_edit_message(
+            edit, session, message, organization_id, request.expected_revision_id
+        )
+
+    def continue_iterative_edit(
+        self,
+        session_id: UUID,
+        edit_id: UUID,
+        organization_id: UUID,
+        request: IterativeEditRequest,
+    ) -> IterativeEditResponse:
+        edit = self.repository.get_iterative_edit(session_id, edit_id, organization_id)
+        if edit.iteration_id is not None:
+            raise IterativeEditConflictError("Iterative edit already created an iteration")
+        session = self.repository.get_design_session(session_id, organization_id)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before iterative edit continuation")
+        message = self.create_message(session_id, organization_id, request.content)
+        return self._apply_iterative_edit_message(
+            edit, session, message, organization_id, request.expected_revision_id
+        )
+
+    def _apply_iterative_edit_message(
+        self, edit, session, message, organization_id: UUID, expected_revision_id: UUID
+    ) -> IterativeEditResponse:
+        if self._text_understanding_provider is None:
+            raise TextUnderstandingUnavailableError("Text understanding is unavailable")
+        candidate = self._text_understanding_provider.understand(message.content, session.locale)
+        proposal = self.create_parser_proposal(
+            session.session_id,
+            organization_id,
+            ParserProposalRequest(
+                expected_revision_id=expected_revision_id,
+                message_id=message.message_id,
+                candidate=candidate,
+            ),
+        )
+        if proposal.has_changes:
+            revision = self.transition_revision(
+                session.session_id,
+                organization_id,
+                EditRevisionRequest(
+                    action="edit",
+                    expected_revision_id=expected_revision_id,
+                    proposed_design=proposal.proposed_design,
+                    source=proposal.source,
+                    reason="Applied supported iterative-edit changes",
+                ),
+            )
+        else:
+            revision = self.repository.get_current_revision(session.session_id, organization_id)
+        evaluation = self.evaluate(session.session_id, organization_id, EvaluateRequest())
+        iteration = None
+        if (
+            proposal.has_changes
+            and not proposal.issues
+            and isinstance(evaluation.decision, ReadyDecision)
+        ):
+            prompt = self.create_prompt_revision(
+                session.session_id,
+                organization_id,
+                CreatePromptRevisionRequest(expected_revision_id=revision.revision_id),
+            )
+            iteration = self._create_visualization_iteration(
+                session.session_id,
+                organization_id,
+                prompt.prompt_revision_id,
+                iterative_edit_id=edit.edit_id,
+            )
+        return IterativeEditResponse(
+            edit_id=edit.edit_id,
+            source_asset_id=edit.source_asset_id,
+            starting_revision_id=edit.starting_revision_id,
+            initial_message_id=edit.initial_message_id,
+            message=message,
+            proposal=proposal,
+            revision=revision,
+            evaluation=evaluation,
+            iteration=iteration,
+            created_at=edit.created_at,
+        )
+
     def transition_revision(self, session_id: UUID, organization_id: UUID, request):
         current = self.repository.get_current_revision(session_id, organization_id)
         now = self._clock()
@@ -589,8 +702,20 @@ class RuntimeService:
         organization_id: UUID,
         request: CreateVisualizationIterationRequest,
     ) -> VisualizationIterationResponse:
+        return self._create_visualization_iteration(
+            session_id, organization_id, request.prompt_revision_id
+        )
+
+    def _create_visualization_iteration(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        prompt_revision_id: UUID,
+        *,
+        iterative_edit_id: UUID | None = None,
+    ) -> VisualizationIterationResponse:
         prompt_row, compiled = self.repository.get_prompt_revision(
-            session_id, request.prompt_revision_id, organization_id
+            session_id, prompt_revision_id, organization_id
         )
         profiles = self._generation_profiles.list_iteration_profiles()
         if not profiles:
@@ -622,6 +747,7 @@ class RuntimeService:
             runs=runs,
             organization_id=organization_id,
             created_at=now,
+            iterative_edit_id=iterative_edit_id,
         )
         for dispatch in dispatches:
             try:
@@ -946,6 +1072,10 @@ class RuntimeService:
             current_visual_asset_id=self.repository.get_current_visual_asset_id(
                 record.session_id, organization_id
             ),
+            iterative_edit_id=record.iterative_edit_id,
+            source_asset_id=record.source_asset_id,
+            starting_revision_id=record.starting_revision_id,
+            change_message_id=record.change_message_id,
             created_at=record.created_at,
         )
 

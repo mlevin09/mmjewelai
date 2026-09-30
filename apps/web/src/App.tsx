@@ -44,6 +44,7 @@ import type {
   Session,
   UiCatalog,
   VisualizationIteration,
+  IterativeEditResponse,
   TextIntakeResponse,
 } from "./types";
 
@@ -68,6 +69,68 @@ function ApiProvider({ children }: { children: React.ReactNode }) {
     [auth, config.apiBaseUrl, navigate],
   );
   return <ApiContext.Provider value={api}>{children}</ApiContext.Provider>;
+}
+
+export function IterativeEditForm({
+  locale,
+  activeEdit,
+  loading,
+  value,
+  onChange,
+  onSubmit,
+}: {
+  locale: string;
+  activeEdit: boolean;
+  loading: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+}) {
+  return (
+    <section className="panel intake-panel">
+      <div>
+        <p className="eyebrow">
+          {locale === "ru"
+            ? "Изменить выбранный вариант"
+            : "Edit current visual"}
+        </p>
+        <h2>
+          {locale === "ru" ? "Что нужно изменить?" : "What should change?"}
+        </h2>
+        <p>
+          {activeEdit
+            ? locale === "ru"
+              ? "Ответьте на уточнение; остальные характеристики будут сохранены."
+              : "Answer the clarification; all unmentioned characteristics stay unchanged."
+            : locale === "ru"
+              ? "Неупомянутые характеристики и заблокированные поля сохраняются."
+              : "Unmentioned characteristics and locked fields remain unchanged."}
+        </p>
+      </div>
+      <form className="intake-form" onSubmit={onSubmit}>
+        <textarea
+          aria-label={
+            locale === "ru" ? "Запрос на изменение" : "Change request"
+          }
+          maxLength={4000}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={
+            locale === "ru"
+              ? "Например: Увеличьте центральный камень на 20%, остальное не меняйте."
+              : "For example: Increase the center stone by 20%, but keep everything else unchanged."
+          }
+        />
+        <button disabled={loading || !value.trim()} type="submit">
+          {loading
+            ? "Applying change…"
+            : activeEdit
+              ? "Continue edit"
+              : "Apply change"}
+        </button>
+      </form>
+    </section>
+  );
 }
 
 function Protected() {
@@ -500,6 +563,9 @@ function Workspace() {
   const [intakeText, setIntakeText] = useState("");
   const [intakeLoading, setIntakeLoading] = useState(false);
   const [intakeIssues, setIntakeIssues] = useState<string[]>([]);
+  const [editText, setEditText] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [activeEditId, setActiveEditId] = useState<string | null>(null);
   const intakeInFlight = useRef(false);
   const [submittedRun, setSubmittedRun] = useState<GenerationRun | null>(null);
   const [submittedIteration, setSubmittedIteration] =
@@ -549,6 +615,9 @@ function Workspace() {
     (item) => item.status === "pending",
   );
   const activeIteration = submittedIteration ?? listedActiveIteration ?? null;
+  const currentVisualAssetId = [...(iterations.data?.iterations ?? [])]
+    .reverse()
+    .find((item) => item.current_visual_asset_id)?.current_visual_asset_id;
   useEffect(() => {
     const latest = iterations.data?.iterations.find(
       (item) => item.iteration_id === submittedIteration?.iteration_id,
@@ -690,6 +759,44 @@ function Workspace() {
       } else throw caught;
     }
   };
+  const submitIterativeEdit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!revision.data || !editText.trim() || editLoading) return;
+    setEditLoading(true);
+    setError(null);
+    try {
+      const path = activeEditId
+        ? `/sessions/${sessionId}/iterative-edits/${activeEditId}/messages`
+        : `/sessions/${sessionId}/iterative-edits`;
+      const result = await api.request<IterativeEditResponse>(path, {
+        ...scoped,
+        method: "POST",
+        body: JSON.stringify({
+          expected_revision_id: revision.data.revision_id,
+          content: editText.trim(),
+        }),
+      });
+      setEditText("");
+      setEvaluation(result.evaluation);
+      setIntakeIssues(result.proposal.issues.map((issue) => issue.detail));
+      if (result.iteration) {
+        setSubmittedIteration(result.iteration);
+        setActiveEditId(null);
+        await iterations.refetch();
+      } else {
+        setActiveEditId(result.edit_id);
+      }
+      await refreshRevision();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError
+          ? caught.message
+          : "The change request failed safely.",
+      );
+    } finally {
+      setEditLoading(false);
+    }
+  };
   if (!session.data || !revision.data)
     return <main className="page">Loading workspace…</main>;
   return (
@@ -776,14 +883,14 @@ function Workspace() {
         {!evaluation && (
           <button onClick={() => void evaluate()}>Evaluate design</button>
         )}
-        {evaluation?.rendered_question && (
+        {evaluation?.rendered_question && !activeEditId && (
           <AnswerForm
             contract={evaluation.rendered_question.answer_contract}
             options={options.data?.options ?? []}
             onSubmit={answer}
           />
         )}
-        {evaluation?.decision.decision === "ready" && (
+        {evaluation?.decision.decision === "ready" && !activeEditId && (
           <ReadyActions
             api={api}
             organizationId={organizationId}
@@ -880,6 +987,16 @@ function Workspace() {
         }}
         onChanged={() => iterations.refetch()}
       />
+      {currentVisualAssetId && (
+        <IterativeEditForm
+          locale={session.data.locale}
+          activeEdit={Boolean(activeEditId)}
+          loading={editLoading}
+          value={editText}
+          onChange={setEditText}
+          onSubmit={(event) => void submitIterativeEdit(event)}
+        />
+      )}
       <AssetPanel
         assets={assets.data?.assets ?? []}
         urls={assetUrls}

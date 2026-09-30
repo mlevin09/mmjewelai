@@ -6,7 +6,12 @@ import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { App, ReadyActions, VisualizationIterationPanel } from "./App";
+import {
+  App,
+  IterativeEditForm,
+  ReadyActions,
+  VisualizationIterationPanel,
+} from "./App";
 import { ApiClient } from "./api";
 import { AuthProvider } from "./auth";
 import { server } from "./test/server";
@@ -242,6 +247,10 @@ describe("visualization result selection", () => {
       ],
       selection: null,
       current_visual_asset_id: null,
+      iterative_edit_id: null,
+      source_asset_id: null,
+      starting_revision_id: null,
+      change_message_id: null,
       created_at: "2026-09-27T00:00:00Z",
     };
     const props = {
@@ -326,6 +335,10 @@ describe("visualization result selection", () => {
       ],
       selection: null,
       current_visual_asset_id: null,
+      iterative_edit_id: null,
+      source_asset_id: null,
+      starting_revision_id: null,
+      change_message_id: null,
       created_at: "2026-09-27T00:00:00Z",
     };
     render(
@@ -351,6 +364,67 @@ describe("visualization result selection", () => {
         { decision: "select", asset_id: "asset-google" },
       ]),
     );
+  });
+});
+
+describe("iterative editing", () => {
+  it("collects a change request only after a current visual is available", async () => {
+    const submitted = vi.fn();
+
+    function Harness() {
+      const [value, setValue] = useState("");
+      return (
+        <IterativeEditForm
+          locale="en"
+          activeEdit={false}
+          loading={false}
+          value={value}
+          onChange={setValue}
+          onSubmit={(event) => {
+            event.preventDefault();
+            submitted(value);
+          }}
+        />
+      );
+    }
+
+    render(<Harness />);
+    const submit = screen.getByRole("button", { name: "Apply change" });
+    expect(submit).toBeDisabled();
+    await userEvent.type(
+      screen.getByLabelText("Change request"),
+      "Increase the center stone by 20%.",
+    );
+    expect(submit).toBeEnabled();
+    await userEvent.click(submit);
+    expect(submitted).toHaveBeenCalledWith("Increase the center stone by 20%.");
+    expect(
+      screen.getByText(
+        "Unmentioned characteristics and locked fields remain unchanged.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows clarification continuation and keeps submission disabled while loading", () => {
+    render(
+      <IterativeEditForm
+        locale="en"
+        activeEdit
+        loading
+        value="clarification"
+        onChange={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Answer the clarification; all unmentioned characteristics stay unchanged.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Applying change…" }),
+    ).toBeDisabled();
   });
 });
 
@@ -460,6 +534,10 @@ describe("text intake", () => {
       http.get(
         "http://localhost:8000/sessions/session-one/generation-runs",
         () => HttpResponse.json({ generation_runs: [] }),
+      ),
+      http.get(
+        "http://localhost:8000/sessions/session-one/visualization-iterations",
+        () => HttpResponse.json({ iterations: [] }),
       ),
       http.post(
         "http://localhost:8000/sessions/session-one/text-intake",

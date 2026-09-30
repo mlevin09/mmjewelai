@@ -12,6 +12,7 @@ from jewelai_assets import (
     AssetIngestionRequest,
     AssetKind,
     AssetStorageError,
+    PrivateObjectReader,
     PrivateObjectStore,
     finalize_staged_asset,
     stage_asset_object,
@@ -22,6 +23,7 @@ from jewelai_model_gateway import (
     GenerationErrorCode,
     GenerationRequest,
     GenerationRun,
+    ImageGenerationEditInput,
     ImageGenerationExecutor,
     ImageGenerationGateway,
     InvalidProviderResponseError,
@@ -118,6 +120,7 @@ def execute_generation_run_with_assets(
     organization_id: UUID,
     executors: ExecutorRegistry,
     object_store: PrivateObjectStore,
+    object_reader: PrivateObjectReader | None = None,
     clock: Callable[[], datetime] | None = None,
 ) -> ExecutionOutcome:
     """Execute once, durably stage all outputs, then persist success and Asset metadata."""
@@ -129,7 +132,32 @@ def execute_generation_run_with_assets(
 
     try:
         executor = executors.get(claimed.provider)
-        execution = validate_generation_execution(request, executor.execute(request))
+        edit_record = repository.get_generation_edit_context(
+            session_id, generation_run_id, organization_id
+        )
+        edit_input = None
+        if edit_record is not None:
+            if object_reader is None:
+                raise AssetStorageError("Private source Asset reader is unavailable")
+            source = edit_record.source_asset
+            source_content = object_reader.read_exact(
+                source.object_key,
+                content_type=source.content_type,
+                content_hash=source.content_hash,
+                byte_size=source.byte_size,
+            )
+            edit_input = ImageGenerationEditInput(
+                source_asset_id=source.asset_id,
+                declared_content_type=source.content_type.value,
+                content_hash=source.content_hash,
+                change_request=edit_record.change_request,
+                content=source_content,
+            )
+        if edit_input is None:
+            untrusted_execution = executor.execute(request)
+        else:
+            untrusted_execution = executor.execute(request, edit_input=edit_input)
+        execution = validate_generation_execution(request, untrusted_execution)
         session = repository.get_design_session(session_id, organization_id)
         staged = []
         for output in execution.outputs:
@@ -144,6 +172,7 @@ def execute_generation_run_with_assets(
                 generation_run_id=generation_run_id,
                 generation_output_ordinal=output.ordinal,
                 provider_output_id=descriptor.provider_output_id,
+                parent_asset_id=(edit_input.source_asset_id if edit_input else None),
             )
             try:
                 stored_object = stage_asset_object(

@@ -15,6 +15,7 @@ from jewelai_model_gateway import (
     GatewayUnavailableError,
     GenerationConfiguration,
     GenerationRequest,
+    ImageGenerationEditInput,
     ImageGenerationExecutor,
     ImageGenerationGateway,
     InvalidProviderResponseError,
@@ -104,6 +105,20 @@ def test_exact_request_mapping_uses_immutable_prompt_png_and_no_url_option(compi
     assert execution.outputs[0].content == PNG
     assert "response_format" not in client.images.calls[0]
     assert "url" not in client.images.calls[0]
+
+
+def test_image_conditioned_edit_is_rejected_without_text_only_fallback(compiled_prompt):
+    client = FakeClient(response_for(PNG))
+    edit = ImageGenerationEditInput(
+        source_asset_id=UUID("33333333-3333-4333-8333-333333333333"),
+        declared_content_type="image/png",
+        content_hash="a" * 64,
+        change_request="Make the stone larger.",
+        content=PNG,
+    )
+    with pytest.raises(ProviderRejectedError):
+        adapter_for(client).execute(request_for(compiled_prompt), edit_input=edit)
+    assert client.images.calls == []
 
 
 def test_adapter_is_executor_only_and_cannot_discard_outputs_through_legacy_gateway(

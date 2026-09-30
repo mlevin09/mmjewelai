@@ -40,6 +40,7 @@ from .models import (
     DesignSessionRow,
     GenerationDispatchOutboxRow,
     GenerationRunRow,
+    IterativeEditRow,
     MessageRow,
     OrganizationMembershipRow,
     OrganizationRow,
@@ -119,6 +120,27 @@ class VisualizationIterationRecord:
     selected_asset_id: UUID | None
     selected_by_principal_id: UUID | None
     selected_at: datetime | None
+    iterative_edit_id: UUID | None = None
+    source_asset_id: UUID | None = None
+    starting_revision_id: UUID | None = None
+    change_message_id: UUID | None = None
+
+
+@dataclass(frozen=True)
+class IterativeEditRecord:
+    edit_id: UUID
+    session_id: UUID
+    source_asset_id: UUID
+    starting_revision_id: UUID
+    initial_message_id: UUID
+    created_at: datetime
+    iteration_id: UUID | None
+
+
+@dataclass(frozen=True)
+class GenerationEditContextRecord:
+    source_asset: Asset
+    change_request: str
 
 
 class PersistenceRepository:
@@ -661,6 +683,7 @@ class PersistenceRepository:
         runs: tuple[GenerationRun, ...],
         organization_id: UUID,
         created_at: datetime,
+        iterative_edit_id: UUID | None = None,
     ) -> tuple[PendingGenerationDispatch, ...]:
         if not runs:
             raise ValueError("A visualization iteration requires at least one generation run")
@@ -681,9 +704,28 @@ class PersistenceRepository:
             )
             if scoped is None or prompt is None or prompt.content_hash != prompt_content_hash:
                 raise OwnershipMismatchError("Prompt revision does not belong to iteration scope")
+            if iterative_edit_id is not None:
+                edit = db.scalar(
+                    select(IterativeEditRow).where(
+                        IterativeEditRow.edit_id == iterative_edit_id,
+                        IterativeEditRow.session_id == session_id,
+                    )
+                )
+                existing_iteration = db.scalar(
+                    select(VisualizationIterationRow.iteration_id).where(
+                        VisualizationIterationRow.iterative_edit_id == iterative_edit_id
+                    )
+                )
+                if edit is None:
+                    raise OwnershipMismatchError("Iterative edit does not belong to session")
+                if existing_iteration is not None:
+                    raise VisualizationSelectionConflictError(
+                        "Iterative edit already has a visualization iteration"
+                    )
             db.add(
                 VisualizationIterationRow(
                     iteration_id=iteration_id,
+                    iterative_edit_id=iterative_edit_id,
                     session_id=session_id,
                     prompt_revision_id=prompt_revision_id,
                     prompt_content_hash=prompt_content_hash,
@@ -752,6 +794,11 @@ class PersistenceRepository:
                 .order_by(GenerationRunRow.provider, AssetRow.asset_id)
             ).all()
             selection = db.get(VisualizationSelectionRow, iteration_id)
+            edit = (
+                db.get(IterativeEditRow, iteration.iterative_edit_id)
+                if iteration.iterative_edit_id is not None
+                else None
+            )
             return VisualizationIterationRecord(
                 iteration_id=iteration.iteration_id,
                 session_id=iteration.session_id,
@@ -764,6 +811,131 @@ class PersistenceRepository:
                 selected_asset_id=selection.asset_id if selection else None,
                 selected_by_principal_id=selection.selected_by_principal_id if selection else None,
                 selected_at=self._utc(selection.created_at) if selection else None,
+                iterative_edit_id=iteration.iterative_edit_id,
+                source_asset_id=edit.source_asset_id if edit else None,
+                starting_revision_id=edit.starting_revision_id if edit else None,
+                change_message_id=edit.initial_message_id if edit else None,
+            )
+
+    def create_iterative_edit(
+        self,
+        *,
+        edit_id: UUID,
+        session_id: UUID,
+        organization_id: UUID,
+        starting_revision_id: UUID,
+        initial_message_id: UUID,
+        created_at: datetime,
+    ) -> IterativeEditRecord:
+        with self._session_factory.begin() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None or session.current_revision_id != starting_revision_id:
+                raise StaleRevisionError("Current revision changed before iterative edit")
+            message = db.scalar(
+                select(MessageRow).where(
+                    MessageRow.message_id == initial_message_id,
+                    MessageRow.session_id == session_id,
+                )
+            )
+            source_asset_id = db.scalar(
+                select(VisualizationSelectionRow.asset_id)
+                .where(
+                    VisualizationSelectionRow.session_id == session_id,
+                    VisualizationSelectionRow.decision == "selected",
+                )
+                .order_by(
+                    VisualizationSelectionRow.created_at.desc(),
+                    VisualizationSelectionRow.iteration_id.desc(),
+                )
+                .limit(1)
+            )
+            source_asset = db.scalar(
+                select(AssetRow).where(
+                    AssetRow.asset_id == source_asset_id,
+                    AssetRow.session_id == session_id,
+                    AssetRow.organization_id == organization_id,
+                    AssetRow.kind == "generated",
+                    AssetRow.status == AssetStatus.READY.value,
+                )
+            )
+            if message is None:
+                raise OwnershipMismatchError("Edit message does not belong to session")
+            if source_asset is None:
+                raise VisualizationSelectionConflictError(
+                    "A selected READY Current Visual Asset is required"
+                )
+            row = IterativeEditRow(
+                edit_id=edit_id,
+                session_id=session_id,
+                source_asset_id=source_asset.asset_id,
+                starting_revision_id=starting_revision_id,
+                initial_message_id=initial_message_id,
+                created_at=created_at,
+            )
+            db.add(row)
+        return self.get_iterative_edit(session_id, edit_id, organization_id)
+
+    def get_iterative_edit(
+        self, session_id: UUID, edit_id: UUID, organization_id: UUID
+    ) -> IterativeEditRecord:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(IterativeEditRow).where(
+                    IterativeEditRow.edit_id == edit_id,
+                    IterativeEditRow.session_id == session_id,
+                )
+            )
+            if row is None:
+                raise OwnershipMismatchError("Iterative edit not found in organization scope")
+            iteration_id = db.scalar(
+                select(VisualizationIterationRow.iteration_id).where(
+                    VisualizationIterationRow.iterative_edit_id == edit_id
+                )
+            )
+            return IterativeEditRecord(
+                edit_id=row.edit_id,
+                session_id=row.session_id,
+                source_asset_id=row.source_asset_id,
+                starting_revision_id=row.starting_revision_id,
+                initial_message_id=row.initial_message_id,
+                created_at=self._utc(row.created_at),
+                iteration_id=iteration_id,
+            )
+
+    def get_generation_edit_context(
+        self, session_id: UUID, generation_run_id: UUID, organization_id: UUID
+    ) -> GenerationEditContextRecord | None:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(GenerationRunRow).where(
+                    GenerationRunRow.generation_run_id == generation_run_id,
+                    GenerationRunRow.session_id == session_id,
+                )
+            )
+            if row is None:
+                raise OwnershipMismatchError("Generation run not found in organization scope")
+            if row.iteration_id is None:
+                return None
+            iteration = db.get(VisualizationIterationRow, row.iteration_id)
+            if iteration is None or iteration.iterative_edit_id is None:
+                return None
+            edit = db.get(IterativeEditRow, iteration.iterative_edit_id)
+            asset = db.get(AssetRow, edit.source_asset_id) if edit else None
+            message = db.get(MessageRow, edit.initial_message_id) if edit else None
+            if (
+                edit is None
+                or asset is None
+                or message is None
+                or asset.session_id != session_id
+                or asset.organization_id != organization_id
+                or asset.status != AssetStatus.READY.value
+            ):
+                raise OwnershipMismatchError("Iterative edit lineage is invalid")
+            return GenerationEditContextRecord(
+                source_asset=self._asset(asset),
+                change_request=message.content,
             )
 
     def list_visualization_iterations(

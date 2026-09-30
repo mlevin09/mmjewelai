@@ -12,6 +12,7 @@ from jewelai_model_gateway import (
     GenerationExecution,
     GenerationRequest,
     GenerationResult,
+    ImageGenerationEditInput,
     InvalidProviderResponseError,
     ProviderRejectedError,
     RetrievedImageOutput,
@@ -47,12 +48,36 @@ class GoogleGenerativeLanguageImageAdapter:
             follow_redirects=False,
         )
 
-    def execute(self, request: GenerationRequest) -> GenerationExecution:
+    def execute(
+        self,
+        request: GenerationRequest,
+        *,
+        edit_input: ImageGenerationEditInput | None = None,
+    ) -> GenerationExecution:
         request = GenerationRequest.model_validate(request)
         self._validate_request(request)
         endpoint = GOOGLE_GENERATIVE_LANGUAGE_ENDPOINT.format(model=request.model)
+        parts = [{"text": request.compiled_prompt.prompt_text}]
+        if edit_input is not None:
+            parts = [
+                {
+                    "text": (
+                        "Edit the supplied current jewelry visualization. Apply only the explicit "
+                        "change request while preserving all other visible characteristics and all "
+                        "locked canonical constraints.\nCHANGE REQUEST:\n"
+                        f"{edit_input.change_request}\n\n"
+                        f"{request.compiled_prompt.prompt_text}"
+                    )
+                },
+                {
+                    "inlineData": {
+                        "mimeType": edit_input.declared_content_type,
+                        "data": base64.b64encode(edit_input.content).decode("ascii"),
+                    }
+                },
+            ]
         payload = {
-            "contents": [{"parts": [{"text": request.compiled_prompt.prompt_text}]}],
+            "contents": [{"parts": parts}],
             "generationConfig": {"responseModalities": ["IMAGE"]},
         }
         try:

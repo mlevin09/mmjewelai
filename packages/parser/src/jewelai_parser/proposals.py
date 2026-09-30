@@ -26,6 +26,7 @@ from .models import (
     AcceptedUpdate,
     CandidateUpdate,
     DimensionsCandidate,
+    DimensionsScaleCandidate,
     ParserCandidate,
     ParserIssue,
     ParserIssueCode,
@@ -101,7 +102,32 @@ def build_parser_proposal(
             )
             continue
 
-        result = _canonicalize(update, locale, dictionary)
+        if isinstance(update.value, DimensionsScaleCandidate):
+            if not isinstance(current, KnownValue) or not isinstance(current.value, Dimensions):
+                issues.append(
+                    ParserIssue(
+                        code=ParserIssueCode.RELATIVE_CHANGE_REQUIRES_EXISTING_VALUE,
+                        target=update.target,
+                        concrete_target=update.concrete_target,
+                        detail=(
+                            "A relative dimension change requires existing explicit center-stone "
+                            "dimensions."
+                        ),
+                    )
+                )
+                continue
+            if current.locked:
+                issues.append(
+                    ParserIssue(
+                        code=ParserIssueCode.LOCKED_FIELD_CONFLICT,
+                        target=update.target,
+                        concrete_target=update.concrete_target,
+                        detail="A parser proposal cannot replace a locked field.",
+                    )
+                )
+                continue
+
+        result = _canonicalize(update, locale, dictionary, current)
         if isinstance(result, ParserIssue):
             issues.append(result)
             continue
@@ -180,7 +206,7 @@ def _current_state(design: Design, update: CandidateUpdate):
     )
 
 
-def _canonicalize(update, locale, dictionary):
+def _canonicalize(update, locale, dictionary, current):
     if isinstance(update.value, TermCandidate):
         return _normalize_term(update, update.value.text, locale, dictionary)
     if isinstance(update.value, StyleTermsCandidate):
@@ -196,6 +222,18 @@ def _canonicalize(update, locale, dictionary):
             warnings.extend(found_warnings)
             match_kinds.append(match_kind)
         return tuple(values), _combined_match_kind(match_kinds), warnings
+    if isinstance(update.value, DimensionsScaleCandidate):
+        factor = update.value.factor
+        value = current.value
+        return (
+            Dimensions(
+                length={"value": round(value.length.value * factor, 6), "unit": "mm"},
+                width={"value": round(value.width.value * factor, 6), "unit": "mm"},
+                depth={"value": round(value.depth.value * factor, 6), "unit": "mm"},
+            ),
+            None,
+            [],
+        )
     return update.value.value, None, []
 
 
@@ -256,7 +294,7 @@ def _explicit_state(update, value, source):
     common = dict(value=value, source=source, confirmed=False, locked=False)
     if isinstance(update.value, WeightCandidate):
         return Explicit[Weight](**common)
-    if isinstance(update.value, DimensionsCandidate):
+    if isinstance(update.value, DimensionsCandidate | DimensionsScaleCandidate):
         return Explicit[Dimensions](**common)
     if isinstance(update.value, PurityCandidate):
         return Explicit[KaratPurity | FinenessPurity](**common)

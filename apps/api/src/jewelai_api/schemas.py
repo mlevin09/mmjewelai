@@ -186,6 +186,24 @@ class TextIntakeResponse(ApiModel):
     evaluation: "EvaluationResponse"
 
 
+class IterativeEditRequest(ApiModel):
+    expected_revision_id: UUID
+    content: MessageContent
+
+
+class IterativeEditResponse(ApiModel):
+    edit_id: UUID
+    source_asset_id: UUID
+    starting_revision_id: UUID
+    initial_message_id: UUID
+    message: MessageResponse
+    proposal: ParserProposal
+    revision: DesignRevision
+    evaluation: "EvaluationResponse"
+    iteration: "VisualizationIterationResponse | None" = None
+    created_at: datetime
+
+
 class CreatePromptRevisionRequest(ApiModel):
     expected_revision_id: UUID
 
@@ -243,6 +261,10 @@ class VisualizationIterationResponse(ApiModel):
     results: tuple[VisualizationResult, ...]
     selection: VisualizationSelection | None = None
     current_visual_asset_id: UUID | None = None
+    iterative_edit_id: UUID | None = None
+    source_asset_id: UUID | None = None
+    starting_revision_id: UUID | None = None
+    change_message_id: UUID | None = None
     created_at: datetime
 
 
@@ -347,3 +369,6 @@ class EvaluationResponse(ApiModel):
 
 class RevisionListResponse(ApiModel):
     revisions: tuple[DesignRevision, ...]
+
+
+IterativeEditResponse.model_rebuild()

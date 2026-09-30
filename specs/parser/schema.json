@@ -17,6 +17,7 @@
           "discriminator": {
             "mapping": {
               "dimensions": "#/$defs/DimensionsCandidate",
+              "dimensions_scale": "#/$defs/DimensionsScaleCandidate",
               "purity": "#/$defs/PurityCandidate",
               "quantity": "#/$defs/QuantityCandidate",
               "style_terms": "#/$defs/StyleTermsCandidate",
@@ -34,6 +35,9 @@
             },
             {
               "$ref": "#/$defs/DimensionsCandidate"
+            },
+            {
+              "$ref": "#/$defs/DimensionsScaleCandidate"
             },
             {
               "$ref": "#/$defs/PurityCandidate"
@@ -741,6 +745,7 @@
           "discriminator": {
             "mapping": {
               "dimensions": "#/$defs/DimensionsCandidate",
+              "dimensions_scale": "#/$defs/DimensionsScaleCandidate",
               "purity": "#/$defs/PurityCandidate",
               "quantity": "#/$defs/QuantityCandidate",
               "style_terms": "#/$defs/StyleTermsCandidate",
@@ -758,6 +763,9 @@
             },
             {
               "$ref": "#/$defs/DimensionsCandidate"
+            },
+            {
+              "$ref": "#/$defs/DimensionsScaleCandidate"
             },
             {
               "$ref": "#/$defs/PurityCandidate"
@@ -1685,6 +1693,29 @@
       "title": "DimensionsCandidate",
       "type": "object"
     },
+    "DimensionsScaleCandidate": {
+      "additionalProperties": false,
+      "description": "Explicit relative resize of existing center-stone dimensions.",
+      "properties": {
+        "kind": {
+          "const": "dimensions_scale",
+          "default": "dimensions_scale",
+          "title": "Kind",
+          "type": "string"
+        },
+        "factor": {
+          "exclusiveMinimum": 0.1,
+          "maximum": 10,
+          "title": "Factor",
+          "type": "number"
+        }
+      },
+      "required": [
+        "factor"
+      ],
+      "title": "DimensionsScaleCandidate",
+      "type": "object"
+    },
     "Explicit_Dimensions_": {
       "additionalProperties": false,
       "allOf": [
@@ -2583,7 +2614,8 @@
         "DEPRECATED_ENTRY",
         "LOCKED_FIELD_CONFLICT",
         "NOT_APPLICABLE_CONFLICT",
-        "UNKNOWN_SIDE_STONE_GROUP"
+        "UNKNOWN_SIDE_STONE_GROUP",
+        "RELATIVE_CHANGE_REQUIRES_EXISTING_VALUE"
       ],
       "title": "ParserIssueCode",
       "type": "string"

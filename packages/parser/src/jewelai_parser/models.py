@@ -53,6 +53,13 @@ class DimensionsCandidate(ImmutableModel):
     value: Dimensions
 
 
+class DimensionsScaleCandidate(ImmutableModel):
+    """Explicit relative resize of existing center-stone dimensions."""
+
+    kind: Literal["dimensions_scale"] = "dimensions_scale"
+    factor: Annotated[float, Field(strict=True, gt=0.1, le=10, allow_inf_nan=False)]
+
+
 class PurityCandidate(ImmutableModel):
     kind: Literal["purity"] = "purity"
     value: KaratPurity | FinenessPurity
@@ -77,6 +84,7 @@ CandidateValue = Annotated[
     TermCandidate
     | WeightCandidate
     | DimensionsCandidate
+    | DimensionsScaleCandidate
     | PurityCandidate
     | QuantityCandidate
     | StyleTermsCandidate,
@@ -111,7 +119,7 @@ class CandidateUpdate(ImmutableModel):
         expected = {
             ParserTarget.METAL_PURITY: PurityCandidate,
             ParserTarget.CENTER_STONE_WEIGHT: WeightCandidate,
-            ParserTarget.CENTER_STONE_DIMENSIONS: DimensionsCandidate,
+            ParserTarget.CENTER_STONE_DIMENSIONS: (DimensionsCandidate, DimensionsScaleCandidate),
             ParserTarget.STYLE: StyleTermsCandidate,
             ParserTarget.SIDE_STONE_QUANTITY: QuantityCandidate,
         }
@@ -144,6 +152,7 @@ class ParserIssueCode(StrEnum):
     LOCKED_FIELD_CONFLICT = "LOCKED_FIELD_CONFLICT"
     NOT_APPLICABLE_CONFLICT = "NOT_APPLICABLE_CONFLICT"
     UNKNOWN_SIDE_STONE_GROUP = "UNKNOWN_SIDE_STONE_GROUP"
+    RELATIVE_CHANGE_REQUIRES_EXISTING_VALUE = "RELATIVE_CHANGE_REQUIRES_EXISTING_VALUE"
 
 
 class ParserWarningCode(StrEnum):

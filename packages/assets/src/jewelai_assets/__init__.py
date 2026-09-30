@@ -44,6 +44,7 @@ from .storage import (
     AssetStorageError,
     PrivateObjectMaintenance,
     PrivateObjectMetadataReader,
+    PrivateObjectReader,
     PrivateObjectStore,
     PrivateObjectVersionDeleter,
 )
@@ -74,6 +75,7 @@ __all__ = [
     "PrivateObjectMaintenance",
     "PrivateObjectMetadata",
     "PrivateObjectMetadataReader",
+    "PrivateObjectReader",
     "PrivateObjectStore",
     "PrivateObjectVersionDeleter",
     "PrivateObjectAccessSigner",

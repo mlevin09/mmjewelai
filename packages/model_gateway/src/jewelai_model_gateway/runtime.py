@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import Protocol, runtime_checkable
+from uuid import UUID
 
 from pydantic import TypeAdapter
 
@@ -10,6 +11,33 @@ from .models import GenerationRequest, GenerationResult, ProviderOutputId
 
 _PROVIDER_OUTPUT_ID = TypeAdapter(ProviderOutputId)
 _SUPPORTED_IMAGE_CONTENT_TYPES = frozenset(("image/png", "image/jpeg", "image/webp"))
+
+
+@dataclass(frozen=True)
+class ImageGenerationEditInput:
+    """Transient source-image context for one image-conditioned edit."""
+
+    source_asset_id: UUID
+    declared_content_type: str
+    content_hash: str
+    change_request: str
+    content: bytes = field(repr=False)
+
+    def __post_init__(self) -> None:
+        if self.declared_content_type not in _SUPPORTED_IMAGE_CONTENT_TYPES:
+            raise ValueError("Edit input must use a supported image content type")
+        if (
+            not isinstance(self.content_hash, str)
+            or len(self.content_hash) != 64
+            or any(character not in "0123456789abcdef" for character in self.content_hash)
+        ):
+            raise ValueError("Edit input requires a SHA-256 content hash")
+        if not isinstance(self.change_request, str) or not self.change_request.strip():
+            raise ValueError("Edit input requires an exact change request")
+        if self.change_request != self.change_request.strip() or len(self.change_request) > 4000:
+            raise ValueError("Edit change request is invalid")
+        if not isinstance(self.content, bytes) or not self.content:
+            raise ValueError("Edit input content must be non-empty bytes")
 
 
 @dataclass(frozen=True)
@@ -50,7 +78,12 @@ class GenerationExecution:
 
 @runtime_checkable
 class ImageGenerationExecutor(Protocol):
-    def execute(self, request: GenerationRequest) -> GenerationExecution:
+    def execute(
+        self,
+        request: GenerationRequest,
+        *,
+        edit_input: ImageGenerationEditInput | None = None,
+    ) -> GenerationExecution:
         """Execute one provider request and return metadata plus transient outputs."""
 
 

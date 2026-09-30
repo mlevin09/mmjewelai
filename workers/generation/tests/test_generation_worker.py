@@ -35,6 +35,7 @@ from jewelai_model_gateway import (
 )
 from jewelai_persistence import (
     Base,
+    GenerationEditContextRecord,
     PersistenceRepository,
     create_database_engine,
     create_session_factory,
@@ -108,12 +109,14 @@ class FakeExecutor:
         self.events = events
         self.calls = 0
         self.requests = []
+        self.edit_inputs = []
 
-    def execute(self, request):
+    def execute(self, request, *, edit_input=None):
         if self.events is not None:
             self.events.append("provider_execute")
         self.calls += 1
         self.requests.append(request)
+        self.edit_inputs.append(edit_input)
         if self.mode == "failure":
             raise ProviderRejectedError
         descriptors = tuple(
@@ -159,6 +162,12 @@ class MemoryObjectStore:
         )
         self.objects[object_key] = content
         return stored
+
+    def read_exact(self, object_key, *, content_type, content_hash, byte_size):
+        content = self.objects[object_key]
+        if len(content) != byte_size or sha256(content).hexdigest() != content_hash:
+            raise AssetStorageConflictError("source mismatch")
+        return content
 
 
 class MemoryMaintenance:
@@ -1154,6 +1163,54 @@ def test_execution_materializes_ready_asset_without_persisting_bytes(persisted):
     assert "worker-output" not in persisted_run.model_dump_json()
     assert "iVBOR" not in persisted_run.model_dump_json()
     assert "content" not in persisted_asset.model_dump()
+
+
+def test_iterative_execution_reads_exact_source_and_preserves_parent_lineage(
+    persisted, monkeypatch
+):
+    repository, _, _ = persisted
+    source_id = UUID("33333333-3333-4333-8333-333333333333")
+    source = Asset(
+        asset_id=source_id,
+        organization_id=ORG_ID,
+        project_id=PROJECT_ID,
+        session_id=SESSION_ID,
+        kind=AssetKind.REFERENCE,
+        status=AssetStatus.PENDING,
+        object_key=build_object_key(ORG_ID, PROJECT_ID, source_id, AssetContentType.PNG),
+        content_type=AssetContentType.PNG,
+        content_hash=sha256(PNG).hexdigest(),
+        byte_size=len(PNG),
+        created_at=NOW,
+    )
+    repository.create_pending_asset(source)
+    source = repository.mark_asset_ready(source_id, ORG_ID, NOW + timedelta(seconds=1))
+    monkeypatch.setattr(
+        repository,
+        "get_generation_edit_context",
+        lambda *_: GenerationEditContextRecord(
+            source_asset=source,
+            change_request="Increase the center stone by 20%.",
+        ),
+    )
+    executor = FakeExecutor()
+    store = MemoryObjectStore()
+    store.objects[source.object_key] = PNG
+    outcome = execute_generation_run_with_assets(
+        repository,
+        session_id=SESSION_ID,
+        generation_run_id=RUN_ID,
+        organization_id=ORG_ID,
+        executors=ExecutorRegistry({"test": executor}),
+        object_store=store,
+        object_reader=store,
+        clock=advancing_clock(),
+    )
+    assert outcome.disposition == "succeeded"
+    assert executor.edit_inputs[0].source_asset_id == source_id
+    assert executor.edit_inputs[0].content == PNG
+    assert outcome.assets[0].parent_asset_id == source_id
+    assert repository.get_asset(SESSION_ID, source_id, ORG_ID) == source
 
 
 def test_duplicate_execution_neither_calls_provider_nor_creates_duplicate_asset(persisted):
