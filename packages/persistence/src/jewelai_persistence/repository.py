@@ -694,6 +694,14 @@ class PersistenceRepository:
             for run in runs:
                 _, row = self._add_generation_run(db, run, organization_id)
                 row.iteration_id = iteration_id
+
+            # PostgreSQL may order inserts for independent mapped tables before
+            # their application-level creation order. Materialize the iteration
+            # and all referenced runs before adding their outbox rows so the
+            # dispatch foreign keys are valid while retaining one transaction.
+            db.flush()
+
+            for run in runs:
                 db.add(
                     GenerationDispatchOutboxRow(
                         generation_run_id=run.generation_run_id,
