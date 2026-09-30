@@ -54,10 +54,11 @@ from jewelai_persistence.models import (
     GenerationDispatchOutboxRow,
     GenerationRunRow,
     PromptRevisionRow,
+    VisualizationIterationRow,
 )
 from jewelai_prompts import compile_prompt
 from pydantic import ValidationError
-from sqlalchemy import func, inspect, select, update
+from sqlalchemy import event, func, inspect, select, update
 from sqlalchemy.exc import IntegrityError
 
 from jewelai_api.artifacts import load_runtime_artifacts
@@ -193,6 +194,61 @@ def create_prompt_and_run(service, organization, session, prompt_id, run_id, *, 
     return compiled, run
 
 
+def create_prompt_and_iteration_runs(service, organization, session, prompt_id, run_ids):
+    current = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+    compiled = compile_prompt(current, service.artifacts.prompts)
+    service.repository.create_prompt_revision(
+        PromptRevisionRow(
+            prompt_revision_id=prompt_id,
+            session_id=session.session_id,
+            specification_revision_id=current.revision_id,
+            prompt_schema_version=compiled.schema_version,
+            compiler_version=compiled.compiler_version,
+            template_id=compiled.template_id,
+            template_version=compiled.template_version,
+            template_artifact_version=compiled.template_artifact_version,
+            compiled_text=compiled.prompt_text,
+            structured_payload=compiled.model_dump(mode="json"),
+            content_hash=compiled.content_hash,
+            created_at=NOW,
+        ),
+        compiled,
+        organization.organization_id,
+        current.revision_id,
+    )
+    runs = tuple(
+        GenerationRun(
+            generation_run_id=run_id,
+            session_id=session.session_id,
+            prompt_revision_id=prompt_id,
+            prompt_content_hash=compiled.content_hash,
+            profile_id=f"test_provider_{ordinal}",
+            profile_version="1.0.0",
+            provider=f"test_provider_{ordinal}",
+            model=f"deterministic-image-v{ordinal}",
+            configuration=GenerationConfiguration(output_count=1),
+            status=GenerationStatus.PENDING,
+            created_at=NOW,
+        )
+        for ordinal, run_id in enumerate(run_ids, start=1)
+    )
+    return compiled, runs
+
+
+def persist_test_visualization_iteration(service, organization, session, iteration_id, runs):
+    return service.repository.create_visualization_iteration_with_dispatches(
+        iteration_id=iteration_id,
+        session_id=session.session_id,
+        prompt_revision_id=runs[0].prompt_revision_id,
+        prompt_content_hash=runs[0].prompt_content_hash,
+        runs=runs,
+        organization_id=organization.organization_id,
+        created_at=NOW,
+    )
+
+
 def test_generation_run_and_dispatch_outbox_are_atomic_and_idempotently_published(engine):
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
@@ -226,6 +282,105 @@ def test_generation_run_and_dispatch_outbox_are_atomic_and_idempotently_publishe
         )
         == run
     )
+
+
+def test_visualization_iteration_persists_runs_before_dispatch_outboxes(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    iteration_id = UUID(int=811)
+    compiled, runs = create_prompt_and_iteration_runs(
+        service,
+        organization,
+        session,
+        UUID(int=812),
+        (UUID(int=813), UUID(int=814)),
+    )
+
+    dispatches = persist_test_visualization_iteration(
+        service, organization, session, iteration_id, runs
+    )
+
+    assert tuple(item.task.generation_run_id for item in dispatches) == tuple(
+        run.generation_run_id for run in runs
+    )
+    with create_session_factory(engine)() as db:
+        iteration = db.get(VisualizationIterationRow, iteration_id)
+        persisted_runs = tuple(
+            db.scalars(
+                select(GenerationRunRow)
+                .where(GenerationRunRow.iteration_id == iteration_id)
+                .order_by(GenerationRunRow.generation_run_id)
+            )
+        )
+        outboxes = tuple(
+            db.scalars(
+                select(GenerationDispatchOutboxRow).order_by(
+                    GenerationDispatchOutboxRow.generation_run_id
+                )
+            )
+        )
+    assert iteration is not None
+    assert iteration.session_id == session.session_id
+    assert iteration.prompt_revision_id == runs[0].prompt_revision_id
+    assert iteration.prompt_content_hash == compiled.content_hash
+    assert len(persisted_runs) == len(outboxes) == 2
+    assert {row.generation_run_id for row in persisted_runs} == {
+        row.generation_run_id for row in outboxes
+    }
+    assert all(row.session_id == session.session_id for row in persisted_runs)
+    assert all(row.prompt_revision_id == runs[0].prompt_revision_id for row in persisted_runs)
+    assert all(row.prompt_content_hash == compiled.content_hash for row in persisted_runs)
+    assert all(row.iteration_id == iteration_id for row in persisted_runs)
+
+
+def test_visualization_iteration_rolls_back_when_outbox_insert_fails(engine):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    iteration_id = UUID(int=815)
+    _, runs = create_prompt_and_iteration_runs(
+        service,
+        organization,
+        session,
+        UUID(int=816),
+        (UUID(int=817), UUID(int=818)),
+    )
+
+    def fail_outbox_insert(*_args, **_kwargs):
+        raise RuntimeError("simulated outbox insert failure")
+
+    event.listen(GenerationDispatchOutboxRow, "before_insert", fail_outbox_insert)
+    try:
+        with pytest.raises(RuntimeError, match="simulated outbox insert failure"):
+            persist_test_visualization_iteration(service, organization, session, iteration_id, runs)
+    finally:
+        event.remove(GenerationDispatchOutboxRow, "before_insert", fail_outbox_insert)
+
+    with create_session_factory(engine)() as db:
+        assert db.get(VisualizationIterationRow, iteration_id) is None
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(GenerationRunRow)
+                .where(
+                    GenerationRunRow.generation_run_id.in_(
+                        tuple(run.generation_run_id for run in runs)
+                    )
+                )
+            )
+            == 0
+        )
+        assert (
+            db.scalar(
+                select(func.count())
+                .select_from(GenerationDispatchOutboxRow)
+                .where(
+                    GenerationDispatchOutboxRow.generation_run_id.in_(
+                        tuple(run.generation_run_id for run in runs)
+                    )
+                )
+            )
+            == 0
+        )
 
 
 def test_stale_running_scan_is_bounded_ordered_and_transition_is_atomic(engine):
@@ -881,6 +1036,54 @@ def test_pre_auth_organization_is_not_claimed(engine):
         UUID("45454545-4545-4545-8545-454545454545"), "Legacy", NOW
     )
     assert repository.list_organization_memberships(organization.organization_id) == ()
+
+
+@pytest.mark.postgres
+def test_postgres_visualization_iteration_flushes_runs_before_dispatch_outboxes():
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL FK ordering coverage")
+    engine = create_database_engine(database_url)
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    try:
+        service = build_service(engine)
+        organization, _, session = create_persisted_session(service)
+        iteration_id = UUID(int=819)
+        compiled, runs = create_prompt_and_iteration_runs(
+            service,
+            organization,
+            session,
+            UUID(int=820),
+            (UUID(int=821), UUID(int=822)),
+        )
+
+        persist_test_visualization_iteration(service, organization, session, iteration_id, runs)
+
+        with create_session_factory(engine)() as db:
+            persisted_runs = tuple(
+                db.scalars(
+                    select(GenerationRunRow).where(GenerationRunRow.iteration_id == iteration_id)
+                )
+            )
+            outbox_run_ids = set(
+                db.scalars(
+                    select(GenerationDispatchOutboxRow.generation_run_id).where(
+                        GenerationDispatchOutboxRow.generation_run_id.in_(
+                            tuple(run.generation_run_id for run in runs)
+                        )
+                    )
+                )
+            )
+        assert len(persisted_runs) == 2
+        assert outbox_run_ids == {run.generation_run_id for run in runs}
+        assert all(row.session_id == session.session_id for row in persisted_runs)
+        assert all(row.prompt_revision_id == runs[0].prompt_revision_id for row in persisted_runs)
+        assert all(row.prompt_content_hash == compiled.content_hash for row in persisted_runs)
+        assert all(row.iteration_id == iteration_id for row in persisted_runs)
+    finally:
+        Base.metadata.drop_all(engine)
+        engine.dispose()
 
 
 @pytest.mark.postgres
