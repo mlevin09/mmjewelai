@@ -224,7 +224,7 @@ resource "google_cloud_run_v2_service" "worker" {
           name = "OPENAI_API_KEY"
           value_source {
             secret_key_ref {
-              secret  = google_secret_manager_secret.openai_api_key[0].secret_id
+              secret  = data.google_secret_manager_secret.openai_api_key[0].secret_id
               version = "latest"
             }
           }

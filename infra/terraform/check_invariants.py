@@ -225,6 +225,31 @@ _require(
     "OpenAI independently optional in preprod",
 )
 _require(
+    preprod_secrets,
+    'data "google_secret_manager_secret" "openai_api_key"',
+    "preprod uses existing OpenAI secret metadata",
+)
+_require(
+    preprod_secrets,
+    'secret_id = "jewelai-${var.deployment_environment}-openai-api-key"',
+    "preprod exact OpenAI secret ID",
+)
+_forbid(
+    preprod_secrets,
+    'resource "google_secret_manager_secret" "openai_api_key"',
+    "preprod Terraform creating OpenAI secret metadata",
+)
+_require(
+    preprod_services,
+    "data.google_secret_manager_secret.openai_api_key[0].secret_id",
+    "preprod worker mounts existing OpenAI secret",
+)
+_require(
+    preprod_iam,
+    "data.google_secret_manager_secret.openai_api_key[0].secret_id",
+    "preprod worker IAM targets existing OpenAI secret",
+)
+_require(
     preprod_identity,
     'resource "google_identity_platform_config" "preprod"',
     "preprod Identity Platform configuration",

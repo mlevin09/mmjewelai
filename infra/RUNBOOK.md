@@ -40,8 +40,9 @@ in `EUROPE-WEST1`.
    profile.
 4. Confirm `jewelai-preprod-google-generative-language-api-key` exists in the preproduction project
    with an enabled version. The workflow references this existing secret; it never creates, reads,
-   prints, or transports the value. OpenAI is optional in preproduction; an empty
-   `OPENAI_ALLOWED_MODELS` omits its secret, IAM, worker environment, and preflight.
+   prints, or transports the value. OpenAI is optional in preproduction; when enabled,
+   `jewelai-preprod-openai-api-key` must likewise exist with an enabled version. An empty
+   `OPENAI_ALLOWED_MODELS` omits its secret lookup, IAM, worker environment, and preflight.
 5. The first platform apply enables Identity Platform email/password authentication, registers the
    Firebase Web application, and authorizes the exact preproduction web domain. Create controlled
    test identities administratively; authentication never creates JewelAI membership or grants

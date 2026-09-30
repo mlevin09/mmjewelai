@@ -12,14 +12,10 @@ resource "google_secret_manager_secret_version" "database_url" {
   secret_data = local.database_url
 }
 
-resource "google_secret_manager_secret" "openai_api_key" {
+data "google_secret_manager_secret" "openai_api_key" {
   count     = local.openai_generation_enabled ? 1 : 0
   project   = var.project_id
   secret_id = "jewelai-${var.deployment_environment}-openai-api-key"
-  replication {
-    auto {}
-  }
-  depends_on = [google_project_service.production]
 }
 
 data "google_secret_manager_secret" "google_generative_language_api_key" {

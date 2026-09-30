@@ -80,7 +80,7 @@ resource "google_secret_manager_secret_iam_member" "database_url" {
 resource "google_secret_manager_secret_iam_member" "openai_key" {
   count     = local.openai_generation_enabled ? 1 : 0
   project   = var.project_id
-  secret_id = google_secret_manager_secret.openai_api_key[0].secret_id
+  secret_id = data.google_secret_manager_secret.openai_api_key[0].secret_id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.runtime["worker"].email}"
 }
