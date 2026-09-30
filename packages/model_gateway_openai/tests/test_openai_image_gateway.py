@@ -1,5 +1,7 @@
 import base64
 import inspect
+import json
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
@@ -173,31 +175,101 @@ def sdk_status_error(error_type, status_code, secret):
 
 
 @pytest.mark.parametrize(
-    "error,expected",
+    "error,expected,classification,status_code",
     [
-        (openai.APITimeoutError(sdk_request()), GatewayTimeoutError),
-        (
-            openai.APIConnectionError(message="provider-secret", request=sdk_request()),
-            GatewayUnavailableError,
-        ),
-        (sdk_status_error(openai.RateLimitError, 429, "provider-secret"), GatewayUnavailableError),
-        (sdk_status_error(openai.BadRequestError, 400, "provider-secret"), ProviderRejectedError),
         (
             sdk_status_error(openai.AuthenticationError, 401, "provider-secret"),
             GatewayUnavailableError,
+            "upstream_auth",
+            401,
         ),
         (
             sdk_status_error(openai.PermissionDeniedError, 403, "provider-secret"),
             GatewayUnavailableError,
+            "upstream_permission",
+            403,
+        ),
+        (
+            sdk_status_error(openai.NotFoundError, 404, "provider-secret"),
+            ProviderRejectedError,
+            "upstream_not_found",
+            404,
+        ),
+        (
+            sdk_status_error(openai.RateLimitError, 429, "provider-secret"),
+            GatewayUnavailableError,
+            "upstream_rate_limited",
+            429,
+        ),
+        (
+            openai.APITimeoutError(sdk_request()),
+            GatewayTimeoutError,
+            "upstream_timeout",
+            None,
+        ),
+        (
+            openai.APIConnectionError(message="provider-secret", request=sdk_request()),
+            GatewayUnavailableError,
+            "upstream_connection",
+            None,
         ),
         (
             sdk_status_error(openai.InternalServerError, 500, "provider-secret"),
             GatewayUnavailableError,
+            "upstream_5xx",
+            500,
+        ),
+        (
+            openai.OpenAIError("provider-secret"),
+            GatewayUnavailableError,
+            "upstream_other",
+            None,
         ),
     ],
 )
-def test_sdk_errors_map_to_safe_gateway_errors(compiled_prompt, error, expected):
-    with pytest.raises(expected) as raised:
+def test_sdk_errors_emit_bounded_diagnostics_and_preserve_gateway_mapping(
+    compiled_prompt,
+    error,
+    expected,
+    classification,
+    status_code,
+):
+    records = []
+
+    class Capture(logging.Handler):
+        def emit(self, record):
+            records.append(record)
+
+    logger = logging.getLogger("jewelai.generation.openai")
+    handler = Capture()
+    original_level = logger.level
+    logger.addHandler(handler)
+    logger.setLevel(logging.INFO)
+    try:
+        with pytest.raises(expected) as raised:
+            adapter_for(FakeClient(error=error)).execute(request_for(compiled_prompt))
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(original_level)
+
+    assert "provider-secret" not in str(raised.value)
+    assert len(records) == 1
+    assert records[0].getMessage() == "openai generation upstream failure"
+    fields = records[0].jewelai_fields
+    assert fields == {
+        "event": "openai_generation_upstream_failure",
+        "generation_run_id": str(RUN_ID),
+        "upstream_classification": classification,
+        **({"upstream_http_status": status_code} if status_code is not None else {}),
+    }
+    serialized = json.dumps(fields)
+    assert "provider-secret" not in serialized
+    assert "prompt" not in serialized
+
+
+def test_bad_request_diagnostic_preserves_provider_rejected_mapping(compiled_prompt):
+    error = sdk_status_error(openai.BadRequestError, 400, "provider-secret")
+    with pytest.raises(ProviderRejectedError) as raised:
         adapter_for(FakeClient(error=error)).execute(request_for(compiled_prompt))
     assert "provider-secret" not in str(raised.value)
 

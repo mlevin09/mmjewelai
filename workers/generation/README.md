@@ -41,7 +41,9 @@ Neither credential enters task data, persistence, logs, or errors, and there is 
 Production emits structured `generation_task_received`, `generation_task_finished`,
 `generation_task_not_claimed`, and `generation_task_failed` JSON events using only the run ID,
 disposition, safe error code, and duration. Provider exception text, prompts, base64, object keys,
-signed URLs, and bytes are excluded. Maintenance commands emit one summary-count event each.
+signed URLs, and bytes are excluded. OpenAI provider failures also emit the run ID, one bounded
+upstream classification, and the numeric HTTP status when available; raw exceptions and provider
+payloads remain excluded. Maintenance commands emit one summary-count event each.
 
 Recovery intentionally lives at the persistence boundary and requires no worker/provider/storage
 composition:

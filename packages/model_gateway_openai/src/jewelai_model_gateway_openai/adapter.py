@@ -2,6 +2,7 @@
 
 import base64
 import binascii
+import logging
 from typing import Any
 
 import openai
@@ -19,6 +20,8 @@ from jewelai_model_gateway import (
 from openai import OpenAI
 
 from .config import OpenAIImageProviderConfig
+
+_LOGGER = logging.getLogger("jewelai.generation.openai")
 
 
 class OpenAIImageGenerationAdapter:
@@ -45,25 +48,41 @@ class OpenAIImageGenerationAdapter:
                 n=request.configuration.output_count,
                 output_format="png",
             )
+        except openai.AuthenticationError as exc:
+            self._log_upstream_failure(request, "upstream_auth", exc)
+            raise GatewayUnavailableError from exc
+        except openai.PermissionDeniedError as exc:
+            self._log_upstream_failure(request, "upstream_permission", exc)
+            raise GatewayUnavailableError from exc
+        except openai.NotFoundError as exc:
+            self._log_upstream_failure(request, "upstream_not_found", exc)
+            raise ProviderRejectedError from exc
+        except openai.RateLimitError as exc:
+            self._log_upstream_failure(request, "upstream_rate_limited", exc)
+            raise GatewayUnavailableError from exc
         except openai.APITimeoutError as exc:
+            self._log_upstream_failure(request, "upstream_timeout", exc)
             raise GatewayTimeoutError from exc
-        except (
-            openai.APIConnectionError,
-            openai.RateLimitError,
-            openai.AuthenticationError,
-            openai.PermissionDeniedError,
-            openai.InternalServerError,
-        ) as exc:
+        except openai.APIConnectionError as exc:
+            self._log_upstream_failure(request, "upstream_connection", exc)
+            raise GatewayUnavailableError from exc
+        except openai.InternalServerError as exc:
+            self._log_upstream_failure(request, "upstream_5xx", exc)
             raise GatewayUnavailableError from exc
         except openai.BadRequestError as exc:
+            self._log_upstream_failure(request, "upstream_other", exc)
             raise ProviderRejectedError from exc
         except openai.APIStatusError as exc:
+            classification = "upstream_5xx" if exc.status_code >= 500 else "upstream_other"
+            self._log_upstream_failure(request, classification, exc)
             if 400 <= exc.status_code < 500:
                 raise ProviderRejectedError from exc
             raise GatewayUnavailableError from exc
         except openai.OpenAIError as exc:
+            self._log_upstream_failure(request, "upstream_other", exc)
             raise GatewayUnavailableError from exc
         except Exception as exc:
+            self._log_upstream_failure(request, "upstream_other", exc)
             raise GatewayUnavailableError from exc
 
         try:
@@ -72,6 +91,25 @@ class OpenAIImageGenerationAdapter:
             raise
         except Exception as exc:
             raise InvalidProviderResponseError from exc
+
+    @staticmethod
+    def _log_upstream_failure(
+        request: GenerationRequest,
+        classification: str,
+        error: Exception,
+    ) -> None:
+        status_code = getattr(error, "status_code", None)
+        fields = {
+            "event": "openai_generation_upstream_failure",
+            "generation_run_id": str(request.generation_run_id),
+            "upstream_classification": classification,
+        }
+        if isinstance(status_code, int):
+            fields["upstream_http_status"] = status_code
+        _LOGGER.info(
+            "openai generation upstream failure",
+            extra={"jewelai_fields": fields},
+        )
 
     def _validate_request(self, request: GenerationRequest) -> None:
         if request.provider != "openai":
