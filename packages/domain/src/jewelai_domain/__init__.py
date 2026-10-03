@@ -9,6 +9,17 @@ from .dictionary import (
     UnsupportedMatch,
     load_domain_dictionary,
 )
+from .knowledge_library import (
+    KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
+    KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
+    CompiledKnowledgeLibrary,
+    CompilationManifest,
+    KnowledgeLibraryRegistry,
+    KnowledgeLibraryValidationError,
+    compile_knowledge_library,
+    load_knowledge_library,
+    validate_knowledge_library,
+)
 from .models import SCHEMA_VERSION, Design, DesignRevision
 from .questions import (
     QUESTION_SCHEMA_VERSION,
@@ -47,6 +58,8 @@ from .rules import (
 
 __all__ = [
     "DICTIONARY_SCHEMA_VERSION",
+    "KNOWLEDGE_LIBRARY_CONTRACT_VERSION",
+    "KNOWLEDGE_LIBRARY_SCHEMA_VERSION",
     "QUESTION_SCHEMA_VERSION",
     "RULES_SCHEMA_VERSION",
     "SCHEMA_VERSION",
@@ -62,6 +75,10 @@ __all__ = [
     "DeriveDecision",
     "Gap",
     "GapState",
+    "CompiledKnowledgeLibrary",
+    "CompilationManifest",
+    "KnowledgeLibraryRegistry",
+    "KnowledgeLibraryValidationError",
     "ProposedDomainUpdate",
     "QuestionCatalog",
     "QuestionId",
@@ -79,13 +96,16 @@ __all__ = [
     "UnknownRoleError",
     "UnsupportedLocaleError",
     "UnsupportedMatch",
+    "compile_knowledge_library",
     "confirm_field",
     "analyze_gaps",
     "lock_field",
     "load_domain_dictionary",
+    "load_knowledge_library",
     "load_question_catalog",
     "load_rules",
     "load_role_profiles",
     "revise_design",
     "unlock_field",
+    "validate_knowledge_library",
 ]
