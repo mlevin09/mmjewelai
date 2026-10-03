@@ -118,9 +118,7 @@ class KnowledgeArtifactStore:
             return self.load(validated.package_id, version)
 
         release_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = Path(
-            tempfile.mkdtemp(prefix=f".{version}-", dir=str(release_path.parent))
-        )
+        temporary = Path(tempfile.mkdtemp(prefix=f".{version}-", dir=str(release_path.parent)))
         try:
             for name, payload in payloads.items():
                 (temporary / name).write_text(payload, encoding="utf-8")
