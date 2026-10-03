@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
 
@@ -10,7 +12,12 @@ from jewelai_domain.knowledge_policy import (
     RuntimeProvenance,
     RuntimeSemanticState,
     RuntimeStateProposal,
+    build_knowledge_runtime_state,
 )
+from jewelai_domain.models import DesignRevision
+
+ROOT = Path(__file__).resolve().parents[3]
+RING = ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json"
 
 
 def runtime():
@@ -86,6 +93,27 @@ def proposal(
         value=value,
         source_id="POLICY-EVAL-1",
         preservation=preservation,
+    )
+
+
+def test_design_revision_projects_to_stable_runtime_state():
+    revision = DesignRevision.model_validate_json(RING.read_text())
+    projected = build_knowledge_runtime_state(runtime(), revision)
+
+    assert projected.existing_group_ids == ("accents",)
+    assert projected.get("center_stone.shape") == RuntimeParameterState(
+        target="center_stone.shape",
+        semantic_state=RuntimeSemanticState.EXPLICIT,
+        provenance=RuntimeProvenance.USER_CONFIRMED,
+        value="oval",
+        confirmed=True,
+        source_ids=("example-request",),
+    )
+    assert projected.get("metal.color").locked is True
+    assert projected.get("center_stone.dimensions").semantic_state == RuntimeSemanticState.MISSING
+    assert projected.get("side_stones.accents.stones.shape").value == "pear"
+    assert tuple(item.target for item in projected.parameters) == tuple(
+        sorted(item.target for item in projected.parameters)
     )
 
 
