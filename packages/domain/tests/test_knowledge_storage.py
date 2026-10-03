@@ -44,9 +44,7 @@ def test_publish_rejects_same_identity_with_different_content(tmp_path):
 def test_load_fails_closed_after_tampering(tmp_path):
     store = KnowledgeArtifactStore(tmp_path)
     stored = store.publish(bundle())
-    source_path = (
-        tmp_path / stored.package_id / stored.artifact_version / "source.json"
-    )
+    source_path = tmp_path / stored.package_id / stored.artifact_version / "source.json"
     source = json.loads(source_path.read_text(encoding="utf-8"))
     source["claims"][0]["statement"] = "Tampered"
     source_path.write_text(json.dumps(source), encoding="utf-8")
