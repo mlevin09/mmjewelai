@@ -29,7 +29,6 @@ on:
       - specs/generation-queue/**
       - tests/test_openai_generation_pipeline.py
       - tests/test_knowledge_library_behavioral_regression.py
-      - tests/test_knowledge_library_behavioral_regression.py
       - data/prompts/**
       - data/roles/**
       - data/dictionary/**
@@ -66,6 +65,7 @@ on:
       - specs/asset-access/**
       - specs/generation-queue/**
       - tests/test_openai_generation_pipeline.py
+      - tests/test_knowledge_library_behavioral_regression.py
       - data/prompts/**
       - data/roles/**
       - data/dictionary/**
