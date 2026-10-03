@@ -169,7 +169,7 @@ def test_existing_side_group_is_addressable_but_unknown_group_fails_closed(
             EnrichmentProposal(
                 target="side_stones.accents.stones.shape",
                 semantic_state=RuntimeSemanticState.NORMALIZED,
-                provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+                provenance=RuntimeProvenance.USER_CONFIRMED,
                 value="marquise",
                 source_id="ENRICH-SIDE",
             ),
