@@ -10,6 +10,7 @@ from jewelai_domain import (
     promote_knowledge_runtime,
 )
 from jewelai_domain.knowledge_activation import ValidationOutcome
+from jewelai_domain.knowledge_activation import ValidationOutcome
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import DesignRevision
 from jewelai_parser import KnowledgeLibraryMatcher, ResolvedKnowledgeMatch
