@@ -432,7 +432,8 @@ class KnowledgeLibraryRegistry:
                 missing = [
                     ref
                     for ref in policy.source_refs
-                    if ref not in sources or sources[ref].source_type != SourceType.INTERNAL_DECISION
+                    if ref not in sources
+                    or sources[ref].source_type != SourceType.INTERNAL_DECISION
                 ]
             if missing:
                 raise KnowledgeLibraryValidationError(
