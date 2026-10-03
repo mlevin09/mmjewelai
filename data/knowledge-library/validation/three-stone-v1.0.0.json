@@ -1,0 +1,55 @@
+{
+  "fixture_id": "jewelai.knowledge_library.vertical_slice.three_stone",
+  "version": "1.0.0",
+  "contract_version": "1.0.0",
+  "status": "REVIEWED",
+  "purpose": "Second vertical-slice validation of frozen Knowledge Library collection semantics.",
+  "design": {
+    "jewelry_type": "ring",
+    "style": "three-stone",
+    "center_stone": {
+      "role": "center",
+      "shape": "oval"
+    },
+    "side_stones": [
+      {
+        "group_id": "flankers",
+        "quantity": {
+          "value": 1,
+          "scope": "per_side"
+        },
+        "stones": {
+          "material": "diamond",
+          "shape": "pear"
+        }
+      }
+    ]
+  },
+  "required_targets": [
+    "center_stone.shape",
+    "side_stones.flankers.stones.material",
+    "side_stones.flankers.stones.shape",
+    "side_stones.flankers.quantity"
+  ],
+  "required_collection_templates": [
+    "side_stones.{group_id}.stones.material",
+    "side_stones.{group_id}.stones.shape",
+    "side_stones.{group_id}.stones.cut",
+    "side_stones.{group_id}.stones.weight",
+    "side_stones.{group_id}.stones.dimensions",
+    "side_stones.{group_id}.stones.color",
+    "side_stones.{group_id}.stones.setting",
+    "side_stones.{group_id}.stones.orientation",
+    "side_stones.{group_id}.quantity"
+  ],
+  "invariants": [
+    "stable_group_id_not_array_index",
+    "known_group_policy_binding",
+    "unknown_group_fail_closed",
+    "lower_precedence_cannot_overwrite_explicit",
+    "locked_state_cannot_be_overwritten",
+    "runtime_and_enrichment_deterministic",
+    "compiled_runtime_not_implicitly_active"
+  ],
+  "architecture_change_required": false
+}
