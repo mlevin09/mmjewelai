@@ -62,7 +62,9 @@ class KnowledgeArtifactStore:
         try:
             release_path.resolve().relative_to(root)
         except ValueError as exc:
-            raise KnowledgeArtifactStorageError(\n                "knowledge artifact path escapes storage root"\n            ) from exc
+            raise KnowledgeArtifactStorageError(
+                "knowledge artifact path escapes storage root"
+            ) from exc
         return release_path
 
     @staticmethod
