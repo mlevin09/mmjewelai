@@ -180,7 +180,7 @@ class KnowledgeArtifactStore:
             package_id=package_id,
             artifact_version=artifact_version,
             source_sha256=expected_checksums["source_sha256"],
-            runtime_sha256=runtime.sha256 if (runtime := stored_runtime) else "",
+            runtime_sha256=stored_runtime.sha256,
             manifest_sha256=expected_checksums["manifest_sha256"],
             release_path=str(release_path),
         )
