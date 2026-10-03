@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -53,7 +54,7 @@ class KnowledgeArtifactStore:
     def _release_path(self, package_id: str, artifact_version: str) -> Path:
         if re.fullmatch(r"[a-z][a-z0-9_.-]+", package_id) is None:
             raise KnowledgeArtifactStorageError("unsafe knowledge package_id")
-        if re.fullmatch(r"[0-9]+\\.[0-9]+\\.[0-9]+", artifact_version) is None:
+        if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", artifact_version) is None:
             raise KnowledgeArtifactStorageError("unsafe knowledge artifact_version")
 
         root = self.root.resolve()
