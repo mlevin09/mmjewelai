@@ -153,7 +153,8 @@ def enrich_prompt(
                 preservation=proposal.preservation,
             ),
         )
-        current[proposal.target] = evaluation.result
+        if evaluation.outcome == "APPLIED":
+            current[proposal.target] = evaluation.result
         decisions.append(
             EnrichmentDecision(
                 target=proposal.target,
