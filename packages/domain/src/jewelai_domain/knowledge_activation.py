@@ -38,7 +38,7 @@ class ProductionValidationCheckId(StrEnum):
     PROVENANCE_INTEGRITY = "provenance_integrity"
     LANGUAGE_MATCHER = "language_matcher"
     RUNTIME_POLICY = "runtime_policy"
-    PROMPT_ENRICHMENT = "prompt_enrichment"
+    PROMPT_ENRICHMENT = "prompt_enrichment_integration"
     BEHAVIORAL_REGRESSION = "behavioral_regression"
 
 
@@ -80,8 +80,10 @@ class ProductionValidationReport(ImmutableModel):
         return ProductionValidationStatus.ELIGIBLE
 
     def canonical_json(self) -> str:
+        payload = self.model_dump(mode="json")
+        payload["checks"] = sorted(payload["checks"], key=lambda check: check["name"])
         return json.dumps(
-            self.model_dump(mode="json"),
+            payload,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
