@@ -29,11 +29,6 @@ from .knowledge_library import (
     load_knowledge_library,
     validate_knowledge_library,
 )
-from .knowledge_storage import (
-    KnowledgeArtifactStorageError,
-    KnowledgeArtifactStore,
-    StoredKnowledgeArtifact,
-)
 from .knowledge_policy import (
     KnowledgePolicyEngine,
     KnowledgeRuntimeState,
@@ -44,6 +39,11 @@ from .knowledge_policy import (
     RuntimeSemanticState,
     RuntimeStateProposal,
     build_knowledge_runtime_state,
+)
+from .knowledge_storage import (
+    KnowledgeArtifactStorageError,
+    KnowledgeArtifactStore,
+    StoredKnowledgeArtifact,
 )
 from .models import SCHEMA_VERSION, Design, DesignRevision
 from .questions import (
