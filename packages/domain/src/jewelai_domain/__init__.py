@@ -40,6 +40,11 @@ from .knowledge_policy import (
     RuntimeStateProposal,
     build_knowledge_runtime_state,
 )
+from .knowledge_storage import (
+    KnowledgeArtifactStorageError,
+    KnowledgeArtifactStore,
+    StoredKnowledgeArtifact,
+)
 from .models import SCHEMA_VERSION, Design, DesignRevision
 from .questions import (
     QUESTION_SCHEMA_VERSION,
@@ -102,6 +107,9 @@ __all__ = [
     "KnowledgeActivationError",
     "KnowledgeLibraryRegistry",
     "KnowledgeLibraryValidationError",
+    "KnowledgeArtifactStorageError",
+    "KnowledgeArtifactStore",
+    "StoredKnowledgeArtifact",
     "KnowledgePolicyEngine",
     "KnowledgeRuntimeState",
     "PolicyEvaluation",

@@ -31,5 +31,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0026 — Iterative editing and Current Visual lineage](0026-iterative-editing-current-visual-lineage.md)
 - [0027 — Knowledge Library Contract v1](0027-knowledge-library-contract-v1.md)
 - [0028 — Knowledge Library production validation and ACTIVE promotion gate](0028-knowledge-library-production-validation-active-gate.md)
+- [0029 — Knowledge Library durable artifact storage and external mirrors](0029-knowledge-library-durable-storage-external-mirrors.md)
 
 Template: status/date, context, decision, alternatives, consequences, validation.
