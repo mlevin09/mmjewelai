@@ -1,0 +1,108 @@
+{
+  "contract_version": "1.0.0",
+  "package_id": "jewelai.vertical_slice.three_stone",
+  "artifact_version": "1.0.0",
+  "sources": [
+    {
+      "source_id": "SRC-THREE-STONE-ARCH",
+      "title": "JewelAI three-stone architecture validation decision",
+      "source_type": "INTERNAL_DECISION",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-THREE-STONE-SCHEMA",
+      "title": "Jewelry Design Schema v1 side-stone collection contract",
+      "source_type": "INTERNAL_DECISION",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-THREE-STONE-001",
+      "statement": "The three-stone validation slice uses one center-stone role plus one stable side-stone group.",
+      "source_id": "SRC-THREE-STONE-ARCH",
+      "evidence_strength": "HIGH",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-THREE-STONE-002",
+      "statement": "Repeated side-stone parameters bind by stable group_id rather than array index.",
+      "source_id": "SRC-THREE-STONE-SCHEMA",
+      "evidence_strength": "HIGH",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "domain_knowledge": [
+    {
+      "concept_id": "design.ring.three_stone",
+      "kind": "design_style",
+      "claim_ids": [
+        "CLM-THREE-STONE-001"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone.role.side_group",
+      "kind": "stone_role",
+      "claim_ids": [
+        "CLM-THREE-STONE-001",
+        "CLM-THREE-STONE-002"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "language_mappings": [
+    {
+      "mapping_id": "LANG-THREE-STONE-EN",
+      "concept_id": "design.ring.three_stone",
+      "locale": "en",
+      "canonical_term": "three-stone ring",
+      "aliases": [
+        "three stone ring"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-THREE-STONE-RU",
+      "concept_id": "design.ring.three_stone",
+      "locale": "ru",
+      "canonical_term": "кольцо с тремя камнями",
+      "aliases": [
+        "кольцо с 3 камнями"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "POL-THREE-STONE-SIDE-SHAPE",
+      "target": "side_stones.{group_id}.stones.shape",
+      "effect": "Bind side-stone shape only to an existing stable group_id.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "SRC-THREE-STONE-ARCH",
+        "SRC-THREE-STONE-SCHEMA"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-THREE-STONE-SIDE-QUANTITY",
+      "target": "side_stones.{group_id}.quantity",
+      "effect": "Bind side-stone quantity only to an existing stable group_id.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "SRC-THREE-STONE-ARCH",
+        "SRC-THREE-STONE-SCHEMA"
+      ],
+      "lifecycle_status": "REVIEWED"
+    }
+  ]
+}
