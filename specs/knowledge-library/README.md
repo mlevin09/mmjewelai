@@ -2,6 +2,8 @@
 
 Status: **FROZEN architecture contract**.  
 Architecture confirmation: **CONFIRMED_WITH_DEFERRALS**.  
+
+**Architecture Confirmed != Production ACTIVE.**
 Production activation: **false**.
 
 This contract freezes the JewelAI Knowledge Library boundary validated through the solitaire vertical
