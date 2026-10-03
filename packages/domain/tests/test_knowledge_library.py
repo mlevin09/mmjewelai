@@ -178,16 +178,19 @@ def test_compiler_sorts_semantically_unordered_inputs():
             lambda data: data["policies"][0].update(target="center_stone.prong_count"),
             "unavailable Design Schema",
         ),
-        (
-            lambda data: data["policies"][1].update(target="side_stones.0.stones.shape"),
-            "unavailable Design Schema",
-        ),
     ],
 )
 def test_validator_fails_closed_on_broken_references_and_targets(mutate, match):
     data = bundle()
     mutate(data)
     with pytest.raises(KnowledgeLibraryValidationError, match=match):
+        validate_knowledge_library(data)
+
+
+def test_validator_rejects_array_index_collection_target():
+    data = bundle()
+    data["policies"][1]["target"] = "side_stones.0.stones.shape"
+    with pytest.raises(ValidationError, match="String should match pattern"):
         validate_knowledge_library(data)
 
 
