@@ -7,9 +7,11 @@ Architecture confirmation: **CONFIRMED_WITH_DEFERRALS**.
 Production activation: **false**.
 
 This contract freezes the JewelAI Knowledge Library boundary validated through the solitaire vertical
-slice and the three-stone architecture stress test. It is the implementation target for the production
-compiler and validator. It does not publish a production knowledge catalog and does not promote any
-record or rule to ACTIVE.
+slice and the three-stone architecture stress test. Steps 9-15 implement the compiler/validator,
+parser/matcher with bounded RU morphology, runtime policy state, Prompt Enrichment integration,
+behavioral regression, production-validation/ACTIVE gate, and immutable durable artifact storage
+against this frozen contract. It does not publish a production knowledge catalog and does not promote
+any record or rule to ACTIVE.
 
 ## Canonical chain
 
@@ -80,7 +82,7 @@ Mapping quality uses one of:
 - `NO_DIRECT_EQUIVALENT`
 
 An AMBIGUOUS surface form cannot simultaneously be an unconditional DIRECT normalization for the
-same locale and scope. The compiler must reject exact direct/ambiguity collisions.
+same locale and scope. The compiler must reject DIRECT/AMBIGUOUS collisions regardless of mapping quality.
 
 ## Product-state semantics
 
@@ -153,7 +155,7 @@ Compilation fails closed on:
 - Language mappings pointing to unknown concepts;
 - policy targets outside the allowed target grammar or unavailable schema scope;
 - unexpected DRAFT promotion;
-- exact DIRECT/AMBIGUOUS collisions;
+- DIRECT/AMBIGUOUS collisions;
 - duplicate semantic IDs or conflicting same-scope aliases;
 - rules without valid source/provenance;
 - schema-version mismatch.
@@ -190,9 +192,11 @@ The following do not block Contract v1.0.0:
 3. Corroborative-only evidence must be represented explicitly (for example with
    `supporting_source_ids`) rather than masquerading as an unused primary source.
 
-Production parser/matcher, RU morphology and phrase boundaries, production ambiguity/context
-resolution, Matrix Engine integration, and production behavioral regression remain implementation
-work. Contract freeze does not claim those capabilities exist.
+The parser/matcher, bounded RU morphology, ambiguity/context handling, Prompt Enrichment integration,
+behavioral regression, production-validation gate, and durable artifact storage are now implemented.
+Remaining work is production catalog curation, application-runtime selection of an approved ACTIVE
+release, generalized repeated-field targeting from deferral AC-DEF-001, and preproduction/live
+verification. The frozen contract itself does not claim that a production catalog is ACTIVE.
 
 ## Versioning
 
