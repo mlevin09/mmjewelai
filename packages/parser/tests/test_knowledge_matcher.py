@@ -101,9 +101,7 @@ def runtime():
 
 def test_normalization_and_ru_morphology_are_deterministic():
     assert normalize_knowledge_text("  ОВАЛЬНАЯ   ") == "овальная"
-    assert ru_morphology_key("крапановой закрепки") == ru_morphology_key(
-        "крапановая закрепка"
-    )
+    assert ru_morphology_key("крапановой закрепки") == ru_morphology_key("крапановая закрепка")
 
 
 def test_exact_direct_match_resolves():
