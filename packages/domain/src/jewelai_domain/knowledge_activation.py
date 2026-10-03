@@ -142,7 +142,7 @@ def validate_for_production(
             + ", ".join(identity_mismatches)
         )
 
-    checks = {check.check_id: check for check in report.checks}
+    checks = {check.name: check for check in report.checks}
     missing = sorted(check.value for check in _REQUIRED_PRODUCTION_CHECKS - checks.keys())
     if missing:
         raise KnowledgeActivationError(
@@ -150,7 +150,7 @@ def validate_for_production(
         )
 
     non_pass = sorted(
-        (check.check_id.value, check.outcome.value)
+        (check.name.value, check.outcome.value)
         for check in report.checks
         if check.outcome != ValidationOutcome.PASS
     )
