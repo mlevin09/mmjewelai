@@ -3,10 +3,18 @@
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, Field, StrictBool, model_validator
+from pydantic import BaseModel, StrictBool, model_validator
 
 from .knowledge_library import CompiledKnowledgeLibrary, CompiledPolicy, PolicyTarget
-from .models import Assumed, Derived, DesignRevision, Explicit, ImmutableModel, NotApplicable, Unknown
+from .models import (
+    Assumed,
+    Derived,
+    DesignRevision,
+    Explicit,
+    ImmutableModel,
+    NotApplicable,
+    Unknown,
+)
 
 
 class RuntimeSemanticState(StrEnum):
@@ -108,8 +116,6 @@ class RuntimeStateProposal(ImmutableModel):
             RuntimeSemanticState.NOT_APPLICABLE,
         } and self.value is not None:
             raise ValueError(f"{self.semantic_state.value} proposal cannot carry a value")
-        if self.preservation == PreservationIntent.LOCKED:
-            raise ValueError("LOCKED preservation describes current state, not a proposal")
         return self
 
 
@@ -120,7 +126,9 @@ class PolicyEvaluation(ImmutableModel):
         "preserve_keep",
         "lower_precedence",
         "locked",
+        "preserve_locked",
         "unknown_collection_group",
+        "unknown_target",
     ]
     target: PolicyTarget
     current: RuntimeParameterState
@@ -170,19 +178,33 @@ def _from_design_state(target: str, state: object | None) -> RuntimeParameterSta
     if isinstance(state, Derived):
         return RuntimeParameterState(
             target=target,
-            semantic_state=RuntimeSemanticState.RECOMMENDED,
-            provenance=RuntimeProvenance.KNOWLEDGE_INFERRED,
+            semantic_state=(
+                RuntimeSemanticState.ACCEPTED
+                if state.confirmed
+                else RuntimeSemanticState.RECOMMENDED
+            ),
+            provenance=(
+                RuntimeProvenance.USER_ACCEPTED_RECOMMENDATION
+                if state.confirmed
+                else RuntimeProvenance.KNOWLEDGE_INFERRED
+            ),
             value=_runtime_value(state.value),
             confirmed=state.confirmed,
             locked=state.locked,
-            source_ids=tuple(source.record_id if hasattr(source, "record_id") else source.rule_id
-                             for source in state.sources),
+            source_ids=tuple(
+                source.record_id if hasattr(source, "record_id") else source.rule_id
+                for source in state.sources
+            ),
         )
     if isinstance(state, Assumed):
         return RuntimeParameterState(
             target=target,
             semantic_state=RuntimeSemanticState.ASSUMED,
-            provenance=RuntimeProvenance.VISUALIZATION_ASSUMPTION,
+            provenance=(
+                RuntimeProvenance.USER_CONFIRMED
+                if state.confirmed
+                else RuntimeProvenance.VISUALIZATION_ASSUMPTION
+            ),
             value=_runtime_value(state.value),
             confirmed=state.confirmed,
             locked=state.locked,
@@ -307,11 +329,27 @@ class KnowledgePolicyEngine:
     ) -> PolicyEvaluation:
         state = KnowledgeRuntimeState.model_validate(state)
         proposal = RuntimeStateProposal.model_validate(proposal)
+        if (
+            state.package_id != self.runtime.package_id
+            or state.artifact_version != self.runtime.artifact_version
+            or state.runtime_sha256 != self.runtime.sha256
+        ):
+            raise ValueError("runtime state does not match the policy engine runtime")
+
         current = state.get(proposal.target)
         if current is None:
             current = RuntimeParameterState(
                 target=proposal.target,
                 semantic_state=RuntimeSemanticState.MISSING,
+            )
+            return PolicyEvaluation(
+                outcome="BLOCKED",
+                reason="unknown_target",
+                target=proposal.target,
+                current=current,
+                proposed=proposal,
+                result=current,
+                applicable_policy_ids=(),
             )
 
         policies = self.policies_for(
@@ -338,6 +376,16 @@ class KnowledgePolicyEngine:
             return PolicyEvaluation(
                 outcome="BLOCKED",
                 reason="locked",
+                target=proposal.target,
+                current=current,
+                proposed=proposal,
+                result=current,
+                applicable_policy_ids=policy_ids,
+            )
+        if proposal.preservation == PreservationIntent.LOCKED:
+            return PolicyEvaluation(
+                outcome="BLOCKED",
+                reason="preserve_locked",
                 target=proposal.target,
                 current=current,
                 proposed=proposal,
@@ -379,7 +427,7 @@ class KnowledgePolicyEngine:
             value=proposal.value,
             confirmed=proposal.provenance == RuntimeProvenance.USER_CONFIRMED,
             locked=False,
-            source_ids=(proposal.source_id, *policy_ids),
+            source_ids=(proposal.source_id,),
         )
         return PolicyEvaluation(
             outcome="APPLIED",
