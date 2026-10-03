@@ -192,3 +192,32 @@ def test_existing_side_group_is_addressable_but_unknown_group_fails_closed(
     )
     assert unknown.decisions[0].outcome == "BLOCKED"
     assert unknown.decisions[0].reason == "unknown_target"
+
+
+def test_blocked_unknown_target_does_not_pollute_final_matrix(ring, templates, runtime):
+    result = enrich_prompt(
+        ring,
+        templates,
+        runtime,
+        proposals=(
+            EnrichmentProposal(
+                target="construction.gallery",
+                semantic_state=RuntimeSemanticState.RECOMMENDED,
+                provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+                value="basket",
+                source_id="ENRICH-UNKNOWN-SCALAR",
+            ),
+            EnrichmentProposal(
+                target="side_stones.unknown.stones.shape",
+                semantic_state=RuntimeSemanticState.NORMALIZED,
+                provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+                value="marquise",
+                source_id="ENRICH-UNKNOWN-GROUP",
+            ),
+        ),
+    )
+
+    assert {decision.outcome for decision in result.decisions} == {"BLOCKED"}
+    final_targets = {cell.target for cell in result.final_matrix}
+    assert "construction.gallery" in final_targets
+    assert "side_stones.unknown.stones.shape" not in final_targets
