@@ -1,0 +1,111 @@
+{
+  "contract_version": "1.0.0",
+  "package_id": "jewelai.knowledge.three_stone.validation",
+  "artifact_version": "1.0.0",
+  "sources": [
+    {
+      "source_id": "SRC-THREE-STONE-STRUCTURE",
+      "title": "JewelAI Jewelry Design Schema structural contract",
+      "source_type": "INTERNAL_DECISION",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "DEC-THREE-STONE-POLICY",
+      "title": "JewelAI three-stone validation policy",
+      "source_type": "INTERNAL_DECISION",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "claims": [],
+  "domain_knowledge": [
+    {
+      "concept_id": "structure.center_stone",
+      "kind": "structural_role",
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "structure.side_stone_group",
+      "kind": "structural_role",
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "language_mappings": [
+    {
+      "mapping_id": "LANG-EN-CENTER-STONE",
+      "concept_id": "structure.center_stone",
+      "locale": "en",
+      "canonical_term": "center stone",
+      "aliases": ["centre stone"],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "EXACT",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CENTER-STONE",
+      "concept_id": "structure.center_stone",
+      "locale": "ru",
+      "canonical_term": "центральный камень",
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SIDE-STONES",
+      "concept_id": "structure.side_stone_group",
+      "locale": "en",
+      "canonical_term": "side stones",
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "EXACT",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SIDE-STONES",
+      "concept_id": "structure.side_stone_group",
+      "locale": "ru",
+      "canonical_term": "боковые камни",
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "POL-THREE-STONE-GROUP-MATERIAL",
+      "target": "side_stones.{group_id}.stones.material",
+      "effect": "Bind material only to an existing stable side-stone group.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": ["DEC-THREE-STONE-POLICY"],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-THREE-STONE-GROUP-SHAPE",
+      "target": "side_stones.{group_id}.stones.shape",
+      "effect": "Bind shape only to an existing stable side-stone group.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": ["DEC-THREE-STONE-POLICY"],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-THREE-STONE-GROUP-SETTING",
+      "target": "side_stones.{group_id}.stones.setting",
+      "effect": "Bind setting only to an existing stable side-stone group.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": ["DEC-THREE-STONE-POLICY"],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-THREE-STONE-GROUP-QUANTITY",
+      "target": "side_stones.{group_id}.quantity",
+      "effect": "Bind quantity only to an existing stable side-stone group.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": ["DEC-THREE-STONE-POLICY"],
+      "lifecycle_status": "REVIEWED"
+    }
+  ]
+}
