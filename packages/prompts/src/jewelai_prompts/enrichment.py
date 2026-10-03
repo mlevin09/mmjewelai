@@ -83,7 +83,7 @@ def _cell(
         target=state.target,
         semantic_state=state.semantic_state,
         provenance=state.provenance,
-        value=state.value,
+        value=state.model_dump(mode="json")["value"],
         confirmed=state.confirmed,
         locked=state.locked,
         source_ids=state.source_ids,
