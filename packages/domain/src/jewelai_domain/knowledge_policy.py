@@ -65,10 +65,14 @@ class RuntimeParameterState(ImmutableModel):
                 raise ValueError("MISSING runtime state cannot carry value or provenance")
         elif self.provenance is None:
             raise ValueError("non-MISSING runtime state requires provenance")
-        if self.semantic_state in {
-            RuntimeSemanticState.AMBIGUOUS,
-            RuntimeSemanticState.NOT_APPLICABLE,
-        } and self.value is not None:
+        if (
+            self.semantic_state
+            in {
+                RuntimeSemanticState.AMBIGUOUS,
+                RuntimeSemanticState.NOT_APPLICABLE,
+            }
+            and self.value is not None
+        ):
             raise ValueError(f"{self.semantic_state.value} runtime state cannot carry a value")
         if len(set(self.source_ids)) != len(self.source_ids):
             raise ValueError("runtime source_ids must be unique")
@@ -111,10 +115,14 @@ class RuntimeStateProposal(ImmutableModel):
     def validate_proposal(self):
         if self.semantic_state == RuntimeSemanticState.MISSING:
             raise ValueError("MISSING is an observed state, not an update proposal")
-        if self.semantic_state in {
-            RuntimeSemanticState.AMBIGUOUS,
-            RuntimeSemanticState.NOT_APPLICABLE,
-        } and self.value is not None:
+        if (
+            self.semantic_state
+            in {
+                RuntimeSemanticState.AMBIGUOUS,
+                RuntimeSemanticState.NOT_APPLICABLE,
+            }
+            and self.value is not None
+        ):
             raise ValueError(f"{self.semantic_state.value} proposal cannot carry a value")
         return self
 
