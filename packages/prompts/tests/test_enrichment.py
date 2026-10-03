@@ -178,18 +178,19 @@ def test_existing_side_group_is_addressable_but_unknown_group_fails_closed(
     assert valid.decisions[0].outcome == "APPLIED"
     assert valid.decisions[0].applicable_policy_ids == ("POL-SIDE-SHAPE",)
 
-    with pytest.raises(ValueError, match="unknown_target"):
-        enrich_prompt(
-            ring,
-            templates,
-            runtime,
-            proposals=(
-                EnrichmentProposal(
-                    target="side_stones.unknown.stones.shape",
-                    semantic_state=RuntimeSemanticState.NORMALIZED,
-                    provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
-                    value="marquise",
-                    source_id="ENRICH-UNKNOWN",
-                ),
+    unknown = enrich_prompt(
+        ring,
+        templates,
+        runtime,
+        proposals=(
+            EnrichmentProposal(
+                target="side_stones.unknown.stones.shape",
+                semantic_state=RuntimeSemanticState.NORMALIZED,
+                provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+                value="marquise",
+                source_id="ENRICH-UNKNOWN",
             ),
-        )
+        ),
+    )
+    assert unknown.decisions[0].outcome == "BLOCKED"
+    assert unknown.decisions[0].reason == "unknown_target"
