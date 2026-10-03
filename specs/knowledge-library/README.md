@@ -31,6 +31,18 @@ The layers have separate responsibilities:
 
 Provider-specific prompt syntax is outside this contract.
 
+## Production ACTIVE promotion gate
+
+Contract v1.0.0 still forbids compiler-driven ACTIVE promotion. Production release is implemented as
+a separate fail-closed gate: an exact compiled runtime may receive an immutable ACTIVE release
+envelope only after all required production-validation categories PASS. EXPECTED_GAP, FAIL, a
+missing check, or package/version/runtime-hash mismatch blocks promotion.
+
+The gate does not mutate the compiled runtime or claim that a catalog is active. The release envelope
+binds the exact runtime SHA-256 to the deterministic validation-report SHA-256. See
+[ADR 0028](../../docs/adr/0028-knowledge-library-production-validation-active-gate.md).
+
+
 ## Stable IDs and references
 
 Canonical concept IDs are language-neutral and stable. Display wording is never an identifier.

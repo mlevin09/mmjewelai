@@ -9,6 +9,15 @@ from .dictionary import (
     UnsupportedMatch,
     load_domain_dictionary,
 )
+from .knowledge_activation import (
+    REQUIRED_PRODUCTION_VALIDATION_CHECKS,
+    ActiveKnowledgeRuntime,
+    KnowledgeActivationError,
+    ProductionValidationCheck,
+    ProductionValidationReport,
+    ProductionValidationStatus,
+    promote_knowledge_runtime,
+)
 from .knowledge_library import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
     KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
@@ -69,11 +78,13 @@ from .rules import (
 
 __all__ = [
     "DICTIONARY_SCHEMA_VERSION",
+    "REQUIRED_PRODUCTION_VALIDATION_CHECKS",
     "KNOWLEDGE_LIBRARY_CONTRACT_VERSION",
     "KNOWLEDGE_LIBRARY_SCHEMA_VERSION",
     "QUESTION_SCHEMA_VERSION",
     "RULES_SCHEMA_VERSION",
     "SCHEMA_VERSION",
+    "ActiveKnowledgeRuntime",
     "AmbiguousMatch",
     "AskDecision",
     "AssumeDecision",
@@ -88,6 +99,7 @@ __all__ = [
     "GapState",
     "CompiledKnowledgeLibrary",
     "CompilationManifest",
+    "KnowledgeActivationError",
     "KnowledgeLibraryRegistry",
     "KnowledgeLibraryValidationError",
     "KnowledgePolicyEngine",
@@ -98,6 +110,9 @@ __all__ = [
     "RuntimeProvenance",
     "RuntimeSemanticState",
     "RuntimeStateProposal",
+    "ProductionValidationCheck",
+    "ProductionValidationReport",
+    "ProductionValidationStatus",
     "ProposedDomainUpdate",
     "QuestionCatalog",
     "QuestionId",
@@ -125,6 +140,7 @@ __all__ = [
     "load_question_catalog",
     "load_rules",
     "load_role_profiles",
+    "promote_knowledge_runtime",
     "revise_design",
     "unlock_field",
     "validate_knowledge_library",
