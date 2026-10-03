@@ -93,6 +93,7 @@ def test_lower_precedence_cannot_overwrite_explicit_user_value():
     result = KnowledgePolicyEngine(runtime()).evaluate(state(parameter()), proposal())
     assert result.outcome == "KEPT"
     assert result.reason == "lower_precedence"
+    assert result.result.source_ids == ("MSG-1",)
     assert result.result.value == "oval"
     assert result.applicable_policy_ids == ("POL-SHAPE",)
 
@@ -174,9 +175,44 @@ def test_collection_policy_binds_only_existing_group_id():
         provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
         value="pear",
     )
-    blocked = engine.evaluate(state(current, groups=("accent",)), unknown)
+    unknown_current = RuntimeParameterState(
+        target="side_stones.unknown.stones.shape",
+        semantic_state=RuntimeSemanticState.MISSING,
+    )
+    blocked = engine.evaluate(state(current, unknown_current, groups=("accent",)), unknown)
     assert blocked.outcome == "BLOCKED"
     assert blocked.reason == "unknown_collection_group"
+
+
+def test_unknown_target_and_locked_preservation_fail_closed():
+    engine = KnowledgePolicyEngine(runtime())
+    unknown = proposal(target="construction.gallery", value="basket")
+    blocked = engine.evaluate(state(parameter()), unknown)
+    assert blocked.outcome == "BLOCKED"
+    assert blocked.reason == "unknown_target"
+
+    current = parameter()
+    locked_intent = proposal(
+        provenance=RuntimeProvenance.USER_CONFIRMED,
+        preservation=PreservationIntent.LOCKED,
+    )
+    preserved = engine.evaluate(state(current), locked_intent)
+    assert preserved.outcome == "BLOCKED"
+    assert preserved.reason == "preserve_locked"
+    assert preserved.result == current
+
+
+def test_runtime_identity_mismatch_is_rejected():
+    engine = KnowledgePolicyEngine(runtime())
+    current = parameter()
+    mismatched = KnowledgeRuntimeState(
+        package_id="jewelai.other.runtime",
+        artifact_version="1.0.0",
+        runtime_sha256="0" * 64,
+        parameters=(current,),
+    )
+    with pytest.raises(ValueError, match="does not match"):
+        engine.evaluate(mismatched, proposal())
 
 
 def test_runtime_state_rejects_invalid_missing_and_lock_shapes():
