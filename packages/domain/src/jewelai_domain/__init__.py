@@ -12,8 +12,8 @@ from .dictionary import (
 from .knowledge_library import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
     KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
-    CompiledKnowledgeLibrary,
     CompilationManifest,
+    CompiledKnowledgeLibrary,
     KnowledgeLibraryRegistry,
     KnowledgeLibraryValidationError,
     compile_knowledge_library,
