@@ -88,7 +88,7 @@ def test_three_stone_slice_exercises_group_binding_enrichment_and_activation_gat
                 source_id="STEP15-SIDE",
             ),
             EnrichmentProposal(
-                target="side_stones.not-present.stones.shape",
+                target="side_stones.not_present.stones.shape",
                 semantic_state=RuntimeSemanticState.NORMALIZED,
                 provenance=RuntimeProvenance.USER_CONFIRMED,
                 value="round",
@@ -98,8 +98,8 @@ def test_three_stone_slice_exercises_group_binding_enrichment_and_activation_gat
     )
     decisions = {item.target: item for item in result.decisions}
     assert decisions["side_stones.accents.stones.shape"].outcome == "APPLIED"
-    assert decisions["side_stones.not-present.stones.shape"].outcome == "BLOCKED"
-    assert decisions["side_stones.not-present.stones.shape"].reason == "unknown_target"
+    assert decisions["side_stones.not_present.stones.shape"].outcome == "BLOCKED"
+    assert decisions["side_stones.not_present.stones.shape"].reason == "unknown_target"
 
     active = promote_knowledge_runtime(runtime, _report(runtime))
     assert active.runtime_sha256 == runtime.sha256
