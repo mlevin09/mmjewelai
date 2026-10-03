@@ -28,6 +28,7 @@ on:
       - specs/asset-access/**
       - specs/generation-queue/**
       - tests/test_openai_generation_pipeline.py
+      - tests/test_knowledge_library_behavioral_regression.py
       - data/prompts/**
       - data/roles/**
       - data/dictionary/**
@@ -64,6 +65,7 @@ on:
       - specs/asset-access/**
       - specs/generation-queue/**
       - tests/test_openai_generation_pipeline.py
+      - tests/test_knowledge_library_behavioral_regression.py
       - data/prompts/**
       - data/roles/**
       - data/dictionary/**
@@ -138,6 +140,7 @@ jobs:
       - run: python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
       - run: python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
       - run: python -m pytest -c workers/generation/pyproject.toml tests/test_openai_generation_pipeline.py -q
+      - run: python -m pytest tests/test_knowledge_library_behavioral_regression.py -q
       - run: python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
       - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
       - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
