@@ -20,6 +20,17 @@ from .knowledge_library import (
     load_knowledge_library,
     validate_knowledge_library,
 )
+from .knowledge_policy import (
+    KnowledgePolicyEngine,
+    KnowledgeRuntimeState,
+    PolicyEvaluation,
+    PreservationIntent,
+    RuntimeParameterState,
+    RuntimeProvenance,
+    RuntimeSemanticState,
+    RuntimeStateProposal,
+    build_knowledge_runtime_state,
+)
 from .models import SCHEMA_VERSION, Design, DesignRevision
 from .questions import (
     QUESTION_SCHEMA_VERSION,
@@ -79,6 +90,14 @@ __all__ = [
     "CompilationManifest",
     "KnowledgeLibraryRegistry",
     "KnowledgeLibraryValidationError",
+    "KnowledgePolicyEngine",
+    "KnowledgeRuntimeState",
+    "PolicyEvaluation",
+    "PreservationIntent",
+    "RuntimeParameterState",
+    "RuntimeProvenance",
+    "RuntimeSemanticState",
+    "RuntimeStateProposal",
     "ProposedDomainUpdate",
     "QuestionCatalog",
     "QuestionId",
@@ -97,6 +116,7 @@ __all__ = [
     "UnsupportedLocaleError",
     "UnsupportedMatch",
     "compile_knowledge_library",
+    "build_knowledge_runtime_state",
     "confirm_field",
     "analyze_gaps",
     "lock_field",
