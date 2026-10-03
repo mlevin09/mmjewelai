@@ -273,6 +273,12 @@ def test_policy_effect_text_is_not_executed_or_parsed():
         policies=(policy,),
     )
     current = parameter()
-    result = KnowledgePolicyEngine(compiled).evaluate(state(current), proposal())
+    compiled_state = KnowledgeRuntimeState(
+        package_id=compiled.package_id,
+        artifact_version=compiled.artifact_version,
+        runtime_sha256=compiled.sha256,
+        parameters=(current,),
+    )
+    result = KnowledgePolicyEngine(compiled).evaluate(compiled_state, proposal())
     assert result.outcome == "KEPT"
     assert result.reason == "lower_precedence"
