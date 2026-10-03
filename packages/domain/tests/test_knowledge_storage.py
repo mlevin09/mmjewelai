@@ -1,12 +1,12 @@
 import json
 
 import pytest
+from test_knowledge_library import bundle
 
 from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
     KnowledgeArtifactStore,
 )
-from test_knowledge_library import bundle
 
 
 def test_publish_round_trip_is_durable_and_idempotent(tmp_path):
