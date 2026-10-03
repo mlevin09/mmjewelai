@@ -6,6 +6,7 @@ on:
     paths:
       - packages/domain/**
       - specs/jewelry-design-schema/**
+      - specs/knowledge-library/**
       - specs/roles/**
       - data/roles/**
       - specs/dictionary/**
@@ -20,6 +21,7 @@ on:
     paths:
       - packages/domain/**
       - specs/jewelry-design-schema/**
+      - specs/knowledge-library/**
       - specs/roles/**
       - data/roles/**
       - specs/dictionary/**
