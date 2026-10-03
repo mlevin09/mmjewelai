@@ -58,7 +58,9 @@ class KnowledgeArtifactStore:
         return self.root / package_id / artifact_version
 
     @staticmethod
-    def _payloads(bundle: KnowledgeLibraryBundle) -> tuple[dict[str, str], CompiledKnowledgeLibrary]:
+    def _payloads(
+        bundle: KnowledgeLibraryBundle,
+    ) -> tuple[dict[str, str], CompiledKnowledgeLibrary]:
         registry = validate_knowledge_library(bundle)
         runtime, manifest = compile_knowledge_library(registry)
         source_json = _canonical_json(registry.bundle.model_dump(mode="json"))
@@ -163,9 +165,13 @@ class KnowledgeArtifactStore:
         if checksums != expected_checksums:
             raise KnowledgeArtifactStorageError("stored knowledge artifact checksum mismatch")
         if stored_runtime != expected_runtime:
-            raise KnowledgeArtifactStorageError("stored runtime does not match deterministic compiler")
+            raise KnowledgeArtifactStorageError(
+                "stored runtime does not match deterministic compiler"
+            )
         if stored_manifest != expected_manifest:
-            raise KnowledgeArtifactStorageError("stored manifest does not match deterministic compiler")
+            raise KnowledgeArtifactStorageError(
+                "stored manifest does not match deterministic compiler"
+            )
         if (
             source.package_id != package_id
             or str(source.artifact_version) != artifact_version
