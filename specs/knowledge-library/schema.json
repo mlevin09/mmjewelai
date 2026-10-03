@@ -1,0 +1,386 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jewelai.local/specs/knowledge-library/schema.json",
+  "title": "JewelAI Knowledge Library Bundle v1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "package_id",
+    "sources",
+    "claims",
+    "domain_knowledge",
+    "language_mappings",
+    "policies"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "package_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "artifact_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      },
+      "uniqueItems": true
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claim"
+      },
+      "uniqueItems": true
+    },
+    "domain_knowledge": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/domain"
+      },
+      "uniqueItems": true
+    },
+    "language_mappings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/language"
+      },
+      "uniqueItems": true
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/policy"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "lifecycle": {
+      "enum": [
+        "DRAFT",
+        "REVIEWED",
+        "COMPILED",
+        "ACTIVE",
+        "DEPRECATED",
+        "REJECTED"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "source_type",
+        "evidence_tier",
+        "lifecycle_status"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_type": {
+          "enum": [
+            "STANDARD",
+            "OFFICIAL_BODY",
+            "PROFESSIONAL_EDUCATION",
+            "TECHNICAL_MANUFACTURER",
+            "RETAIL_SECONDARY",
+            "INTERNAL_DECISION",
+            "STRUCTURAL_SCHEMA"
+          ]
+        },
+        "uri": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "language": {
+          "enum": [
+            "en",
+            "ru",
+            "mixed",
+            "not_applicable"
+          ]
+        },
+        "jurisdiction": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "evidence_tier": {
+          "enum": [
+            "PRIMARY",
+            "SECONDARY",
+            "CORROBORATIVE",
+            "INTERNAL",
+            "STRUCTURAL"
+          ]
+        },
+        "lifecycle_status": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "statement",
+        "source_id",
+        "evidence_strength",
+        "lifecycle_status"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supporting_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "evidence_strength": {
+          "enum": [
+            "HIGH",
+            "MEDIUM",
+            "LOW",
+            "STRUCTURAL"
+          ]
+        },
+        "scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lifecycle_status": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "target_id"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "target_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        }
+      }
+    },
+    "domain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concept_id",
+        "kind",
+        "claim_ids",
+        "structural_schema",
+        "lifecycle_status"
+      ],
+      "properties": {
+        "concept_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "kind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "parent_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "relationships": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relationship"
+          },
+          "default": []
+        },
+        "claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "structural_schema": {
+          "type": "boolean"
+        },
+        "lifecycle_status": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "structural_schema": {
+              "const": true
+            }
+          }
+        },
+        {
+          "properties": {
+            "claim_ids": {
+              "minItems": 1
+            }
+          }
+        }
+      ]
+    },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mapping_id",
+        "concept_id",
+        "locale",
+        "canonical_term",
+        "mapping_mode",
+        "mapping_quality",
+        "lifecycle_status"
+      ],
+      "properties": {
+        "mapping_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "concept_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "locale": {
+          "enum": [
+            "en",
+            "ru"
+          ]
+        },
+        "canonical_term": {
+          "type": "string",
+          "minLength": 1
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "mapping_mode": {
+          "enum": [
+            "DIRECT",
+            "CONTEXTUAL",
+            "INPUT_ONLY",
+            "AMBIGUOUS"
+          ]
+        },
+        "mapping_quality": {
+          "enum": [
+            "EXACT",
+            "PREFERRED",
+            "CONTEXT_DEPENDENT",
+            "APPROXIMATE",
+            "NO_DIRECT_EQUIVALENT"
+          ]
+        },
+        "context": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lifecycle_status": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_id",
+        "target",
+        "effect",
+        "source_kind",
+        "source_refs",
+        "lifecycle_status"
+      ],
+      "properties": {
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?:\\.(?:[a-z][a-z0-9_]*|\\{group_id\\}))*$"
+        },
+        "effect": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_kind": {
+          "enum": [
+            "DOMAIN_KNOWLEDGE",
+            "INTERNAL_PRODUCT_DECISION"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "lifecycle_status": {
+          "$ref": "#/$defs/lifecycle"
+        }
+      }
+    }
+  }
+}
