@@ -74,9 +74,7 @@ def test_enrichment_matrix_is_deterministic_and_pinned(ring, templates, runtime)
     assert first.content_hash == hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def test_lower_precedence_enrichment_cannot_overwrite_user_shape(
-    ring, templates, runtime
-):
+def test_lower_precedence_enrichment_cannot_overwrite_user_shape(ring, templates, runtime):
     result = enrich_prompt(
         ring,
         templates,
