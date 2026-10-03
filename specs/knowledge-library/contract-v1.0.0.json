@@ -79,7 +79,9 @@
       "metal.color"
     ],
     "collection_token": "{group_id}",
-    "collection_templates": [
+    "collection_binding": "existing_group_id_only",
+    "array_index_addressing": false,
+    "collection_parameter_templates": [
       "side_stones.{group_id}.stones.material",
       "side_stones.{group_id}.stones.shape",
       "side_stones.{group_id}.stones.cut",
@@ -89,9 +91,7 @@
       "side_stones.{group_id}.stones.setting",
       "side_stones.{group_id}.stones.orientation",
       "side_stones.{group_id}.quantity"
-    ],
-    "collection_binding": "existing_group_id_only",
-    "array_index_addressing": false
+    ]
   },
   "semantic_invariants": [
     "engagement_occasion_is_not_solitaire_style",
