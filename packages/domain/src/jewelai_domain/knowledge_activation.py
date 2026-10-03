@@ -42,9 +42,7 @@ class ProductionValidationCheckId(StrEnum):
     BEHAVIORAL_REGRESSION = "behavioral_regression"
 
 
-REQUIRED_PRODUCTION_VALIDATION_CHECKS = tuple(
-    check.value for check in ProductionValidationCheckId
-)
+REQUIRED_PRODUCTION_VALIDATION_CHECKS = tuple(check.value for check in ProductionValidationCheckId)
 _REQUIRED_PRODUCTION_CHECKS = frozenset(ProductionValidationCheckId)
 
 
@@ -147,9 +145,7 @@ def validate_for_production(
     checks = {check.name: check for check in report.checks}
     missing = sorted(check.value for check in _REQUIRED_PRODUCTION_CHECKS - checks.keys())
     if missing:
-        raise KnowledgeActivationError(
-            f"missing required production validation checks: {missing}"
-        )
+        raise KnowledgeActivationError(f"missing required production validation checks: {missing}")
 
     non_pass = sorted(
         (check.name.value, check.outcome.value)
