@@ -1,0 +1,165 @@
+{
+  "contract_id": "jewelai.knowledge_library.contract",
+  "contract_version": "1.0.0",
+  "schema_version": "1.0.0",
+  "status": "FROZEN",
+  "architecture_status": "CONFIRMED_WITH_DEFERRALS",
+  "production_active": false,
+  "canonical_chain": [
+    "SOURCE",
+    "CLAIM",
+    "DOMAIN_KNOWLEDGE",
+    "LANGUAGE",
+    "JEWELAI_POLICY",
+    "COMPILED_RUNTIME",
+    "TEST"
+  ],
+  "lifecycle_states": [
+    "DRAFT",
+    "REVIEWED",
+    "COMPILED",
+    "ACTIVE",
+    "DEPRECATED",
+    "REJECTED"
+  ],
+  "language": {
+    "locales": [
+      "en",
+      "ru"
+    ],
+    "mapping_modes": [
+      "DIRECT",
+      "CONTEXTUAL",
+      "INPUT_ONLY",
+      "AMBIGUOUS"
+    ],
+    "mapping_quality": [
+      "EXACT",
+      "PREFERRED",
+      "CONTEXT_DEPENDENT",
+      "APPROXIMATE",
+      "NO_DIRECT_EQUIVALENT"
+    ],
+    "direct_ambiguity_overlap_allowed": false,
+    "locale_maturity_independent": true
+  },
+  "product_state": {
+    "states": [
+      "EXPLICIT",
+      "NORMALIZED",
+      "MISSING",
+      "AMBIGUOUS",
+      "RECOMMENDED",
+      "ACCEPTED",
+      "ASSUMED",
+      "NOT_APPLICABLE",
+      "CONFIRMED",
+      "LOCKED"
+    ],
+    "preservation": [
+      "CHANGE",
+      "KEEP",
+      "LOCKED"
+    ],
+    "provenance_precedence": [
+      "USER_CONFIRMED",
+      "USER_EXPLICIT_LATEST",
+      "USER_ACCEPTED_RECOMMENDATION",
+      "NORMALIZED_FROM_USER",
+      "KNOWLEDGE_INFERRED",
+      "JEWELAI_RECOMMENDED",
+      "VISUALIZATION_ASSUMPTION"
+    ]
+  },
+  "parameter_targets": {
+    "scalar_examples": [
+      "center_stone.shape",
+      "center_stone.setting",
+      "metal.material",
+      "metal.color"
+    ],
+    "collection_token": "{group_id}",
+    "collection_templates": [
+      "side_stones.{group_id}.stones.material",
+      "side_stones.{group_id}.stones.shape",
+      "side_stones.{group_id}.stones.cut",
+      "side_stones.{group_id}.stones.weight",
+      "side_stones.{group_id}.stones.dimensions",
+      "side_stones.{group_id}.stones.color",
+      "side_stones.{group_id}.stones.setting",
+      "side_stones.{group_id}.stones.orientation",
+      "side_stones.{group_id}.quantity"
+    ],
+    "collection_binding": "existing_group_id_only",
+    "array_index_addressing": false
+  },
+  "semantic_invariants": [
+    "engagement_occasion_is_not_solitaire_style",
+    "prong_setting_is_separate_from_prong_count",
+    "bezel_type_is_separate_from_coverage",
+    "ru_gluhaya_zakrepka_is_not_unconditional_exact_generic_bezel",
+    "rose_gold_is_distinct_from_red_gold",
+    "white_gold_does_not_imply_rhodium_coating",
+    "cushion_shape_is_separate_from_cutting_style",
+    "round_shape_does_not_imply_round_brilliant",
+    "carat_weight_is_mass_and_does_not_determine_dimensions",
+    "center_stone_role_does_not_imply_material_or_largest_stone",
+    "qualitative_shank_width_has_no_universal_mm_thresholds"
+  ],
+  "compiler_gate": {
+    "fail_closed": true,
+    "required_zero": [
+      "broken_canonical_references",
+      "unresolved_required_parent_or_relationship_references",
+      "broken_domain_claim_source_provenance",
+      "language_mappings_to_unknown_concepts",
+      "invalid_policy_parameter_references",
+      "unexpected_draft_promotions",
+      "direct_ambiguity_exact_collisions",
+      "duplicate_semantic_ids",
+      "rules_without_valid_source",
+      "schema_version_mismatches"
+    ],
+    "runtime_rule_max_lifecycle": "COMPILED",
+    "active_for_production": false
+  },
+  "test_outcomes": [
+    "PASS",
+    "EXPECTED_GAP",
+    "FAIL"
+  ],
+  "expected_gap_counts_as_pass": false,
+  "confirmed_slices": [
+    "solitaire_engagement_ring",
+    "three_stone_ring"
+  ],
+  "deferrals": [
+    {
+      "id": "AC-DEF-001",
+      "severity": "MEDIUM",
+      "scope": "production_integration",
+      "blocking": false,
+      "summary": "Generalized repeated-field runtime targeting beyond side_stones[*].quantity remains for production integration."
+    },
+    {
+      "id": "AC-DEF-002",
+      "severity": "MEDIUM",
+      "scope": "future_domain_schema",
+      "blocking": false,
+      "summary": "Multi-focal designs without a unique center require a future explicit schema/domain decision."
+    },
+    {
+      "id": "AC-DEF-003",
+      "severity": "TRACEABILITY_NOTE",
+      "scope": "provenance",
+      "blocking": false,
+      "summary": "Corroborative-only evidence must be explicit, using supporting_source_ids or an equivalent reviewed representation."
+    }
+  ],
+  "implementation_target": {
+    "next_step": "production_compiler_and_validator",
+    "provider_specific_prompt_syntax_in_scope": false,
+    "production_parser_matcher_in_scope": false,
+    "matrix_engine_integration_in_scope": false
+  }
+}
