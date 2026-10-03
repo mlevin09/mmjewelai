@@ -395,14 +395,9 @@ class KnowledgeLibraryRegistry:
                 surfaces.setdefault(key, []).append(mapping)
 
         for (locale, context, surface), mappings in surfaces.items():
-            direct_exact = [
-                item
-                for item in mappings
-                if item.mapping_mode == MappingMode.DIRECT
-                and item.mapping_quality == MappingQuality.EXACT
-            ]
+            direct = [item for item in mappings if item.mapping_mode == MappingMode.DIRECT]
             ambiguous = [item for item in mappings if item.mapping_mode == MappingMode.AMBIGUOUS]
-            if direct_exact and ambiguous:
+            if direct and ambiguous:
                 raise KnowledgeLibraryValidationError(
                     f"DIRECT/AMBIGUOUS collision for {locale}/{context}/{surface!r}"
                 )

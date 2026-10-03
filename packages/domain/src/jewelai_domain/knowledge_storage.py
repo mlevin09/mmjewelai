@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -51,11 +52,20 @@ class KnowledgeArtifactStore:
         self.root = Path(root)
 
     def _release_path(self, package_id: str, artifact_version: str) -> Path:
-        if not package_id or "/" in package_id or "\\" in package_id or ".." in package_id:
+        if re.fullmatch(r"[a-z][a-z0-9_.-]+", package_id) is None:
             raise KnowledgeArtifactStorageError("unsafe knowledge package_id")
-        if not artifact_version or "/" in artifact_version or "\\" in artifact_version:
+        if re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", artifact_version) is None:
             raise KnowledgeArtifactStorageError("unsafe knowledge artifact_version")
-        return self.root / package_id / artifact_version
+
+        root = self.root.resolve()
+        release_path = self.root / package_id / artifact_version
+        try:
+            release_path.resolve().relative_to(root)
+        except ValueError as exc:
+            raise KnowledgeArtifactStorageError(
+                "knowledge artifact path escapes storage root"
+            ) from exc
+        return release_path
 
     @staticmethod
     def _payloads(

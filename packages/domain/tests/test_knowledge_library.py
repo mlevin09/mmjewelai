@@ -251,3 +251,22 @@ def test_runtime_json_is_stable_utf8_json():
     payload = runtime.canonical_json()
     assert json.loads(payload)["contract_version"] == "1.0.0"
     assert "\\u043e" not in payload
+
+
+def test_validator_rejects_preferred_direct_ambiguous_collision():
+    data = bundle()
+    data["language_mappings"][0]["mapping_quality"] = "PREFERRED"
+    data["language_mappings"].append(
+        {
+            "mapping_id": "LANG-EN-OVAL-AMB-PREFERRED",
+            "concept_id": "stone.shape.oval",
+            "locale": "en",
+            "canonical_term": "oval",
+            "mapping_mode": "AMBIGUOUS",
+            "mapping_quality": "CONTEXT_DEPENDENT",
+            "lifecycle_status": "DRAFT",
+        }
+    )
+
+    with pytest.raises(KnowledgeLibraryValidationError, match="DIRECT/AMBIGUOUS collision"):
+        validate_knowledge_library(data)

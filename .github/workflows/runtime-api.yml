@@ -21,6 +21,7 @@ on:
       - packages/assets_gcs/**
       - workers/generation/**
       - packages/domain/**
+      - specs/knowledge-library/**
       - specs/parser/**
       - specs/prompts/**
       - specs/model-gateway/**
@@ -60,6 +61,7 @@ on:
       - packages/assets_gcs/**
       - workers/generation/**
       - packages/domain/**
+      - specs/knowledge-library/**
       - specs/parser/**
       - specs/prompts/**
       - specs/model-gateway/**
