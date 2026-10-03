@@ -58,6 +58,10 @@ def test_load_fails_closed_after_tampering(tmp_path):
     [
         ("../escape", "1.0.0"),
         ("safe.package", "../1.0.0"),
+        ("safe.package", ".."),
+        ("safe.package", "."),
+        ("safe.package", "1.0"),
+        ("safe package", "1.0.0"),
         ("safe/package", "1.0.0"),
     ],
 )
