@@ -29,7 +29,12 @@ from .knowledge_library import (
     load_knowledge_library,
     validate_knowledge_library,
 )
-from .knowledge_storage import (\n    KnowledgeArtifactStorageError,\n    KnowledgeArtifactStore,\n    StoredKnowledgeArtifact,\n)\nfrom .knowledge_policy import (
+from .knowledge_storage import (
+    KnowledgeArtifactStorageError,
+    KnowledgeArtifactStore,
+    StoredKnowledgeArtifact,
+)
+from .knowledge_policy import (
     KnowledgePolicyEngine,
     KnowledgeRuntimeState,
     PolicyEvaluation,
@@ -101,7 +106,10 @@ __all__ = [
     "CompilationManifest",
     "KnowledgeActivationError",
     "KnowledgeLibraryRegistry",
-    "KnowledgeLibraryValidationError",\n    "KnowledgeArtifactStorageError",\n    "KnowledgeArtifactStore",\n    "StoredKnowledgeArtifact",
+    "KnowledgeLibraryValidationError",
+    "KnowledgeArtifactStorageError",
+    "KnowledgeArtifactStore",
+    "StoredKnowledgeArtifact",
     "KnowledgePolicyEngine",
     "KnowledgeRuntimeState",
     "PolicyEvaluation",
