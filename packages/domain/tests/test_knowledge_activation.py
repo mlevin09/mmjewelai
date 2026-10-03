@@ -50,9 +50,7 @@ def test_complete_pass_report_is_eligible_and_promotes_exact_runtime():
     assert active.runtime_sha256 == compiled.sha256
     assert active.validation_report_sha256 == validation.sha256
     assert active.active_for_production is True
-    assert {item.name for item in validation.checks} == set(
-        REQUIRED_PRODUCTION_VALIDATION_CHECKS
-    )
+    assert {item.name for item in validation.checks} == set(REQUIRED_PRODUCTION_VALIDATION_CHECKS)
 
 
 def test_expected_gap_blocks_promotion():
