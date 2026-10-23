@@ -30,9 +30,32 @@ The original `enrich_prompt` remains available for backward-compatible offline a
 it does not claim verified ACTIVE provenance. Session persistence and runtime API wiring remain out
 of scope for this boundary.
 
+`assemble_internal_final_prompt` is the offline Step #12 boundary. It consumes one explicit,
+single-revision `FinalPromptSnapshot`: the immutable Product State, latest applicable enrichment
+result, exact verified ACTIVE Knowledge release pin, artifact versions, existing Rules Engine
+decision, and normalized clarification/correction lineage. It fails closed for stale revisions,
+cross-session evidence, release/artifact mismatches, altered enrichment hashes, or a `CompiledPrompt`
+that no longer matches the same revision. It does not select a release or re-enrich.
+
+The builder returns two versioned derived artifacts from the same snapshot:
+
+- `UserReadableJewelryDescription` v1.0.0 renders deterministic EN/RU prose without schema paths,
+  stable group IDs, UUIDs, hashes, or release metadata. Unknown or deferred facts remain explicit;
+  values are never invented.
+- `InternalFinalPrompt` v1.0.0 is the structured provider-neutral module handoff. It retains
+  authoritative design facts, requirements, prohibitions, locks/preservation, accepted versus
+  unaccepted enrichment evidence, unresolved details, decision lineage, release/artifact
+  provenance, readiness, and a canonical SHA-256. Its deterministic text rendering is derived from
+  that structure and contains no provider/model syntax.
+
+This new contract is intentionally distinct from `CompiledPrompt`; the existing compiler and live
+API/generation path are unchanged. Step #13 will provide reviewed runtime integration. The builder
+uses no network, provider, persistence, clock, random ID, or catalog fallback.
+
 ```sh
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
 python -m jewelai_prompts.schema specs/prompts/schema.json
+python -m jewelai_prompts.final_schema specs/prompts/internal-final-prompt-schema.json
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 ```

@@ -1,0 +1,660 @@
+{
+  "$defs": {
+    "FinalPromptArtifactVersions": {
+      "additionalProperties": false,
+      "properties": {
+        "design_schema_version": {
+          "title": "Design Schema Version",
+          "type": "string"
+        },
+        "dictionary_artifact_version": {
+          "title": "Dictionary Artifact Version",
+          "type": "string"
+        },
+        "question_artifact_version": {
+          "title": "Question Artifact Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "prompt_template_artifact_version": {
+          "title": "Prompt Template Artifact Version",
+          "type": "string"
+        },
+        "enrichment_version": {
+          "title": "Enrichment Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "design_schema_version",
+        "dictionary_artifact_version",
+        "question_artifact_version",
+        "rules_artifact_version",
+        "prompt_template_artifact_version",
+        "enrichment_version"
+      ],
+      "title": "FinalPromptArtifactVersions",
+      "type": "object"
+    },
+    "FinalPromptConstraint": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "requirement",
+            "prohibition",
+            "preservation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "instruction": {
+          "title": "Instruction",
+          "type": "string"
+        },
+        "source_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "target",
+        "instruction"
+      ],
+      "title": "FinalPromptConstraint",
+      "type": "object"
+    },
+    "FinalPromptDecisionLineage": {
+      "additionalProperties": false,
+      "description": "Normalized immutable evidence from existing clarification/correction results.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "clarification",
+            "correction"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "decision": {
+          "title": "Decision",
+          "type": "string"
+        },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        },
+        "selected_value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "source_revision_id": {
+          "format": "uuid",
+          "title": "Source Revision Id",
+          "type": "string"
+        },
+        "resulting_revision_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resulting Revision Id"
+        },
+        "applies_to_revision_id": {
+          "format": "uuid",
+          "title": "Applies To Revision Id",
+          "type": "string"
+        },
+        "knowledge_package_id": {
+          "title": "Knowledge Package Id",
+          "type": "string"
+        },
+        "knowledge_artifact_version": {
+          "title": "Knowledge Artifact Version",
+          "type": "string"
+        },
+        "knowledge_runtime_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Knowledge Runtime Sha256",
+          "type": "string"
+        },
+        "knowledge_validation_report_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Knowledge Validation Report Sha256",
+          "type": "string"
+        },
+        "question_artifact_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Question Artifact Version"
+        },
+        "rules_artifact_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rules Artifact Version"
+        },
+        "blocks_progression": {
+          "default": false,
+          "title": "Blocks Progression",
+          "type": "boolean"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "session_id",
+        "decision_id",
+        "decision",
+        "outcome",
+        "source_revision_id",
+        "applies_to_revision_id",
+        "knowledge_package_id",
+        "knowledge_artifact_version",
+        "knowledge_runtime_sha256",
+        "knowledge_validation_report_sha256",
+        "content_hash"
+      ],
+      "title": "FinalPromptDecisionLineage",
+      "type": "object"
+    },
+    "FinalPromptDesignFact": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "applicability": {
+          "enum": [
+            "value",
+            "not_applicable"
+          ],
+          "title": "Applicability",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "origin": {
+          "enum": [
+            "explicit",
+            "derived",
+            "assumed"
+          ],
+          "title": "Origin",
+          "type": "string"
+        },
+        "semantic_state": {
+          "$ref": "#/$defs/RuntimeSemanticState"
+        },
+        "provenance": {
+          "$ref": "#/$defs/RuntimeProvenance"
+        },
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target",
+        "applicability",
+        "origin",
+        "semantic_state",
+        "provenance",
+        "confirmed",
+        "locked",
+        "source_ids"
+      ],
+      "title": "FinalPromptDesignFact",
+      "type": "object"
+    },
+    "FinalPromptEnrichmentEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "semantic_state": {
+          "$ref": "#/$defs/RuntimeSemanticState"
+        },
+        "provenance": {
+          "$ref": "#/$defs/RuntimeProvenance"
+        },
+        "outcome": {
+          "enum": [
+            "APPLIED",
+            "KEPT",
+            "BLOCKED"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "source_id": {
+          "title": "Source Id",
+          "type": "string"
+        },
+        "preservation": {
+          "$ref": "#/$defs/PreservationIntent"
+        },
+        "accepted_as_requirement": {
+          "title": "Accepted As Requirement",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "target",
+        "semantic_state",
+        "provenance",
+        "outcome",
+        "source_id",
+        "preservation",
+        "accepted_as_requirement"
+      ],
+      "title": "FinalPromptEnrichmentEvidence",
+      "type": "object"
+    },
+    "FinalPromptReadiness": {
+      "enum": [
+        "ready",
+        "ready_with_unresolved",
+        "blocked"
+      ],
+      "title": "FinalPromptReadiness",
+      "type": "string"
+    },
+    "FinalPromptUnresolvedDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "missing",
+            "ambiguous",
+            "unaccepted_recommendation",
+            "skipped",
+            "unknown",
+            "deferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "source_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target",
+        "classification",
+        "blocking"
+      ],
+      "title": "FinalPromptUnresolvedDetail",
+      "type": "object"
+    },
+    "InternalFinalPrompt": {
+      "additionalProperties": false,
+      "description": "Official provider-neutral Prompt Enrichment Module v1 handoff artifact.",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "design_id": {
+          "format": "uuid",
+          "title": "Design Id",
+          "type": "string"
+        },
+        "product_state_revision_id": {
+          "format": "uuid",
+          "title": "Product State Revision Id",
+          "type": "string"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "enrichment_cycle_number": {
+          "title": "Enrichment Cycle Number",
+          "type": "integer"
+        },
+        "locale": {
+          "enum": [
+            "en",
+            "ru"
+          ],
+          "title": "Locale",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/FinalPromptReadiness"
+        },
+        "readiness_reason": {
+          "title": "Readiness Reason",
+          "type": "string"
+        },
+        "description_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Description Content Hash",
+          "type": "string"
+        },
+        "prompt_text": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Prompt Text",
+          "type": "string"
+        },
+        "design_facts": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptDesignFact"
+          },
+          "title": "Design Facts",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptConstraint"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "unresolved_details": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptUnresolvedDetail"
+          },
+          "title": "Unresolved Details",
+          "type": "array"
+        },
+        "enrichment_evidence": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptEnrichmentEvidence"
+          },
+          "title": "Enrichment Evidence",
+          "type": "array"
+        },
+        "decision_lineage": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptDecisionLineage"
+          },
+          "title": "Decision Lineage",
+          "type": "array"
+        },
+        "knowledge_release": {
+          "$ref": "#/$defs/KnowledgeReleaseReference"
+        },
+        "artifact_versions": {
+          "$ref": "#/$defs/FinalPromptArtifactVersions"
+        },
+        "enrichment_result_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Enrichment Result Content Hash",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id",
+        "organization_id",
+        "design_id",
+        "product_state_revision_id",
+        "enrichment_cycle_id",
+        "enrichment_cycle_number",
+        "locale",
+        "readiness",
+        "readiness_reason",
+        "description_content_hash",
+        "prompt_text",
+        "design_facts",
+        "constraints",
+        "unresolved_details",
+        "enrichment_evidence",
+        "decision_lineage",
+        "knowledge_release",
+        "artifact_versions",
+        "enrichment_result_content_hash",
+        "content_hash"
+      ],
+      "title": "InternalFinalPrompt",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "KnowledgeReleaseReference": {
+      "additionalProperties": false,
+      "properties": {
+        "package_id": {
+          "title": "Package Id",
+          "type": "string"
+        },
+        "artifact_version": {
+          "title": "Artifact Version",
+          "type": "string"
+        },
+        "runtime_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Runtime Sha256",
+          "type": "string"
+        },
+        "validation_report_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Validation Report Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "artifact_version",
+        "runtime_sha256",
+        "validation_report_sha256"
+      ],
+      "title": "KnowledgeReleaseReference",
+      "type": "object"
+    },
+    "PreservationIntent": {
+      "enum": [
+        "CHANGE",
+        "KEEP",
+        "LOCKED"
+      ],
+      "title": "PreservationIntent",
+      "type": "string"
+    },
+    "RuntimeProvenance": {
+      "enum": [
+        "USER_CONFIRMED",
+        "USER_EXPLICIT_LATEST",
+        "USER_ACCEPTED_RECOMMENDATION",
+        "NORMALIZED_FROM_USER",
+        "KNOWLEDGE_INFERRED",
+        "JEWELAI_RECOMMENDED",
+        "VISUALIZATION_ASSUMPTION"
+      ],
+      "title": "RuntimeProvenance",
+      "type": "string"
+    },
+    "RuntimeSemanticState": {
+      "enum": [
+        "EXPLICIT",
+        "NORMALIZED",
+        "MISSING",
+        "AMBIGUOUS",
+        "RECOMMENDED",
+        "ACCEPTED",
+        "ASSUMED",
+        "NOT_APPLICABLE"
+      ],
+      "title": "RuntimeSemanticState",
+      "type": "string"
+    },
+    "UserReadableJewelryDescription": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "locale": {
+          "enum": [
+            "en",
+            "ru"
+          ],
+          "title": "Locale",
+          "type": "string"
+        },
+        "authoritative_revision_id": {
+          "format": "uuid",
+          "title": "Authoritative Revision Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        },
+        "unresolved_summary": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unresolved Summary",
+          "type": "array"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "locale",
+        "authoritative_revision_id",
+        "text",
+        "unresolved_summary",
+        "content_hash"
+      ],
+      "title": "UserReadableJewelryDescription",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "$ref": "#/$defs/UserReadableJewelryDescription"
+    },
+    "internal_final_prompt": {
+      "$ref": "#/$defs/InternalFinalPrompt"
+    }
+  },
+  "required": [
+    "description",
+    "internal_final_prompt"
+  ],
+  "title": "FinalPromptAssembly",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:prompt-enrichment-final-output:1.0.0"
+}
