@@ -19,6 +19,11 @@ from jewelai_auth import (
     MembershipRole,
     VerifiedIdentity,
 )
+from jewelai_domain.knowledge_activation import (
+    ActiveKnowledgeRuntime,
+    ProductionValidationReport,
+)
+from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import DesignRevision
 from jewelai_generation_queue import GenerationTaskEnvelope, PendingGenerationDispatch
 from jewelai_model_gateway import (
@@ -29,7 +34,8 @@ from jewelai_model_gateway import (
     GenerationStatus,
     validate_generation_result,
 )
-from jewelai_prompts import CompiledPrompt
+from jewelai_prompts import CompiledPrompt, PromptEnrichmentResult
+from pydantic import ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
@@ -38,6 +44,7 @@ from .models import (
     AssetRow,
     AuthPrincipalRow,
     DesignSessionRow,
+    EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
     GenerationRunRow,
     IterativeEditRow,
@@ -82,6 +89,18 @@ class GenerationRetryNotAllowedError(GenerationStateConflictError):
 
 
 class VisualizationSelectionConflictError(GenerationStateConflictError):
+    pass
+
+
+class KnowledgeReleasePinConflictError(PersistenceError):
+    pass
+
+
+class EnrichmentCycleConflictError(PersistenceError):
+    pass
+
+
+class EnrichmentIntegrityError(PersistenceError):
     pass
 
 
@@ -141,6 +160,48 @@ class IterativeEditRecord:
 class GenerationEditContextRecord:
     source_asset: Asset
     change_request: str
+
+
+@dataclass(frozen=True)
+class KnowledgeReleasePinRecord:
+    session_id: UUID
+    package_id: str
+    artifact_version: str
+    runtime_sha256: str
+    validation_report_sha256: str
+
+    def restore_verified_runtime(
+        self,
+        artifact_store: KnowledgeArtifactStore,
+        *,
+        active_release: ActiveKnowledgeRuntime | object,
+        validation_report: ProductionValidationReport | object,
+    ) -> ActiveKnowledgeRuntime:
+        verified = artifact_store.load_active_runtime(
+            self.package_id,
+            self.artifact_version,
+            active_release=active_release,
+            validation_report=validation_report,
+        )
+        if (
+            verified.runtime_sha256 != self.runtime_sha256
+            or verified.validation_report_sha256 != self.validation_report_sha256
+        ):
+            raise KnowledgeReleasePinConflictError(
+                "verified Knowledge release does not match the persisted session pin"
+            )
+        return verified
+
+
+@dataclass(frozen=True)
+class EnrichmentCycleRecord:
+    enrichment_cycle_id: UUID
+    session_id: UUID
+    cycle_number: int
+    specification_revision_id: UUID
+    release_pin: KnowledgeReleasePinRecord
+    result: PromptEnrichmentResult
+    created_at: datetime
 
 
 class PersistenceRepository:
@@ -644,6 +705,182 @@ class PersistenceRepository:
             for row in rows:
                 db.expunge(row)
             return result
+
+    def create_enrichment_cycle(
+        self,
+        *,
+        enrichment_cycle_id: UUID,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        expected_previous_cycle_number: int,
+        result: PromptEnrichmentResult,
+        created_at: datetime,
+    ) -> EnrichmentCycleRecord:
+        """Atomically pin one verified release and append one immutable enrichment cycle."""
+
+        try:
+            enrichment = PromptEnrichmentResult.model_validate(result)
+        except ValidationError as exc:
+            raise EnrichmentIntegrityError("enrichment result is invalid") from exc
+        if enrichment.knowledge_validation_report_sha256 is None:
+            raise EnrichmentIntegrityError(
+                "persisted enrichment requires verified ACTIVE release provenance"
+            )
+        if enrichment.design_revision_id != str(expected_revision_id):
+            raise StaleRevisionError(
+                "enrichment result does not match the expected Product State revision"
+            )
+        if expected_previous_cycle_number < 0:
+            raise ValueError("expected_previous_cycle_number must be non-negative")
+
+        pin_identity = (
+            enrichment.knowledge_package_id,
+            enrichment.knowledge_artifact_version,
+            enrichment.knowledge_runtime_sha256,
+            enrichment.knowledge_validation_report_sha256,
+        )
+        cycle_number = expected_previous_cycle_number + 1
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
+                if session.current_revision_id != expected_revision_id:
+                    raise StaleRevisionError(
+                        "Current Product State revision changed during enrichment"
+                    )
+                revision = db.scalar(
+                    select(SpecificationRevisionRow.revision_id).where(
+                        SpecificationRevisionRow.session_id == session_id,
+                        SpecificationRevisionRow.revision_id == expected_revision_id,
+                    )
+                )
+                if revision is None:
+                    raise OwnershipMismatchError(
+                        "Product State revision does not belong to enrichment session"
+                    )
+
+                stored_pin = (
+                    session.knowledge_package_id,
+                    session.knowledge_artifact_version,
+                    session.knowledge_runtime_sha256,
+                    session.knowledge_validation_report_sha256,
+                )
+                if all(value is None for value in stored_pin):
+                    (
+                        session.knowledge_package_id,
+                        session.knowledge_artifact_version,
+                        session.knowledge_runtime_sha256,
+                        session.knowledge_validation_report_sha256,
+                    ) = pin_identity
+                    session.updated_at = created_at
+                elif stored_pin != pin_identity:
+                    raise KnowledgeReleasePinConflictError(
+                        "session is already pinned to a different Knowledge release"
+                    )
+
+                latest_cycle = db.scalar(
+                    select(func.max(EnrichmentCycleRow.cycle_number)).where(
+                        EnrichmentCycleRow.session_id == session_id
+                    )
+                )
+                if (latest_cycle or 0) != expected_previous_cycle_number:
+                    raise EnrichmentCycleConflictError(
+                        "enrichment cycle sequence changed before commit"
+                    )
+
+                row = EnrichmentCycleRow(
+                    enrichment_cycle_id=enrichment_cycle_id,
+                    session_id=session_id,
+                    cycle_number=cycle_number,
+                    specification_revision_id=expected_revision_id,
+                    knowledge_package_id=pin_identity[0],
+                    knowledge_artifact_version=pin_identity[1],
+                    knowledge_runtime_sha256=pin_identity[2],
+                    knowledge_validation_report_sha256=pin_identity[3],
+                    enrichment_version=enrichment.enrichment_version,
+                    result_payload=enrichment.model_dump(mode="json"),
+                    content_hash=enrichment.content_hash,
+                    created_at=created_at,
+                )
+                db.add(row)
+        except IntegrityError as exc:
+            raise EnrichmentCycleConflictError(
+                "enrichment cycle identity or sequence already exists"
+            ) from exc
+
+        return EnrichmentCycleRecord(
+            enrichment_cycle_id=enrichment_cycle_id,
+            session_id=session_id,
+            cycle_number=cycle_number,
+            specification_revision_id=expected_revision_id,
+            release_pin=KnowledgeReleasePinRecord(
+                session_id=session_id,
+                package_id=pin_identity[0],
+                artifact_version=pin_identity[1],
+                runtime_sha256=pin_identity[2],
+                validation_report_sha256=pin_identity[3],
+            ),
+            result=enrichment,
+            created_at=created_at,
+        )
+
+    def get_knowledge_release_pin(
+        self, session_id: UUID, organization_id: UUID
+    ) -> KnowledgeReleasePinRecord:
+        session = self.get_design_session(session_id, organization_id)
+        return self._knowledge_release_pin(session)
+
+    def restore_pinned_knowledge_runtime(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        artifact_store: KnowledgeArtifactStore,
+        *,
+        active_release: ActiveKnowledgeRuntime | object,
+        validation_report: ProductionValidationReport | object,
+    ) -> ActiveKnowledgeRuntime:
+        pin = self.get_knowledge_release_pin(session_id, organization_id)
+        return pin.restore_verified_runtime(
+            artifact_store,
+            active_release=active_release,
+            validation_report=validation_report,
+        )
+
+    def get_enrichment_cycle(
+        self,
+        session_id: UUID,
+        enrichment_cycle_id: UUID,
+        organization_id: UUID,
+    ) -> EnrichmentCycleRecord:
+        session = self.get_design_session(session_id, organization_id)
+        pin = self._knowledge_release_pin(session)
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(EnrichmentCycleRow).where(
+                    EnrichmentCycleRow.session_id == session_id,
+                    EnrichmentCycleRow.enrichment_cycle_id == enrichment_cycle_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("Enrichment cycle not found")
+            return self._enrichment_cycle_record(row, pin)
+
+    def list_enrichment_cycles(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[EnrichmentCycleRecord, ...]:
+        session = self.get_design_session(session_id, organization_id)
+        pin = self._knowledge_release_pin(session)
+        with self._session_factory() as db:
+            rows = db.scalars(
+                select(EnrichmentCycleRow)
+                .where(EnrichmentCycleRow.session_id == session_id)
+                .order_by(EnrichmentCycleRow.cycle_number)
+            ).all()
+            return tuple(self._enrichment_cycle_record(row, pin) for row in rows)
 
     def create_generation_run(self, run: GenerationRun, organization_id: UUID) -> GenerationRun:
         run = GenerationRun.model_validate(run)
@@ -1592,6 +1829,72 @@ class PersistenceRepository:
         compiled = CompiledPrompt.model_validate(row.structured_payload)
         cls._validate_prompt_row(row, compiled)
         return compiled
+
+    @staticmethod
+    def _knowledge_release_pin(session: DesignSessionRow) -> KnowledgeReleasePinRecord:
+        values = (
+            session.knowledge_package_id,
+            session.knowledge_artifact_version,
+            session.knowledge_runtime_sha256,
+            session.knowledge_validation_report_sha256,
+        )
+        if any(value is None for value in values):
+            raise NotFoundError("Session has no verified Knowledge release pin")
+        return KnowledgeReleasePinRecord(
+            session_id=session.session_id,
+            package_id=values[0],
+            artifact_version=values[1],
+            runtime_sha256=values[2],
+            validation_report_sha256=values[3],
+        )
+
+    @staticmethod
+    def _enrichment_cycle_record(
+        row: EnrichmentCycleRow,
+        session_pin: KnowledgeReleasePinRecord,
+    ) -> EnrichmentCycleRecord:
+        try:
+            result = PromptEnrichmentResult.model_validate(row.result_payload)
+        except ValidationError as exc:
+            raise EnrichmentIntegrityError("stored enrichment result is invalid") from exc
+        row_identity = (
+            row.knowledge_package_id,
+            row.knowledge_artifact_version,
+            row.knowledge_runtime_sha256,
+            row.knowledge_validation_report_sha256,
+        )
+        result_identity = (
+            result.knowledge_package_id,
+            result.knowledge_artifact_version,
+            result.knowledge_runtime_sha256,
+            result.knowledge_validation_report_sha256,
+        )
+        pin_identity = (
+            session_pin.package_id,
+            session_pin.artifact_version,
+            session_pin.runtime_sha256,
+            session_pin.validation_report_sha256,
+        )
+        if (
+            result.knowledge_validation_report_sha256 is None
+            or result.design_revision_id != str(row.specification_revision_id)
+            or row.enrichment_version != result.enrichment_version
+            or row.content_hash != result.content_hash
+            or row_identity != result_identity
+            or row_identity != pin_identity
+        ):
+            raise EnrichmentIntegrityError(
+                "stored enrichment relational metadata does not match its result payload"
+            )
+        return EnrichmentCycleRecord(
+            enrichment_cycle_id=row.enrichment_cycle_id,
+            session_id=row.session_id,
+            cycle_number=row.cycle_number,
+            specification_revision_id=row.specification_revision_id,
+            release_pin=session_pin,
+            result=result,
+            created_at=PersistenceRepository._utc(row.created_at),
+        )
 
     @staticmethod
     def _generation_row(run: GenerationRun) -> GenerationRunRow:

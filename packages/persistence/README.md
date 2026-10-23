@@ -48,6 +48,15 @@ immutable prompt revision and adds one immutable selected/rejected decision per 
 single GenerationRuns remain valid with a null iteration link. Current Visual State is derived from
 the latest selected Asset; rejected Assets are retained.
 
+The `0012_enrichment_cycles` migration adds an optional all-or-none verified Knowledge Library pin
+to each session and an append-only, numbered enrichment-cycle history. A cycle stores the existing
+`PromptEnrichmentResult` JSON plus relational Product State revision, release identity, validation
+report hash, and content hash mirrors. The repository locks the scoped session, verifies current
+Product State and expected cycle number, establishes or checks the immutable release pin, and inserts
+the cycle in one transaction. Reads revalidate both the result hash and relational mirrors. Restoring
+the session pin must also pass `KnowledgeArtifactStore.load_active_runtime()`; persisted metadata is
+never activation authority and no latest-version or external-mirror fallback exists.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.
