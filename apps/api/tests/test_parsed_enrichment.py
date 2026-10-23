@@ -2,6 +2,8 @@ import copy
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from jewelai_domain import (
@@ -38,6 +40,15 @@ from jewelai_api.clarification import (
     ClarificationPlanInputError,
     UnaskedReason,
     plan_clarifications,
+)
+from jewelai_api.clarification_answers import (
+    ClarificationAnswer,
+    ClarificationAnswerError,
+    ClarificationAnswerErrorCode,
+    ClarificationAnswerOutcome,
+    ClarificationAnswerReason,
+    ClarificationDecision,
+    process_clarification_answer,
 )
 from jewelai_api.parsed_enrichment import (
     CandidateDispositionOutcome,
@@ -873,3 +884,539 @@ def test_clarification_planner_rejects_mismatched_release_lineage(
 
     with pytest.raises(ClarificationPlanInputError, match="identities do not match"):
         _plan(ring, mismatched, runtime_artifacts)
+
+
+def _answer(plan, question, *, session_id, decision, selected_option=None, **changes):
+    payload = {
+        "session_id": session_id,
+        "plan_content_hash": plan.content_hash,
+        "clarification_id": question.clarification_id,
+        "decision": decision,
+        "selected_option": selected_option,
+        "expected_revision_id": plan.design_revision_id,
+        "knowledge_package_id": plan.knowledge_package_id,
+        "knowledge_artifact_version": plan.knowledge_artifact_version,
+        "knowledge_runtime_sha256": plan.knowledge_runtime_sha256,
+        "knowledge_validation_report_sha256": plan.knowledge_validation_report_sha256,
+        "source": MessageSource(message_id="clarification-answer", recorded_at=NOW),
+    }
+    payload.update(changes)
+    return ClarificationAnswer.model_validate(payload)
+
+
+def _process(plan, answer, revision, active_release, runtime_artifacts, **changes):
+    options = {
+        "authoritative_session_id": answer.session_id,
+        "current_revision": revision,
+        "active_release": active_release[4],
+        "dictionary": runtime_artifacts.dictionary,
+        "questions": runtime_artifacts.questions,
+        "rules": runtime_artifacts.rules,
+        "created_at": NOW,
+    }
+    options.update(changes)
+    return process_clarification_answer(plan, answer, **options)
+
+
+def _ambiguous_shape_plan(ring, dictionary, templates, active_release, runtime_artifacts):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["center_stone"]["shape"] = None
+    revision = DesignRevision.model_validate(payload)
+    _, enriched = _enrich(
+        "Design a platinum ring with either an oval or emerald-cut center diamond.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    plan = _plan(revision, enriched, runtime_artifacts)
+    question = next(
+        item for item in plan.questions if item.category == ClarificationCategory.MATERIAL_AMBIGUITY
+    )
+    return revision, plan, question
+
+
+def _preference_plan(ring, dictionary, templates, active_release, runtime_artifacts):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["metal"]["color"] = None
+    revision = DesignRevision.model_validate(payload)
+    _, enriched = _enrich(
+        "I would probably prefer a delicate yellow-gold ring.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    plan = _plan(revision, enriched, runtime_artifacts)
+    question = next(
+        item
+        for item in plan.questions
+        if item.category == ClarificationCategory.PREFERENCE_ACCEPTANCE
+    )
+    return revision, plan, question
+
+
+def _recommendation_plan(ring, dictionary, templates, active_release, runtime_artifacts):
+    revision, _, _ = _preference_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    _, enriched = _enrich(
+        "Create a ring.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    store, stored, _, report, active = active_release
+    recommendation = enrich_prompt_with_active_release(
+        revision,
+        templates,
+        store,
+        knowledge_package_id=stored.package_id,
+        knowledge_artifact_version=stored.artifact_version,
+        active_release=active,
+        validation_report=report,
+        proposals=(
+            EnrichmentProposal(
+                target="metal.color",
+                semantic_state=RuntimeSemanticState.RECOMMENDED,
+                provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+                value="yellow",
+                source_id="recommendation-yellow",
+            ),
+        ),
+    )
+    payload = enriched.model_dump(mode="json")
+    payload["enrichment_result"] = recommendation.model_dump(mode="json")
+    enriched = type(enriched).model_validate(payload)
+    plan = _plan(revision, enriched, runtime_artifacts)
+    question = next(
+        item
+        for item in plan.questions
+        if item.category == ClarificationCategory.KNOWLEDGE_RECOMMENDATION
+    )
+    return revision, plan, question
+
+
+def test_answer_selects_only_an_offered_shape_and_preserves_unrelated_state(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _ambiguous_shape_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    session_id = uuid4()
+    answer = _answer(
+        plan,
+        question,
+        session_id=session_id,
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="emerald_cut",
+    )
+
+    result = _process(plan, answer, revision, active_release, runtime_artifacts)
+
+    assert result.outcome == ClarificationAnswerOutcome.APPLIED
+    assert result.reason == ClarificationAnswerReason.USER_SELECTED_OFFERED_OPTION
+    assert result.resulting_revision.design.center_stone.shape.value == "emerald_cut"
+    assert result.resulting_revision.design.center_stone.shape.source == answer.source
+    assert result.resulting_revision.design.metal == revision.design.metal
+    assert result.resulting_revision.design.side_stones == revision.design.side_stones
+    assert result.previous_revision_id == revision.revision_id
+    assert result.new_revision_id == result.resulting_revision.revision_id
+    assert result.source_candidate_ids == question.source_candidate_ids
+    assert result.evidence == question.evidence
+    assert result.knowledge_runtime_sha256 == plan.knowledge_runtime_sha256
+
+
+def test_answer_application_does_not_create_a_missing_side_stone_group(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["side_stones"] = []
+    without_side_stones = DesignRevision.model_validate(payload)
+    revision, plan, question = _ambiguous_shape_plan(
+        without_side_stones,
+        dictionary,
+        templates,
+        active_release,
+        runtime_artifacts,
+    )
+    answer = _answer(
+        plan,
+        question,
+        session_id=uuid4(),
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="oval",
+    )
+
+    result = _process(plan, answer, revision, active_release, runtime_artifacts)
+
+    assert result.outcome == ClarificationAnswerOutcome.APPLIED
+    assert revision.design.side_stones == ()
+    assert result.resulting_revision.design.side_stones == ()
+
+
+def test_explicit_preference_acceptance_applies_only_the_recorded_option(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _preference_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    answer = _answer(
+        plan,
+        question,
+        session_id=uuid4(),
+        decision=ClarificationDecision.ACCEPT,
+    )
+
+    result = _process(plan, answer, revision, active_release, runtime_artifacts)
+
+    assert result.outcome == ClarificationAnswerOutcome.APPLIED
+    assert result.reason == ClarificationAnswerReason.USER_ACCEPTED_PREFERENCE
+    assert result.selected_option.value == "yellow"
+    assert result.resulting_revision.design.metal.color.value == "yellow"
+    assert result.resulting_revision.design.center_stone == revision.design.center_stone
+
+
+@pytest.mark.parametrize(
+    ("decision", "outcome", "reason", "resolved"),
+    [
+        (
+            ClarificationDecision.REJECT,
+            ClarificationAnswerOutcome.REJECTED,
+            ClarificationAnswerReason.USER_REJECTED_OFFER,
+            True,
+        ),
+        (
+            ClarificationDecision.SKIP,
+            ClarificationAnswerOutcome.SKIPPED,
+            ClarificationAnswerReason.USER_SKIPPED,
+            False,
+        ),
+        (
+            ClarificationDecision.UNKNOWN,
+            ClarificationAnswerOutcome.UNKNOWN,
+            ClarificationAnswerReason.USER_DOES_NOT_KNOW,
+            False,
+        ),
+    ],
+)
+def test_reject_skip_and_unknown_preserve_state_without_implicit_acceptance(
+    decision,
+    outcome,
+    reason,
+    resolved,
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _recommendation_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    answer = _answer(plan, question, session_id=uuid4(), decision=decision)
+
+    first = _process(plan, answer, revision, active_release, runtime_artifacts)
+    second = _process(plan, answer, revision, active_release, runtime_artifacts)
+
+    assert first == second
+    assert first.outcome == outcome
+    assert first.reason == reason
+    assert first.question_resolved is resolved
+    assert first.blocks_progression is False
+    assert first.new_revision_id is None
+    assert first.resulting_revision is None
+    assert revision.design.metal.color is None
+    assert first.source_proposal_ids == ("recommendation-yellow",)
+
+
+def test_knowledge_recommendation_requires_explicit_acceptance_to_apply(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _recommendation_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    answer = _answer(
+        plan,
+        question,
+        session_id=uuid4(),
+        decision=ClarificationDecision.ACCEPT,
+    )
+
+    result = _process(plan, answer, revision, active_release, runtime_artifacts)
+
+    assert result.outcome == ClarificationAnswerOutcome.APPLIED
+    assert result.reason == ClarificationAnswerReason.USER_ACCEPTED_RECOMMENDATION
+    assert result.resulting_revision.design.metal.color.value == "yellow"
+    assert result.source_proposal_ids == ("recommendation-yellow",)
+
+
+def test_skip_or_unknown_does_not_resolve_a_blocking_question(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _ambiguous_shape_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    assert question.importance == ClarificationImportance.BLOCKING
+
+    for decision in (ClarificationDecision.SKIP, ClarificationDecision.UNKNOWN):
+        answer = _answer(plan, question, session_id=uuid4(), decision=decision)
+        result = _process(plan, answer, revision, active_release, runtime_artifacts)
+        assert result.question_resolved is False
+        assert result.blocks_progression is True
+        assert result.new_revision_id is None
+
+
+def test_invalid_option_unknown_question_and_cross_session_fail_closed(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _ambiguous_shape_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    session_id = uuid4()
+    invalid = _answer(
+        plan,
+        question,
+        session_id=session_id,
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="round",
+    )
+    with pytest.raises(ClarificationAnswerError) as invalid_error:
+        _process(plan, invalid, revision, active_release, runtime_artifacts)
+    assert invalid_error.value.code == ClarificationAnswerErrorCode.INVALID_OPTION
+
+    unknown = invalid.model_copy(
+        update={"clarification_id": "clarification_does_not_exist", "selected_option": "oval"}
+    )
+    with pytest.raises(ClarificationAnswerError) as unknown_error:
+        _process(plan, unknown, revision, active_release, runtime_artifacts)
+    assert unknown_error.value.code == ClarificationAnswerErrorCode.UNKNOWN_QUESTION
+
+    valid = invalid.model_copy(update={"selected_option": "oval"})
+    with pytest.raises(ClarificationAnswerError) as scope_error:
+        _process(
+            plan,
+            valid,
+            revision,
+            active_release,
+            runtime_artifacts,
+            authoritative_session_id=uuid4(),
+        )
+    assert scope_error.value.code == ClarificationAnswerErrorCode.CROSS_SESSION
+
+
+def test_tampered_plan_stale_revision_and_release_mismatch_fail_closed(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _ambiguous_shape_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    answer = _answer(
+        plan,
+        question,
+        session_id=uuid4(),
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="oval",
+    )
+
+    tampered = plan.model_copy(update={"content_hash": "0" * 64})
+    with pytest.raises(ClarificationAnswerError) as plan_error:
+        _process(tampered, answer, revision, active_release, runtime_artifacts)
+    assert plan_error.value.code == ClarificationAnswerErrorCode.INVALID_PLAN
+
+    stale_payload = revision.model_dump(mode="json")
+    stale_payload["revision_id"] = str(uuid4())
+    stale = DesignRevision.model_validate(stale_payload)
+    with pytest.raises(ClarificationAnswerError) as stale_error:
+        _process(plan, answer, stale, active_release, runtime_artifacts)
+    assert stale_error.value.code == ClarificationAnswerErrorCode.STALE_REVISION
+
+    mismatched = answer.model_copy(update={"knowledge_runtime_sha256": "0" * 64})
+    with pytest.raises(ClarificationAnswerError) as release_error:
+        _process(plan, mismatched, revision, active_release, runtime_artifacts)
+    assert release_error.value.code == ClarificationAnswerErrorCode.RELEASE_MISMATCH
+
+
+def test_question_and_rules_artifact_mismatch_fails_closed(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _ambiguous_shape_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    answer = _answer(
+        plan,
+        question,
+        session_id=uuid4(),
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="oval",
+    )
+    wrong_questions = SimpleNamespace(artifact_version="9.9.9")
+    with pytest.raises(ClarificationAnswerError) as question_error:
+        _process(
+            plan,
+            answer,
+            revision,
+            active_release,
+            runtime_artifacts,
+            questions=wrong_questions,
+        )
+    assert question_error.value.code == ClarificationAnswerErrorCode.ARTIFACT_MISMATCH
+
+    wrong_rules = SimpleNamespace(artifact_version="9.9.9")
+    with pytest.raises(ClarificationAnswerError) as rules_error:
+        _process(
+            plan,
+            answer,
+            revision,
+            active_release,
+            runtime_artifacts,
+            rules=wrong_rules,
+        )
+    assert rules_error.value.code == ClarificationAnswerErrorCode.ARTIFACT_MISMATCH
+
+
+@pytest.mark.parametrize(("confirmed", "locked"), [(True, False), (True, True)])
+def test_confirmed_and_locked_targets_cannot_be_overwritten(
+    confirmed,
+    locked,
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _preference_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    payload = revision.model_dump(mode="json")
+    protected = copy.deepcopy(ring.model_dump(mode="json")["design"]["metal"]["color"])
+    protected["confirmed"] = confirmed
+    protected["locked"] = locked
+    payload["design"]["metal"]["color"] = protected
+    authoritative = DesignRevision.model_validate(payload)
+    answer = _answer(
+        plan,
+        question,
+        session_id=uuid4(),
+        decision=ClarificationDecision.ACCEPT,
+    )
+
+    result = _process(plan, answer, authoritative, active_release, runtime_artifacts)
+
+    assert result.outcome == ClarificationAnswerOutcome.DEFERRED
+    assert result.reason == ClarificationAnswerReason.TARGET_PROTECTED
+    assert result.new_revision_id is None
+    assert authoritative.design.metal.color.value == "white"
+
+
+def test_duplicate_is_idempotent_and_conflicting_repeat_is_rejected(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, question = _ambiguous_shape_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    session_id = uuid4()
+    emerald = _answer(
+        plan,
+        question,
+        session_id=session_id,
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="emerald_cut",
+    )
+    first = _process(plan, emerald, revision, active_release, runtime_artifacts)
+
+    duplicate = _process(
+        plan,
+        emerald,
+        revision,
+        active_release,
+        runtime_artifacts,
+        previous_results=(first,),
+    )
+    assert duplicate == first
+    assert duplicate.content_hash == first.content_hash
+    assert duplicate.new_revision_id == first.new_revision_id
+
+    oval = emerald.model_copy(update={"selected_option": "oval"})
+    with pytest.raises(ClarificationAnswerError) as conflict:
+        _process(
+            plan,
+            oval,
+            revision,
+            active_release,
+            runtime_artifacts,
+            previous_results=(first,),
+        )
+    assert conflict.value.code == ClarificationAnswerErrorCode.CONFLICTING_ANSWER
+
+
+def test_unsupported_rule_answer_never_creates_groups_or_mutates_state(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    revision, plan, _ = _preference_plan(
+        ring, dictionary, templates, active_release, runtime_artifacts
+    )
+    required_without_options = next(
+        item
+        for item in plan.questions
+        if item.category == ClarificationCategory.REQUIRED_INFORMATION and not item.options
+    )
+    answer = _answer(
+        plan,
+        required_without_options,
+        session_id=uuid4(),
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option="invented",
+    )
+    before = copy.deepcopy(revision)
+
+    with pytest.raises(ClarificationAnswerError) as error:
+        _process(plan, answer, revision, active_release, runtime_artifacts)
+
+    assert error.value.code == ClarificationAnswerErrorCode.INVALID_OPTION
+    assert revision == before
+    assert revision.design.side_stones == before.design.side_stones
