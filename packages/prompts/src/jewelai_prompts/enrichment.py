@@ -15,13 +15,13 @@ from jewelai_domain.knowledge_policy import (
     RuntimeStateProposal,
     build_knowledge_runtime_state,
 )
-from jewelai_domain.models import DesignRevision, ImmutableModel
-from pydantic import JsonValue, model_validator
+from jewelai_domain.models import DesignRevision, ImmutableModel, Text
+from pydantic import JsonValue, field_validator, model_validator
 
 from .compiler import compile_prompt
 from .models import CompiledPrompt, PromptTemplateBundle
 
-PROMPT_ENRICHMENT_VERSION = "1.0.0"
+PROMPT_ENRICHMENT_VERSION = "1.1.0"
 
 
 class EnrichmentMatrixCell(ImmutableModel):
@@ -40,8 +40,15 @@ class EnrichmentProposal(ImmutableModel):
     semantic_state: RuntimeSemanticState
     provenance: RuntimeProvenance
     value: JsonValue = None
-    source_id: str
+    source_id: Text
     preservation: PreservationIntent = PreservationIntent.CHANGE
+
+    @field_validator("source_id")
+    @classmethod
+    def validate_exact_source_id(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("enrichment proposal source_id must be exact")
+        return value
 
 
 class EnrichmentDecision(ImmutableModel):
@@ -49,11 +56,18 @@ class EnrichmentDecision(ImmutableModel):
     outcome: Literal["APPLIED", "KEPT", "BLOCKED"]
     reason: str
     applicable_policy_ids: tuple[str, ...]
+    proposal: EnrichmentProposal
     result: EnrichmentMatrixCell
+
+    @model_validator(mode="after")
+    def validate_target_lineage(self):
+        if self.target != self.proposal.target or self.target != self.result.target:
+            raise ValueError("enrichment decision target lineage mismatch")
+        return self
 
 
 class PromptEnrichmentResult(ImmutableModel):
-    enrichment_version: Literal["1.0.0"] = PROMPT_ENRICHMENT_VERSION
+    enrichment_version: Literal["1.1.0"] = PROMPT_ENRICHMENT_VERSION
     design_revision_id: str
     knowledge_package_id: str
     knowledge_artifact_version: str
@@ -161,6 +175,7 @@ def enrich_prompt(
                 outcome=evaluation.outcome,
                 reason=evaluation.reason,
                 applicable_policy_ids=evaluation.applicable_policy_ids,
+                proposal=proposal,
                 result=_cell(
                     evaluation.result,
                     applicable_policy_ids=evaluation.applicable_policy_ids,

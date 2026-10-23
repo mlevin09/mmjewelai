@@ -14,6 +14,13 @@ into a structured manifest and rendered under the template's locked-constraint l
 `validate_compiled_prompt` recompiles from the pinned revision/template and requires complete model
 equality, detecting altered text, hashes, entries, disclosures, metadata, or lock manifests.
 
+`enrich_prompt` is the deterministic provider-neutral orchestration entry point for the current
+Knowledge Library enrichment slice. `PromptEnrichmentResult` v1.1.0 retains the exact validated
+proposal on every `EnrichmentDecision`, including kept and blocked proposals, so later persistence
+can retain attempted value, source, provenance and preservation intent. The result remains derived
+evidence: it does not mutate `DesignRevision`, accept recommendations automatically, create repeated
+groups, interpret policy prose, or alter the backward-compatible `CompiledPrompt`.
+
 ```sh
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'

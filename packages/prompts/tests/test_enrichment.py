@@ -10,8 +10,11 @@ from jewelai_domain.knowledge_policy import (
     RuntimeSemanticState,
 )
 from jewelai_domain.models import DesignRevision
+from pydantic import ValidationError
 
 from jewelai_prompts import (
+    EnrichmentDecision,
+    EnrichmentMatrixCell,
     EnrichmentProposal,
     enrich_prompt,
     load_prompt_templates,
@@ -72,6 +75,7 @@ def test_enrichment_matrix_is_deterministic_and_pinned(ring, templates, runtime)
     payload = first.model_dump(mode="json", exclude={"content_hash"})
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     assert first.content_hash == hashlib.sha256(canonical.encode()).hexdigest()
+    assert first.enrichment_version == "1.1.0"
 
 
 def test_lower_precedence_enrichment_cannot_overwrite_user_shape(ring, templates, runtime):
@@ -221,3 +225,124 @@ def test_blocked_unknown_target_does_not_pollute_final_matrix(ring, templates, r
     final_targets = {cell.target for cell in result.final_matrix}
     assert "references" not in final_targets
     assert "side_stones.unknown.stones.shape" not in final_targets
+
+
+def test_decisions_retain_exact_proposal_evidence_for_later_persistence(ring, templates, runtime):
+    proposals = (
+        EnrichmentProposal(
+            target="center_stone.setting",
+            semantic_state=RuntimeSemanticState.RECOMMENDED,
+            provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+            value="prong_setting",
+            source_id="REC-SETTING-1",
+        ),
+        EnrichmentProposal(
+            target="center_stone.shape",
+            semantic_state=RuntimeSemanticState.RECOMMENDED,
+            provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+            value="round",
+            source_id="REC-SHAPE-1",
+            preservation=PreservationIntent.KEEP,
+        ),
+        EnrichmentProposal(
+            target="metal.color",
+            semantic_state=RuntimeSemanticState.NORMALIZED,
+            provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+            value="yellow",
+            source_id="MESSAGE-1",
+        ),
+        EnrichmentProposal(
+            target="side_stones.unknown.stones.shape",
+            semantic_state=RuntimeSemanticState.NORMALIZED,
+            provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+            value="marquise",
+            source_id="MESSAGE-2",
+        ),
+    )
+
+    result = enrich_prompt(ring, templates, runtime, proposals=proposals)
+    assert result == enrich_prompt(ring, templates, runtime, proposals=proposals)
+    decisions = {decision.target: decision for decision in result.decisions}
+    initial = {cell.target: cell for cell in result.initial_matrix}
+    final = {cell.target: cell for cell in result.final_matrix}
+
+    assert decisions["center_stone.setting"].outcome == "APPLIED"
+    assert decisions["center_stone.shape"].outcome == "KEPT"
+    assert decisions["metal.color"].outcome == "BLOCKED"
+    assert decisions["side_stones.unknown.stones.shape"].outcome == "BLOCKED"
+    assert {decision.proposal for decision in result.decisions} == set(proposals)
+    assert decisions["center_stone.setting"].result.confirmed is False
+    assert decisions["center_stone.setting"].result.provenance == (
+        RuntimeProvenance.JEWELAI_RECOMMENDED
+    )
+    assert decisions["center_stone.setting"].result.source_ids == ("REC-SETTING-1",)
+    assert initial["center_stone.setting"].semantic_state == RuntimeSemanticState.MISSING
+    assert final["center_stone.setting"] == decisions["center_stone.setting"].result
+    assert final["center_stone.shape"] == initial["center_stone.shape"]
+    assert final["metal.color"] == initial["metal.color"]
+
+
+@pytest.mark.parametrize("source_id", ["", " ", " leading", "trailing "])
+def test_enrichment_proposal_requires_an_exact_nonblank_source(source_id):
+    with pytest.raises(ValidationError):
+        EnrichmentProposal(
+            target="center_stone.setting",
+            semantic_state=RuntimeSemanticState.RECOMMENDED,
+            provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+            value="prong_setting",
+            source_id=source_id,
+        )
+
+
+def test_enrichment_decision_rejects_mismatched_target_lineage():
+    proposal = EnrichmentProposal(
+        target="center_stone.setting",
+        semantic_state=RuntimeSemanticState.RECOMMENDED,
+        provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+        value="prong_setting",
+        source_id="REC-SETTING-1",
+    )
+    with pytest.raises(ValidationError, match="target lineage mismatch"):
+        EnrichmentDecision(
+            target="center_stone.shape",
+            outcome="APPLIED",
+            reason="higher_or_equal_precedence",
+            applicable_policy_ids=(),
+            proposal=proposal,
+            result=EnrichmentMatrixCell(
+                target="center_stone.setting",
+                semantic_state=RuntimeSemanticState.RECOMMENDED,
+                provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+                value="prong_setting",
+                confirmed=False,
+                locked=False,
+                source_ids=("REC-SETTING-1",),
+            ),
+        )
+
+
+def test_blocked_proposal_source_remains_part_of_enrichment_content_hash(ring, templates, runtime):
+    def blocked(source_id):
+        return enrich_prompt(
+            ring,
+            templates,
+            runtime,
+            proposals=(
+                EnrichmentProposal(
+                    target="metal.color",
+                    semantic_state=RuntimeSemanticState.NORMALIZED,
+                    provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+                    value="yellow",
+                    source_id=source_id,
+                ),
+            ),
+        )
+
+    first = blocked("MESSAGE-1")
+    second = blocked("MESSAGE-2")
+
+    assert first.decisions[0].outcome == second.decisions[0].outcome == "BLOCKED"
+    assert first.decisions[0].result == second.decisions[0].result
+    assert first.decisions[0].proposal.source_id == "MESSAGE-1"
+    assert second.decisions[0].proposal.source_id == "MESSAGE-2"
+    assert first.content_hash != second.content_hash
