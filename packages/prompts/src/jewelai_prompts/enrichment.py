@@ -4,6 +4,11 @@ import hashlib
 import json
 from typing import Literal
 
+from jewelai_domain.knowledge_activation import (
+    ActiveKnowledgeRuntime,
+    ProductionValidationReport,
+    Sha256,
+)
 from jewelai_domain.knowledge_library import CompiledKnowledgeLibrary
 from jewelai_domain.knowledge_policy import (
     KnowledgePolicyEngine,
@@ -15,8 +20,9 @@ from jewelai_domain.knowledge_policy import (
     RuntimeStateProposal,
     build_knowledge_runtime_state,
 )
+from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import DesignRevision, ImmutableModel, Text
-from pydantic import JsonValue, field_validator, model_validator
+from pydantic import Field, JsonValue, field_validator, model_validator
 
 from .compiler import compile_prompt
 from .models import CompiledPrompt, PromptTemplateBundle
@@ -72,6 +78,10 @@ class PromptEnrichmentResult(ImmutableModel):
     knowledge_package_id: str
     knowledge_artifact_version: str
     knowledge_runtime_sha256: str
+    knowledge_validation_report_sha256: Sha256 | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     initial_matrix: tuple[EnrichmentMatrixCell, ...]
     decisions: tuple[EnrichmentDecision, ...]
     final_matrix: tuple[EnrichmentMatrixCell, ...]
@@ -203,6 +213,42 @@ def enrich_prompt(
         "final_matrix": [item.model_dump(mode="json") for item in final_matrix],
         "compiled_prompt": compiled.model_dump(mode="json"),
     }
+    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return PromptEnrichmentResult(
+        **payload,
+        content_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+    )
+
+
+def enrich_prompt_with_active_release(
+    revision: DesignRevision,
+    templates: PromptTemplateBundle,
+    artifact_store: KnowledgeArtifactStore,
+    *,
+    knowledge_package_id: str,
+    knowledge_artifact_version: str,
+    active_release: ActiveKnowledgeRuntime | object,
+    validation_report: ProductionValidationReport | object,
+    proposals: tuple[EnrichmentProposal, ...] = (),
+    template_id: str = "jewelry_visualization",
+) -> PromptEnrichmentResult:
+    """Enrich one cycle with an explicitly selected, durably verified ACTIVE release."""
+
+    verified = artifact_store.load_active_runtime(
+        knowledge_package_id,
+        knowledge_artifact_version,
+        active_release=active_release,
+        validation_report=validation_report,
+    )
+    base = enrich_prompt(
+        revision,
+        templates,
+        verified.compiled_runtime,
+        proposals=proposals,
+        template_id=template_id,
+    )
+    payload = base.model_dump(mode="json", exclude={"content_hash"})
+    payload["knowledge_validation_report_sha256"] = verified.validation_report_sha256
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return PromptEnrichmentResult(
         **payload,

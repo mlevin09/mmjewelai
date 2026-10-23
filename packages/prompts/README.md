@@ -21,6 +21,15 @@ can retain attempted value, source, provenance and preservation intent. The resu
 evidence: it does not mutate `DesignRevision`, accept recommendations automatically, create repeated
 groups, interpret policy prose, or alter the backward-compatible `CompiledPrompt`.
 
+`enrich_prompt_with_active_release` is the production-pinning boundary for one in-memory enrichment
+cycle. Its caller must explicitly name a package ID and artifact version and supply the existing
+ACTIVE envelope and production-validation report. It delegates durable artifact and evidence checks
+to `KnowledgeArtifactStore.load_active_runtime()`, uses only the verified stored runtime, and records
+the validation-report SHA-256 in the immutable enrichment result. It never selects a latest release.
+The original `enrich_prompt` remains available for backward-compatible offline and validation use;
+it does not claim verified ACTIVE provenance. Session persistence and runtime API wiring remain out
+of scope for this boundary.
+
 ```sh
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
