@@ -57,6 +57,15 @@ the cycle in one transaction. Reads revalidate both the result hash and relation
 the session pin must also pass `KnowledgeArtifactStore.load_active_runtime()`; persisted metadata is
 never activation authority and no latest-version or external-mirror fallback exists.
 
+The `0013_enrichment_decisions` migration adds immutable clarification-answer and user-correction
+records. Processing and enrichment remain outside the database transaction. At commit, the
+repository locks the organization-scoped session and rechecks its Product State revision, exact
+Knowledge release pin, artifact lineage, and (for corrections) authoritative latest enrichment
+cycle. An authorized revision, session pointer, decision/correction record, and prepared next cycle
+are then flushed and committed as one unit. Database uniqueness makes identical retries durable and
+conflicting retries fail closed across workers and restarts. Reads revalidate payload hashes,
+relational mirrors, revision lineage, and correction-cycle links; they never regenerate history.
+
 Revision writes use a conditional `UPDATE design_session ... WHERE current_revision_id = :expected`
 inside the same transaction as the immutable revision insert. A zero-row update raises the typed
 `StaleRevisionError`; no stale snapshot is committed.

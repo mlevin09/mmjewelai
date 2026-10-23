@@ -219,6 +219,94 @@ class EnrichmentCycleRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class ClarificationAnswerRow(Base):
+    __tablename__ = "clarification_answer"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "plan_content_hash",
+            "clarification_id",
+            name="uq_clarification_answer_question",
+        ),
+        Index("ix_clarification_answer_session_created", "session_id", "created_at"),
+    )
+
+    answer_record_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    plan_content_hash: Mapped[str] = mapped_column(String(64))
+    clarification_id: Mapped[str] = mapped_column(String(200))
+    previous_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"), index=True
+    )
+    new_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    decision: Mapped[str] = mapped_column(String(32))
+    outcome: Mapped[str] = mapped_column(String(32))
+    answer_hash: Mapped[str] = mapped_column(String(64), index=True)
+    knowledge_package_id: Mapped[str] = mapped_column(String(200))
+    knowledge_artifact_version: Mapped[str] = mapped_column(String(32))
+    knowledge_runtime_sha256: Mapped[str] = mapped_column(String(64))
+    knowledge_validation_report_sha256: Mapped[str] = mapped_column(String(64))
+    question_artifact_version: Mapped[str] = mapped_column(String(32))
+    rules_artifact_version: Mapped[str] = mapped_column(String(32))
+    result_payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class UserCorrectionRow(Base):
+    __tablename__ = "user_correction"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "source_identity_hash",
+            name="uq_user_correction_source",
+        ),
+        UniqueConstraint("next_enrichment_cycle_id", name="uq_user_correction_next_cycle"),
+        Index("ix_user_correction_session_created", "session_id", "created_at"),
+    )
+
+    correction_record_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    source_kind: Mapped[str] = mapped_column(String(32))
+    source_message_id: Mapped[str] = mapped_column(String(2000))
+    source_identity_hash: Mapped[str] = mapped_column(String(64))
+    correction_text: Mapped[str] = mapped_column(String(2000))
+    previous_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"), index=True
+    )
+    new_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    previous_enrichment_cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("enrichment_cycle.enrichment_cycle_id", ondelete="RESTRICT"), index=True
+    )
+    next_enrichment_cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("enrichment_cycle.enrichment_cycle_id", ondelete="RESTRICT"), index=True
+    )
+    outcome: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(String(100))
+    semantic_hash: Mapped[str] = mapped_column(String(64), index=True)
+    knowledge_package_id: Mapped[str] = mapped_column(String(200))
+    knowledge_artifact_version: Mapped[str] = mapped_column(String(32))
+    knowledge_runtime_sha256: Mapped[str] = mapped_column(String(64))
+    knowledge_validation_report_sha256: Mapped[str] = mapped_column(String(64))
+    dictionary_artifact_version: Mapped[str] = mapped_column(String(32))
+    prompt_template_artifact_version: Mapped[str] = mapped_column(String(32))
+    result_payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class IterativeEditRow(Base):
     __tablename__ = "iterative_edit"
     __table_args__ = (Index("ix_iterative_edit_session_created", "session_id", "created_at"),)
