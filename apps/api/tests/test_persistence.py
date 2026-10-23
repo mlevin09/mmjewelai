@@ -940,6 +940,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "alembic_version",
         "auth_principal",
         "design_session",
+        "enrichment_cycle",
         "generation_run",
         "generation_dispatch_outbox",
         "iterative_edit",
@@ -953,9 +954,14 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "visualization_iteration",
         "visualization_selection",
     }
-    assert "prompt_artifact_version" in {
-        column["name"] for column in inspect(engine).get_columns("design_session")
-    }
+    session_columns = {column["name"] for column in inspect(engine).get_columns("design_session")}
+    assert {
+        "prompt_artifact_version",
+        "knowledge_package_id",
+        "knowledge_artifact_version",
+        "knowledge_runtime_sha256",
+        "knowledge_validation_report_sha256",
+    }.issubset(session_columns)
     command.downgrade(config, "base")
     assert inspect(engine).get_table_names() == ["alembic_version"]
     engine.dispose()

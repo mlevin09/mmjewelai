@@ -77,6 +77,17 @@ class ProjectRow(Base):
 
 class DesignSessionRow(Base):
     __tablename__ = "design_session"
+    __table_args__ = (
+        CheckConstraint(
+            "(knowledge_package_id IS NULL AND knowledge_artifact_version IS NULL "
+            "AND knowledge_runtime_sha256 IS NULL "
+            "AND knowledge_validation_report_sha256 IS NULL) OR "
+            "(knowledge_package_id IS NOT NULL AND knowledge_artifact_version IS NOT NULL "
+            "AND knowledge_runtime_sha256 IS NOT NULL "
+            "AND knowledge_validation_report_sha256 IS NOT NULL)",
+            name="ck_design_session_knowledge_pin_complete",
+        ),
+    )
 
     session_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     project_id: Mapped[UUID] = mapped_column(
@@ -93,6 +104,12 @@ class DesignSessionRow(Base):
     question_artifact_version: Mapped[str] = mapped_column(String(32))
     rules_artifact_version: Mapped[str] = mapped_column(String(32))
     prompt_artifact_version: Mapped[str] = mapped_column(String(32))
+    knowledge_package_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    knowledge_artifact_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    knowledge_runtime_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    knowledge_validation_report_sha256: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
 
 
 class SpecificationRevisionRow(Base):
@@ -172,6 +189,32 @@ class PromptRevisionRow(Base):
     template_artifact_version: Mapped[str] = mapped_column(String(32))
     compiled_text: Mapped[str] = mapped_column(String)
     structured_payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class EnrichmentCycleRow(Base):
+    __tablename__ = "enrichment_cycle"
+    __table_args__ = (
+        CheckConstraint("cycle_number >= 1", name="ck_enrichment_cycle_number_positive"),
+        UniqueConstraint("session_id", "cycle_number", name="uq_enrichment_cycle_session_number"),
+        Index("ix_enrichment_cycle_session_created", "session_id", "created_at"),
+    )
+
+    enrichment_cycle_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    cycle_number: Mapped[int] = mapped_column(Integer)
+    specification_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"), index=True
+    )
+    knowledge_package_id: Mapped[str] = mapped_column(String(200))
+    knowledge_artifact_version: Mapped[str] = mapped_column(String(32))
+    knowledge_runtime_sha256: Mapped[str] = mapped_column(String(64))
+    knowledge_validation_report_sha256: Mapped[str] = mapped_column(String(64))
+    enrichment_version: Mapped[str] = mapped_column(String(32))
+    result_payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
