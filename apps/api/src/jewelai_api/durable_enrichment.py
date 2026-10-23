@@ -13,6 +13,7 @@ from jewelai_persistence import (
     PersistenceRepository,
     UserCorrectionRecord,
 )
+from jewelai_prompts import PromptEnrichmentResult
 
 from .clarification_answers import ClarificationAnswerResult
 from .correction_enrichment import CorrectionReenrichmentResult
@@ -26,6 +27,8 @@ def commit_clarification_answer_result(
     expected_revision_id: UUID,
     result: ClarificationAnswerResult,
     created_at: datetime,
+    next_enrichment_cycle_id: UUID | None = None,
+    next_enrichment_result: PromptEnrichmentResult | None = None,
 ) -> ClarificationAnswerResult:
     """Validate and atomically persist one authoritative clarification result."""
 
@@ -37,6 +40,8 @@ def commit_clarification_answer_result(
         expected_revision_id=expected_revision_id,
         result_payload=validated.model_dump(mode="json"),
         created_at=created_at,
+        next_enrichment_cycle_id=next_enrichment_cycle_id,
+        next_enrichment_result=next_enrichment_result,
     )
     return _answer_result(record)
 

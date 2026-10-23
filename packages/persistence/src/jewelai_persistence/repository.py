@@ -878,6 +878,130 @@ class PersistenceRepository:
             created_at=created_at,
         )
 
+    def commit_initial_enrichment(
+        self,
+        *,
+        enrichment_cycle_id: UUID,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        resulting_revision: DesignRevision | None,
+        result: PromptEnrichmentResult,
+        created_at: datetime,
+    ) -> EnrichmentCycleRecord:
+        """Atomically commit the optional first edit, release pin, and first cycle."""
+
+        try:
+            enrichment = PromptEnrichmentResult.model_validate(result)
+            revision = (
+                DesignRevision.model_validate(resulting_revision)
+                if resulting_revision is not None
+                else None
+            )
+        except ValidationError as exc:
+            raise EnrichmentIntegrityError("initial enrichment result is invalid") from exc
+        authoritative_revision_id = (
+            revision.revision_id if revision is not None else expected_revision_id
+        )
+        if enrichment.knowledge_validation_report_sha256 is None:
+            raise EnrichmentIntegrityError(
+                "persisted enrichment requires verified ACTIVE release provenance"
+            )
+        if enrichment.design_revision_id != str(authoritative_revision_id):
+            raise EnrichmentIntegrityError(
+                "initial enrichment does not match the authoritative Product State revision"
+            )
+        if revision is not None and revision.parent_revision_id != expected_revision_id:
+            raise EnrichmentIntegrityError(
+                "initial enrichment revision does not continue the expected revision"
+            )
+        pin_identity = (
+            enrichment.knowledge_package_id,
+            enrichment.knowledge_artifact_version,
+            enrichment.knowledge_runtime_sha256,
+            enrichment.knowledge_validation_report_sha256,
+        )
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
+                if session.current_revision_id != expected_revision_id:
+                    raise StaleRevisionError(
+                        "Current Product State revision changed before initial enrichment commit"
+                    )
+                if db.scalar(
+                    select(func.count())
+                    .select_from(EnrichmentCycleRow)
+                    .where(EnrichmentCycleRow.session_id == session_id)
+                ):
+                    raise EnrichmentCycleConflictError(
+                        "initial enrichment cycle already exists for the session"
+                    )
+                stored_pin = (
+                    session.knowledge_package_id,
+                    session.knowledge_artifact_version,
+                    session.knowledge_runtime_sha256,
+                    session.knowledge_validation_report_sha256,
+                )
+                if all(value is None for value in stored_pin):
+                    (
+                        session.knowledge_package_id,
+                        session.knowledge_artifact_version,
+                        session.knowledge_runtime_sha256,
+                        session.knowledge_validation_report_sha256,
+                    ) = pin_identity
+                elif stored_pin != pin_identity:
+                    raise KnowledgeReleasePinConflictError(
+                        "session is already pinned to a different Knowledge release"
+                    )
+                parent = self._locked_revision(db, session_id, expected_revision_id)
+                if revision is not None:
+                    self._validate_next_revision(parent, revision)
+                    db.add(self._revision_row(session_id, revision))
+                    db.flush()
+                    session.current_revision_id = revision.revision_id
+                    session.updated_at = revision.created_at
+                else:
+                    session.updated_at = created_at
+                row = EnrichmentCycleRow(
+                    enrichment_cycle_id=enrichment_cycle_id,
+                    session_id=session_id,
+                    cycle_number=1,
+                    specification_revision_id=authoritative_revision_id,
+                    knowledge_package_id=pin_identity[0],
+                    knowledge_artifact_version=pin_identity[1],
+                    knowledge_runtime_sha256=pin_identity[2],
+                    knowledge_validation_report_sha256=pin_identity[3],
+                    enrichment_version=enrichment.enrichment_version,
+                    result_payload=enrichment.model_dump(mode="json"),
+                    content_hash=enrichment.content_hash,
+                    created_at=created_at,
+                )
+                db.add(row)
+                db.flush()
+        except IntegrityError as exc:
+            raise EnrichmentCycleConflictError(
+                "initial revision or enrichment cycle already exists"
+            ) from exc
+        return EnrichmentCycleRecord(
+            enrichment_cycle_id=enrichment_cycle_id,
+            session_id=session_id,
+            cycle_number=1,
+            specification_revision_id=authoritative_revision_id,
+            release_pin=KnowledgeReleasePinRecord(
+                session_id=session_id,
+                package_id=pin_identity[0],
+                artifact_version=pin_identity[1],
+                runtime_sha256=pin_identity[2],
+                validation_report_sha256=pin_identity[3],
+            ),
+            result=enrichment,
+            created_at=created_at,
+        )
+
     def get_knowledge_release_pin(
         self, session_id: UUID, organization_id: UUID
     ) -> KnowledgeReleasePinRecord:
@@ -941,6 +1065,8 @@ class PersistenceRepository:
         expected_revision_id: UUID,
         result_payload: dict,
         created_at: datetime,
+        next_enrichment_cycle_id: UUID | None = None,
+        next_enrichment_result: PromptEnrichmentResult | None = None,
     ) -> ClarificationAnswerRecord:
         """Atomically record one validated answer and its optional revision transition."""
 
@@ -979,6 +1105,31 @@ class PersistenceRepository:
             raise ClarificationDecisionIntegrityError(
                 "clarification answer lineage does not match the commit request"
             )
+        if (next_enrichment_cycle_id is None) != (next_enrichment_result is None):
+            raise ClarificationDecisionIntegrityError(
+                "clarification re-enrichment identity and result must be supplied together"
+            )
+        next_enrichment = None
+        if next_enrichment_result is not None:
+            try:
+                next_enrichment = PromptEnrichmentResult.model_validate(next_enrichment_result)
+            except ValidationError as exc:
+                raise ClarificationDecisionIntegrityError(
+                    "clarification re-enrichment result is invalid"
+                ) from exc
+            if (
+                new_revision_id is None
+                or next_enrichment.design_revision_id != str(new_revision_id)
+                or next_enrichment.knowledge_package_id != payload["knowledge_package_id"]
+                or next_enrichment.knowledge_artifact_version
+                != payload["knowledge_artifact_version"]
+                or next_enrichment.knowledge_runtime_sha256 != payload["knowledge_runtime_sha256"]
+                or next_enrichment.knowledge_validation_report_sha256
+                != payload["knowledge_validation_report_sha256"]
+            ):
+                raise ClarificationDecisionIntegrityError(
+                    "clarification re-enrichment lineage does not match the answer"
+                )
 
         try:
             with self._session_factory.begin() as db:
@@ -1012,6 +1163,22 @@ class PersistenceRepository:
                     raise StaleRevisionError(
                         "Current Product State revision changed before answer commit"
                     )
+                latest_cycle = None
+                if next_enrichment is not None:
+                    latest_cycle = db.scalar(
+                        select(EnrichmentCycleRow)
+                        .where(EnrichmentCycleRow.session_id == session_id)
+                        .order_by(EnrichmentCycleRow.cycle_number.desc())
+                        .limit(1)
+                        .with_for_update()
+                    )
+                    if (
+                        latest_cycle is None
+                        or latest_cycle.specification_revision_id != expected_revision_id
+                    ):
+                        raise EnrichmentCycleConflictError(
+                            "authoritative enrichment cycle changed before answer commit"
+                        )
                 parent = self._locked_revision(db, session_id, expected_revision_id)
                 if resulting_revision is not None:
                     self._validate_next_revision(parent, resulting_revision)
@@ -1019,6 +1186,26 @@ class PersistenceRepository:
                     db.flush()
                     session.current_revision_id = resulting_revision.revision_id
                     session.updated_at = resulting_revision.created_at
+                    db.flush()
+                if next_enrichment is not None:
+                    db.add(
+                        EnrichmentCycleRow(
+                            enrichment_cycle_id=next_enrichment_cycle_id,
+                            session_id=session_id,
+                            cycle_number=latest_cycle.cycle_number + 1,
+                            specification_revision_id=new_revision_id,
+                            knowledge_package_id=payload["knowledge_package_id"],
+                            knowledge_artifact_version=payload["knowledge_artifact_version"],
+                            knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
+                            knowledge_validation_report_sha256=payload[
+                                "knowledge_validation_report_sha256"
+                            ],
+                            enrichment_version=next_enrichment.enrichment_version,
+                            result_payload=next_enrichment.model_dump(mode="json"),
+                            content_hash=next_enrichment.content_hash,
+                            created_at=created_at,
+                        )
+                    )
                     db.flush()
                 row = ClarificationAnswerRow(
                     answer_record_id=answer_record_id,
