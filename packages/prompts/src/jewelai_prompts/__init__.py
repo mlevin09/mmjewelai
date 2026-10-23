@@ -8,6 +8,7 @@ from .enrichment import (
     EnrichmentProposal,
     PromptEnrichmentResult,
     enrich_prompt,
+    enrich_prompt_with_active_release,
 )
 from .loader import load_prompt_templates
 from .models import (
@@ -38,6 +39,7 @@ __all__ = [
     "SpecificationEntry",
     "compile_prompt",
     "enrich_prompt",
+    "enrich_prompt_with_active_release",
     "load_prompt_templates",
     "validate_compiled_prompt",
 ]
