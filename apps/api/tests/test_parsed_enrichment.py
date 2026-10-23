@@ -9,6 +9,7 @@ from jewelai_domain import (
     ProductionValidationCheck,
     ProductionValidationReport,
     RuntimeProvenance,
+    RuntimeSemanticState,
     compile_knowledge_library,
     load_domain_dictionary,
     promote_knowledge_runtime,
@@ -24,8 +25,20 @@ from jewelai_parser import (
     StructuredTarget,
     parse_full_message,
 )
-from jewelai_prompts import load_prompt_templates
+from jewelai_prompts import (
+    EnrichmentProposal,
+    enrich_prompt_with_active_release,
+    load_prompt_templates,
+)
 
+from jewelai_api.artifacts import load_runtime_artifacts
+from jewelai_api.clarification import (
+    ClarificationCategory,
+    ClarificationImportance,
+    ClarificationPlanInputError,
+    UnaskedReason,
+    plan_clarifications,
+)
 from jewelai_api.parsed_enrichment import (
     CandidateDispositionOutcome,
     CandidateDispositionReason,
@@ -34,6 +47,7 @@ from jewelai_api.parsed_enrichment import (
     ParseKnowledgeLineage,
     enrich_parsed_candidates_with_active_release,
 )
+from jewelai_api.settings import ArtifactVersions
 
 ROOT = Path(__file__).resolve().parents[3]
 KNOWLEDGE = ROOT / "data" / "knowledge" / "v1" / "three-stone-1.0.0.json"
@@ -49,6 +63,11 @@ def dictionary():
 @pytest.fixture(scope="module")
 def templates():
     return load_prompt_templates(ROOT / "data" / "prompts" / "v1.0.0.json")
+
+
+@pytest.fixture(scope="module")
+def runtime_artifacts():
+    return load_runtime_artifacts(ROOT, ArtifactVersions())
 
 
 @pytest.fixture
@@ -534,3 +553,323 @@ def test_explicit_release_never_falls_forward_and_result_is_deterministic(
             if item.enrichment_proposal is not None
         )
     )
+
+
+def _plan(revision, enrichment, runtime_artifacts, *, role_id="retail_client"):
+    return plan_clarifications(
+        revision,
+        enrichment,
+        role_id=role_id,
+        dictionary=runtime_artifacts.dictionary,
+        questions=runtime_artifacts.questions,
+        rules=runtime_artifacts.rules,
+    )
+
+
+@pytest.mark.parametrize(
+    ("locale", "text", "expected_fragment"),
+    [
+        (
+            "en",
+            "Design a platinum ring with either an oval or emerald-cut center diamond.",
+            "Which option would you prefer",
+        ),
+        (
+            "ru",
+            "Создайте кольцо с овальным или emerald-cut центральным бриллиантом.",
+            "Какой вариант вы предпочитаете",
+        ),
+        (
+            "en",
+            "Create ring с овальным or emerald-cut center diamond.",
+            "Which option would you prefer",
+        ),
+    ],
+)
+def test_clarification_planner_localizes_one_verified_material_choice(
+    locale,
+    text,
+    expected_fragment,
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["center_stone"]["shape"] = None
+    revision = DesignRevision.model_validate(payload)
+    _, enriched = _enrich(
+        text,
+        locale=locale,
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+
+    first = _plan(revision, enriched, runtime_artifacts)
+    second = _plan(revision, enriched, runtime_artifacts)
+
+    ambiguity = next(
+        item
+        for item in first.questions
+        if item.category == ClarificationCategory.MATERIAL_AMBIGUITY
+    )
+    assert first == second
+    assert first.content_hash == second.content_hash
+    assert ambiguity.importance == ClarificationImportance.BLOCKING
+    assert expected_fragment in ambiguity.text
+    assert {item.value for item in ambiguity.options} == {"oval", "emerald_cut"}
+    assert tuple(item.candidate_id for item in ambiguity.evidence) == (
+        ambiguity.source_candidate_ids
+    )
+    for evidence in ambiguity.evidence:
+        assert enriched.parse_result.original_text[evidence.start : evidence.end] == evidence.text
+    assert ambiguity.design_revision_id == str(revision.revision_id)
+    assert ambiguity.knowledge_runtime_sha256 == active_release[2].sha256
+    assert (
+        ambiguity.knowledge_validation_report_sha256 == active_release[4].validation_report_sha256
+    )
+    assert "center_stone.shape" not in ambiguity.text
+    assert "group_id" not in ambiguity.text
+    assert active_release[2].sha256 not in ambiguity.text
+
+
+def test_preference_is_optional_but_approved_missing_information_is_blocking(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["metal"]["color"] = None
+    revision = DesignRevision.model_validate(payload)
+    _, enriched = _enrich(
+        "I would probably prefer a delicate yellow-gold ring.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+
+    plan = _plan(revision, enriched, runtime_artifacts)
+    preference = next(
+        item
+        for item in plan.questions
+        if item.category == ClarificationCategory.PREFERENCE_ACCEPTANCE
+    )
+    blocking = tuple(
+        item for item in plan.questions if item.importance == ClarificationImportance.BLOCKING
+    )
+
+    assert preference.importance == ClarificationImportance.OPTIONAL
+    assert tuple(item.value for item in preference.options) == ("yellow",)
+    assert "Would you like" in preference.text
+    assert blocking
+    assert all(item.rule_id is not None for item in blocking)
+    assert plan.can_continue_without_answers is False
+    delicate = next(
+        item
+        for item in enriched.dispositions
+        if item.candidate.evidence.text.casefold() == "delicate"
+    )
+    assert any(
+        item.candidate_id == delicate.candidate.candidate_id
+        and item.reason == UnaskedReason.NONCRITICAL_UNKNOWN
+        for item in plan.unasked_evidence
+    )
+
+
+def test_unsupported_side_group_negative_and_preservation_evidence_do_not_create_questions(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    payload = ring.model_dump(mode="json")
+    second = copy.deepcopy(payload["design"]["side_stones"][0])
+    second["group_id"] = "other"
+    payload["design"]["side_stones"].append(second)
+    revision = DesignRevision.model_validate(payload)
+    _, enriched = _enrich(
+        "Make the diamonds on the sides round. No halo. "
+        "Keep the center stone exactly as specified.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+
+    plan = _plan(revision, enriched, runtime_artifacts)
+    side_ids = {
+        item.candidate.candidate_id
+        for item in enriched.dispositions
+        if item.candidate.subject == CandidateSubject.SIDE_STONES
+    }
+    assert side_ids
+    assert not any(side_ids.intersection(item.source_candidate_ids) for item in plan.questions)
+    assert all(
+        any(entry.candidate_id == candidate_id for entry in plan.unasked_evidence)
+        for candidate_id in side_ids
+    )
+    assert {item.reason for item in plan.unasked_evidence} >= {
+        UnaskedReason.UNSUPPORTED_ANSWER_PATH,
+        UnaskedReason.CONSTRAINT_RETAINED,
+    }
+
+
+def test_confirmed_and_locked_targets_are_never_offered_for_replacement(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    _, enriched = _enrich(
+        "Perhaps an oval or emerald-cut center diamond. I prefer yellow gold.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+
+    plan = _plan(ring, enriched, runtime_artifacts)
+    protected = {
+        item.candidate_id
+        for item in plan.unasked_evidence
+        if item.reason == UnaskedReason.TARGET_ALREADY_CONFIRMED
+    }
+    expected = {
+        item.candidate.candidate_id
+        for item in enriched.dispositions
+        if item.candidate.target
+        in {StructuredTarget.CENTER_STONE_SHAPE, StructuredTarget.METAL_COLOR}
+        and item.reason
+        in {
+            CandidateDispositionReason.AMBIGUOUS_CANDIDATE,
+            CandidateDispositionReason.PREFERENCE_REQUIRES_ACCEPTANCE,
+        }
+    }
+    assert protected == expected
+    assert not any(expected.intersection(item.source_candidate_ids) for item in plan.questions)
+
+
+def test_knowledge_recommendation_requires_acceptance_without_mutating_product_state(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["metal"]["color"] = None
+    revision = DesignRevision.model_validate(payload)
+    before = copy.deepcopy(revision)
+    _, enriched = _enrich(
+        "Create a ring.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    store, stored, _, report, active = active_release
+    recommendation = enrich_prompt_with_active_release(
+        revision,
+        templates,
+        store,
+        knowledge_package_id=stored.package_id,
+        knowledge_artifact_version=stored.artifact_version,
+        active_release=active,
+        validation_report=report,
+        proposals=(
+            EnrichmentProposal(
+                target="metal.color",
+                semantic_state=RuntimeSemanticState.RECOMMENDED,
+                provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+                value="yellow",
+                source_id="recommendation-yellow",
+            ),
+        ),
+    )
+    enriched_payload = enriched.model_dump(mode="json")
+    enriched_payload["enrichment_result"] = recommendation.model_dump(mode="json")
+    enriched_with_recommendation = type(enriched).model_validate(enriched_payload)
+
+    plan = _plan(revision, enriched_with_recommendation, runtime_artifacts)
+    question = next(
+        item
+        for item in plan.questions
+        if item.category == ClarificationCategory.KNOWLEDGE_RECOMMENDATION
+    )
+
+    assert question.importance == ClarificationImportance.RECOMMENDED
+    assert question.source_proposal_ids == ("recommendation-yellow",)
+    assert tuple(item.value for item in question.options) == ("yellow",)
+    assert revision == before
+    assert revision.design.metal.color is None
+
+
+def test_empty_plan_is_valid_for_noncritical_unknowns_when_rules_are_ready(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    payload = ring.model_dump(mode="json")
+    source = copy.deepcopy(payload["design"]["center_stone"]["weight"])
+    source["value"] = {
+        "length": {"value": 9.0, "unit": "mm"},
+        "width": {"value": 7.0, "unit": "mm"},
+        "depth": {"value": 4.5, "unit": "mm"},
+    }
+    payload["design"]["center_stone"]["dimensions"] = source
+    setting = copy.deepcopy(payload["design"]["center_stone"]["shape"])
+    setting["value"] = "prong"
+    payload["design"]["center_stone"]["setting"] = setting
+    revision = DesignRevision.model_validate(payload)
+    _, enriched = _enrich(
+        "Make it delicate.",
+        locale="en",
+        revision=revision,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+
+    plan = _plan(revision, enriched, runtime_artifacts)
+
+    assert plan.questions == ()
+    assert plan.can_continue_without_answers is True
+    assert plan.unasked_evidence
+    assert all(item.reason == UnaskedReason.NONCRITICAL_UNKNOWN for item in plan.unasked_evidence)
+
+
+def test_clarification_planner_rejects_mismatched_release_lineage(
+    ring,
+    dictionary,
+    templates,
+    active_release,
+    runtime_artifacts,
+):
+    _, enriched = _enrich(
+        "Create a platinum ring.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    payload = enriched.model_dump(mode="json")
+    payload["parse_result"]["knowledge_runtime_sha256"] = "0" * 64
+    mismatched = type(enriched).model_validate(payload)
+
+    with pytest.raises(ClarificationPlanInputError, match="identities do not match"):
+        _plan(ring, mismatched, runtime_artifacts)

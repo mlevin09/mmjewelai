@@ -149,6 +149,14 @@ schema-supported facts. Preferences, constraints, ambiguous or unresolved facts,
 that Product State v1 cannot represent, and side-stone facts without exactly one stable group remain
 traceable deferred evidence. The boundary never mutates Product State or accepts a recommendation.
 
+The internal `plan_clarifications()` boundary deterministically composes that first-enrichment
+evidence with the existing Rules Engine and Question Catalog. It emits immutable English or Russian
+questions with stable IDs, exact candidate evidence, Product State revision lineage and verified
+Knowledge release lineage. Only an existing selected ASK rule can make a question blocking;
+preferences and Knowledge recommendations remain unaccepted, while unsupported targets and
+noncritical unknowns remain traceable without manufacturing an answer path. This planner is not yet
+connected to HTTP routing and does not interpret answers or mutate Product State.
+
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,
 validates the lock manifest/text/hash, rechecks current revision under the persistence transaction,
