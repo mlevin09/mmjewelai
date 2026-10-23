@@ -9,6 +9,12 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from .knowledge_activation import (
+    ActiveKnowledgeRuntime,
+    KnowledgeActivationError,
+    ProductionValidationReport,
+    validate_for_production,
+)
 from .knowledge_library import (
     CompilationManifest,
     CompiledKnowledgeLibrary,
@@ -141,9 +147,11 @@ class KnowledgeArtifactStore:
             if temporary.exists():
                 shutil.rmtree(temporary)
 
-    def load(self, package_id: str, artifact_version: str) -> StoredKnowledgeArtifact:
-        """Load one stored release and verify source, compiler output, manifest, and checksums."""
-
+    def _load_verified(
+        self,
+        package_id: str,
+        artifact_version: str,
+    ) -> tuple[StoredKnowledgeArtifact, CompiledKnowledgeLibrary]:
         release_path = self._release_path(package_id, artifact_version)
         required = ("source.json", "runtime.json", "manifest.json", "checksums.json")
         missing = [name for name in required if not (release_path / name).is_file()]
@@ -190,11 +198,83 @@ class KnowledgeArtifactStore:
         if stored_manifest.runtime_sha256 != stored_runtime.sha256:
             raise KnowledgeArtifactStorageError("stored runtime SHA-256 does not match manifest")
 
-        return StoredKnowledgeArtifact(
+        return (
+            StoredKnowledgeArtifact(
+                package_id=package_id,
+                artifact_version=artifact_version,
+                source_sha256=expected_checksums["source_sha256"],
+                runtime_sha256=stored_runtime.sha256,
+                manifest_sha256=expected_checksums["manifest_sha256"],
+                release_path=str(release_path),
+            ),
+            stored_runtime,
+        )
+
+    def load(self, package_id: str, artifact_version: str) -> StoredKnowledgeArtifact:
+        """Load one stored release and verify source, compiler output, manifest, and checksums."""
+
+        stored, _ = self._load_verified(package_id, artifact_version)
+        return stored
+
+    def load_active_runtime(
+        self,
+        package_id: str,
+        artifact_version: str,
+        *,
+        active_release: ActiveKnowledgeRuntime | object,
+        validation_report: ProductionValidationReport | object,
+    ) -> ActiveKnowledgeRuntime:
+        """Load one explicit durable release through its exact ACTIVE evidence.
+
+        The caller selects the package and version and supplies the separately governed ACTIVE
+        envelope and production-validation report. The returned envelope is rebuilt around the
+        compiled runtime deserialized from the verified durable artifact, so an in-memory envelope
+        can never substitute different runtime content for the selected release.
+        """
+
+        try:
+            active = ActiveKnowledgeRuntime.model_validate(active_release)
+        except ValidationError as exc:
+            raise KnowledgeArtifactStorageError(
+                "ACTIVE release envelope is missing or invalid"
+            ) from exc
+        try:
+            report = ProductionValidationReport.model_validate(validation_report)
+        except ValidationError as exc:
+            raise KnowledgeArtifactStorageError(
+                "production validation report is missing or invalid"
+            ) from exc
+
+        if active.package_id != package_id or str(active.artifact_version) != artifact_version:
+            raise KnowledgeArtifactStorageError(
+                "ACTIVE release identity does not match the explicitly selected release"
+            )
+
+        _, stored_runtime = self._load_verified(package_id, artifact_version)
+        if active.runtime_sha256 != stored_runtime.sha256:
+            raise KnowledgeArtifactStorageError(
+                "ACTIVE release runtime SHA-256 does not match the durable runtime"
+            )
+        if active.compiled_runtime != stored_runtime:
+            raise KnowledgeArtifactStorageError(
+                "ACTIVE release compiled runtime does not match the durable runtime"
+            )
+
+        try:
+            validate_for_production(stored_runtime, report)
+        except KnowledgeActivationError as exc:
+            raise KnowledgeArtifactStorageError(
+                "production validation report does not approve the durable runtime"
+            ) from exc
+        if active.validation_report_sha256 != report.sha256:
+            raise KnowledgeArtifactStorageError(
+                "ACTIVE release validation report SHA-256 does not match the supplied report"
+            )
+
+        return ActiveKnowledgeRuntime(
             package_id=package_id,
             artifact_version=artifact_version,
-            source_sha256=expected_checksums["source_sha256"],
             runtime_sha256=stored_runtime.sha256,
-            manifest_sha256=expected_checksums["manifest_sha256"],
-            release_path=str(release_path),
+            validation_report_sha256=report.sha256,
+            compiled_runtime=stored_runtime,
         )
