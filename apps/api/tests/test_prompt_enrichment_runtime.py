@@ -1,0 +1,411 @@
+import json
+import os
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+from jewelai_domain import compile_knowledge_library, promote_knowledge_runtime
+from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
+from jewelai_domain.models import MessageSource
+from jewelai_persistence import Base, create_database_engine, create_session_factory
+from jewelai_persistence.models import EnrichmentCycleRow
+from sqlalchemy import event, func, select
+from test_enrichment_persistence import _report
+from test_persistence import NOW, build_service, create_persisted_session, next_revision
+
+from jewelai_api.clarification_answers import ClarificationAnswer, ClarificationDecision
+from jewelai_api.correction_enrichment import UserCorrection
+from jewelai_api.prompt_enrichment_runtime import (
+    InitialEnrichmentRequest,
+    PromptEnrichmentRuntimeError,
+    PromptEnrichmentRuntimeErrorCode,
+    PromptEnrichmentRuntimeService,
+    build_final_prompt_snapshot,
+)
+
+ROOT = Path(__file__).resolve().parents[3]
+KNOWLEDGE = ROOT / "data" / "knowledge" / "v1" / "three-stone-1.0.0.json"
+
+
+def _runtime(service, tmp_path):
+    payload = json.loads(KNOWLEDGE.read_text(encoding="utf-8"))
+    store = KnowledgeArtifactStore(tmp_path / "knowledge")
+    stored = store.publish(payload)
+    compiled, _ = compile_knowledge_library(payload)
+    report = _report(compiled)
+    active = promote_knowledge_runtime(compiled, report)
+    runtime = PromptEnrichmentRuntimeService(
+        service.repository,
+        service.artifacts,
+        store,
+        knowledge_package_id=stored.package_id,
+        knowledge_artifact_version=stored.artifact_version,
+        active_release=active,
+        validation_report=report,
+        clock=lambda: NOW,
+        uuid_factory=uuid4,
+    )
+    return runtime, store, active, report
+
+
+def _request(service, organization, session, text):
+    current = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+    message = service.create_message(session.session_id, organization.organization_id, text)
+    return InitialEnrichmentRequest(
+        session_id=session.session_id,
+        organization_id=organization.organization_id,
+        expected_revision_id=current.revision_id,
+        message_id=message.message_id,
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "I want a white-gold engagement ring with an oval center stone.",
+        "Хочу помолвочное кольцо из белого золота с овальным центральным камнем.",
+    ),
+)
+def test_internal_parse_revision_enrichment_and_snapshot_are_one_coherent_flow(
+    engine, tmp_path, text
+):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, text)
+    runtime, store, active, report = _runtime(service, tmp_path)
+
+    result = runtime.start_initial_message(request)
+    current = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+    cycles = service.repository.list_enrichment_cycles(
+        session.session_id, organization.organization_id
+    )
+    snapshot = build_final_prompt_snapshot(
+        service.repository,
+        session_id=session.session_id,
+        organization_id=organization.organization_id,
+        artifacts=service.artifacts,
+        artifact_store=store,
+        active_release=active,
+        validation_report=report,
+    )
+
+    assert result.parse_result.original_text == text
+    assert result.parser_proposal.source.message_id == str(request.message_id)
+    assert current.revision_id == result.workflow.authoritative_revision_id
+    assert len(cycles) == 1
+    assert cycles[0].specification_revision_id == current.revision_id
+    assert snapshot.revision == current
+    assert snapshot.enrichment_result == cycles[0].result
+    assert snapshot.knowledge_release.runtime_sha256 == active.runtime_sha256
+    assert result.workflow.final_output is not None
+
+
+def test_stale_and_cross_organization_initial_requests_fail_closed(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    foreign, _, _ = create_persisted_session(service)
+    request = _request(service, organization, session, "I want an oval ring.")
+    runtime, *_ = _runtime(service, tmp_path)
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as cross_scope:
+        runtime.start_initial_message(
+            request.model_copy(update={"organization_id": foreign.organization_id})
+        )
+    assert cross_scope.value.code == PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND
+
+    current = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+    advanced = next_revision(current, "round")
+    service.repository.append_revision_cas(
+        session.session_id,
+        organization.organization_id,
+        current.revision_id,
+        advanced,
+    )
+    with pytest.raises(PromptEnrichmentRuntimeError) as stale:
+        runtime.start_initial_message(request)
+    assert stale.value.code == PromptEnrichmentRuntimeErrorCode.STALE_REVISION
+
+
+def test_initial_revision_and_cycle_roll_back_together(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(
+        service,
+        organization,
+        session,
+        "I want a white-gold engagement ring with an oval center stone.",
+    )
+    runtime, *_ = _runtime(service, tmp_path)
+    original = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+
+    def reject_cycle(mapper, connection, target):
+        raise RuntimeError("simulated cycle write failure")
+
+    event.listen(EnrichmentCycleRow, "before_insert", reject_cycle)
+    try:
+        with pytest.raises(RuntimeError, match="simulated cycle write failure"):
+            runtime.start_initial_message(request)
+    finally:
+        event.remove(EnrichmentCycleRow, "before_insert", reject_cycle)
+
+    assert (
+        service.repository.get_current_revision(session.session_id, organization.organization_id)
+        == original
+    )
+    assert service.repository.list_revisions(session.session_id, organization.organization_id) == (
+        original,
+    )
+    with create_session_factory(engine)() as db:
+        assert db.scalar(select(func.count()).select_from(EnrichmentCycleRow)) == 0
+
+
+def test_snapshot_rejects_a_cycle_from_an_old_revision(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want an oval ring.")
+    runtime, *_ = _runtime(service, tmp_path)
+    runtime.start_initial_message(request)
+    current = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+    advanced = next_revision(current, "round")
+    service.repository.append_revision_cas(
+        session.session_id,
+        organization.organization_id,
+        current.revision_id,
+        advanced,
+    )
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as mismatch:
+        runtime.get_current_state(session.session_id, organization.organization_id)
+    assert mismatch.value.code == PromptEnrichmentRuntimeErrorCode.ENRICHMENT_CYCLE_MISMATCH
+
+
+def test_explicit_release_mismatch_never_falls_forward(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want an oval ring.")
+    runtime, _, active, _ = _runtime(service, tmp_path)
+    runtime.active_release = active.model_copy(update={"runtime_sha256": "0" * 64})
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as invalid:
+        runtime.start_initial_message(request)
+    assert invalid.value.code == PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE
+    with create_session_factory(engine)() as db:
+        assert db.scalar(select(func.count()).select_from(EnrichmentCycleRow)) == 0
+
+
+def test_clarification_answer_revision_and_reenrichment_commit_atomically(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want a white or yellow gold ring.")
+    runtime, *_ = _runtime(service, tmp_path)
+    initial = runtime.start_initial_message(request)
+    plan = initial.workflow.clarification_plan
+    assert plan is not None
+    question = next(item for item in plan.questions if len(item.options) >= 2)
+    selected = question.options[0]
+    answer = ClarificationAnswer(
+        session_id=session.session_id,
+        plan_content_hash=plan.content_hash,
+        clarification_id=question.clarification_id,
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option=selected.value,
+        expected_revision_id=initial.workflow.authoritative_revision_id,
+        knowledge_package_id=initial.workflow.knowledge_release.package_id,
+        knowledge_artifact_version=initial.workflow.knowledge_release.artifact_version,
+        knowledge_runtime_sha256=initial.workflow.knowledge_release.runtime_sha256,
+        knowledge_validation_report_sha256=(
+            initial.workflow.knowledge_release.validation_report_sha256
+        ),
+        source=MessageSource(message_id="clarification-answer-1", recorded_at=NOW),
+    )
+
+    result, state = runtime.record_clarification_answer(organization.organization_id, plan, answer)
+    retry, retry_state = runtime.record_clarification_answer(
+        organization.organization_id, plan, answer
+    )
+    cycles = service.repository.list_enrichment_cycles(
+        session.session_id, organization.organization_id
+    )
+
+    assert result.resulting_revision is not None
+    assert retry == result
+    assert retry_state.authoritative_revision_id == state.authoritative_revision_id
+    assert state.authoritative_revision_id == result.new_revision_id
+    assert len(cycles) == 2
+    assert cycles[-1].specification_revision_id == result.new_revision_id
+    assert cycles[-1].result.design_revision_id == str(result.new_revision_id)
+    assert (
+        len(
+            service.repository.list_clarification_answers(
+                session.session_id, organization.organization_id
+            )
+        )
+        == 1
+    )
+
+
+def test_scoped_user_correction_reuses_durable_cas_and_latest_cycle(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want an oval white-gold ring.")
+    runtime, *_ = _runtime(service, tmp_path)
+    initial = runtime.start_initial_message(request)
+    cycle = service.repository.list_enrichment_cycles(
+        session.session_id, organization.organization_id
+    )[-1]
+    message = service.create_message(
+        session.session_id,
+        organization.organization_id,
+        "Change the center stone shape to round and keep the white gold.",
+    )
+    correction = UserCorrection(
+        session_id=session.session_id,
+        expected_revision_id=initial.workflow.authoritative_revision_id,
+        correction_text=message.content,
+        locale="en",
+        source=MessageSource(message_id=str(message.message_id), recorded_at=NOW),
+        previous_enrichment_cycle_id=cycle.enrichment_cycle_id,
+        previous_enrichment_cycle_number=cycle.cycle_number,
+        previous_enrichment_content_hash=cycle.result.content_hash,
+        knowledge_package_id=cycle.release_pin.package_id,
+        knowledge_artifact_version=cycle.release_pin.artifact_version,
+        knowledge_runtime_sha256=cycle.release_pin.runtime_sha256,
+        knowledge_validation_report_sha256=cycle.release_pin.validation_report_sha256,
+        dictionary_artifact_version=service.artifacts.versions.dictionary,
+        prompt_template_artifact_version=service.artifacts.versions.prompts,
+    )
+
+    result, state = runtime.apply_scoped_user_correction(organization.organization_id, correction)
+    retry, retry_state = runtime.apply_scoped_user_correction(
+        organization.organization_id, correction
+    )
+    cycles = service.repository.list_enrichment_cycles(
+        session.session_id, organization.organization_id
+    )
+
+    assert result.next_enrichment_cycle_number == 2
+    assert retry == result
+    assert retry_state.authoritative_revision_id == state.authoritative_revision_id
+    assert len(cycles) == 2
+    assert cycles[-1].specification_revision_id == state.authoritative_revision_id
+    assert state.final_output is not None
+    assert (
+        state.final_output.description.authoritative_revision_id == state.authoritative_revision_id
+    )
+
+
+def test_clarification_revision_answer_and_cycle_roll_back_together(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want a white or yellow gold ring.")
+    runtime, *_ = _runtime(service, tmp_path)
+    initial = runtime.start_initial_message(request)
+    plan = initial.workflow.clarification_plan
+    assert plan is not None
+    question = next(item for item in plan.questions if len(item.options) >= 2)
+    answer = ClarificationAnswer(
+        session_id=session.session_id,
+        plan_content_hash=plan.content_hash,
+        clarification_id=question.clarification_id,
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option=question.options[0].value,
+        expected_revision_id=initial.workflow.authoritative_revision_id,
+        knowledge_package_id=initial.workflow.knowledge_release.package_id,
+        knowledge_artifact_version=initial.workflow.knowledge_release.artifact_version,
+        knowledge_runtime_sha256=initial.workflow.knowledge_release.runtime_sha256,
+        knowledge_validation_report_sha256=(
+            initial.workflow.knowledge_release.validation_report_sha256
+        ),
+        source=MessageSource(message_id="clarification-answer-rollback", recorded_at=NOW),
+    )
+    before = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+
+    def reject_second_cycle(mapper, connection, target):
+        if target.cycle_number == 2:
+            raise RuntimeError("simulated answer cycle failure")
+
+    event.listen(EnrichmentCycleRow, "before_insert", reject_second_cycle)
+    try:
+        with pytest.raises(RuntimeError, match="simulated answer cycle failure"):
+            runtime.record_clarification_answer(organization.organization_id, plan, answer)
+    finally:
+        event.remove(EnrichmentCycleRow, "before_insert", reject_second_cycle)
+
+    assert (
+        service.repository.get_current_revision(session.session_id, organization.organization_id)
+        == before
+    )
+    assert (
+        len(
+            service.repository.list_enrichment_cycles(
+                session.session_id, organization.organization_id
+            )
+        )
+        == 1
+    )
+    assert (
+        service.repository.list_clarification_answers(
+            session.session_id, organization.organization_id
+        )
+        == ()
+    )
+
+
+@pytest.mark.postgres
+def test_postgres_concurrent_initial_orchestration_commits_one_complete_history(tmp_path):
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    pg_engine = create_database_engine(database_url)
+    Base.metadata.drop_all(pg_engine)
+    Base.metadata.create_all(pg_engine)
+    try:
+        service = build_service(pg_engine)
+        organization, _, session = create_persisted_session(service)
+        request = _request(
+            service,
+            organization,
+            session,
+            "I want a white-gold engagement ring with an oval center stone.",
+        )
+        runtime, *_ = _runtime(service, tmp_path)
+
+        def run_once():
+            try:
+                runtime.start_initial_message(request)
+                return "success"
+            except PromptEnrichmentRuntimeError as exc:
+                assert exc.code in {
+                    PromptEnrichmentRuntimeErrorCode.STALE_REVISION,
+                    PromptEnrichmentRuntimeErrorCode.CONCURRENT_CONFLICT,
+                }
+                return "conflict"
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = tuple(pool.map(lambda _: run_once(), range(2)))
+
+        assert sorted(outcomes) == ["conflict", "success"]
+        cycles = service.repository.list_enrichment_cycles(
+            session.session_id, organization.organization_id
+        )
+        revisions = service.repository.list_revisions(
+            session.session_id, organization.organization_id
+        )
+        assert len(cycles) == 1
+        assert len(revisions) == 2
+        assert cycles[0].specification_revision_id == revisions[-1].revision_id
+    finally:
+        pg_engine.dispose()

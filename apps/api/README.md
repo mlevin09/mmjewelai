@@ -157,6 +157,17 @@ preferences and Knowledge recommendations remain unaccepted, while unsupported t
 noncritical unknowns remain traceable without manufacturing an answer path. This planner is not yet
 connected to HTTP routing and does not interpret answers or mutate Product State.
 
+The internal-only `PromptEnrichmentRuntimeService` composes these approved boundaries for the
+future initial-creation flow. It starts from an already persisted organization-scoped message,
+runs JewelAI full-message parsing before any external provider, applies supported changes only via
+the existing revision transition, verifies one explicitly selected ACTIVE Knowledge release, and
+atomically persists the first revision/release pin/enrichment cycle. Clarification answers that
+change Product State commit their answer, revision, and re-enrichment cycle together; corrections
+reuse the existing durable correction CAS boundary. A fail-closed snapshot adapter restores the
+latest matching revision, cycle, release hashes, artifacts, decisions, and Rules result before
+calling Step #12 final-output assembly. This service is not registered in FastAPI and does not
+change the existing Google Text Intake route, generation behavior, or runtime configuration.
+
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,
 validates the lock manifest/text/hash, rechecks current revision under the persistence transaction,
