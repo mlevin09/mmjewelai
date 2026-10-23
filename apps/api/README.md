@@ -141,6 +141,14 @@ EDIT/domain/CAS boundary. It then invokes the existing Rules Engine and Question
 cannot select questions, write revisions, confirm/lock fields, infer dimensions, compile prompts, or
 start generation. Provider failures are typed and redacted.
 
+The internal `enrich_parsed_candidates_with_active_release()` composition boundary connects an
+immutable full-message parse result to the existing Parser Proposal and enrichment Matrix without
+changing live request routing. It verifies the explicitly selected ACTIVE Knowledge release,
+retains one disposition for every source candidate, and forwards only explicit, unambiguous,
+schema-supported facts. Preferences, constraints, ambiguous or unresolved facts, component targets
+that Product State v1 cannot represent, and side-stone facts without exactly one stable group remain
+traceable deferred evidence. The boundary never mutates Product State or accepts a recommendation.
+
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,
 validates the lock manifest/text/hash, rechecks current revision under the persistence transaction,
