@@ -1,5 +1,7 @@
 """Scoped repositories and atomic revision compare-and-swap."""
 
+import hashlib
+import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -43,6 +45,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from .models import (
     AssetRow,
     AuthPrincipalRow,
+    ClarificationAnswerRow,
     DesignSessionRow,
     EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
@@ -55,6 +58,7 @@ from .models import (
     PromptRevisionRow,
     QuestionEventRow,
     SpecificationRevisionRow,
+    UserCorrectionRow,
     VisualizationIterationRow,
     VisualizationSelectionRow,
 )
@@ -101,6 +105,22 @@ class EnrichmentCycleConflictError(PersistenceError):
 
 
 class EnrichmentIntegrityError(PersistenceError):
+    pass
+
+
+class ClarificationDecisionConflictError(PersistenceError):
+    pass
+
+
+class ClarificationDecisionIntegrityError(PersistenceError):
+    pass
+
+
+class UserCorrectionConflictError(PersistenceError):
+    pass
+
+
+class UserCorrectionIntegrityError(PersistenceError):
     pass
 
 
@@ -201,6 +221,36 @@ class EnrichmentCycleRecord:
     specification_revision_id: UUID
     release_pin: KnowledgeReleasePinRecord
     result: PromptEnrichmentResult
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ClarificationAnswerRecord:
+    answer_record_id: UUID
+    session_id: UUID
+    plan_content_hash: str
+    clarification_id: str
+    previous_revision_id: UUID
+    new_revision_id: UUID | None
+    answer_hash: str
+    result_payload: dict
+    content_hash: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class UserCorrectionRecord:
+    correction_record_id: UUID
+    session_id: UUID
+    source_kind: str
+    source_message_id: str
+    previous_revision_id: UUID
+    new_revision_id: UUID | None
+    previous_enrichment_cycle_id: UUID
+    next_enrichment_cycle_id: UUID
+    semantic_hash: str
+    result_payload: dict
+    content_hash: str
     created_at: datetime
 
 
@@ -881,6 +931,367 @@ class PersistenceRepository:
                 .order_by(EnrichmentCycleRow.cycle_number)
             ).all()
             return tuple(self._enrichment_cycle_record(row, pin) for row in rows)
+
+    def commit_clarification_answer(
+        self,
+        *,
+        answer_record_id: UUID,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        result_payload: dict,
+        created_at: datetime,
+    ) -> ClarificationAnswerRecord:
+        """Atomically record one validated answer and its optional revision transition."""
+
+        payload = self._verified_payload_hash(
+            result_payload,
+            hash_field="content_hash",
+            error_type=ClarificationDecisionIntegrityError,
+        )
+        try:
+            payload_session_id = UUID(payload["session_id"])
+            previous_revision_id = UUID(payload["previous_revision_id"])
+            new_revision_id = (
+                UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
+            )
+            resulting_revision = (
+                DesignRevision.model_validate(payload["resulting_revision"])
+                if payload["resulting_revision"] is not None
+                else None
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise ClarificationDecisionIntegrityError(
+                "clarification answer result is invalid"
+            ) from exc
+        if (
+            payload_session_id != session_id
+            or previous_revision_id != expected_revision_id
+            or (new_revision_id is None) != (resulting_revision is None)
+            or (
+                resulting_revision is not None
+                and (
+                    resulting_revision.revision_id != new_revision_id
+                    or resulting_revision.parent_revision_id != previous_revision_id
+                )
+            )
+        ):
+            raise ClarificationDecisionIntegrityError(
+                "clarification answer lineage does not match the commit request"
+            )
+
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
+                self._validate_release_identity(session, payload)
+                if (
+                    session.question_artifact_version != payload["question_artifact_version"]
+                    or session.rules_artifact_version != payload["rules_artifact_version"]
+                ):
+                    raise ClarificationDecisionIntegrityError(
+                        "clarification answer artifact lineage does not match the session"
+                    )
+                existing = db.scalar(
+                    select(ClarificationAnswerRow).where(
+                        ClarificationAnswerRow.session_id == session_id,
+                        ClarificationAnswerRow.plan_content_hash == payload["plan_content_hash"],
+                        ClarificationAnswerRow.clarification_id == payload["clarification_id"],
+                    )
+                )
+                if existing is not None:
+                    if existing.answer_hash != payload["answer_hash"]:
+                        raise ClarificationDecisionConflictError(
+                            "clarification question already has a different decision"
+                        )
+                    return self._clarification_answer_record(db, existing, session)
+                if session.current_revision_id != expected_revision_id:
+                    raise StaleRevisionError(
+                        "Current Product State revision changed before answer commit"
+                    )
+                parent = self._locked_revision(db, session_id, expected_revision_id)
+                if resulting_revision is not None:
+                    self._validate_next_revision(parent, resulting_revision)
+                    db.add(self._revision_row(session_id, resulting_revision))
+                    db.flush()
+                    session.current_revision_id = resulting_revision.revision_id
+                    session.updated_at = resulting_revision.created_at
+                    db.flush()
+                row = ClarificationAnswerRow(
+                    answer_record_id=answer_record_id,
+                    session_id=session_id,
+                    plan_content_hash=payload["plan_content_hash"],
+                    clarification_id=payload["clarification_id"],
+                    previous_revision_id=previous_revision_id,
+                    new_revision_id=new_revision_id,
+                    decision=payload["decision"],
+                    outcome=payload["outcome"],
+                    answer_hash=payload["answer_hash"],
+                    knowledge_package_id=payload["knowledge_package_id"],
+                    knowledge_artifact_version=payload["knowledge_artifact_version"],
+                    knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
+                    knowledge_validation_report_sha256=payload[
+                        "knowledge_validation_report_sha256"
+                    ],
+                    question_artifact_version=payload["question_artifact_version"],
+                    rules_artifact_version=payload["rules_artifact_version"],
+                    result_payload=payload,
+                    content_hash=payload["content_hash"],
+                    created_at=created_at,
+                )
+                db.add(row)
+                db.flush()
+                return self._clarification_answer_record(db, row, session)
+        except IntegrityError as exc:
+            raise ClarificationDecisionConflictError(
+                "clarification answer or revision already exists"
+            ) from exc
+
+    def get_clarification_answer(
+        self,
+        session_id: UUID,
+        plan_content_hash: str,
+        clarification_id: str,
+        organization_id: UUID,
+    ) -> ClarificationAnswerRecord:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            row = db.scalar(
+                select(ClarificationAnswerRow).where(
+                    ClarificationAnswerRow.session_id == session_id,
+                    ClarificationAnswerRow.plan_content_hash == plan_content_hash,
+                    ClarificationAnswerRow.clarification_id == clarification_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("Clarification answer not found")
+            return self._clarification_answer_record(db, row, session)
+
+    def list_clarification_answers(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[ClarificationAnswerRecord, ...]:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            rows = db.scalars(
+                select(ClarificationAnswerRow)
+                .where(ClarificationAnswerRow.session_id == session_id)
+                .order_by(
+                    ClarificationAnswerRow.created_at, ClarificationAnswerRow.answer_record_id
+                )
+            ).all()
+            return tuple(self._clarification_answer_record(db, row, session) for row in rows)
+
+    def commit_user_correction(
+        self,
+        *,
+        correction_record_id: UUID,
+        next_enrichment_cycle_id: UUID,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        result_payload: dict,
+        created_at: datetime,
+    ) -> UserCorrectionRecord:
+        """Atomically record a correction, optional revision, and next enrichment cycle."""
+
+        payload = self._verified_payload_hash(
+            result_payload,
+            hash_field="content_hash",
+            error_type=UserCorrectionIntegrityError,
+        )
+        try:
+            payload_session_id = UUID(payload["session_id"])
+            previous_revision_id = UUID(payload["previous_revision_id"])
+            new_revision_id = (
+                UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
+            )
+            authoritative_revision = DesignRevision.model_validate(
+                payload["authoritative_revision"]
+            )
+            next_enrichment = PromptEnrichmentResult.model_validate(
+                payload["next_enrichment_result"]
+            )
+            source = payload["source"]
+            previous_cycle_id = UUID(payload["previous_enrichment_cycle_id"])
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise UserCorrectionIntegrityError("correction result is invalid") from exc
+        expected_authoritative_id = new_revision_id or previous_revision_id
+        if (
+            payload_session_id != session_id
+            or previous_revision_id != expected_revision_id
+            or authoritative_revision.revision_id != expected_authoritative_id
+            or (
+                new_revision_id is not None
+                and authoritative_revision.parent_revision_id != previous_revision_id
+            )
+            or next_enrichment.design_revision_id != str(expected_authoritative_id)
+        ):
+            raise UserCorrectionIntegrityError(
+                "correction lineage does not match the commit request"
+            )
+        try:
+            source_identity_hash = self._canonical_hash(
+                {"kind": source["kind"], "message_id": source["message_id"]}
+            )
+        except (KeyError, TypeError) as exc:
+            raise UserCorrectionIntegrityError("correction source identity is invalid") from exc
+
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
+                self._validate_release_identity(session, payload)
+                if (
+                    session.dictionary_artifact_version != payload["dictionary_artifact_version"]
+                    or session.prompt_artifact_version
+                    != payload["prompt_template_artifact_version"]
+                ):
+                    raise UserCorrectionIntegrityError(
+                        "correction artifact lineage does not match the session"
+                    )
+                existing = db.scalar(
+                    select(UserCorrectionRow).where(
+                        UserCorrectionRow.session_id == session_id,
+                        UserCorrectionRow.source_identity_hash == source_identity_hash,
+                    )
+                )
+                if existing is not None:
+                    if existing.semantic_hash != payload["semantic_hash"]:
+                        raise UserCorrectionConflictError(
+                            "correction source already has a different result"
+                        )
+                    return self._user_correction_record(db, existing, session)
+                if session.current_revision_id != expected_revision_id:
+                    raise StaleRevisionError(
+                        "Current Product State revision changed before correction commit"
+                    )
+                latest_cycle = db.scalar(
+                    select(EnrichmentCycleRow)
+                    .where(EnrichmentCycleRow.session_id == session_id)
+                    .order_by(EnrichmentCycleRow.cycle_number.desc())
+                    .limit(1)
+                    .with_for_update()
+                )
+                if (
+                    latest_cycle is None
+                    or latest_cycle.enrichment_cycle_id != previous_cycle_id
+                    or latest_cycle.cycle_number != payload["previous_enrichment_cycle_number"]
+                    or latest_cycle.content_hash != payload["previous_enrichment_content_hash"]
+                    or payload["next_enrichment_cycle_number"] != latest_cycle.cycle_number + 1
+                ):
+                    raise EnrichmentCycleConflictError(
+                        "authoritative enrichment cycle changed before correction commit"
+                    )
+                self._validate_prior_answer_lineage(
+                    db,
+                    session,
+                    latest_cycle,
+                    payload.get("prior_answer_results"),
+                    expected_revision_id,
+                )
+                parent = self._locked_revision(db, session_id, expected_revision_id)
+                if new_revision_id is not None:
+                    self._validate_next_revision(parent, authoritative_revision)
+                    db.add(self._revision_row(session_id, authoritative_revision))
+                    db.flush()
+                    session.current_revision_id = new_revision_id
+                    session.updated_at = authoritative_revision.created_at
+                    db.flush()
+                next_cycle = EnrichmentCycleRow(
+                    enrichment_cycle_id=next_enrichment_cycle_id,
+                    session_id=session_id,
+                    cycle_number=payload["next_enrichment_cycle_number"],
+                    specification_revision_id=expected_authoritative_id,
+                    knowledge_package_id=payload["knowledge_package_id"],
+                    knowledge_artifact_version=payload["knowledge_artifact_version"],
+                    knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
+                    knowledge_validation_report_sha256=payload[
+                        "knowledge_validation_report_sha256"
+                    ],
+                    enrichment_version=next_enrichment.enrichment_version,
+                    result_payload=next_enrichment.model_dump(mode="json"),
+                    content_hash=next_enrichment.content_hash,
+                    created_at=created_at,
+                )
+                db.add(next_cycle)
+                db.flush()
+                row = UserCorrectionRow(
+                    correction_record_id=correction_record_id,
+                    session_id=session_id,
+                    source_kind=source["kind"],
+                    source_message_id=source["message_id"],
+                    source_identity_hash=source_identity_hash,
+                    correction_text=payload["correction_text"],
+                    previous_revision_id=previous_revision_id,
+                    new_revision_id=new_revision_id,
+                    previous_enrichment_cycle_id=previous_cycle_id,
+                    next_enrichment_cycle_id=next_enrichment_cycle_id,
+                    outcome=payload["outcome"],
+                    reason=payload["reason"],
+                    semantic_hash=payload["semantic_hash"],
+                    knowledge_package_id=payload["knowledge_package_id"],
+                    knowledge_artifact_version=payload["knowledge_artifact_version"],
+                    knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
+                    knowledge_validation_report_sha256=payload[
+                        "knowledge_validation_report_sha256"
+                    ],
+                    dictionary_artifact_version=payload["dictionary_artifact_version"],
+                    prompt_template_artifact_version=payload["prompt_template_artifact_version"],
+                    result_payload=payload,
+                    content_hash=payload["content_hash"],
+                    created_at=created_at,
+                )
+                db.add(row)
+                db.flush()
+                return self._user_correction_record(db, row, session)
+        except IntegrityError as exc:
+            raise UserCorrectionConflictError(
+                "correction, revision, or enrichment cycle already exists"
+            ) from exc
+
+    def get_user_correction(
+        self,
+        session_id: UUID,
+        correction_record_id: UUID,
+        organization_id: UUID,
+    ) -> UserCorrectionRecord:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            row = db.scalar(
+                select(UserCorrectionRow).where(
+                    UserCorrectionRow.session_id == session_id,
+                    UserCorrectionRow.correction_record_id == correction_record_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("User correction not found")
+            return self._user_correction_record(db, row, session)
+
+    def list_user_corrections(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[UserCorrectionRecord, ...]:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            rows = db.scalars(
+                select(UserCorrectionRow)
+                .where(UserCorrectionRow.session_id == session_id)
+                .order_by(UserCorrectionRow.created_at, UserCorrectionRow.correction_record_id)
+            ).all()
+            return tuple(self._user_correction_record(db, row, session) for row in rows)
 
     def create_generation_run(self, run: GenerationRun, organization_id: UUID) -> GenerationRun:
         run = GenerationRun.model_validate(run)
@@ -1895,6 +2306,315 @@ class PersistenceRepository:
             result=result,
             created_at=PersistenceRepository._utc(row.created_at),
         )
+
+    @staticmethod
+    def _canonical_hash(payload: object) -> str:
+        canonical = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    @classmethod
+    def _verified_payload_hash(cls, payload, *, hash_field, error_type):
+        if not isinstance(payload, dict) or not isinstance(payload.get(hash_field), str):
+            raise error_type("stored result payload is invalid")
+        verified = dict(payload)
+        expected = verified.pop(hash_field)
+        if cls._canonical_hash(verified) != expected:
+            raise error_type("stored result content hash is invalid")
+        return dict(payload)
+
+    @staticmethod
+    def _validate_release_identity(session: DesignSessionRow, payload: dict) -> None:
+        stored = (
+            session.knowledge_package_id,
+            session.knowledge_artifact_version,
+            session.knowledge_runtime_sha256,
+            session.knowledge_validation_report_sha256,
+        )
+        try:
+            supplied = (
+                payload["knowledge_package_id"],
+                payload["knowledge_artifact_version"],
+                payload["knowledge_runtime_sha256"],
+                payload["knowledge_validation_report_sha256"],
+            )
+        except KeyError as exc:
+            raise KnowledgeReleasePinConflictError(
+                "result has incomplete Knowledge release provenance"
+            ) from exc
+        if any(value is None for value in stored) or stored != supplied:
+            raise KnowledgeReleasePinConflictError(
+                "result Knowledge release does not match the persisted session pin"
+            )
+
+    @staticmethod
+    def _locked_revision(
+        db: Session, session_id: UUID, revision_id: UUID
+    ) -> SpecificationRevisionRow:
+        row = db.scalar(
+            select(SpecificationRevisionRow)
+            .where(
+                SpecificationRevisionRow.session_id == session_id,
+                SpecificationRevisionRow.revision_id == revision_id,
+            )
+            .with_for_update()
+        )
+        if row is None:
+            raise OwnershipMismatchError("Product State revision does not belong to session")
+        return row
+
+    @staticmethod
+    def _validate_next_revision(parent: SpecificationRevisionRow, revision: DesignRevision) -> None:
+        if (
+            revision.parent_revision_id != parent.revision_id
+            or revision.design_id != parent.design_id
+            or revision.revision != parent.revision_number + 1
+            or revision.schema_version != parent.schema_version
+        ):
+            raise DuplicateRevisionError(
+                "Revision must continue the stored design, schema, and sequence"
+            )
+
+    @classmethod
+    def _clarification_answer_record(
+        cls,
+        db: Session,
+        row: ClarificationAnswerRow,
+        session: DesignSessionRow,
+    ) -> ClarificationAnswerRecord:
+        payload = cls._verified_payload_hash(
+            row.result_payload,
+            hash_field="content_hash",
+            error_type=ClarificationDecisionIntegrityError,
+        )
+        cls._validate_release_identity(session, payload)
+        try:
+            previous = cls._locked_revision(db, row.session_id, row.previous_revision_id)
+            resulting = (
+                DesignRevision.model_validate(payload["resulting_revision"])
+                if payload["resulting_revision"] is not None
+                else None
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise ClarificationDecisionIntegrityError(
+                "stored clarification answer result is invalid"
+            ) from exc
+        try:
+            mirrors = (
+                row.session_id == UUID(payload["session_id"]),
+                row.plan_content_hash == payload["plan_content_hash"],
+                row.clarification_id == payload["clarification_id"],
+                row.previous_revision_id == UUID(payload["previous_revision_id"]),
+                row.new_revision_id
+                == (UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None),
+                row.decision == payload["decision"],
+                row.outcome == payload["outcome"],
+                row.answer_hash == payload["answer_hash"],
+                row.question_artifact_version == payload["question_artifact_version"],
+                row.rules_artifact_version == payload["rules_artifact_version"],
+                row.content_hash == payload["content_hash"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ClarificationDecisionIntegrityError(
+                "stored clarification answer metadata is invalid"
+            ) from exc
+        if not all(mirrors):
+            raise ClarificationDecisionIntegrityError(
+                "stored clarification answer metadata does not match its payload"
+            )
+        if resulting is not None:
+            cls._validate_next_revision(previous, resulting)
+            persisted = db.get(SpecificationRevisionRow, resulting.revision_id)
+            if persisted is None or cls._domain_revision(persisted) != resulting:
+                raise ClarificationDecisionIntegrityError(
+                    "stored clarification answer revision is missing or inconsistent"
+                )
+        authoritative_id = row.new_revision_id or row.previous_revision_id
+        if not cls._revision_reaches_current(db, session, authoritative_id):
+            raise ClarificationDecisionIntegrityError(
+                "stored clarification answer is not in the current Product State lineage"
+            )
+        return ClarificationAnswerRecord(
+            answer_record_id=row.answer_record_id,
+            session_id=row.session_id,
+            plan_content_hash=row.plan_content_hash,
+            clarification_id=row.clarification_id,
+            previous_revision_id=row.previous_revision_id,
+            new_revision_id=row.new_revision_id,
+            answer_hash=row.answer_hash,
+            result_payload=payload,
+            content_hash=row.content_hash,
+            created_at=cls._utc(row.created_at),
+        )
+
+    @classmethod
+    def _user_correction_record(
+        cls,
+        db: Session,
+        row: UserCorrectionRow,
+        session: DesignSessionRow,
+    ) -> UserCorrectionRecord:
+        payload = cls._verified_payload_hash(
+            row.result_payload,
+            hash_field="content_hash",
+            error_type=UserCorrectionIntegrityError,
+        )
+        cls._validate_release_identity(session, payload)
+        try:
+            previous = cls._locked_revision(db, row.session_id, row.previous_revision_id)
+            authoritative = DesignRevision.model_validate(payload["authoritative_revision"])
+            source = payload["source"]
+            previous_cycle = db.get(EnrichmentCycleRow, row.previous_enrichment_cycle_id)
+            next_cycle = db.get(EnrichmentCycleRow, row.next_enrichment_cycle_id)
+            next_enrichment = PromptEnrichmentResult.model_validate(
+                payload["next_enrichment_result"]
+            )
+        except (KeyError, TypeError, ValueError, ValidationError) as exc:
+            raise UserCorrectionIntegrityError("stored correction result is invalid") from exc
+        try:
+            source_hash = cls._canonical_hash(
+                {"kind": source["kind"], "message_id": source["message_id"]}
+            )
+            mirrors = (
+                row.session_id == UUID(payload["session_id"]),
+                row.source_kind == source["kind"],
+                row.source_message_id == source["message_id"],
+                row.source_identity_hash == source_hash,
+                row.correction_text == payload["correction_text"],
+                row.previous_revision_id == UUID(payload["previous_revision_id"]),
+                row.new_revision_id
+                == (UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None),
+                row.previous_enrichment_cycle_id == UUID(payload["previous_enrichment_cycle_id"]),
+                row.outcome == payload["outcome"],
+                row.reason == payload["reason"],
+                row.semantic_hash == payload["semantic_hash"],
+                row.dictionary_artifact_version == payload["dictionary_artifact_version"],
+                row.prompt_template_artifact_version == payload["prompt_template_artifact_version"],
+                row.content_hash == payload["content_hash"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise UserCorrectionIntegrityError("stored correction metadata is invalid") from exc
+        if not all(mirrors) or previous_cycle is None or next_cycle is None:
+            raise UserCorrectionIntegrityError(
+                "stored correction metadata does not match its payload"
+            )
+        if (
+            previous_cycle.session_id != row.session_id
+            or previous_cycle.cycle_number != payload["previous_enrichment_cycle_number"]
+            or previous_cycle.content_hash != payload["previous_enrichment_content_hash"]
+            or next_cycle.session_id != row.session_id
+            or next_cycle.cycle_number != previous_cycle.cycle_number + 1
+            or next_cycle.cycle_number != payload["next_enrichment_cycle_number"]
+            or next_cycle.specification_revision_id != authoritative.revision_id
+            or next_cycle.content_hash != next_enrichment.content_hash
+        ):
+            raise UserCorrectionIntegrityError("stored correction cycle lineage is inconsistent")
+        cls._enrichment_cycle_record(next_cycle, cls._knowledge_release_pin(session))
+        cls._validate_prior_answer_lineage(
+            db,
+            session,
+            previous_cycle,
+            payload.get("prior_answer_results"),
+            row.previous_revision_id,
+        )
+        if row.new_revision_id is not None:
+            cls._validate_next_revision(previous, authoritative)
+            persisted = db.get(SpecificationRevisionRow, row.new_revision_id)
+            if persisted is None or cls._domain_revision(persisted) != authoritative:
+                raise UserCorrectionIntegrityError(
+                    "stored corrected Product State revision is missing or inconsistent"
+                )
+        elif authoritative.revision_id != previous.revision_id:
+            raise UserCorrectionIntegrityError(
+                "non-mutating correction does not preserve the previous revision"
+            )
+        if not cls._revision_reaches_current(db, session, authoritative.revision_id):
+            raise UserCorrectionIntegrityError(
+                "stored correction is not in the current Product State lineage"
+            )
+        return UserCorrectionRecord(
+            correction_record_id=row.correction_record_id,
+            session_id=row.session_id,
+            source_kind=row.source_kind,
+            source_message_id=row.source_message_id,
+            previous_revision_id=row.previous_revision_id,
+            new_revision_id=row.new_revision_id,
+            previous_enrichment_cycle_id=row.previous_enrichment_cycle_id,
+            next_enrichment_cycle_id=row.next_enrichment_cycle_id,
+            semantic_hash=row.semantic_hash,
+            result_payload=payload,
+            content_hash=row.content_hash,
+            created_at=cls._utc(row.created_at),
+        )
+
+    @staticmethod
+    def _revision_reaches_current(
+        db: Session,
+        session: DesignSessionRow,
+        ancestor_revision_id: UUID,
+    ) -> bool:
+        cursor = session.current_revision_id
+        seen: set[UUID] = set()
+        while cursor not in seen:
+            if cursor == ancestor_revision_id:
+                return True
+            seen.add(cursor)
+            row = db.scalar(
+                select(SpecificationRevisionRow).where(
+                    SpecificationRevisionRow.session_id == session.session_id,
+                    SpecificationRevisionRow.revision_id == cursor,
+                )
+            )
+            if row is None or row.parent_revision_id is None:
+                return False
+            cursor = row.parent_revision_id
+        return False
+
+    @classmethod
+    def _validate_prior_answer_lineage(
+        cls,
+        db: Session,
+        session: DesignSessionRow,
+        previous_cycle: EnrichmentCycleRow,
+        answers: object,
+        expected_revision_id: UUID,
+    ) -> None:
+        if not isinstance(answers, list) or not all(isinstance(item, dict) for item in answers):
+            raise UserCorrectionIntegrityError("correction clarification lineage is invalid")
+        cursor = previous_cycle.specification_revision_id
+        try:
+            for answer in answers:
+                if UUID(answer["previous_revision_id"]) != cursor:
+                    raise UserCorrectionIntegrityError(
+                        "correction clarification lineage is not contiguous"
+                    )
+                row = db.scalar(
+                    select(ClarificationAnswerRow)
+                    .where(
+                        ClarificationAnswerRow.session_id == session.session_id,
+                        ClarificationAnswerRow.content_hash == answer["content_hash"],
+                    )
+                    .limit(1)
+                )
+                if row is None or row.result_payload != answer:
+                    raise UserCorrectionIntegrityError(
+                        "correction references a clarification decision not committed in session"
+                    )
+                cls._clarification_answer_record(db, row, session)
+                if answer["new_revision_id"] is not None:
+                    cursor = UUID(answer["new_revision_id"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise UserCorrectionIntegrityError(
+                "correction clarification lineage is invalid"
+            ) from exc
+        if cursor != expected_revision_id:
+            raise UserCorrectionIntegrityError(
+                "correction clarification decisions do not reach its previous revision"
+            )
 
     @staticmethod
     def _generation_row(run: GenerationRun) -> GenerationRunRow:

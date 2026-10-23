@@ -5,9 +5,11 @@ from .models import (
     AssetRow,
     AuthPrincipalRow,
     Base,
+    ClarificationAnswerRow,
     EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
     OrganizationMembershipRow,
+    UserCorrectionRow,
 )
 from .recovery import (
     DEFAULT_STALE_AFTER_SECONDS,
@@ -18,6 +20,9 @@ from .recovery import (
     recover_stale_generation_runs,
 )
 from .repository import (
+    ClarificationAnswerRecord,
+    ClarificationDecisionConflictError,
+    ClarificationDecisionIntegrityError,
     DuplicateRevisionError,
     EnrichmentCycleConflictError,
     EnrichmentCycleRecord,
@@ -35,6 +40,9 @@ from .repository import (
     PersistenceRepository,
     StaleGenerationRunCandidate,
     StaleRevisionError,
+    UserCorrectionConflictError,
+    UserCorrectionIntegrityError,
+    UserCorrectionRecord,
     VisualizationIterationRecord,
     VisualizationSelectionConflictError,
 )
@@ -43,6 +51,10 @@ __all__ = [
     "Base",
     "AssetRow",
     "AuthPrincipalRow",
+    "ClarificationAnswerRecord",
+    "ClarificationAnswerRow",
+    "ClarificationDecisionConflictError",
+    "ClarificationDecisionIntegrityError",
     "DuplicateRevisionError",
     "EnrichmentCycleConflictError",
     "EnrichmentCycleRecord",
@@ -70,6 +82,10 @@ __all__ = [
     "StaleGenerationRunCandidate",
     "StaleGenerationRecoverySummary",
     "StaleRevisionError",
+    "UserCorrectionConflictError",
+    "UserCorrectionIntegrityError",
+    "UserCorrectionRecord",
+    "UserCorrectionRow",
     "create_database_engine",
     "create_session_factory",
     "DatabasePoolConfig",

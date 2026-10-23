@@ -939,6 +939,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "asset",
         "alembic_version",
         "auth_principal",
+        "clarification_answer",
         "design_session",
         "enrichment_cycle",
         "generation_run",
@@ -951,6 +952,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "prompt_revision",
         "question_event",
         "specification_revision",
+        "user_correction",
         "visualization_iteration",
         "visualization_selection",
     }
