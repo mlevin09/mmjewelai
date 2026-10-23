@@ -44,6 +44,13 @@ The gate does not mutate the compiled runtime or claim that a catalog is active.
 binds the exact runtime SHA-256 to the deterministic validation-report SHA-256. See
 [ADR 0028](../../docs/adr/0028-knowledge-library-production-validation-active-gate.md).
 
+`KnowledgeArtifactStore.load_active_runtime()` is the internal fail-closed load boundary. Its caller
+must explicitly select a package ID and artifact version and supply the exact ACTIVE envelope and
+production-validation report. The loader verifies all four ADR 0029 durable artifacts, reloads the
+actual compiled runtime, and checks the runtime and report hashes before returning an ACTIVE
+envelope rebuilt around that durable runtime. It never selects a latest release and has no external
+mirror or network fallback.
+
 
 ## Stable IDs and references
 
@@ -195,8 +202,9 @@ The following do not block Contract v1.0.0:
 The parser/matcher, bounded RU morphology, ambiguity/context handling, Prompt Enrichment integration,
 behavioral regression, production-validation gate, and durable artifact storage are now implemented.
 Remaining work is production catalog curation, application-runtime selection of an approved ACTIVE
-release, generalized repeated-field targeting from deferral AC-DEF-001, and preproduction/live
-verification. The frozen contract itself does not claim that a production catalog is ACTIVE.
+release and wiring of the verified loader into that request boundary, generalized repeated-field
+targeting from deferral AC-DEF-001, and preproduction/live verification. The frozen contract itself
+does not claim that a production catalog is ACTIVE.
 
 ## Versioning
 
