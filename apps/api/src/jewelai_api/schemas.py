@@ -24,6 +24,7 @@ from jewelai_parser import ParserCandidate, ParserProposal
 from jewelai_prompts import (
     CompiledPrompt,
     InternalFinalPrompt,
+    KnowledgeReleaseReference,
     UserReadableJewelryDescription,
 )
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -230,6 +231,7 @@ class PromptEnrichmentStateResponse(ApiModel):
     authoritative_revision_id: UUID
     enrichment_cycle_id: UUID
     enrichment_cycle_number: int
+    knowledge_release: KnowledgeReleaseReference
     status: str
     clarification_plan_id: UUID | None = None
     clarification_plan_content_hash: str | None = None

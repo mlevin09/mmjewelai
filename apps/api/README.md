@@ -173,9 +173,11 @@ Rules result before calling Step #12 final-output assembly.
 The controlled `/v1/sessions/{session_id}/prompt-enrichment/` HTTP surface is registered only when
 `PromptEnrichmentRuntimeService` is explicitly injected into the application factory. It exposes
 initial enrichment, current state, persisted-plan answers, persisted-message corrections and final
-output without duplicating business logic. Default application composition does not inject it, so
-the existing Google Text Intake route, frontend, generation/provider behavior and live traffic are
-unchanged pending a separate rollout decision.
+output without duplicating business logic. State responses include the exact non-secret package,
+artifact, runtime-hash and validation-report-hash lineage, but clients cannot select or replace that
+server-pinned release. Default application composition does not inject it, so the existing Google
+Text Intake route, frontend, generation/provider behavior and live traffic are unchanged pending a
+separate rollout decision.
 
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,

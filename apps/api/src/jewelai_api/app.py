@@ -956,6 +956,7 @@ def _prompt_enrichment_state(
         authoritative_revision_id=state.authoritative_revision_id,
         enrichment_cycle_id=state.enrichment_cycle_id,
         enrichment_cycle_number=state.enrichment_cycle_number,
+        knowledge_release=state.knowledge_release,
         status=state.status.value,
         clarification_plan_id=state.clarification_plan_id,
         clarification_plan_content_hash=plan.content_hash if plan is not None else None,
