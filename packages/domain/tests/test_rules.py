@@ -432,7 +432,7 @@ def test_same_material_and_weight_with_different_shape_never_derives(ring, engin
         match={
             "jewelry_type": "ring",
             "center_stone_material": "emerald",
-            "center_stone_shape": "round",
+            "center_stone_shape": "emerald_cut",
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         }
     )
