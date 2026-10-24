@@ -21,7 +21,9 @@ def select_parametric_references(
     revision: DesignRevision,
     catalog: ParametricKnowledgeBundle,
 ) -> tuple[ParametricEnrichmentReference, ...]:
-    """Select exact-context calibrated references without interpolation or Product State mutation."""
+    """Select exact-context calibrated references without interpolation
+    or Product State mutation.
+    """
 
     revision = DesignRevision.model_validate(revision)
     catalog = ParametricKnowledgeBundle.model_validate(catalog)
