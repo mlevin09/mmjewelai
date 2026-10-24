@@ -88,7 +88,7 @@ def _enrich(store, ring, templates, stored, report, active):
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="round",
-                source_id="SYNTHETIC-RECOMMENDATION-1",
+                source_id="POL-THREE-STONE-SIDE-SHAPE",
             ),
         ),
     )

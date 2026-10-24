@@ -11,6 +11,7 @@ from .enrichment import (
     PromptEnrichmentResult,
     enrich_prompt,
     enrich_prompt_with_active_release,
+    parametric_reference_context_is_eligible,
 )
 from .final_prompt import (
     DESCRIPTION_SCHEMA_VERSION,
@@ -94,6 +95,7 @@ __all__ = [
     "compile_prompt",
     "enrich_prompt",
     "enrich_prompt_with_active_release",
+    "parametric_reference_context_is_eligible",
     "load_prompt_templates",
     "validate_compiled_prompt",
 ]

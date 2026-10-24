@@ -276,6 +276,59 @@ def test_parametric_reference_is_source_backed_guidance_not_authoritative_fact(
     assert "REFERENCE ONLY" not in result.description.text
 
 
+def test_not_applicable_dimensions_cannot_reintroduce_parametric_guidance(
+    ring, templates, runtime, dictionary
+):
+    reference = ParametricEnrichmentReference(
+        target="center_stone.dimensions",
+        material_id="emerald",
+        shape_id="oval",
+        weight_ct=3.0,
+        dimensions=ParametricReferenceDimensions(length_mm=12.0, width_mm=10.0),
+        estimate_kind="APPROXIMATE_CALIBRATION",
+        record_ids=("CAL-EMERALD-OVAL-3CT",),
+        source_ids=("SRC-CALIBRATED",),
+        applicability=("Loose faceted gemstone in a calibrated cutting context.",),
+        uncertainty=("Approximate reference; actual proportions and depth vary.",),
+    )
+    revision = _changed(
+        ring,
+        lambda design: design["center_stone"].update(
+            {
+                "dimensions": {
+                    "availability": "not_applicable",
+                    "origin": "explicit",
+                    "value": None,
+                    "reason": "The user explicitly excluded dimensional guidance.",
+                    "source": ring.event.source.model_dump(mode="json"),
+                    "confirmed": True,
+                    "locked": False,
+                }
+            }
+        ),
+    )
+
+    with pytest.raises(ValueError, match="parametric references require authoritative context"):
+        _verified_enrichment(
+            revision,
+            templates,
+            runtime,
+            parametric_catalog_id="jewelai.production.parametric_gemstones",
+            parametric_artifact_version="1.0.0",
+            parametric_catalog_sha256="b" * 64,
+            parametric_references=(reference,),
+        )
+
+    clean = _verified_enrichment(revision, templates, runtime)
+    prompt = assemble_internal_final_prompt(
+        _snapshot(revision, clean),
+        dictionary=dictionary,
+        templates=templates,
+    ).internal_final_prompt
+    assert "center_stone.dimensions = NOT_APPLICABLE" in prompt.prompt_text
+    assert "REFERENCE ONLY: center_stone.dimensions" not in prompt.prompt_text
+
+
 def test_english_and_russian_descriptions_share_meaning_without_internal_ids(
     ring, templates, runtime, dictionary
 ):
@@ -469,7 +522,7 @@ def test_unaccepted_recommendation_is_evidence_not_requirement(
         semantic_state=RuntimeSemanticState.RECOMMENDED,
         provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
         value="prong_setting",
-        source_id="REC-SETTING",
+        source_id="DEC-1",
     )
     enrichment = _verified_enrichment(ring, templates, runtime, proposals=(proposal,))
     prohibition = _constraint_evidence(ring)
@@ -499,7 +552,7 @@ def test_rejected_recommendation_remains_non_authoritative(ring, templates, runt
         semantic_state=RuntimeSemanticState.RECOMMENDED,
         provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
         value="prong_setting",
-        source_id="REC-REJECTED",
+        source_id="DEC-1",
     )
     enrichment = _verified_enrichment(ring, templates, runtime, proposals=(proposal,))
     lineage = (
@@ -904,7 +957,7 @@ def test_handoff_preserves_constraints_decisions_and_unaccepted_recommendation(
         semantic_state=RuntimeSemanticState.RECOMMENDED,
         provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
         value="prong_setting",
-        source_id="REC-SETTING",
+        source_id="DEC-1",
     )
     enrichment = _verified_enrichment(ring, templates, runtime, proposals=(proposal,))
     assembly = assemble_internal_final_prompt(

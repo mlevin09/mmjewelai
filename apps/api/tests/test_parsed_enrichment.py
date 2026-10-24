@@ -806,7 +806,7 @@ def test_knowledge_recommendation_requires_acceptance_without_mutating_product_s
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="yellow",
-                source_id="recommendation-yellow",
+                source_id="DEC-THREE-STONE-POLICY",
             ),
         ),
     )
@@ -822,7 +822,7 @@ def test_knowledge_recommendation_requires_acceptance_without_mutating_product_s
     )
 
     assert question.importance == ClarificationImportance.RECOMMENDED
-    assert question.source_proposal_ids == ("recommendation-yellow",)
+    assert question.source_proposal_ids == ("DEC-THREE-STONE-POLICY",)
     assert tuple(item.value for item in question.options) == ("yellow",)
     assert revision == before
     assert revision.design.metal.color is None
@@ -986,7 +986,7 @@ def _recommendation_plan(ring, dictionary, templates, active_release, runtime_ar
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="yellow",
-                source_id="recommendation-yellow",
+                source_id="DEC-THREE-STONE-POLICY",
             ),
         ),
     )
@@ -1144,7 +1144,7 @@ def test_reject_skip_and_unknown_preserve_state_without_implicit_acceptance(
     assert first.new_revision_id is None
     assert first.resulting_revision is None
     assert revision.design.metal.color is None
-    assert first.source_proposal_ids == ("recommendation-yellow",)
+    assert first.source_proposal_ids == ("DEC-THREE-STONE-POLICY",)
 
 
 def test_knowledge_recommendation_requires_explicit_acceptance_to_apply(
@@ -1169,7 +1169,7 @@ def test_knowledge_recommendation_requires_explicit_acceptance_to_apply(
     assert result.outcome == ClarificationAnswerOutcome.APPLIED
     assert result.reason == ClarificationAnswerReason.USER_ACCEPTED_RECOMMENDATION
     assert result.resulting_revision.design.metal.color.value == "yellow"
-    assert result.source_proposal_ids == ("recommendation-yellow",)
+    assert result.source_proposal_ids == ("DEC-THREE-STONE-POLICY",)
 
 
 def test_skip_or_unknown_does_not_resolve_a_blocking_question(

@@ -19,9 +19,19 @@ from jewelai_domain.knowledge_policy import (
     RuntimeSemanticState,
     RuntimeStateProposal,
     build_knowledge_runtime_state,
+    validate_proposal_authority,
 )
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
-from jewelai_domain.models import DesignRevision, ImmutableModel, Text
+from jewelai_domain.models import (
+    Assumed,
+    Derived,
+    DesignRevision,
+    Explicit,
+    ImmutableModel,
+    KnownValue,
+    NotApplicable,
+    Text,
+)
 from pydantic import Field, JsonValue, field_validator, model_validator
 
 from .compiler import compile_prompt
@@ -97,6 +107,11 @@ class EnrichmentProposal(ImmutableModel):
         if value != value.strip():
             raise ValueError("enrichment proposal source_id must be exact")
         return value
+
+    @model_validator(mode="after")
+    def validate_authority(self):
+        validate_proposal_authority(self.semantic_state, self.provenance)
+        return self
 
 
 class EnrichmentDecision(ImmutableModel):
@@ -205,6 +220,30 @@ def _matrix(
     )
 
 
+def _is_authoritative_parametric_input(state: object | None) -> bool:
+    if isinstance(state, Explicit):
+        return True
+    return isinstance(state, (Derived, Assumed)) and state.confirmed
+
+
+def parametric_reference_context_is_eligible(revision: DesignRevision) -> bool:
+    """Return whether Product State can safely select center-stone size guidance.
+
+    Explicit values are user authority even before a separate confirmation action. Derived and
+    assumed values qualify only after confirmation. Existing or explicitly inapplicable dimensions
+    always suppress advisory dimensional references.
+    """
+
+    revision = DesignRevision.model_validate(revision)
+    stone = revision.design.center_stone
+    if isinstance(stone.dimensions, (KnownValue, NotApplicable)):
+        return False
+    return all(
+        _is_authoritative_parametric_input(state)
+        for state in (stone.material, stone.shape, stone.weight)
+    )
+
+
 def enrich_prompt(
     revision: DesignRevision,
     templates: PromptTemplateBundle,
@@ -230,6 +269,10 @@ def enrich_prompt(
     parametric_references = tuple(
         ParametricEnrichmentReference.model_validate(item) for item in parametric_references
     )
+    if parametric_references and not parametric_reference_context_is_eligible(revision):
+        raise ValueError(
+            "parametric references require authoritative context and applicable unknown dimensions"
+        )
     initial_matrix = _matrix(state, engine)
 
     decisions = []

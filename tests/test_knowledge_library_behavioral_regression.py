@@ -391,14 +391,14 @@ def test_enrichment_precedence_locked_state_and_collection_binding_regression():
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="prong_setting",
-                source_id="REG-SETTING",
+                source_id="POL-SETTING",
             ),
             EnrichmentProposal(
                 target="center_stone.shape",
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="round",
-                source_id="REG-SHAPE",
+                source_id="POL-SHAPE",
             ),
             EnrichmentProposal(
                 target="metal.color",
@@ -453,7 +453,7 @@ def test_enrichment_is_derived_state_and_cannot_silently_rewrite_prompt():
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="prong_setting",
-                source_id="REG-PROMPT",
+                source_id="POL-SETTING",
             ),
         ),
     )

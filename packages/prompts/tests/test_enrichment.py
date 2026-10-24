@@ -89,7 +89,7 @@ def test_lower_precedence_enrichment_cannot_overwrite_user_shape(ring, templates
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="round",
-                source_id="ENRICH-1",
+                source_id="POL-SHAPE",
             ),
         ),
     )
@@ -112,7 +112,7 @@ def test_enrichment_does_not_mutate_canonical_revision_or_prompt(ring, templates
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="prong_setting",
-                source_id="ENRICH-SETTING",
+                source_id="DEC-1",
             ),
         ),
     )
@@ -133,7 +133,7 @@ def test_keep_and_locked_semantics_are_preserved(ring, templates, runtime):
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="prong_setting",
-                source_id="ENRICH-KEEP",
+                source_id="DEC-1",
                 preservation=PreservationIntent.KEEP,
             ),
         ),
@@ -209,7 +209,7 @@ def test_blocked_unknown_target_does_not_pollute_final_matrix(ring, templates, r
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="basket",
-                source_id="ENRICH-UNKNOWN-SCALAR",
+                source_id="DEC-1",
             ),
             EnrichmentProposal(
                 target="side_stones.unknown.stones.shape",
@@ -234,14 +234,14 @@ def test_decisions_retain_exact_proposal_evidence_for_later_persistence(ring, te
             semantic_state=RuntimeSemanticState.RECOMMENDED,
             provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
             value="prong_setting",
-            source_id="REC-SETTING-1",
+            source_id="DEC-1",
         ),
         EnrichmentProposal(
             target="center_stone.shape",
             semantic_state=RuntimeSemanticState.RECOMMENDED,
             provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
             value="round",
-            source_id="REC-SHAPE-1",
+            source_id="POL-SHAPE",
             preservation=PreservationIntent.KEEP,
         ),
         EnrichmentProposal(
@@ -275,7 +275,7 @@ def test_decisions_retain_exact_proposal_evidence_for_later_persistence(ring, te
     assert decisions["center_stone.setting"].result.provenance == (
         RuntimeProvenance.JEWELAI_RECOMMENDED
     )
-    assert decisions["center_stone.setting"].result.source_ids == ("REC-SETTING-1",)
+    assert decisions["center_stone.setting"].result.source_ids == ("DEC-1",)
     assert initial["center_stone.setting"].semantic_state == RuntimeSemanticState.MISSING
     assert final["center_stone.setting"] == decisions["center_stone.setting"].result
     assert final["center_stone.shape"] == initial["center_stone.shape"]
@@ -291,6 +291,38 @@ def test_enrichment_proposal_requires_an_exact_nonblank_source(source_id):
             provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
             value="prong_setting",
             source_id=source_id,
+        )
+
+
+def test_enrichment_proposal_rejects_impossible_authority_pair():
+    with pytest.raises(
+        ValidationError,
+        match="EXPLICIT proposal cannot use KNOWLEDGE_INFERRED provenance",
+    ):
+        EnrichmentProposal(
+            target="center_stone.material",
+            semantic_state=RuntimeSemanticState.EXPLICIT,
+            provenance=RuntimeProvenance.KNOWLEDGE_INFERRED,
+            value="diamond",
+            source_id="POL-SHAPE",
+        )
+
+
+def test_enrichment_rejects_foreign_knowledge_source(ring, templates, runtime):
+    with pytest.raises(ValueError, match="does not belong to the selected runtime"):
+        enrich_prompt(
+            ring,
+            templates,
+            runtime,
+            proposals=(
+                EnrichmentProposal(
+                    target="center_stone.setting",
+                    semantic_state=RuntimeSemanticState.RECOMMENDED,
+                    provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+                    value="prong_setting",
+                    source_id="FOREIGN-RUNTIME-POLICY",
+                ),
+            ),
         )
 
 

@@ -85,13 +85,14 @@ def proposal(
     provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
     value="round",
     preservation=PreservationIntent.CHANGE,
+    source_id="POL-SHAPE",
 ):
     return RuntimeStateProposal(
         target=target,
         semantic_state=semantic_state,
         provenance=provenance,
         value=value,
-        source_id="POLICY-EVAL-1",
+        source_id=source_id,
         preservation=preservation,
     )
 
@@ -136,6 +137,7 @@ def test_higher_precedence_applies_deterministically():
         semantic_state=RuntimeSemanticState.NORMALIZED,
         provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
         value="oval",
+        source_id="MESSAGE-1",
     )
     first = KnowledgePolicyEngine(runtime()).evaluate(state(current), incoming)
     second = KnowledgePolicyEngine(runtime()).evaluate(state(current), incoming)
@@ -152,9 +154,10 @@ def test_locked_state_blocks_even_user_confirmed_proposal():
         locked=True,
     )
     incoming = proposal(
-        semantic_state=RuntimeSemanticState.ACCEPTED,
+        semantic_state=RuntimeSemanticState.NORMALIZED,
         provenance=RuntimeProvenance.USER_CONFIRMED,
         value="round",
+        source_id="MESSAGE-1",
     )
     result = KnowledgePolicyEngine(runtime()).evaluate(state(current), incoming)
     assert result.outcome == "BLOCKED"
@@ -165,9 +168,11 @@ def test_locked_state_blocks_even_user_confirmed_proposal():
 def test_keep_preservation_never_changes_state():
     current = parameter()
     incoming = proposal(
+        semantic_state=RuntimeSemanticState.NORMALIZED,
         provenance=RuntimeProvenance.USER_CONFIRMED,
         value="round",
         preservation=PreservationIntent.KEEP,
+        source_id="MESSAGE-1",
     )
     result = KnowledgePolicyEngine(runtime()).evaluate(state(current), incoming)
     assert result.outcome == "KEPT"
@@ -192,6 +197,7 @@ def test_collection_policy_binds_only_existing_group_id():
         semantic_state=RuntimeSemanticState.NORMALIZED,
         provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
         value="pear",
+        source_id="MESSAGE-1",
     )
     result = engine.evaluate(state(current, groups=("accent",)), incoming)
     assert result.outcome == "APPLIED"
@@ -202,6 +208,7 @@ def test_collection_policy_binds_only_existing_group_id():
         semantic_state=RuntimeSemanticState.NORMALIZED,
         provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
         value="pear",
+        source_id="MESSAGE-1",
     )
     unknown_current = RuntimeParameterState(
         target="side_stones.unknown.stones.shape",
@@ -223,6 +230,8 @@ def test_unknown_target_and_locked_preservation_fail_closed():
     locked_intent = proposal(
         provenance=RuntimeProvenance.USER_CONFIRMED,
         preservation=PreservationIntent.LOCKED,
+        semantic_state=RuntimeSemanticState.EXPLICIT,
+        source_id="MESSAGE-1",
     )
     preserved = engine.evaluate(state(current), locked_intent)
     assert preserved.outcome == "BLOCKED"
@@ -279,6 +288,66 @@ def test_policy_effect_text_is_not_executed_or_parsed():
         runtime_sha256=compiled.sha256,
         parameters=(current,),
     )
-    result = KnowledgePolicyEngine(compiled).evaluate(compiled_state, proposal())
+    result = KnowledgePolicyEngine(compiled).evaluate(
+        compiled_state,
+        proposal(source_id="POL-PROSE"),
+    )
     assert result.outcome == "KEPT"
     assert result.reason == "lower_precedence"
+
+
+def test_proposal_rejects_inconsistent_semantic_authority():
+    with pytest.raises(ValidationError, match="EXPLICIT proposal cannot use KNOWLEDGE_INFERRED"):
+        proposal(
+            semantic_state=RuntimeSemanticState.EXPLICIT,
+            provenance=RuntimeProvenance.KNOWLEDGE_INFERRED,
+        )
+    with pytest.raises(ValidationError, match="RECOMMENDED proposal cannot use USER_CONFIRMED"):
+        proposal(
+            semantic_state=RuntimeSemanticState.RECOMMENDED,
+            provenance=RuntimeProvenance.USER_CONFIRMED,
+            source_id="MESSAGE-1",
+        )
+
+
+def test_knowledge_proposal_source_must_belong_to_exact_runtime():
+    engine = KnowledgePolicyEngine(runtime())
+    with pytest.raises(ValueError, match="does not belong to the selected runtime"):
+        engine.evaluate(state(parameter()), proposal(source_id="UNLISTED-SOURCE"))
+
+    other_runtime = CompiledKnowledgeLibrary(
+        package_id="jewelai.other.runtime-policy",
+        artifact_version="1.0.0",
+        sources=(),
+        claims=(),
+        domain_knowledge=(),
+        language_mappings=(),
+        policies=(
+            CompiledPolicy(
+                policy_id="POL-OTHER-SHAPE",
+                target="center_stone.shape",
+                effect="Recommend a shape only inside the other runtime.",
+                source_kind="INTERNAL_PRODUCT_DECISION",
+                source_refs=("DEC-OTHER",),
+            ),
+        ),
+    )
+    foreign = proposal(source_id=other_runtime.policies[0].policy_id)
+    with pytest.raises(ValueError, match="does not belong to the selected runtime"):
+        engine.evaluate(state(parameter()), foreign)
+
+
+def test_user_origin_source_does_not_require_knowledge_runtime_membership():
+    current = RuntimeParameterState(
+        target="center_stone.shape",
+        semantic_state=RuntimeSemanticState.MISSING,
+    )
+    incoming = proposal(
+        semantic_state=RuntimeSemanticState.EXPLICIT,
+        provenance=RuntimeProvenance.USER_EXPLICIT_LATEST,
+        value="oval",
+        source_id="MESSAGE-OUTSIDE-KNOWLEDGE-RUNTIME",
+    )
+    result = KnowledgePolicyEngine(runtime()).evaluate(state(current), incoming)
+    assert result.outcome == "APPLIED"
+    assert result.result.provenance == RuntimeProvenance.USER_EXPLICIT_LATEST
