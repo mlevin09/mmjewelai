@@ -3,7 +3,9 @@
 Status: `IN_PROGRESS`
 PR scope: 14A qualification foundation, 14B controlled runtime composition, 14C typed handoff,
 and 14D evidence-driven release readiness
-14D baseline: `jewelai-v2` at `f1769bab181282fa6a9089a2bf89c666bb043656`
+14D required baseline: `jewelai-v2` at `f1769bab181282fa6a9089a2bf89c666bb043656`;
+review branch synchronized with subsequent reviewed catalog merges through
+`5584c4b177a1bd9f11c268bc39ca8754144d6f93`
 
 Step 13 remains `INTERNAL_VALIDATION_PASSED`. That evidence proves the controlled internal flow, not
 production approval. Step 14A added a read-only qualification operation. Step 14B adds an explicit,
@@ -72,10 +74,12 @@ Existing repository suites exercise the Matrix/Policy engine, recommendation non
 explicit constraint preservation, final provider-neutral prompt assembly, and the three-stone stable
 group slice. PR 14A does not reinterpret evidence references or invent a second validation gate.
 
-The checked-in `jewelai.validation.three_stone` package is a synthetic validation slice. It is not a
-reviewed production-intended release, and the repository contains no corresponding governed real
-ACTIVE envelope and production-validation report. Therefore the actual production-candidate result
-at this baseline is `NOT_EVALUATED`. Actual qualification requires all of:
+The checked-in `jewelai.validation.three_stone` package is a synthetic validation slice. The later
+merged `jewelai.production.jewelry_core` v1.0.0 source is an explicitly named production catalog
+candidate, but it remains compiler state `COMPILED`/`active_for_production=false`; the repository
+contains no corresponding governed ACTIVE envelope and production-validation report. Therefore the
+actual production-candidate result at this baseline is `NOT_EVALUATED`. Actual qualification
+requires all of:
 
 1. a separately reviewed real catalog published under an immutable package ID/version;
 2. its all-PASS six-category `ProductionValidationReport` with behavioral and three-stone evidence
@@ -139,7 +143,8 @@ PROMPT_ENRICHMENT_CANDIDATE_KIND=SYNTHETIC
 
 `SYNTHETIC` is rejected when `JEWELAI_ENVIRONMENT=production`. Conversely, labeling a candidate
 `PRODUCTION_INTENDED` records intent only; it is not human approval, activation, deployment, or a
-go-live decision. The repository still contains no real governed production-intended catalog.
+go-live decision. The checked-in production candidate still lacks governed ACTIVE and validation
+evidence and has not been submitted to the qualifier by this work.
 
 ### Pinning, authorization, and rollback
 
@@ -228,8 +233,8 @@ configuration, call a provider, or deploy anything.
 
 | Item | Directly observed state | Classification |
 |---|---|---|
-| Knowledge candidates | Only `data/knowledge/v1/three-stone-1.0.0.json` is checked in | Verified synthetic |
-| Governed real catalog | No production-intended release artifact is present | Missing |
+| Knowledge candidates | Synthetic three-stone and `jewelai.production.jewelry_core` v1.0.0 source are checked in | Verified directly |
+| Governed real catalog | Production source candidate exists but remains non-ACTIVE and unevaluated by the release qualifier | Available, not qualified |
 | ACTIVE envelope/report | Test helpers construct synthetic evidence; no real governed files are present | Real evidence missing |
 | Six-category validation | Existing synthetic three-stone report and tests pass all categories | Synthetic only |
 | Durable runtime | Filesystem store/compiler/loader/checksum/recompilation are tested | Synthetic only |
@@ -255,7 +260,7 @@ This matrix describes the evidence actually available at the 14D baseline, not a
 | Gate | Status | Evidence | Kind / direct | Blocking reason and follow-up |
 |---|---|---|---|---|
 | Source integrity | PASS | exact baseline and merged PR CI | Real / yes | Re-run CI on this PR head |
-| Real catalog | NOT_EVALUATED | repository inventory | None / yes | Govern, review, and explicitly classify a real release |
+| Real catalog | NOT_EVALUATED | production candidate source inventory | Real candidate / yes | Create governed validation/ACTIVE evidence and explicitly qualify it |
 | Knowledge validation | NOT_EVALUATED | synthetic qualification tests only | Synthetic / yes | Produce real six-category PASS report |
 | ACTIVE integrity | NOT_EVALUATED | synthetic envelope tests only | Synthetic / yes | Provide matching real envelope/report/runtime hashes |
 | Durable storage | NOT_EVALUATED | synthetic filesystem release only | Synthetic / yes | Publish exact reviewed real artifacts to governed storage |
