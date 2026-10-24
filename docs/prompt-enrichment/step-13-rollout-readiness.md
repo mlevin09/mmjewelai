@@ -1,11 +1,33 @@
 # Prompt Enrichment Step 13 rollout-readiness assessment
 
-Status: `BLOCKED`  
-Assessment scope: internal integration validation only  
-Baseline: `jewelai-v2` at `936581c9deb194054941e7cd08c80ed175f88bb6`
+Status: `INTERNAL_VALIDATION_PASSED`
+Assessment scope: internal integration validation only
+Baseline: `jewelai-v2` at `63f326988f089a181d1550c554776cbe241d16e6`
 
 This label is an assessment, not a feature flag or production approval. The controlled HTTP surface
 remains absent from default application composition.
+
+## Constraint-preservation correction
+
+PR 13C preserved non-schema constraints only as an unasked candidate ID/reason. That representation
+lost the authoritative kind, semantic subject, source span, active/superseded state, and normalized
+meaning before `FinalPromptSnapshot`, so an explicit `no halo` could disappear after restart.
+
+This change selects the typed-evidence fallback allowed by the boundary contract. Canonical Product
+State binding was rejected for this narrow case because the existing `visual_constraints` aggregate
+has one aggregate State provenance and cannot represent independent source spans, applicability, or
+supersession for multiple constraints without loss. `FullMessageParseResult` v1.1 identifies only a
+small allowlist of supported semantic subjects. `ClarificationPlan` v1.1 stores the resulting typed,
+hashed evidence in its existing append-only durable payload. `InternalFinalPrompt` v1.1 includes the
+complete evidence history but emits only active evidence as authority. The user-readable description
+renders only normalized, applicable instructions and never exposes IDs or hashes.
+
+Tests cover English, Russian and mixed-language halo prohibitions, engraving prohibition, band
+preservation, superseding and reaffirming corrections, unbound ambiguity, an unaccepted/rejected
+recommendation, restart and idempotent clarification, correction/re-enrichment, cross-scope
+rejection, nested-payload tampering, legacy v1.0 plan rejection, rollback, and PostgreSQL correction
+concurrency. The full HTTP test inspects the structured final artifact, active/superseded evidence,
+description, exact Product State revision, and exact pinned Knowledge release.
 
 ## Verified capabilities
 
@@ -20,8 +42,18 @@ remains absent from default application composition.
 - A persisted answer is checked against its durable plan and offered options. An identical retry
   after restart returns the existing result; conflicting or stale input fails closed.
 - A persisted correction creates append-only revision, cycle, plan, and correction lineage while
-  preserving unchanged canonical Product State. Constraint evidence remains durable in the
-  clarification/correction history, but the final-output snapshot gap described below is blocking.
+  preserving unchanged canonical Product State.
+- Explicit non-schema requirements, prohibitions, and preservation instructions are represented by
+  a minimal typed evidence contract because Product State v1 `visual_constraints` cannot preserve
+  per-constraint source spans, revision/cycle lineage, applicability, and supersession without
+  semantic loss. Product State remains authoritative for every representable design fact.
+- Constraint evidence is derived only from verified deterministic parser candidates and exact
+  persisted-message provenance. It is hashed, organization/session scoped, bound to its source
+  revision and enrichment cycle, and stored inside the existing append-only clarification-plan JSON
+  payload. No migration was required.
+- Later explicit evidence for the same semantic subject supersedes prior active evidence. Historical
+  evidence remains auditable, while only one current active constraint can reach final assembly.
+  Ambiguous evidence remains unresolved and recommendations remain non-authoritative until accepted.
 - The user-readable description and provider-neutral `InternalFinalPrompt` are assembled from the
   same authoritative revision and carry deterministic hashes and exact Knowledge release lineage.
 - Organization membership and session scope protect every controlled endpoint.
@@ -54,19 +86,19 @@ git diff --check
 
 Local results on the PR branch:
 
-- focused integration/runtime/HTTP: `23 passed, 3 skipped` (the skips require PostgreSQL);
-- Runtime API: `262 passed, 18 skipped` (the skips require PostgreSQL);
+- Runtime API: `266 passed, 19 skipped` (the skips require PostgreSQL or optional integrations);
 - Domain: `315 passed`;
-- Parser: `40 passed`;
-- Prompts: `58 passed`;
+- Parser: `46 passed`;
+- Prompts: `65 passed`;
 - Knowledge behavioral and three-stone regression: `7 passed`;
 - Ruff lint and format: passed;
 - SQLite Alembic upgrade/check/current: passed at `0014_clarification_plans (head)`;
 - `git diff --check`: passed.
 
-PostgreSQL-gated Runtime API CI is required to execute concurrent initial and answer transactions;
-locally skipped PostgreSQL cases are not counted as passing evidence. GitHub workflow links and
-exact final counts are recorded in the pull request completion report after checks finish.
+PostgreSQL-gated Runtime API CI executes concurrent initial, answer, and conflicting-correction
+transactions. The correction race verifies one commit and no partial cycle/plan/constraint history.
+Locally skipped PostgreSQL cases are not counted as passing evidence. GitHub workflow links and exact
+final counts are recorded in the pull request completion report after checks finish.
 
 ## Database state
 
@@ -129,12 +161,12 @@ routes must not delete or heuristically reconstruct history.
 - Current deterministic RU parsing preserves source text and language evidence, but some inflected
   RU domain terms are not yet normalized into canonical Product State. This is a known language
   coverage gap, not permission for inference or an external-provider fallback.
-- Explicit prohibitions and preservation instructions that do not map to an existing parser target
-  are classified and retained as clarification evidence, but the current durable plan records only
-  their candidate ID/reason and `FinalPromptSnapshot` does not consume that evidence. Therefore an
-  instruction such as `no halo` is not safely reproducible in `InternalFinalPrompt` after restart.
-  Resolving this requires an approved structured binding to canonical `visual_constraints` or a
-  versioned final-snapshot constraint-evidence contract; PR 13C deliberately does not invent one.
+- Deterministic parser coverage is deliberately narrow: the validated EN/RU/mixed halo forms,
+  engraving prohibition, side-stone prohibition, and supported preservation phrases are recognized.
+  General Russian morphology and arbitrary natural-language constraints remain unsupported and must
+  remain unresolved rather than inferred.
+- Clarification plan v1.0 histories predate typed constraint evidence. They fail closed as
+  incompatible; the runtime does not guess or claim restoration of evidence it never stored.
 - The controlled HTTP response now exposes exact non-secret release lineage for auditability, but
   clients still have no release-selection authority.
 - `InternalFinalPrompt` remains distinct from legacy `CompiledPrompt`; no provider adapter consumes
@@ -150,17 +182,17 @@ routes must not delete or heuristically reconstruct history.
 4. Verify authorization, integrity failures, structured observability, and restart/concurrency under
    deployed PostgreSQL.
 5. Validate RU/EN catalog language coverage accepted for the rollout cohort.
-6. Approve and implement a structured durable prohibition/preservation handoff into the final
-   snapshot, with provenance and restart-safe tests.
-7. Define the typed downstream adapter boundary from `InternalFinalPrompt` without replacing legacy
+6. Define the typed downstream adapter boundary from `InternalFinalPrompt` without replacing legacy
    `CompiledPrompt` prematurely.
-8. Complete preproduction acceptance and obtain release approval before any production traffic
+7. Complete preproduction acceptance and obtain release approval before any production traffic
    switch.
 
 ## Classification rationale
 
-`BLOCKED` means the orchestration and controlled HTTP boundary are internally integrated, but the
-first-cycle contract cannot yet guarantee that an explicit non-schema prohibition or preservation
-instruction reaches the restart-safe provider-neutral final artifact. The real catalog, deployment
-composition, operational controls, language acceptance, migration rehearsal, and downstream
-provider handoff also remain unapproved and unverified.
+`INTERNAL_VALIDATION_PASSED` means the Step #13 controlled flow now demonstrates restart-safe
+constraint preservation through real HTTP orchestration, clarification, correction, final snapshot,
+description, and provider-neutral final assembly. It includes deterministic EN/RU/mixed prohibition,
+preservation, supersession, recommendation-authority, integrity, legacy-compatibility, rollback and
+PostgreSQL concurrency coverage. It is not production approval: the real catalog, deployed runtime
+composition, operational controls, migration rehearsal, and downstream provider handoff remain
+separate Step #14 prerequisites.

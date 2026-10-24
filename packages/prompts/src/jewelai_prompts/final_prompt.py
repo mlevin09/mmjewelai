@@ -22,7 +22,9 @@ from jewelai_domain.models import (
     DesignRevision,
     Explicit,
     ImmutableModel,
+    MessageSource,
     NotApplicable,
+    Text,
 )
 from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from pydantic import Field, JsonValue, StringConstraints, ValidationError, model_validator
@@ -31,7 +33,7 @@ from .compiler import PromptValidationError, validate_compiled_prompt
 from .enrichment import PromptEnrichmentResult
 from .models import PromptTemplateBundle, Sha256
 
-FINAL_PROMPT_SCHEMA_VERSION = "1.0.0"
+FINAL_PROMPT_SCHEMA_VERSION = "1.1.0"
 DESCRIPTION_SCHEMA_VERSION = "1.0.0"
 LongText = Annotated[str, StringConstraints(min_length=1, max_length=20_000, pattern=r"\S")]
 
@@ -99,6 +101,51 @@ class FinalPromptDecisionLineage(ImmutableModel):
     content_hash: Sha256
 
 
+class FinalPromptConstraintEvidence(ImmutableModel):
+    """Versioned, hashed evidence for explicit constraints outside canonical schema fields."""
+
+    schema_version: Literal["1.0.0"] = "1.0.0"
+    evidence_id: Annotated[str, StringConstraints(pattern=r"^constraint_[0-9a-f]{24}$")]
+    session_id: UUID
+    organization_id: UUID
+    kind: Literal["requirement", "prohibition", "preservation"]
+    status: Literal["active", "superseded", "rejected", "unresolved"]
+    acceptance: Literal["user_explicit", "user_accepted", "rejected", "unresolved"]
+    semantic_subject: str | None = None
+    canonical_target: str | None = None
+    normalized_instruction: Text | None = None
+    original_wording: Text
+    source: MessageSource
+    source_candidate_id: str
+    source_span_start: int = Field(ge=0)
+    source_span_end: int = Field(gt=0)
+    source_revision_id: UUID
+    source_enrichment_cycle_id: UUID
+    superseded_by_evidence_id: str | None = None
+    content_hash: Sha256
+
+    @model_validator(mode="after")
+    def validate_contract(self):
+        if self.source_span_end <= self.source_span_start:
+            raise ValueError("constraint evidence span is invalid")
+        if self.status == "active":
+            if (
+                self.acceptance not in {"user_explicit", "user_accepted"}
+                or self.semantic_subject is None
+                or self.normalized_instruction is None
+                or self.superseded_by_evidence_id is not None
+            ):
+                raise ValueError("active constraint evidence lacks authoritative semantics")
+        elif self.status == "superseded":
+            if self.superseded_by_evidence_id is None:
+                raise ValueError("superseded constraint evidence requires replacement lineage")
+        elif self.superseded_by_evidence_id is not None:
+            raise ValueError("only superseded evidence may reference a replacement")
+        if self.content_hash != _hash(self.model_dump(mode="json", exclude={"content_hash"})):
+            raise ValueError("constraint evidence content hash mismatch")
+        return self
+
+
 class FinalPromptSnapshot(ImmutableModel):
     """Explicit single-revision module snapshot supplied by the future runtime orchestrator."""
 
@@ -114,6 +161,7 @@ class FinalPromptSnapshot(ImmutableModel):
     artifact_versions: FinalPromptArtifactVersions
     rule_decision: RuleDecision
     decision_lineage: tuple[FinalPromptDecisionLineage, ...] = ()
+    constraint_evidence: tuple[FinalPromptConstraintEvidence, ...] = ()
 
     @model_validator(mode="after")
     def validate_stable_lineage_order(self):
@@ -122,6 +170,24 @@ class FinalPromptSnapshot(ImmutableModel):
             raise ValueError("decision lineage must use stable kind/ID/hash order")
         if len(set(keys)) != len(keys):
             raise ValueError("decision lineage entries must be unique")
+        evidence_keys = tuple(item.evidence_id for item in self.constraint_evidence)
+        if evidence_keys != tuple(sorted(evidence_keys)):
+            raise ValueError("constraint evidence must use stable evidence-ID order")
+        if len(set(evidence_keys)) != len(evidence_keys):
+            raise ValueError("constraint evidence IDs must be unique")
+        by_id = {item.evidence_id: item for item in self.constraint_evidence}
+        active_subjects: set[str] = set()
+        for item in self.constraint_evidence:
+            if item.session_id != self.session_id or item.organization_id != self.organization_id:
+                raise ValueError("constraint evidence belongs to another session scope")
+            if item.status == "active":
+                if item.semantic_subject in active_subjects:
+                    raise ValueError("conflicting active constraint evidence cannot coexist")
+                active_subjects.add(item.semantic_subject)
+            if item.status == "superseded":
+                replacement = by_id.get(item.superseded_by_evidence_id)
+                if replacement is None or replacement.semantic_subject != item.semantic_subject:
+                    raise ValueError("constraint supersession lineage is invalid")
         return self
 
 
@@ -187,7 +253,7 @@ class UserReadableJewelryDescription(ImmutableModel):
 class InternalFinalPrompt(ImmutableModel):
     """Official provider-neutral Prompt Enrichment Module v1 handoff artifact."""
 
-    schema_version: Literal["1.0.0"] = FINAL_PROMPT_SCHEMA_VERSION
+    schema_version: Literal["1.1.0"] = FINAL_PROMPT_SCHEMA_VERSION
     session_id: UUID
     organization_id: UUID
     design_id: UUID
@@ -204,6 +270,7 @@ class InternalFinalPrompt(ImmutableModel):
     unresolved_details: tuple[FinalPromptUnresolvedDetail, ...]
     enrichment_evidence: tuple[FinalPromptEnrichmentEvidence, ...]
     decision_lineage: tuple[FinalPromptDecisionLineage, ...]
+    constraint_evidence: tuple[FinalPromptConstraintEvidence, ...]
     knowledge_release: KnowledgeReleaseReference
     artifact_versions: FinalPromptArtifactVersions
     enrichment_result_content_hash: Sha256
@@ -281,6 +348,7 @@ def assemble_internal_final_prompt(
         "unresolved_details": unresolved,
         "enrichment_evidence": evidence,
         "decision_lineage": snapshot.decision_lineage,
+        "constraint_evidence": snapshot.constraint_evidence,
         "knowledge_release": snapshot.knowledge_release,
         "artifact_versions": snapshot.artifact_versions,
         "enrichment_result_content_hash": snapshot.enrichment_result.content_hash,
@@ -543,6 +611,17 @@ def _constraints(snapshot, facts) -> tuple[FinalPromptConstraint, ...]:
                 )
             )
             existing.add(("preservation", decision.target))
+    for evidence in snapshot.constraint_evidence:
+        if evidence.status != "active":
+            continue
+        constraints.append(
+            FinalPromptConstraint(
+                kind=evidence.kind,
+                target=evidence.canonical_target or evidence.semantic_subject,
+                instruction=evidence.normalized_instruction,
+                source_ids=(evidence.evidence_id, evidence.source.message_id),
+            )
+        )
     return tuple(sorted(constraints, key=lambda item: (item.target, item.kind)))
 
 
@@ -576,6 +655,16 @@ def _unresolved_details(snapshot) -> tuple[FinalPromptUnresolvedDetail, ...]:
                     classification=classification,
                     blocking=lineage.blocks_progression,
                     source_ids=(lineage.decision_id,),
+                )
+            )
+    for evidence in snapshot.constraint_evidence:
+        if evidence.status == "unresolved":
+            items.append(
+                FinalPromptUnresolvedDetail(
+                    target=evidence.semantic_subject or "constraint.unresolved",
+                    classification="ambiguous",
+                    blocking=False,
+                    source_ids=(evidence.evidence_id, evidence.source.message_id),
                 )
             )
     unique = {
@@ -675,6 +764,24 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
             f"Explicitly excluded: {labels}."
             if snapshot.locale == "en"
             else f"Явно исключено: {labels}."
+        )
+    noncanonical_requirements = [
+        item for item in constraints if item.kind == "requirement" and item.target not in fact_map
+    ]
+    if noncanonical_requirements:
+        labels = "; ".join(item.instruction for item in noncanonical_requirements)
+        sentences.append(
+            f"Explicit requirements: {labels}"
+            if snapshot.locale == "en"
+            else f"Явные требования: {labels}"
+        )
+    noncanonical_preservation = [
+        item for item in constraints if item.kind == "preservation" and item.target not in fact_map
+    ]
+    if noncanonical_preservation:
+        labels = "; ".join(item.instruction for item in noncanonical_preservation)
+        sentences.append(
+            f"Preserve: {labels}" if snapshot.locale == "en" else f"Сохранить: {labels}"
         )
     unconfirmed = [item for item in facts if not item.confirmed]
     if unconfirmed:

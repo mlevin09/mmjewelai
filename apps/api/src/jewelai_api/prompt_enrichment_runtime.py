@@ -64,6 +64,7 @@ from .clarification_answers import (
     ClarificationDecision,
     process_clarification_answer,
 )
+from .constraint_evidence import merge_constraint_evidence
 from .correction_enrichment import (
     CorrectionErrorCode,
     CorrectionInputError,
@@ -247,6 +248,14 @@ class PromptEnrichmentRuntimeService:
             )
             cycle_id = self._uuid()
             clarification_plan_id = self._uuid()
+            constraint_evidence = merge_constraint_evidence(
+                enrichment,
+                session_id=request.session_id,
+                organization_id=request.organization_id,
+                source=source,
+                authoritative_revision=authoritative,
+                enrichment_cycle_id=cycle_id,
+            )
             clarification = plan_clarifications(
                 authoritative,
                 enrichment,
@@ -254,6 +263,7 @@ class PromptEnrichmentRuntimeService:
                 dictionary=self.artifacts.dictionary,
                 questions=self.artifacts.questions,
                 rules=self.artifacts.rules,
+                constraint_evidence=constraint_evidence,
             )
             cycle = self.repository.commit_initial_enrichment(
                 enrichment_cycle_id=cycle_id,
@@ -375,6 +385,11 @@ class PromptEnrichmentRuntimeService:
             if duplicate is not None:
                 return duplicate, self.get_current_state(request.session_id, organization_id)
             cycle_answers = _answers_after_cycle(cycles[-1], answers)
+            _, previous_plan = self._restore_plan_for_cycle(
+                request.session_id,
+                organization_id,
+                cycles[-1].enrichment_cycle_id,
+            )
             result = process_user_correction(
                 request,
                 authoritative_session_id=request.session_id,
@@ -388,6 +403,16 @@ class PromptEnrichmentRuntimeService:
                 validation_report=self.validation_report,
                 created_at=self._clock(),
             )
+            next_cycle_id = self._uuid()
+            constraint_evidence = merge_constraint_evidence(
+                result.post_transition_evaluation,
+                session_id=request.session_id,
+                organization_id=organization_id,
+                source=request.source,
+                authoritative_revision=result.authoritative_revision,
+                enrichment_cycle_id=next_cycle_id,
+                previous=previous_plan.constraint_evidence,
+            )
             next_plan = plan_clarifications(
                 result.authoritative_revision,
                 result.post_transition_evaluation,
@@ -395,11 +420,12 @@ class PromptEnrichmentRuntimeService:
                 dictionary=self.artifacts.dictionary,
                 questions=self.artifacts.questions,
                 rules=self.artifacts.rules,
+                constraint_evidence=constraint_evidence,
             )
             commit_user_correction_result(
                 self.repository,
                 correction_record_id=self._uuid(),
-                next_enrichment_cycle_id=self._uuid(),
+                next_enrichment_cycle_id=next_cycle_id,
                 organization_id=organization_id,
                 expected_revision_id=request.expected_revision_id,
                 result=result,
@@ -827,6 +853,18 @@ class PromptEnrichmentRuntimeService:
                         PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
                         "Clarification question lineage failed integrity validation",
                     )
+            for evidence in plan.constraint_evidence:
+                if evidence.session_id != session_id or evidence.organization_id != organization_id:
+                    raise PromptEnrichmentRuntimeError(
+                        PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                        "Constraint evidence belongs to another session scope",
+                    )
+                self.repository.get_enrichment_cycle(
+                    session_id, evidence.source_enrichment_cycle_id, organization_id
+                )
+                self.repository.get_revision(
+                    session_id, evidence.source_revision_id, organization_id
+                )
             answers = list_clarification_answer_results(
                 self.repository, session_id=session_id, organization_id=organization_id
             )
@@ -1043,6 +1081,39 @@ def build_final_prompt_snapshot(
         repository, session_id=session_id, organization_id=organization_id
     )
     lineage = _decision_lineage(session_id, revision.revision_id, answers, corrections)
+    try:
+        plan_record = repository.get_clarification_plan_for_cycle(
+            session_id, latest.enrichment_cycle_id, organization_id
+        )
+        plan = ClarificationPlan.model_validate(plan_record.plan_payload)
+    except (NotFoundError, ClarificationPlanIntegrityError, ValueError) as exc:
+        raise PromptEnrichmentRuntimeError(
+            PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+            "Latest enrichment cycle has no compatible durable constraint evidence",
+        ) from exc
+    if (
+        plan_record.content_hash != plan.content_hash
+        or plan.design_revision_id != str(revision.revision_id)
+        or plan.knowledge_package_id != pin.package_id
+        or plan.knowledge_artifact_version != pin.artifact_version
+        or plan.knowledge_runtime_sha256 != pin.runtime_sha256
+        or plan.knowledge_validation_report_sha256 != pin.validation_report_sha256
+    ):
+        raise PromptEnrichmentRuntimeError(
+            PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+            "Durable constraint evidence lineage does not match the authoritative cycle",
+        )
+    for evidence in plan.constraint_evidence:
+        try:
+            repository.get_enrichment_cycle(
+                session_id, evidence.source_enrichment_cycle_id, organization_id
+            )
+            repository.get_revision(session_id, evidence.source_revision_id, organization_id)
+        except (NotFoundError, OwnershipMismatchError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+                "Constraint evidence references invalid session history",
+            ) from exc
     return FinalPromptSnapshot(
         session_id=session_id,
         organization_id=organization_id,
@@ -1068,6 +1139,7 @@ def build_final_prompt_snapshot(
         ),
         rule_decision=artifacts.rules.evaluate(revision, session.role_id),
         decision_lineage=lineage,
+        constraint_evidence=plan.constraint_evidence,
     )
 
 

@@ -12,7 +12,7 @@ from .final_prompt import FinalPromptAssembly
 def internal_final_prompt_json_schema() -> dict:
     schema = TypeAdapter(FinalPromptAssembly).json_schema(ref_template="#/$defs/{model}")
     schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-    schema["$id"] = "urn:jewelai:prompt-enrichment-final-output:1.0.0"
+    schema["$id"] = "urn:jewelai:prompt-enrichment-final-output:1.1.0"
     return schema
 
 

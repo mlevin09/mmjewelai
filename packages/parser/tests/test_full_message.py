@@ -179,6 +179,7 @@ def test_complex_english_message_preserves_roles_constraints_and_intent(dictiona
     prohibition = _find(result, classification=CandidateClassification.PROHIBITION, text="no halo")
     assert prohibition.parser_update is None
     assert set(prohibition.normalized_values) == {"halo_setting", "halo_style"}
+    assert prohibition.semantic_subject == "feature.halo"
     delicate = _find(result, target=StructuredTarget.STYLE, text="delicate")
     assert delicate.certainty == CandidateCertainty.UNRESOLVED
     assert not any(
@@ -356,6 +357,49 @@ def test_original_whitespace_and_wording_are_preserved(dictionary):
     assert result.original_text == text
     preservation = _find(result, classification=CandidateClassification.PRESERVATION)
     assert preservation.evidence.text == "Keep the original proportions"
+
+
+@pytest.mark.parametrize(
+    ("text", "locale", "classification", "semantic_subject"),
+    (
+        ("Жёлтое золото, овальный сапфир, без гало.", "ru", "prohibition", "feature.halo"),
+        ("Yellow gold ring, oval sapphire, без halo.", "ru", "prohibition", "feature.halo"),
+        ("Create a platinum ring without engraving.", "en", "prohibition", "feature.engraving"),
+        (
+            "Change the center stone to round, but keep the original band.",
+            "en",
+            "preservation",
+            "component.band",
+        ),
+        ("Actually, add a halo.", "en", "requirement", "feature.halo"),
+    ),
+)
+def test_supported_non_schema_constraints_have_stable_semantic_subjects(
+    dictionary, text, locale, classification, semantic_subject
+):
+    result = parse_full_message(text, locale=locale, dictionary=dictionary)
+
+    candidate = next(
+        item
+        for item in result.candidates
+        if item.classification.value == classification and item.semantic_subject == semantic_subject
+    )
+    assert candidate.certainty == CandidateCertainty.EXPLICIT
+    assert candidate.application == CandidateApplication.STRUCTURED_EVIDENCE_ONLY
+    assert candidate.parser_update is None
+
+
+def test_unbound_preservation_remains_ambiguous_without_lock(dictionary):
+    result = parse_full_message("Don't change that part.", locale="en", dictionary=dictionary)
+
+    candidate = next(
+        item
+        for item in result.candidates
+        if item.classification == CandidateClassification.PRESERVATION
+    )
+    assert candidate.certainty == CandidateCertainty.AMBIGUOUS
+    assert candidate.semantic_subject is None
+    assert candidate.parser_update is None
 
 
 def test_empty_input_and_partial_knowledge_identity_fail_closed(dictionary):

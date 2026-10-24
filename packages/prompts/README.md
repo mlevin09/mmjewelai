@@ -42,11 +42,14 @@ The builder returns two versioned derived artifacts from the same snapshot:
 - `UserReadableJewelryDescription` v1.0.0 renders deterministic EN/RU prose without schema paths,
   stable group IDs, UUIDs, hashes, or release metadata. Unknown or deferred facts remain explicit;
   values are never invented.
-- `InternalFinalPrompt` v1.0.0 is the structured provider-neutral module handoff. It retains
+- `InternalFinalPrompt` v1.1.0 is the structured provider-neutral module handoff. It retains
   authoritative design facts, requirements, prohibitions, locks/preservation, accepted versus
   unaccepted enrichment evidence, unresolved details, decision lineage, release/artifact
   provenance, readiness, and a canonical SHA-256. Its deterministic text rendering is derived from
-  that structure and contains no provider/model syntax.
+  that structure and contains no provider/model syntax. Versioned `FinalPromptConstraintEvidence`
+  preserves explicit non-schema user constraints with exact message/span, revision/cycle lineage,
+  active/superseded/unresolved status, and its own canonical hash. Only verified active evidence is
+  rendered as authority; ambiguous evidence is never promoted into a requirement.
 
 This new contract is intentionally distinct from `CompiledPrompt`; the existing compiler and live
 API/generation path are unchanged. Step #13 will provide reviewed runtime integration. The builder

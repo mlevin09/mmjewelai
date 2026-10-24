@@ -32,7 +32,7 @@ from .models import (
     WeightCandidate,
 )
 
-FULL_MESSAGE_PARSE_VERSION = "1.0.0"
+FULL_MESSAGE_PARSE_VERSION = "1.1.0"
 
 
 class MessageLanguage(StrEnum):
@@ -120,6 +120,7 @@ class StructuredCandidate(ImmutableModel):
     evidence: EvidenceSpan
     raw_value: JsonValue = None
     normalized_values: tuple[str, ...] = ()
+    semantic_subject: str | None = None
     normalization_source: NormalizationSource = NormalizationSource.NONE
     application: CandidateApplication
     parser_update: CandidateUpdate | None = None
@@ -141,7 +142,7 @@ class StructuredCandidate(ImmutableModel):
 
 
 class FullMessageParseResult(ImmutableModel):
-    parse_version: Literal["1.0.0"] = FULL_MESSAGE_PARSE_VERSION
+    parse_version: Literal["1.1.0"] = FULL_MESSAGE_PARSE_VERSION
     original_text: Text
     requested_locale: Literal["en", "ru"]
     detected_language: MessageLanguage
@@ -233,11 +234,31 @@ _TOKEN = re.compile(r"[^\W_]+|\d+(?:[.,]\d+)?", re.UNICODE)
 
 _SPECIAL_CONSTRAINTS = (
     (
-        re.compile(r"\b(?:no|without)\s+(?:a\s+)?halo\b|\bбез\s+гало\b", re.I),
+        re.compile(r"\b(?:no|without)\s+(?:a\s+)?halo\b|\bбез\s+(?:гало|halo)\b", re.I),
         CandidateClassification.PROHIBITION,
         CandidateSubject.SETTING,
         ("halo_setting", "halo_style"),
+        "feature.halo",
+        CandidateCertainty.EXPLICIT,
         "A negative halo constraint has no positive ParserCandidate representation.",
+    ),
+    (
+        re.compile(r"\b(?:add|include|use|with)\s+(?:a\s+)?halo\b", re.I),
+        CandidateClassification.REQUIREMENT,
+        CandidateSubject.SETTING,
+        ("halo_setting", "halo_style"),
+        "feature.halo",
+        CandidateCertainty.EXPLICIT,
+        "A halo requirement is retained as constraint evidence without guessing a schema field.",
+    ),
+    (
+        re.compile(r"\b(?:no|without)\s+(?:an?\s+)?engrav(?:ing|ed)\b", re.I),
+        CandidateClassification.PROHIBITION,
+        CandidateSubject.OVERALL_DESIGN,
+        (),
+        "feature.engraving",
+        CandidateCertainty.EXPLICIT,
+        "An engraving prohibition is retained without inventing a schema field.",
     ),
     (
         re.compile(
@@ -248,6 +269,8 @@ _SPECIAL_CONSTRAINTS = (
         CandidateClassification.PROHIBITION,
         CandidateSubject.SIDE_STONES,
         (),
+        "feature.side_stones",
+        CandidateCertainty.EXPLICIT,
         "Absence of side stones cannot create or bind a side-stone group.",
     ),
     (
@@ -260,6 +283,8 @@ _SPECIAL_CONSTRAINTS = (
         CandidateClassification.PRESERVATION,
         CandidateSubject.CENTER_STONE,
         (),
+        "component.center_stone",
+        CandidateCertainty.EXPLICIT,
         "Preservation intent is evidence for later policy processing, not a value update.",
     ),
     (
@@ -271,7 +296,27 @@ _SPECIAL_CONSTRAINTS = (
         CandidateClassification.PRESERVATION,
         CandidateSubject.OVERALL_DESIGN,
         (),
+        "design.proportions",
+        CandidateCertainty.EXPLICIT,
         "Qualitative preservation intent is retained without inventing dimensions.",
+    ),
+    (
+        re.compile(r"\b(?:keep|preserve)\s+(?:the\s+)?(?:original\s+)?(?:band|shank)\b", re.I),
+        CandidateClassification.PRESERVATION,
+        CandidateSubject.BAND,
+        (),
+        "component.band",
+        CandidateCertainty.EXPLICIT,
+        "Band preservation is retained without inventing or locking unspecified attributes.",
+    ),
+    (
+        re.compile(r"\b(?:do\s+not|don't)\s+change\s+(?:that|this)\s+part\b", re.I),
+        CandidateClassification.PRESERVATION,
+        CandidateSubject.UNKNOWN,
+        (),
+        None,
+        CandidateCertainty.AMBIGUOUS,
+        "An unbound preservation instruction remains ambiguous and cannot create a lock.",
     ),
 )
 
@@ -353,7 +398,15 @@ def parse_full_message(
 
     candidates: list[dict] = []
     protected_spans: list[tuple[int, int]] = []
-    for pattern, classification, subject, normalized_values, detail in _SPECIAL_CONSTRAINTS:
+    for (
+        pattern,
+        classification,
+        subject,
+        normalized_values,
+        semantic_subject,
+        certainty,
+        detail,
+    ) in _SPECIAL_CONSTRAINTS:
         for match in pattern.finditer(text):
             protected_spans.append(match.span())
             candidates.append(
@@ -364,9 +417,10 @@ def parse_full_message(
                     target=None,
                     subject=subject,
                     classification=classification,
-                    certainty=CandidateCertainty.EXPLICIT,
+                    certainty=certainty,
                     raw_value=match.group(0),
                     normalized_values=normalized_values,
+                    semantic_subject=semantic_subject,
                     normalization_source=NormalizationSource.DETERMINISTIC_PATTERN,
                     detail=detail,
                 )
@@ -950,6 +1004,7 @@ def _structured_candidate(
     certainty: CandidateCertainty,
     raw_value: JsonValue,
     normalized_values: tuple[str, ...] = (),
+    semantic_subject: str | None = None,
     normalization_source: NormalizationSource,
     application: CandidateApplication = CandidateApplication.STRUCTURED_EVIDENCE_ONLY,
     parser_update: CandidateUpdate | None = None,
@@ -963,6 +1018,7 @@ def _structured_candidate(
         "evidence": {"start": start, "end": end, "text": text[start:end]},
         "raw_value": raw_value,
         "normalized_values": normalized_values,
+        "semantic_subject": semantic_subject,
         "normalization_source": normalization_source,
         "application": application,
         "parser_update": parser_update,
