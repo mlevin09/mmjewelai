@@ -33,6 +33,25 @@ The layers have separate responsibilities:
 
 Provider-specific prompt syntax is outside this contract.
 
+## Production Jewelry Catalog v1
+
+A reviewed production-intended semantic catalog is now versioned at
+`data/knowledge/v1/jewelry-core-1.0.0.json` with package ID
+`jewelai.production.jewelry_core`.
+
+Its v1 scope is complete for the current Jewelry Design Schema / Prompt Enrichment semantic boundary:
+jewelry type, metal material/color/purity/finish, gemstone material, stone shape, cutting style,
+setting, orientation, general stone color, style, construction terminology, and policies covering all
+current scalar and side-stone collection targets.
+
+The catalog deliberately contains no weight-to-size tables, gemstone diameter estimates, manufacturing
+tolerances, or other quantitative derivations. Those remain a separate source-backed parametric
+knowledge layer because Contract v1 forbids treating carat weight as a dimension or inventing universal
+millimetre thresholds.
+
+**Catalog present != Production ACTIVE.** This source bundle remains REVIEWED input. It must still pass
+the separate production-validation and ACTIVE promotion gate before application runtime selection.
+
 ## Production ACTIVE promotion gate
 
 Contract v1.0.0 still forbids compiler-driven ACTIVE promotion. Production release is implemented as
