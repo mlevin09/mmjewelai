@@ -260,6 +260,7 @@ def process_user_correction(
             artifact_store=artifact_store,
             active_release=verified,
             validation_report=validation_report,
+            parametric_knowledge=parametric_knowledge,
             template_id=template_id,
         )
         if new_revision is not None
