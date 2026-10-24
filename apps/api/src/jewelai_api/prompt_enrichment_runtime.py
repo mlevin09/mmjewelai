@@ -65,6 +65,7 @@ from .clarification_answers import (
     process_clarification_answer,
 )
 from .correction_enrichment import (
+    CorrectionErrorCode,
     CorrectionInputError,
     CorrectionReenrichmentResult,
     UserCorrection,
@@ -430,8 +431,13 @@ class PromptEnrichmentRuntimeService:
                 "Concurrent Product State or enrichment-cycle update detected",
             ) from exc
         except CorrectionInputError as exc:
+            code = (
+                PromptEnrichmentRuntimeErrorCode.STALE_REVISION
+                if exc.code == CorrectionErrorCode.STALE_REVISION
+                else PromptEnrichmentRuntimeErrorCode.INVALID_CORRECTION
+            )
             raise PromptEnrichmentRuntimeError(
-                PromptEnrichmentRuntimeErrorCode.INVALID_CORRECTION,
+                code,
                 "Correction failed deterministic validation",
             ) from exc
         except UserCorrectionConflictError as exc:
@@ -852,6 +858,11 @@ class PromptEnrichmentRuntimeService:
             raise PromptEnrichmentRuntimeError(
                 PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
                 "Clarification plan was not found in organization scope",
+            ) from exc
+        except (KnowledgeArtifactStorageError, KnowledgeReleasePinConflictError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE,
+                "Pinned ACTIVE Knowledge release failed integrity verification",
             ) from exc
         except (ClarificationPlanIntegrityError, ValueError) as exc:
             raise PromptEnrichmentRuntimeError(
