@@ -21,6 +21,8 @@ from .artifacts import RuntimeArtifacts
 from .prompt_enrichment_runtime import PromptEnrichmentRuntimeService
 from .settings import PromptEnrichmentRuntimeConfig
 
+PROMPT_ENRICHMENT_RUNTIME_COMPOSITION_VERSION = "1.0.0"
+
 
 class PromptEnrichmentCompositionErrorCode(StrEnum):
     EVIDENCE_UNAVAILABLE = "evidence_unavailable"

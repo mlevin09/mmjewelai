@@ -1391,35 +1391,54 @@ class PersistenceRepository:
         organization_id: UUID,
     ) -> ClarificationAnswerRecord:
         with self._session_factory() as db:
-            session = db.scalar(self._scoped_session_query(session_id, organization_id))
-            if session is None:
-                raise OwnershipMismatchError("Session not found in organization scope")
-            row = db.scalar(
-                select(ClarificationAnswerRow).where(
-                    ClarificationAnswerRow.session_id == session_id,
+            result = db.execute(
+                select(DesignSessionRow, ClarificationAnswerRow)
+                .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                .join(
+                    ClarificationAnswerRow,
+                    ClarificationAnswerRow.session_id == DesignSessionRow.session_id,
+                )
+                .where(
+                    DesignSessionRow.session_id == session_id,
+                    ProjectRow.organization_id == organization_id,
                     ClarificationAnswerRow.plan_content_hash == plan_content_hash,
                     ClarificationAnswerRow.clarification_id == clarification_id,
                 )
-            )
-            if row is None:
+            ).one_or_none()
+            if result is None:
+                if db.scalar(self._scoped_session_query(session_id, organization_id)) is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
                 raise NotFoundError("Clarification answer not found")
+            session, row = result
             return self._clarification_answer_record(db, row, session)
 
     def list_clarification_answers(
         self, session_id: UUID, organization_id: UUID
     ) -> tuple[ClarificationAnswerRecord, ...]:
         with self._session_factory() as db:
-            session = db.scalar(self._scoped_session_query(session_id, organization_id))
-            if session is None:
-                raise OwnershipMismatchError("Session not found in organization scope")
-            rows = db.scalars(
-                select(ClarificationAnswerRow)
-                .where(ClarificationAnswerRow.session_id == session_id)
+            results = db.execute(
+                select(DesignSessionRow, ClarificationAnswerRow)
+                .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
+                .outerjoin(
+                    ClarificationAnswerRow,
+                    ClarificationAnswerRow.session_id == DesignSessionRow.session_id,
+                )
+                .where(
+                    DesignSessionRow.session_id == session_id,
+                    ProjectRow.organization_id == organization_id,
+                )
                 .order_by(
                     ClarificationAnswerRow.created_at, ClarificationAnswerRow.answer_record_id
                 )
             ).all()
-            return tuple(self._clarification_answer_record(db, row, session) for row in rows)
+            if not results:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            session = results[0][0]
+            return tuple(
+                self._clarification_answer_record(db, row, session)
+                for _, row in results
+                if row is not None
+            )
 
     def commit_user_correction(
         self,
