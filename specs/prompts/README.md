@@ -35,7 +35,7 @@ python -m ruff check packages/prompts
 python -m ruff format --check packages/prompts
 ```
 
-## Prompt Enrichment final output v1.0.0
+## Prompt Enrichment final output v1.1.0
 
 Step #12 adds a separate [provider-neutral output schema](internal-final-prompt-schema.json) for the
 approved Prompt Enrichment Module boundary. `UserReadableJewelryDescription` is deterministic EN/RU
@@ -43,7 +43,11 @@ review prose; it is not authoritative state. `InternalFinalPrompt` is the struct
 from the same exact Product State revision, immutable enrichment cycle, verified ACTIVE Knowledge
 release pin, artifact versions, existing Rules decision, and applicable decision lineage.
 
-The output preserves accepted facts, prohibitions, locks, preservation, unresolved information and
-machine-readable provenance. Unaccepted recommendations remain evidence rather than requirements.
-Input inconsistencies fail closed. Neither contract changes `CompiledPrompt`, selects a provider,
-calls a network service, activates a catalog, or connects to the live API.
+The v1.1 output adds hashed, typed evidence for explicit requirements, prohibitions and preservation
+instructions that Product State v1 cannot represent without semantic or provenance loss. Active
+evidence is emitted as a constraint; superseded and rejected history remains auditable but is not
+emitted as active authority; unresolved evidence remains unresolved. Evidence is bound to the
+session, organization, source message/span, Product State revision and enrichment cycle. Unaccepted
+recommendations remain evidence rather than requirements. Input inconsistencies fail closed.
+Neither contract changes `CompiledPrompt`, selects a provider, calls a network service, activates a
+catalog, or changes generation behavior.

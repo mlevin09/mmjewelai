@@ -2694,13 +2694,14 @@ class PersistenceRepository:
                 payload["knowledge_validation_report_sha256"],
             )
             valid = (
-                payload["plan_version"] == "1.0.0"
+                payload["plan_version"] == "1.1.0"
                 and UUID(payload["design_revision_id"]) == specification_revision_id
                 and supplied_release == release_identity
                 and isinstance(payload["question_artifact_version"], str)
                 and isinstance(payload["rules_artifact_version"], str)
                 and isinstance(payload["questions"], list)
                 and isinstance(payload["unasked_evidence"], list)
+                and isinstance(payload["constraint_evidence"], list)
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ClarificationPlanIntegrityError("clarification plan payload is invalid") from exc

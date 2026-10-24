@@ -17,6 +17,7 @@ from jewelai_domain.questions import QuestionCatalog, QuestionId, QuestionLocale
 from jewelai_domain.roles import RoleId
 from jewelai_domain.rules import AskDecision, BlockDecision, RuleDecision, RuleRegistry
 from jewelai_parser import CandidateSubject, StructuredTarget
+from jewelai_prompts import FinalPromptConstraintEvidence
 from pydantic import Field, model_validator
 
 from .parsed_enrichment import (
@@ -24,7 +25,7 @@ from .parsed_enrichment import (
     ParsedCandidateEnrichmentResult,
 )
 
-CLARIFICATION_PLAN_VERSION = "1.0.0"
+CLARIFICATION_PLAN_VERSION = "1.1.0"
 
 
 class ClarificationPlanInputError(ValueError):
@@ -98,7 +99,7 @@ class UnaskedClarificationEvidence(ImmutableModel):
 
 
 class ClarificationPlan(ImmutableModel):
-    plan_version: Literal["1.0.0"] = CLARIFICATION_PLAN_VERSION
+    plan_version: Literal["1.1.0"] = CLARIFICATION_PLAN_VERSION
     design_revision_id: str
     knowledge_package_id: str
     knowledge_artifact_version: str
@@ -111,6 +112,7 @@ class ClarificationPlan(ImmutableModel):
     rule_decision: RuleDecision
     questions: tuple[ClarificationQuestion, ...]
     unasked_evidence: tuple[UnaskedClarificationEvidence, ...]
+    constraint_evidence: tuple[FinalPromptConstraintEvidence, ...]
     can_continue_without_answers: bool
     content_hash: str
 
@@ -124,6 +126,11 @@ class ClarificationPlan(ImmutableModel):
         )
         if self.can_continue_without_answers != expected:
             raise ValueError("clarification progression flag does not match blocking evidence")
+        evidence_ids = tuple(item.evidence_id for item in self.constraint_evidence)
+        if evidence_ids != tuple(sorted(evidence_ids)) or len(evidence_ids) != len(
+            set(evidence_ids)
+        ):
+            raise ValueError("constraint evidence must use unique stable evidence-ID order")
         return self
 
 
@@ -161,12 +168,19 @@ def plan_clarifications(
     dictionary: DictionaryRegistry,
     questions: QuestionCatalog,
     rules: RuleRegistry,
+    constraint_evidence: tuple[FinalPromptConstraintEvidence, ...] = (),
 ) -> ClarificationPlan:
     """Build a minimal immutable plan without accepting evidence or changing Product State."""
 
     revision = DesignRevision.model_validate(revision)
     enrichment = ParsedCandidateEnrichmentResult.model_validate(enrichment)
     role_id = RoleId(role_id)
+    constraint_evidence = tuple(
+        sorted(
+            (FinalPromptConstraintEvidence.model_validate(item) for item in constraint_evidence),
+            key=lambda item: item.evidence_id,
+        )
+    )
     result = enrichment.enrichment_result
     if result.design_revision_id != str(revision.revision_id):
         raise ClarificationPlanInputError("enrichment and Product State revision do not match")
@@ -339,6 +353,7 @@ def plan_clarifications(
         "rule_decision": rule_decision,
         "questions": ordered,
         "unasked_evidence": ordered_unasked,
+        "constraint_evidence": constraint_evidence,
         "can_continue_without_answers": not isinstance(rule_decision, BlockDecision)
         and not any(item.importance == ClarificationImportance.BLOCKING for item in ordered),
     }
@@ -401,6 +416,7 @@ def continue_clarification_plan(
         "rule_decision": rule_decision,
         "questions": ordered,
         "unasked_evidence": plan.unasked_evidence,
+        "constraint_evidence": plan.constraint_evidence,
         "can_continue_without_answers": not isinstance(rule_decision, BlockDecision)
         and not any(item.importance == ClarificationImportance.BLOCKING for item in ordered),
     }

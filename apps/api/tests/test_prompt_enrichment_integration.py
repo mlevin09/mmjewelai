@@ -73,6 +73,14 @@ def test_full_http_cycle_restores_retries_corrects_and_preserves_authority(engin
         assert initial_state["clarification_plan_content_hash"]
         assert first_legacy_provider.calls == []
 
+    initial_durable = runtime.get_current_state(UUID(session_id), UUID(organization_id))
+    initial_constraints = initial_durable.clarification_plan.constraint_evidence
+    assert len(initial_constraints) == 1
+    assert initial_constraints[0].kind == "prohibition"
+    assert initial_constraints[0].status == "active"
+    assert initial_constraints[0].semantic_subject == "feature.halo"
+    assert initial_constraints[0].original_wording == "no halo"
+
     original_revision = service.repository.get_current_revision(
         UUID(session_id), UUID(organization_id)
     )
@@ -172,18 +180,30 @@ def test_full_http_cycle_restores_retries_corrects_and_preserves_authority(engin
             f"/v1/sessions/{session_id}/prompt-enrichment/final-output",
             headers={"X-Organization-ID": organization_id},
         )
-        assert final.status_code in {200, 409}
-        if final.status_code == 200:
-            output = final.json()
-            prompt = output["internal_final_prompt"]
-            assert prompt["product_state_revision_id"] == corrected["authoritative_revision_id"]
-            assert prompt["knowledge_release"] == _release_payload(runtime)
-            assert prompt["description_content_hash"] == output["description"]["content_hash"]
-            assert "oval" not in output["description"]["text"].casefold()
-            assert "google" not in prompt["prompt_text"].casefold()
-            assert "openai" not in prompt["prompt_text"].casefold()
-        else:
-            assert final.json()["error"] == "final_output_not_ready"
+        assert final.status_code == 200, final.json()
+        output = final.json()
+        prompt = output["internal_final_prompt"]
+        assert prompt["schema_version"] == "1.1.0"
+        assert prompt["product_state_revision_id"] == corrected["authoritative_revision_id"]
+        assert prompt["knowledge_release"] == _release_payload(runtime)
+        assert prompt["description_content_hash"] == output["description"]["content_hash"]
+        assert "oval" not in output["description"]["text"].casefold()
+        assert "Do not include a halo" in prompt["prompt_text"]
+        assert "Do not include a halo" in output["description"]["text"]
+        halo_constraints = [
+            item for item in prompt["constraints"] if item["target"] == "feature.halo"
+        ]
+        assert len(halo_constraints) == 1
+        assert halo_constraints[0]["kind"] == "prohibition"
+        halo_evidence = [
+            item
+            for item in prompt["constraint_evidence"]
+            if item["semantic_subject"] == "feature.halo"
+        ]
+        assert [item["status"] for item in halo_evidence].count("active") == 1
+        assert [item["status"] for item in halo_evidence].count("superseded") == 1
+        assert "google" not in prompt["prompt_text"].casefold()
+        assert "openai" not in prompt["prompt_text"].casefold()
 
         stale_message = _message(
             third_client,
@@ -290,6 +310,17 @@ def test_http_initial_flow_is_internal_bilingual_and_provider_independent(
         UUID(session["session_id"]), UUID(message["message_id"]), UUID(organization_id)
     )
     assert persisted.content == text
+    durable = runtime.get_current_state(UUID(session["session_id"]), UUID(organization_id))
+    prohibition = next(
+        item
+        for item in durable.clarification_plan.constraint_evidence
+        if item.semantic_subject == "feature.halo" and item.status == "active"
+    )
+    assert prohibition.kind == "prohibition"
+    assert prohibition.original_wording.casefold() in {"no halo", "без гало", "без halo"}
+    assert prohibition.normalized_instruction == (
+        "Не добавлять гало." if locale == "ru" else "Do not include a halo."
+    )
 
 
 def test_http_contract_rejects_client_release_authority_and_exposes_routes_only_when_injected(

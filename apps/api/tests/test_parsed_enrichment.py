@@ -50,6 +50,7 @@ from jewelai_api.clarification_answers import (
     ClarificationDecision,
     process_clarification_answer,
 )
+from jewelai_api.constraint_evidence import merge_constraint_evidence
 from jewelai_api.parsed_enrichment import (
     CandidateDispositionOutcome,
     CandidateDispositionReason,
@@ -1420,3 +1421,103 @@ def test_unsupported_rule_answer_never_creates_groups_or_mutates_state(
     assert error.value.code == ClarificationAnswerErrorCode.INVALID_OPTION
     assert revision == before
     assert revision.design.side_stones == before.design.side_stones
+
+
+def test_constraint_evidence_supersession_reaffirmation_and_ambiguity_are_deterministic(
+    ring, dictionary, templates, active_release
+):
+    _, initial = _enrich(
+        "No halo.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    session_id = uuid4()
+    organization_id = uuid4()
+    first_cycle = uuid4()
+    first = merge_constraint_evidence(
+        initial,
+        session_id=session_id,
+        organization_id=organization_id,
+        source=initial.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=first_cycle,
+    )
+    assert len(first) == 1
+    assert first[0].kind == "prohibition"
+    assert first[0].status == "active"
+    assert first[0].semantic_subject == "feature.halo"
+
+    _, correction = _enrich(
+        "Actually, add a halo.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    corrected = merge_constraint_evidence(
+        correction,
+        session_id=session_id,
+        organization_id=organization_id,
+        source=correction.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=uuid4(),
+        previous=first,
+    )
+    active = [item for item in corrected if item.status == "active"]
+    superseded = [item for item in corrected if item.status == "superseded"]
+    assert len(active) == len(superseded) == 1
+    assert active[0].kind == "requirement"
+    assert superseded[0].superseded_by_evidence_id == active[0].evidence_id
+
+    _, ambiguous = _enrich(
+        "Don't change that part.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    with_ambiguous = merge_constraint_evidence(
+        ambiguous,
+        session_id=session_id,
+        organization_id=organization_id,
+        source=ambiguous.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=uuid4(),
+        previous=corrected,
+    )
+    unresolved = [item for item in with_ambiguous if item.status == "unresolved"]
+    assert len(unresolved) == 1
+    assert unresolved[0].semantic_subject is None
+    assert [item for item in with_ambiguous if item.status == "active"] == active
+
+
+def test_preservation_evidence_is_active_but_does_not_mutate_product_state(
+    ring, dictionary, templates, active_release
+):
+    before = ring.model_dump_json()
+    _, enrichment = _enrich(
+        "Change the center stone to round, but keep the original band.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    evidence = merge_constraint_evidence(
+        enrichment,
+        session_id=uuid4(),
+        organization_id=uuid4(),
+        source=enrichment.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=uuid4(),
+    )
+
+    preserved = next(item for item in evidence if item.semantic_subject == "component.band")
+    assert preserved.kind == "preservation"
+    assert preserved.status == "active"
+    assert ring.model_dump_json() == before

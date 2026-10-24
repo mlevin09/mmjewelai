@@ -165,6 +165,12 @@ atomically persists the first revision/release pin/enrichment cycle and complete
 clarification plan. Plans retain their exact ordered questions, options, evidence, artifact pins,
 revision/cycle binding and canonical hash, so answer processing restores server-owned semantics
 after restart rather than trusting client options or rerunning planning with newer artifacts.
+Clarification plan v1.1 also retains hashed typed evidence for explicit non-schema requirements,
+prohibitions and preservation instructions. The evidence is derived only from the verified internal
+parser result and persisted message provenance, is scoped to organization/session/revision/cycle,
+and is deterministically superseded by later explicit evidence for the same semantic subject.
+Historical v1.0 plans lack this complete contract and fail closed rather than receiving a guessed
+backfill.
 Clarification answers commit their decision, next cycle, and next plan together; corrections reuse
 the existing durable correction CAS boundary and append their resulting plan. A fail-closed snapshot
 adapter restores the latest matching revision, cycle, release hashes, artifacts, decisions, and

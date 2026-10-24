@@ -17,6 +17,7 @@ from jewelai_prompts import (
     CompiledPrompt,
     EnrichmentProposal,
     FinalPromptArtifactVersions,
+    FinalPromptConstraintEvidence,
     FinalPromptDecisionLineage,
     FinalPromptInputError,
     FinalPromptInputErrorCode,
@@ -77,7 +78,13 @@ def runtime():
 
 
 def _hash(payload):
-    canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(
+        payload,
+        default=str,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
@@ -118,8 +125,8 @@ def _blocked():
 
 def _snapshot(revision, enrichment, *, locale="en", lineage=(), **changes):
     payload = {
-        "session_id": SESSION_ID,
-        "organization_id": ORGANIZATION_ID,
+        "session_id": str(SESSION_ID),
+        "organization_id": str(ORGANIZATION_ID),
         "locale": locale,
         "revision": revision,
         "enrichment_cycle_id": CYCLE_ID,
@@ -145,6 +152,40 @@ def _snapshot(revision, enrichment, *, locale="en", lineage=(), **changes):
     }
     payload.update(changes)
     return FinalPromptSnapshot(**payload)
+
+
+def _constraint_evidence(
+    revision,
+    *,
+    evidence_id="constraint_111111111111111111111111",
+    kind="prohibition",
+    status="active",
+    subject="feature.halo",
+    instruction="Do not include a halo.",
+    original_wording="no halo",
+    superseded_by=None,
+):
+    payload = {
+        "schema_version": "1.0.0",
+        "evidence_id": evidence_id,
+        "session_id": str(SESSION_ID),
+        "organization_id": str(ORGANIZATION_ID),
+        "kind": kind,
+        "status": status,
+        "acceptance": "user_explicit",
+        "semantic_subject": subject,
+        "canonical_target": None,
+        "normalized_instruction": instruction,
+        "original_wording": original_wording,
+        "source": revision.event.source.model_dump(mode="json"),
+        "source_candidate_id": "candidate_0001",
+        "source_span_start": 0,
+        "source_span_end": 7,
+        "source_revision_id": str(revision.revision_id),
+        "source_enrichment_cycle_id": str(CYCLE_ID),
+        "superseded_by_evidence_id": superseded_by,
+    }
+    return FinalPromptConstraintEvidence(**payload, content_hash=_hash(payload))
 
 
 def _assemble(revision, templates, runtime, dictionary, **snapshot_changes):
@@ -173,7 +214,7 @@ def test_builds_deterministic_provider_neutral_outputs(ring, templates, runtime,
 
     assert first == second
     prompt = first.internal_final_prompt
-    assert prompt.schema_version == "1.0.0"
+    assert prompt.schema_version == "1.1.0"
     assert prompt.product_state_revision_id == ring.revision_id
     assert prompt.knowledge_release.runtime_sha256 == runtime.sha256
     assert prompt.description_content_hash == first.description.content_hash
@@ -233,6 +274,141 @@ def test_locked_confirmed_values_and_prohibitions_are_preserved(
     assert "No halo or other surrounding style" in result.internal_final_prompt.prompt_text
 
 
+def test_explicit_non_schema_prohibition_is_preserved_in_both_outputs(
+    ring, templates, runtime, dictionary
+):
+    evidence = _constraint_evidence(ring)
+    enrichment = _verified_enrichment(ring, templates, runtime)
+    result = assemble_internal_final_prompt(
+        _snapshot(ring, enrichment, constraint_evidence=(evidence,)),
+        dictionary=dictionary,
+        templates=templates,
+    )
+
+    constraint = next(
+        item for item in result.internal_final_prompt.constraints if item.target == "feature.halo"
+    )
+    assert constraint.kind == "prohibition"
+    assert constraint.instruction == "Do not include a halo."
+    assert result.internal_final_prompt.constraint_evidence == (evidence,)
+    assert "Do not include a halo" in result.internal_final_prompt.prompt_text
+    assert "Do not include a halo" in result.description.text
+
+
+@pytest.mark.parametrize(
+    ("locale", "kind", "subject", "instruction", "wording"),
+    (
+        ("ru", "prohibition", "feature.halo", "Не добавлять гало.", "без гало"),
+        ("ru", "prohibition", "feature.halo", "Не добавлять гало.", "без halo"),
+        (
+            "en",
+            "prohibition",
+            "feature.engraving",
+            "Do not include engraving.",
+            "without engraving",
+        ),
+        (
+            "en",
+            "preservation",
+            "component.band",
+            "Keep the existing band unchanged.",
+            "keep the original band",
+        ),
+    ),
+)
+def test_localized_non_schema_constraints_survive_final_assembly(
+    ring, templates, runtime, dictionary, locale, kind, subject, instruction, wording
+):
+    evidence = _constraint_evidence(
+        ring,
+        kind=kind,
+        subject=subject,
+        instruction=instruction,
+        original_wording=wording,
+    )
+    result = assemble_internal_final_prompt(
+        _snapshot(
+            ring,
+            _verified_enrichment(ring, templates, runtime),
+            locale=locale,
+            constraint_evidence=(evidence,),
+        ),
+        dictionary=dictionary,
+        templates=templates,
+    )
+
+    constraint = next(
+        item for item in result.internal_final_prompt.constraints if item.target == subject
+    )
+    assert constraint.kind == kind
+    assert constraint.instruction == instruction
+    assert instruction.rstrip(".") in result.internal_final_prompt.prompt_text
+    assert instruction.rstrip(".") in result.description.text
+
+
+def test_superseded_constraint_is_not_emitted_as_active(ring, templates, runtime, dictionary):
+    replacement = _constraint_evidence(
+        ring,
+        evidence_id="constraint_222222222222222222222222",
+        kind="requirement",
+        instruction="Include a halo.",
+    )
+    previous = _constraint_evidence(
+        ring,
+        status="superseded",
+        superseded_by=replacement.evidence_id,
+    )
+    enrichment = _verified_enrichment(ring, templates, runtime)
+    result = assemble_internal_final_prompt(
+        _snapshot(ring, enrichment, constraint_evidence=(previous, replacement)),
+        dictionary=dictionary,
+        templates=templates,
+    )
+
+    active = [
+        item for item in result.internal_final_prompt.constraints if item.target == "feature.halo"
+    ]
+    assert len(active) == 1
+    assert active[0].kind == "requirement"
+    assert "Do not include a halo" not in result.internal_final_prompt.prompt_text
+
+
+def test_constraint_evidence_tampering_and_conflicting_active_items_fail_closed(
+    ring, templates, runtime
+):
+    evidence = _constraint_evidence(ring)
+    payload = evidence.model_dump(mode="json")
+    payload["original_wording"] = "tampered"
+    with pytest.raises(ValidationError, match="content hash mismatch"):
+        FinalPromptConstraintEvidence.model_validate(payload)
+
+    conflict = _constraint_evidence(
+        ring,
+        evidence_id="constraint_222222222222222222222222",
+        kind="requirement",
+        instruction="Include a halo.",
+    )
+    with pytest.raises(ValidationError, match="conflicting active"):
+        _snapshot(
+            ring,
+            _verified_enrichment(ring, templates, runtime),
+            constraint_evidence=(evidence, conflict),
+        )
+
+    foreign_payload = evidence.model_dump(mode="json", exclude={"content_hash"})
+    foreign_payload["organization_id"] = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
+    foreign = FinalPromptConstraintEvidence(
+        **foreign_payload,
+        content_hash=_hash(foreign_payload),
+    )
+    with pytest.raises(ValidationError, match="another session scope"):
+        _snapshot(
+            ring,
+            _verified_enrichment(ring, templates, runtime),
+            constraint_evidence=(foreign,),
+        )
+
+
 def test_unaccepted_recommendation_is_evidence_not_requirement(
     ring, templates, runtime, dictionary
 ):
@@ -244,8 +420,11 @@ def test_unaccepted_recommendation_is_evidence_not_requirement(
         source_id="REC-SETTING",
     )
     enrichment = _verified_enrichment(ring, templates, runtime, proposals=(proposal,))
+    prohibition = _constraint_evidence(ring)
     result = assemble_internal_final_prompt(
-        _snapshot(ring, enrichment), dictionary=dictionary, templates=templates
+        _snapshot(ring, enrichment, constraint_evidence=(prohibition,)),
+        dictionary=dictionary,
+        templates=templates,
     )
 
     assert "center_stone.setting" not in {
@@ -255,6 +434,10 @@ def test_unaccepted_recommendation_is_evidence_not_requirement(
     assert any(
         item.target == "center_stone.setting" and item.classification == "unaccepted_recommendation"
         for item in result.internal_final_prompt.unresolved_details
+    )
+    assert any(
+        item.target == "feature.halo" and item.kind == "prohibition"
+        for item in result.internal_final_prompt.constraints
     )
 
 
@@ -575,7 +758,7 @@ def test_rejects_invalid_hash_and_cross_session_lineage(ring, templates, runtime
 
 def test_contract_schema_is_versioned_and_no_network_or_provider_dependency():
     schema = internal_final_prompt_json_schema()
-    assert schema["$id"] == "urn:jewelai:prompt-enrichment-final-output:1.0.0"
+    assert schema["$id"] == "urn:jewelai:prompt-enrichment-final-output:1.1.0"
     assert (
         json.loads((ROOT / "specs" / "prompts" / "internal-final-prompt-schema.json").read_text())
         == schema

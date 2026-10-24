@@ -80,6 +80,170 @@
       "title": "FinalPromptConstraint",
       "type": "object"
     },
+    "FinalPromptConstraintEvidence": {
+      "additionalProperties": false,
+      "description": "Versioned, hashed evidence for explicit constraints outside canonical schema fields.",
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "default": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "evidence_id": {
+          "pattern": "^constraint_[0-9a-f]{24}$",
+          "title": "Evidence Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "requirement",
+            "prohibition",
+            "preservation"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "active",
+            "superseded",
+            "rejected",
+            "unresolved"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "acceptance": {
+          "enum": [
+            "user_explicit",
+            "user_accepted",
+            "rejected",
+            "unresolved"
+          ],
+          "title": "Acceptance",
+          "type": "string"
+        },
+        "semantic_subject": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Semantic Subject"
+        },
+        "canonical_target": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Target"
+        },
+        "normalized_instruction": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalized Instruction"
+        },
+        "original_wording": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Original Wording",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        },
+        "source_candidate_id": {
+          "title": "Source Candidate Id",
+          "type": "string"
+        },
+        "source_span_start": {
+          "minimum": 0,
+          "title": "Source Span Start",
+          "type": "integer"
+        },
+        "source_span_end": {
+          "exclusiveMinimum": 0,
+          "title": "Source Span End",
+          "type": "integer"
+        },
+        "source_revision_id": {
+          "format": "uuid",
+          "title": "Source Revision Id",
+          "type": "string"
+        },
+        "source_enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Source Enrichment Cycle Id",
+          "type": "string"
+        },
+        "superseded_by_evidence_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Superseded By Evidence Id"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evidence_id",
+        "session_id",
+        "organization_id",
+        "kind",
+        "status",
+        "acceptance",
+        "original_wording",
+        "source",
+        "source_candidate_id",
+        "source_span_start",
+        "source_span_end",
+        "source_revision_id",
+        "source_enrichment_cycle_id",
+        "content_hash"
+      ],
+      "title": "FinalPromptConstraintEvidence",
+      "type": "object"
+    },
     "FinalPromptDecisionLineage": {
       "additionalProperties": false,
       "description": "Normalized immutable evidence from existing clarification/correction results.",
@@ -381,8 +545,8 @@
       "description": "Official provider-neutral Prompt Enrichment Module v1 handoff artifact.",
       "properties": {
         "schema_version": {
-          "const": "1.0.0",
-          "default": "1.0.0",
+          "const": "1.1.0",
+          "default": "1.1.0",
           "title": "Schema Version",
           "type": "string"
         },
@@ -477,6 +641,13 @@
           "title": "Decision Lineage",
           "type": "array"
         },
+        "constraint_evidence": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptConstraintEvidence"
+          },
+          "title": "Constraint Evidence",
+          "type": "array"
+        },
         "knowledge_release": {
           "$ref": "#/$defs/KnowledgeReleaseReference"
         },
@@ -511,6 +682,7 @@
         "unresolved_details",
         "enrichment_evidence",
         "decision_lineage",
+        "constraint_evidence",
         "knowledge_release",
         "artifact_versions",
         "enrichment_result_content_hash",
@@ -549,6 +721,35 @@
         "validation_report_sha256"
       ],
       "title": "KnowledgeReleaseReference",
+      "type": "object"
+    },
+    "MessageSource": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "message",
+          "default": "message",
+          "title": "Kind",
+          "type": "string"
+        },
+        "message_id": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "recorded_at": {
+          "format": "date-time",
+          "title": "Recorded At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "recorded_at"
+      ],
+      "title": "MessageSource",
       "type": "object"
     },
     "PreservationIntent": {
@@ -656,5 +857,5 @@
   "title": "FinalPromptAssembly",
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:jewelai:prompt-enrichment-final-output:1.0.0"
+  "$id": "urn:jewelai:prompt-enrichment-final-output:1.1.0"
 }
