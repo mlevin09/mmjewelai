@@ -122,6 +122,7 @@ def knowledge_fact(**overrides):
         "match": {
             "jewelry_type": "ring",
             "center_stone_material": "emerald",
+            "center_stone_shape": "oval",
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         },
     }
@@ -417,10 +418,25 @@ def test_no_fact_or_nonmatching_fact_never_derives(ring, engine):
         match={
             "jewelry_type": "ring",
             "center_stone_material": "diamond",
+            "center_stone_shape": "oval",
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         }
     )
     decision = engine.evaluate(ring, "retail_client", knowledge_facts=(nonmatching,))
+    assert decision.decision == "ask"
+    assert decision.proposed_change is None
+
+
+def test_same_material_and_weight_with_different_shape_never_derives(ring, engine):
+    different_shape = knowledge_fact(
+        match={
+            "jewelry_type": "ring",
+            "center_stone_material": "emerald",
+            "center_stone_shape": "pear",
+            "center_stone_weight": {"value": 3.0, "unit": "ct"},
+        }
+    )
+    decision = engine.evaluate(ring, "retail_client", knowledge_facts=(different_shape,))
     assert decision.decision == "ask"
     assert decision.proposed_change is None
 
@@ -438,6 +454,7 @@ def test_knowledge_fact_requires_source_uncertainty_and_valid_dictionary_context
         match={
             "jewelry_type": "oval",
             "center_stone_material": "emerald",
+            "center_stone_shape": "oval",
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         }
     )
