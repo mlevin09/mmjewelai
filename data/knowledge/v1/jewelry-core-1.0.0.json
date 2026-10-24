@@ -1,0 +1,4140 @@
+{
+  "contract_version": "1.0.0",
+  "package_id": "jewelai.production.jewelry_core",
+  "artifact_version": "1.0.0",
+  "sources": [
+    {
+      "source_id": "SRC-CIBJO-BLUE-BOOKS-2026",
+      "title": "CIBJO Blue Books — industry standards and nomenclature",
+      "source_type": "OFFICIAL_BODY",
+      "uri": "https://cibjo.org/the-blue-books/",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-CIBJO-PRECIOUS-METALS-RRG",
+      "title": "CIBJO Retailer's Reference Guide — Precious Metals",
+      "source_type": "OFFICIAL_BODY",
+      "uri": "https://cibjo.org/rrg/download-the-guides/",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-GIA-GEM-ENCYCLOPEDIA",
+      "title": "GIA Gem Encyclopedia",
+      "source_type": "PROFESSIONAL_EDUCATION",
+      "uri": "https://www.gia.edu/gem-encyclopedia",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-GIA-DIAMOND-SHAPES",
+      "title": "GIA Guide to Diamond Engagement Ring Shapes",
+      "source_type": "PROFESSIONAL_EDUCATION",
+      "uri": "https://4cs.gia.edu/en-us/blog/guide-diamond-shapes-engagement-rings/",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-GIA-CUTTING-STYLES",
+      "title": "GIA Gem Cutting Styles — Definitions",
+      "source_type": "PROFESSIONAL_EDUCATION",
+      "uri": "https://www.gia.edu/gia-news-research-value-factors-gem-cutting-styles-definitions",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-GIA-RING-SETTINGS-2026",
+      "title": "GIA Complete Guide to Engagement Ring Settings",
+      "source_type": "PROFESSIONAL_EDUCATION",
+      "uri": "https://4cs.gia.edu/en-us/blog/guide-to-ring-settings/",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-GIA-RING-MOUNTING",
+      "title": "GIA Semi-Mount Rings — mounting, shank, head and prongs",
+      "source_type": "PROFESSIONAL_EDUCATION",
+      "uri": "https://4cs.gia.edu/en-us/blog/how-to-build-your-own-engagement-ring/",
+      "language": "en",
+      "evidence_tier": "PRIMARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-JA-JEWELRY-STYLES",
+      "title": "Jewelers of America — Jewelry Styles",
+      "source_type": "RETAIL_SECONDARY",
+      "uri": "https://www.jewelers.org/buying-jewelry/jewelry-styles",
+      "language": "en",
+      "evidence_tier": "SECONDARY",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-GIA-PEARL-ITEM-TYPES",
+      "title": "GIA Cultured Pearl Classification Report — mounted item descriptions",
+      "source_type": "PROFESSIONAL_EDUCATION",
+      "uri": "https://www.gia.edu/doc/CulturedPearl_ClassificationReport_SubmissionForm_Acc_Final.pdf",
+      "language": "en",
+      "evidence_tier": "CORROBORATIVE",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "SRC-JEWELAI-KL-CONTRACT-V1",
+      "title": "JewelAI Knowledge Library Contract v1.0.0 semantic invariants",
+      "source_type": "INTERNAL_DECISION",
+      "uri": "https://github.com/mlevin09/mmjewelai/blob/jewelai-v2/specs/knowledge-library/contract-v1.0.0.json",
+      "language": "not_applicable",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "DEC-JEWELAI-PRODUCTION-CATALOG-V1",
+      "title": "JewelAI Production Jewelry Catalog v1 canonical vocabulary and policy decision",
+      "source_type": "INTERNAL_DECISION",
+      "uri": "https://github.com/mlevin09/mmjewelai/blob/jewelai-v2/specs/knowledge-library/README.md",
+      "language": "not_applicable",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-JEWELRY-TYPES",
+      "statement": "The production catalog recognizes ring, earrings, necklace, pendant, bracelet and brooch/pin as jewelry item types used by the current product model.",
+      "source_id": "SRC-JA-JEWELRY-STYLES",
+      "supporting_source_ids": [
+        "SRC-GIA-PEARL-ITEM-TYPES"
+      ],
+      "evidence_strength": "MEDIUM",
+      "scope": "Jewelry item type taxonomy for Product State v1",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-GEMSTONE-MATERIALS",
+      "statement": "GIA's Gem Encyclopedia presents alexandrite, amber, amethyst, ametrine, aquamarine, citrine, diamond, emerald, garnet, iolite, jade, kunzite, lapis lazuli, moonstone, morganite, opal, pearl, peridot, rose quartz, ruby, sapphire, spinel, sunstone, tanzanite, topaz, tourmaline, turquoise and zircon as named gem materials or gem entries.",
+      "source_id": "SRC-GIA-GEM-ENCYCLOPEDIA",
+      "supporting_source_ids": [
+        "SRC-CIBJO-BLUE-BOOKS-2026"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Common gem material nomenclature",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-SHAPE-CUT-SEPARATION",
+      "statement": "Gem shape describes outline while cut style describes facet arrangement; round, oval, pear, marquise, cushion, heart, square, rectangular, octagonal and triangular outlines must remain distinct from brilliant, step and other cutting styles.",
+      "source_id": "SRC-GIA-DIAMOND-SHAPES",
+      "supporting_source_ids": [
+        "SRC-JEWELAI-KL-CONTRACT-V1"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Stone shape and cut semantics",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-CUTTING-STYLES",
+      "statement": "Brilliant, step, mixed and rose are distinct faceting styles, while cabochon is a non-faceted fashioning style; outline shape is a separate attribute.",
+      "source_id": "SRC-GIA-CUTTING-STYLES",
+      "supporting_source_ids": [
+        "SRC-GIA-DIAMOND-SHAPES"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Stone cutting style taxonomy",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-SETTING-TYPES",
+      "statement": "Prong, bezel, flush, channel, tension, bar, basket and pavé are recognized gemstone-setting methods or setting structures; setting method is distinct from overall ring design style.",
+      "source_id": "SRC-GIA-RING-SETTINGS-2026",
+      "supporting_source_ids": [],
+      "evidence_strength": "HIGH",
+      "scope": "Stone setting taxonomy",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-RING-STYLES",
+      "statement": "Solitaire, three-stone, cathedral, halo and toi et moi are ring design or setting styles and must remain distinct from the mechanical method that secures a gemstone.",
+      "source_id": "SRC-GIA-RING-SETTINGS-2026",
+      "supporting_source_ids": [],
+      "evidence_strength": "HIGH",
+      "scope": "Ring style taxonomy",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-PRECIOUS-METALS",
+      "statement": "CIBJO precious-metal nomenclature includes platinum, gold, palladium and silver, and defines fineness as precious-metal content expressed in parts per thousand by weight of alloy.",
+      "source_id": "SRC-CIBJO-PRECIOUS-METALS-RRG",
+      "supporting_source_ids": [
+        "SRC-CIBJO-BLUE-BOOKS-2026"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Metal material and purity terminology",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-GOLD-COLORS",
+      "statement": "Jewelry gold is commonly described in yellow, white and rose color variants; color is a separate design attribute from the metal material itself.",
+      "source_id": "SRC-GIA-RING-SETTINGS-2026",
+      "supporting_source_ids": [
+        "SRC-JEWELAI-KL-CONTRACT-V1"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Metal color semantics",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-ROSE-RED-DISTINCT",
+      "statement": "JewelAI Contract v1 requires rose gold and red gold to remain distinct canonical metal-color concepts.",
+      "source_id": "SRC-JEWELAI-KL-CONTRACT-V1",
+      "supporting_source_ids": [],
+      "evidence_strength": "HIGH",
+      "scope": "JewelAI canonical metal-color semantics",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-CONSTRUCTION-COMPONENTS",
+      "statement": "A ring mounting includes a shank and head; shoulders connect the shank toward the head, and basket structures can support and stabilize gemstone settings.",
+      "source_id": "SRC-GIA-RING-SETTINGS-2026",
+      "supporting_source_ids": [
+        "SRC-GIA-RING-MOUNTING"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Ring construction terminology",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-STONE-COLORS",
+      "statement": "The production catalog uses the GIA Gem Encyclopedia's broad color vocabulary including colorless, white, yellow, pink, red, blue, green, purple, orange, brown, black and gray as non-grading color descriptors.",
+      "source_id": "SRC-GIA-GEM-ENCYCLOPEDIA",
+      "supporting_source_ids": [],
+      "evidence_strength": "MEDIUM",
+      "scope": "General gemstone color descriptors; not laboratory grading scales",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-JEWELAI-CANONICAL-EXTENSIONS",
+      "statement": "JewelAI Production Catalog v1 defines bounded canonical product vocabulary for metal finish, stone orientation, selected construction terms and general aesthetic styles where the current Product State has fields but external quantitative facts are not required.",
+      "source_id": "DEC-JEWELAI-PRODUCTION-CATALOG-V1",
+      "supporting_source_ids": [],
+      "evidence_strength": "HIGH",
+      "scope": "Internal canonical product vocabulary",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-NO-PARAMETRIC-INFERENCE",
+      "statement": "Carat weight is mass and does not determine physical dimensions; center-stone role does not imply material; qualitative shank width has no universal millimetre thresholds; white gold does not imply rhodium coating.",
+      "source_id": "SRC-JEWELAI-KL-CONTRACT-V1",
+      "supporting_source_ids": [],
+      "evidence_strength": "HIGH",
+      "scope": "Production no-silent-inference invariants",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "domain_knowledge": [
+    {
+      "concept_id": "category.jewelry_type",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.gemstone_material",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.stone_shape",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.stone_cut",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.stone_setting",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.metal_material",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.metal_color",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.metal_purity",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.metal_finish",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.construction",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.style",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.stone_orientation",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "category.stone_color",
+      "kind": "taxonomy",
+      "relationships": [],
+      "claim_ids": [],
+      "structural_schema": true,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "ring",
+      "kind": "jewelry_type",
+      "parent_id": "category.jewelry_type",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELRY-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "earrings",
+      "kind": "jewelry_type",
+      "parent_id": "category.jewelry_type",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELRY-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "necklace",
+      "kind": "jewelry_type",
+      "parent_id": "category.jewelry_type",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELRY-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "pendant",
+      "kind": "jewelry_type",
+      "parent_id": "category.jewelry_type",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELRY-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "bracelet",
+      "kind": "jewelry_type",
+      "parent_id": "category.jewelry_type",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELRY-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "brooch",
+      "kind": "jewelry_type",
+      "parent_id": "category.jewelry_type",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELRY-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "alexandrite",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "amber",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "amethyst",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "ametrine",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "aquamarine",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "citrine",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "diamond",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "emerald",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "garnet",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "iolite",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "jade",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "kunzite",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "lapis_lazuli",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "moonstone",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "morganite",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "opal",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "pearl",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "peridot",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "rose_quartz",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "ruby",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "sapphire",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "spinel",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "sunstone",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "tanzanite",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "topaz",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "tourmaline",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "turquoise",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "zircon",
+      "kind": "gemstone_material",
+      "parent_id": "category.gemstone_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GEMSTONE-MATERIALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "round",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "oval",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "pear",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "marquise",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "cushion",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "heart",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "square",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "rectangle",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "octagon",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "triangle",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "emerald_cut",
+      "kind": "stone_shape",
+      "parent_id": "category.stone_shape",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SHAPE-CUT-SEPARATION"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "brilliant_cut",
+      "kind": "stone_cut",
+      "parent_id": "category.stone_cut",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CUTTING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "step_cut",
+      "kind": "stone_cut",
+      "parent_id": "category.stone_cut",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CUTTING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "mixed_cut",
+      "kind": "stone_cut",
+      "parent_id": "category.stone_cut",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CUTTING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "rose_cut",
+      "kind": "stone_cut",
+      "parent_id": "category.stone_cut",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CUTTING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "cabochon",
+      "kind": "stone_cut",
+      "parent_id": "category.stone_cut",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CUTTING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "prong_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "bezel_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "flush_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "channel_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "pave_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "tension_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "bar_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "basket_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "bead_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-SETTING-TYPES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "halo_setting",
+      "kind": "stone_setting",
+      "parent_id": "category.stone_setting",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-RING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "gold",
+      "kind": "metal_material",
+      "parent_id": "category.metal_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-PRECIOUS-METALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "platinum",
+      "kind": "metal_material",
+      "parent_id": "category.metal_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-PRECIOUS-METALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "silver",
+      "kind": "metal_material",
+      "parent_id": "category.metal_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-PRECIOUS-METALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "palladium",
+      "kind": "metal_material",
+      "parent_id": "category.metal_material",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-PRECIOUS-METALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "yellow",
+      "kind": "metal_color",
+      "parent_id": "category.metal_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GOLD-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "white",
+      "kind": "metal_color",
+      "parent_id": "category.metal_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GOLD-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "rose",
+      "kind": "metal_color",
+      "parent_id": "category.metal_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-GOLD-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "red",
+      "kind": "metal_color",
+      "parent_id": "category.metal_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-ROSE-RED-DISTINCT"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "fineness",
+      "kind": "metal_purity",
+      "parent_id": "category.metal_purity",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-PRECIOUS-METALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "karat",
+      "kind": "metal_purity",
+      "parent_id": "category.metal_purity",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-PRECIOUS-METALS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "finish.polished",
+      "kind": "metal_finish",
+      "parent_id": "category.metal_finish",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "finish.matte",
+      "kind": "metal_finish",
+      "parent_id": "category.metal_finish",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "finish.satin",
+      "kind": "metal_finish",
+      "parent_id": "category.metal_finish",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "finish.brushed",
+      "kind": "metal_finish",
+      "parent_id": "category.metal_finish",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "finish.hammered",
+      "kind": "metal_finish",
+      "parent_id": "category.metal_finish",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "ring_shank",
+      "kind": "construction",
+      "parent_id": "category.construction",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CONSTRUCTION-COMPONENTS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "ring_head",
+      "kind": "construction",
+      "parent_id": "category.construction",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CONSTRUCTION-COMPONENTS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "ring_shoulders",
+      "kind": "construction",
+      "parent_id": "category.construction",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CONSTRUCTION-COMPONENTS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "basket_gallery",
+      "kind": "construction",
+      "parent_id": "category.construction",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-CONSTRUCTION-COMPONENTS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "split_shank",
+      "kind": "construction",
+      "parent_id": "category.construction",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "solitaire",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-RING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "three_stone",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-RING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "halo_style",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-RING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "cathedral_style",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-RING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "toi_et_moi",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-RING-STYLES"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "cluster_style",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "minimalist",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "classic",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "modern",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "vintage",
+      "kind": "style",
+      "parent_id": "category.style",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "orientation.north_south",
+      "kind": "stone_orientation",
+      "parent_id": "category.stone_orientation",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "orientation.east_west",
+      "kind": "stone_orientation",
+      "parent_id": "category.stone_orientation",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-JEWELAI-CANONICAL-EXTENSIONS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.colorless",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.white",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.yellow",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.pink",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.red",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.blue",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.green",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.purple",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.orange",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.brown",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.black",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "concept_id": "stone_color.gray",
+      "kind": "stone_color",
+      "parent_id": "category.stone_color",
+      "relationships": [],
+      "claim_ids": [
+        "CLM-STONE-COLORS"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "language_mappings": [
+    {
+      "mapping_id": "LANG-EN-RING",
+      "concept_id": "ring",
+      "locale": "en",
+      "canonical_term": "ring",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RING",
+      "concept_id": "ring",
+      "locale": "ru",
+      "canonical_term": "кольцо",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-EARRINGS",
+      "concept_id": "earrings",
+      "locale": "en",
+      "canonical_term": "earrings",
+      "aliases": [
+        "earring"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-EARRINGS",
+      "concept_id": "earrings",
+      "locale": "ru",
+      "canonical_term": "серьги",
+      "aliases": [
+        "серьга"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-NECKLACE",
+      "concept_id": "necklace",
+      "locale": "en",
+      "canonical_term": "necklace",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-NECKLACE",
+      "concept_id": "necklace",
+      "locale": "ru",
+      "canonical_term": "ожерелье",
+      "aliases": [
+        "колье"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PENDANT",
+      "concept_id": "pendant",
+      "locale": "en",
+      "canonical_term": "pendant",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PENDANT",
+      "concept_id": "pendant",
+      "locale": "ru",
+      "canonical_term": "подвеска",
+      "aliases": [
+        "кулон"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BRACELET",
+      "concept_id": "bracelet",
+      "locale": "en",
+      "canonical_term": "bracelet",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BRACELET",
+      "concept_id": "bracelet",
+      "locale": "ru",
+      "canonical_term": "браслет",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BROOCH",
+      "concept_id": "brooch",
+      "locale": "en",
+      "canonical_term": "brooch",
+      "aliases": [
+        "pin"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BROOCH",
+      "concept_id": "brooch",
+      "locale": "ru",
+      "canonical_term": "брошь",
+      "aliases": [
+        "брошь-булавка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ALEXANDRITE",
+      "concept_id": "alexandrite",
+      "locale": "en",
+      "canonical_term": "alexandrite",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ALEXANDRITE",
+      "concept_id": "alexandrite",
+      "locale": "ru",
+      "canonical_term": "александрит",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-AMBER",
+      "concept_id": "amber",
+      "locale": "en",
+      "canonical_term": "amber",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-AMBER",
+      "concept_id": "amber",
+      "locale": "ru",
+      "canonical_term": "янтарь",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-AMETHYST",
+      "concept_id": "amethyst",
+      "locale": "en",
+      "canonical_term": "amethyst",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-AMETHYST",
+      "concept_id": "amethyst",
+      "locale": "ru",
+      "canonical_term": "аметист",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-AMETRINE",
+      "concept_id": "ametrine",
+      "locale": "en",
+      "canonical_term": "ametrine",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-AMETRINE",
+      "concept_id": "ametrine",
+      "locale": "ru",
+      "canonical_term": "аметрин",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-AQUAMARINE",
+      "concept_id": "aquamarine",
+      "locale": "en",
+      "canonical_term": "aquamarine",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-AQUAMARINE",
+      "concept_id": "aquamarine",
+      "locale": "ru",
+      "canonical_term": "аквамарин",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CITRINE",
+      "concept_id": "citrine",
+      "locale": "en",
+      "canonical_term": "citrine",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CITRINE",
+      "concept_id": "citrine",
+      "locale": "ru",
+      "canonical_term": "цитрин",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-DIAMOND",
+      "concept_id": "diamond",
+      "locale": "en",
+      "canonical_term": "diamond",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-DIAMOND",
+      "concept_id": "diamond",
+      "locale": "ru",
+      "canonical_term": "алмаз",
+      "aliases": [
+        "бриллиант"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-EMERALD",
+      "concept_id": "emerald",
+      "locale": "en",
+      "canonical_term": "emerald",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-EMERALD",
+      "concept_id": "emerald",
+      "locale": "ru",
+      "canonical_term": "изумруд",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-GARNET",
+      "concept_id": "garnet",
+      "locale": "en",
+      "canonical_term": "garnet",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-GARNET",
+      "concept_id": "garnet",
+      "locale": "ru",
+      "canonical_term": "гранат",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-IOLITE",
+      "concept_id": "iolite",
+      "locale": "en",
+      "canonical_term": "iolite",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-IOLITE",
+      "concept_id": "iolite",
+      "locale": "ru",
+      "canonical_term": "иолит",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-JADE",
+      "concept_id": "jade",
+      "locale": "en",
+      "canonical_term": "jade",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-JADE",
+      "concept_id": "jade",
+      "locale": "ru",
+      "canonical_term": "жад",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-KUNZITE",
+      "concept_id": "kunzite",
+      "locale": "en",
+      "canonical_term": "kunzite",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-KUNZITE",
+      "concept_id": "kunzite",
+      "locale": "ru",
+      "canonical_term": "кунцит",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-LAPIS-LAZULI",
+      "concept_id": "lapis_lazuli",
+      "locale": "en",
+      "canonical_term": "lapis lazuli",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-LAPIS-LAZULI",
+      "concept_id": "lapis_lazuli",
+      "locale": "ru",
+      "canonical_term": "лазурит",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-MOONSTONE",
+      "concept_id": "moonstone",
+      "locale": "en",
+      "canonical_term": "moonstone",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-MOONSTONE",
+      "concept_id": "moonstone",
+      "locale": "ru",
+      "canonical_term": "лунный камень",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-MORGANITE",
+      "concept_id": "morganite",
+      "locale": "en",
+      "canonical_term": "morganite",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-MORGANITE",
+      "concept_id": "morganite",
+      "locale": "ru",
+      "canonical_term": "морганит",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-OPAL",
+      "concept_id": "opal",
+      "locale": "en",
+      "canonical_term": "opal",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-OPAL",
+      "concept_id": "opal",
+      "locale": "ru",
+      "canonical_term": "опал",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PEARL",
+      "concept_id": "pearl",
+      "locale": "en",
+      "canonical_term": "pearl",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PEARL",
+      "concept_id": "pearl",
+      "locale": "ru",
+      "canonical_term": "жемчуг",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PERIDOT",
+      "concept_id": "peridot",
+      "locale": "en",
+      "canonical_term": "peridot",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PERIDOT",
+      "concept_id": "peridot",
+      "locale": "ru",
+      "canonical_term": "перидот",
+      "aliases": [
+        "хризолит"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ROSE-QUARTZ",
+      "concept_id": "rose_quartz",
+      "locale": "en",
+      "canonical_term": "rose quartz",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ROSE-QUARTZ",
+      "concept_id": "rose_quartz",
+      "locale": "ru",
+      "canonical_term": "розовый кварц",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-RUBY",
+      "concept_id": "ruby",
+      "locale": "en",
+      "canonical_term": "ruby",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RUBY",
+      "concept_id": "ruby",
+      "locale": "ru",
+      "canonical_term": "рубин",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SAPPHIRE",
+      "concept_id": "sapphire",
+      "locale": "en",
+      "canonical_term": "sapphire",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SAPPHIRE",
+      "concept_id": "sapphire",
+      "locale": "ru",
+      "canonical_term": "сапфир",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SPINEL",
+      "concept_id": "spinel",
+      "locale": "en",
+      "canonical_term": "spinel",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SPINEL",
+      "concept_id": "spinel",
+      "locale": "ru",
+      "canonical_term": "шпинель",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SUNSTONE",
+      "concept_id": "sunstone",
+      "locale": "en",
+      "canonical_term": "sunstone",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SUNSTONE",
+      "concept_id": "sunstone",
+      "locale": "ru",
+      "canonical_term": "солнечный камень",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TANZANITE",
+      "concept_id": "tanzanite",
+      "locale": "en",
+      "canonical_term": "tanzanite",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TANZANITE",
+      "concept_id": "tanzanite",
+      "locale": "ru",
+      "canonical_term": "танзанит",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TOPAZ",
+      "concept_id": "topaz",
+      "locale": "en",
+      "canonical_term": "topaz",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TOPAZ",
+      "concept_id": "topaz",
+      "locale": "ru",
+      "canonical_term": "топаз",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TOURMALINE",
+      "concept_id": "tourmaline",
+      "locale": "en",
+      "canonical_term": "tourmaline",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TOURMALINE",
+      "concept_id": "tourmaline",
+      "locale": "ru",
+      "canonical_term": "турмалин",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TURQUOISE",
+      "concept_id": "turquoise",
+      "locale": "en",
+      "canonical_term": "turquoise",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TURQUOISE",
+      "concept_id": "turquoise",
+      "locale": "ru",
+      "canonical_term": "бирюза",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ZIRCON",
+      "concept_id": "zircon",
+      "locale": "en",
+      "canonical_term": "zircon",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ZIRCON",
+      "concept_id": "zircon",
+      "locale": "ru",
+      "canonical_term": "циркон",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ROUND",
+      "concept_id": "round",
+      "locale": "en",
+      "canonical_term": "round",
+      "aliases": [
+        "round shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ROUND",
+      "concept_id": "round",
+      "locale": "ru",
+      "canonical_term": "круг",
+      "aliases": [
+        "круглая форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-OVAL",
+      "concept_id": "oval",
+      "locale": "en",
+      "canonical_term": "oval",
+      "aliases": [
+        "oval shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-OVAL",
+      "concept_id": "oval",
+      "locale": "ru",
+      "canonical_term": "овал",
+      "aliases": [
+        "овальная форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PEAR",
+      "concept_id": "pear",
+      "locale": "en",
+      "canonical_term": "pear",
+      "aliases": [
+        "pear shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PEAR",
+      "concept_id": "pear",
+      "locale": "ru",
+      "canonical_term": "груша",
+      "aliases": [
+        "грушевидная форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-MARQUISE",
+      "concept_id": "marquise",
+      "locale": "en",
+      "canonical_term": "marquise",
+      "aliases": [
+        "marquise shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-MARQUISE",
+      "concept_id": "marquise",
+      "locale": "ru",
+      "canonical_term": "маркиз",
+      "aliases": [
+        "форма маркиз"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CUSHION",
+      "concept_id": "cushion",
+      "locale": "en",
+      "canonical_term": "cushion",
+      "aliases": [
+        "cushion shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CUSHION",
+      "concept_id": "cushion",
+      "locale": "ru",
+      "canonical_term": "кушон",
+      "aliases": [
+        "форма кушон"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-HEART",
+      "concept_id": "heart",
+      "locale": "en",
+      "canonical_term": "heart",
+      "aliases": [
+        "heart shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-HEART",
+      "concept_id": "heart",
+      "locale": "ru",
+      "canonical_term": "сердце",
+      "aliases": [
+        "сердцевидная форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SQUARE",
+      "concept_id": "square",
+      "locale": "en",
+      "canonical_term": "square",
+      "aliases": [
+        "square shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SQUARE",
+      "concept_id": "square",
+      "locale": "ru",
+      "canonical_term": "квадрат",
+      "aliases": [
+        "квадратная форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-RECTANGLE",
+      "concept_id": "rectangle",
+      "locale": "en",
+      "canonical_term": "rectangle",
+      "aliases": [
+        "rectangular shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RECTANGLE",
+      "concept_id": "rectangle",
+      "locale": "ru",
+      "canonical_term": "прямоугольник",
+      "aliases": [
+        "прямоугольная форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-OCTAGON",
+      "concept_id": "octagon",
+      "locale": "en",
+      "canonical_term": "octagon",
+      "aliases": [
+        "octagonal shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-OCTAGON",
+      "concept_id": "octagon",
+      "locale": "ru",
+      "canonical_term": "октагон",
+      "aliases": [
+        "восьмиугольник"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TRIANGLE",
+      "concept_id": "triangle",
+      "locale": "en",
+      "canonical_term": "triangle",
+      "aliases": [
+        "triangular shape"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TRIANGLE",
+      "concept_id": "triangle",
+      "locale": "ru",
+      "canonical_term": "треугольник",
+      "aliases": [
+        "треугольная форма"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-EMERALD-CUT",
+      "concept_id": "emerald_cut",
+      "locale": "en",
+      "canonical_term": "emerald cut",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_shape",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-EMERALD-CUT",
+      "concept_id": "emerald_cut",
+      "locale": "ru",
+      "canonical_term": "изумрудная огранка",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_shape",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BRILLIANT-CUT",
+      "concept_id": "brilliant_cut",
+      "locale": "en",
+      "canonical_term": "brilliant cut",
+      "aliases": [
+        "brilliant-cut"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BRILLIANT-CUT",
+      "concept_id": "brilliant_cut",
+      "locale": "ru",
+      "canonical_term": "бриллиантовая огранка",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STEP-CUT",
+      "concept_id": "step_cut",
+      "locale": "en",
+      "canonical_term": "step cut",
+      "aliases": [
+        "step-cut"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STEP-CUT",
+      "concept_id": "step_cut",
+      "locale": "ru",
+      "canonical_term": "ступенчатая огранка",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-MIXED-CUT",
+      "concept_id": "mixed_cut",
+      "locale": "en",
+      "canonical_term": "mixed cut",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-MIXED-CUT",
+      "concept_id": "mixed_cut",
+      "locale": "ru",
+      "canonical_term": "смешанная огранка",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ROSE-CUT",
+      "concept_id": "rose_cut",
+      "locale": "en",
+      "canonical_term": "rose cut",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ROSE-CUT",
+      "concept_id": "rose_cut",
+      "locale": "ru",
+      "canonical_term": "огранка роза",
+      "aliases": [
+        "роза"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CABOCHON",
+      "concept_id": "cabochon",
+      "locale": "en",
+      "canonical_term": "cabochon",
+      "aliases": [
+        "cab"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CABOCHON",
+      "concept_id": "cabochon",
+      "locale": "ru",
+      "canonical_term": "кабошон",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STEP-CUT-EMERALD-CONTEXT",
+      "concept_id": "step_cut",
+      "locale": "en",
+      "canonical_term": "emerald cut",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_cut",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STEP-CUT-EMERALD-CONTEXT",
+      "concept_id": "step_cut",
+      "locale": "ru",
+      "canonical_term": "изумрудная огранка",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_cut",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PRONG-SETTING",
+      "concept_id": "prong_setting",
+      "locale": "en",
+      "canonical_term": "prong setting",
+      "aliases": [
+        "prong"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PRONG-SETTING",
+      "concept_id": "prong_setting",
+      "locale": "ru",
+      "canonical_term": "крапановая закрепка",
+      "aliases": [
+        "крапан"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BEZEL-SETTING",
+      "concept_id": "bezel_setting",
+      "locale": "en",
+      "canonical_term": "bezel setting",
+      "aliases": [
+        "bezel"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BEZEL-SETTING",
+      "concept_id": "bezel_setting",
+      "locale": "ru",
+      "canonical_term": "ободковая закрепка",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FLUSH-SETTING",
+      "concept_id": "flush_setting",
+      "locale": "en",
+      "canonical_term": "flush setting",
+      "aliases": [
+        "burnish setting"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FLUSH-SETTING",
+      "concept_id": "flush_setting",
+      "locale": "ru",
+      "canonical_term": "закрепка заподлицо",
+      "aliases": [
+        "глухая посадка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CHANNEL-SETTING",
+      "concept_id": "channel_setting",
+      "locale": "en",
+      "canonical_term": "channel setting",
+      "aliases": [
+        "channel"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CHANNEL-SETTING",
+      "concept_id": "channel_setting",
+      "locale": "ru",
+      "canonical_term": "канальная закрепка",
+      "aliases": [
+        "канал"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PAVE-SETTING",
+      "concept_id": "pave_setting",
+      "locale": "en",
+      "canonical_term": "pavé setting",
+      "aliases": [
+        "pave setting",
+        "pavé",
+        "pave"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PAVE-SETTING",
+      "concept_id": "pave_setting",
+      "locale": "ru",
+      "canonical_term": "паве",
+      "aliases": [
+        "закрепка паве"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TENSION-SETTING",
+      "concept_id": "tension_setting",
+      "locale": "en",
+      "canonical_term": "tension setting",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TENSION-SETTING",
+      "concept_id": "tension_setting",
+      "locale": "ru",
+      "canonical_term": "тензионная закрепка",
+      "aliases": [
+        "закрепка натяжением"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BAR-SETTING",
+      "concept_id": "bar_setting",
+      "locale": "en",
+      "canonical_term": "bar setting",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BAR-SETTING",
+      "concept_id": "bar_setting",
+      "locale": "ru",
+      "canonical_term": "закрепка между планками",
+      "aliases": [
+        "планочная закрепка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BASKET-SETTING",
+      "concept_id": "basket_setting",
+      "locale": "en",
+      "canonical_term": "basket setting",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BASKET-SETTING",
+      "concept_id": "basket_setting",
+      "locale": "ru",
+      "canonical_term": "корзиночная закрепка",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BEAD-SETTING",
+      "concept_id": "bead_setting",
+      "locale": "en",
+      "canonical_term": "bead setting",
+      "aliases": [
+        "bead and bright"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BEAD-SETTING",
+      "concept_id": "bead_setting",
+      "locale": "ru",
+      "canonical_term": "корнеровая закрепка",
+      "aliases": [
+        "корнерная закрепка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-HALO-SETTING",
+      "concept_id": "halo_setting",
+      "locale": "en",
+      "canonical_term": "halo setting",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_setting",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-HALO-SETTING",
+      "concept_id": "halo_setting",
+      "locale": "ru",
+      "canonical_term": "закрепка гало",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_setting",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BEZEL-GLUHAYA-CONTEXT",
+      "concept_id": "bezel_setting",
+      "locale": "ru",
+      "canonical_term": "глухая закрепка",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "stone_setting",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-GOLD",
+      "concept_id": "gold",
+      "locale": "en",
+      "canonical_term": "gold",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-GOLD",
+      "concept_id": "gold",
+      "locale": "ru",
+      "canonical_term": "золото",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PLATINUM",
+      "concept_id": "platinum",
+      "locale": "en",
+      "canonical_term": "platinum",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PLATINUM",
+      "concept_id": "platinum",
+      "locale": "ru",
+      "canonical_term": "платина",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SILVER",
+      "concept_id": "silver",
+      "locale": "en",
+      "canonical_term": "silver",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SILVER",
+      "concept_id": "silver",
+      "locale": "ru",
+      "canonical_term": "серебро",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-PALLADIUM",
+      "concept_id": "palladium",
+      "locale": "en",
+      "canonical_term": "palladium",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-PALLADIUM",
+      "concept_id": "palladium",
+      "locale": "ru",
+      "canonical_term": "палладий",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-YELLOW",
+      "concept_id": "yellow",
+      "locale": "en",
+      "canonical_term": "yellow",
+      "aliases": [
+        "yellow metal color"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-YELLOW",
+      "concept_id": "yellow",
+      "locale": "ru",
+      "canonical_term": "желтый",
+      "aliases": [
+        "желтый цвет металла"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-WHITE",
+      "concept_id": "white",
+      "locale": "en",
+      "canonical_term": "white",
+      "aliases": [
+        "white metal color"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-WHITE",
+      "concept_id": "white",
+      "locale": "ru",
+      "canonical_term": "белый",
+      "aliases": [
+        "белый цвет металла"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ROSE",
+      "concept_id": "rose",
+      "locale": "en",
+      "canonical_term": "rose",
+      "aliases": [
+        "rose metal color"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ROSE",
+      "concept_id": "rose",
+      "locale": "ru",
+      "canonical_term": "розовый",
+      "aliases": [
+        "розовый цвет металла"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-RED",
+      "concept_id": "red",
+      "locale": "en",
+      "canonical_term": "red",
+      "aliases": [
+        "red metal color"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RED",
+      "concept_id": "red",
+      "locale": "ru",
+      "canonical_term": "красный",
+      "aliases": [
+        "красный цвет металла"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FINENESS",
+      "concept_id": "fineness",
+      "locale": "en",
+      "canonical_term": "fineness",
+      "aliases": [
+        "millesimal fineness"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FINENESS",
+      "concept_id": "fineness",
+      "locale": "ru",
+      "canonical_term": "проба",
+      "aliases": [
+        "метрическая проба"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-KARAT",
+      "concept_id": "karat",
+      "locale": "en",
+      "canonical_term": "karat",
+      "aliases": [
+        "karat purity",
+        "kt"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-KARAT",
+      "concept_id": "karat",
+      "locale": "ru",
+      "canonical_term": "каратность",
+      "aliases": [
+        "каратная проба"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FINISH-POLISHED",
+      "concept_id": "finish.polished",
+      "locale": "en",
+      "canonical_term": "polished finish",
+      "aliases": [
+        "polished"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FINISH-POLISHED",
+      "concept_id": "finish.polished",
+      "locale": "ru",
+      "canonical_term": "полированная поверхность",
+      "aliases": [
+        "полировка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FINISH-MATTE",
+      "concept_id": "finish.matte",
+      "locale": "en",
+      "canonical_term": "matte finish",
+      "aliases": [
+        "matte"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FINISH-MATTE",
+      "concept_id": "finish.matte",
+      "locale": "ru",
+      "canonical_term": "матовая поверхность",
+      "aliases": [
+        "матовая"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FINISH-SATIN",
+      "concept_id": "finish.satin",
+      "locale": "en",
+      "canonical_term": "satin finish",
+      "aliases": [
+        "satin"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FINISH-SATIN",
+      "concept_id": "finish.satin",
+      "locale": "ru",
+      "canonical_term": "сатинированная поверхность",
+      "aliases": [
+        "сатин"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FINISH-BRUSHED",
+      "concept_id": "finish.brushed",
+      "locale": "en",
+      "canonical_term": "brushed finish",
+      "aliases": [
+        "brushed"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FINISH-BRUSHED",
+      "concept_id": "finish.brushed",
+      "locale": "ru",
+      "canonical_term": "брашированная поверхность",
+      "aliases": [
+        "щеточная обработка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-FINISH-HAMMERED",
+      "concept_id": "finish.hammered",
+      "locale": "en",
+      "canonical_term": "hammered finish",
+      "aliases": [
+        "hammered"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-FINISH-HAMMERED",
+      "concept_id": "finish.hammered",
+      "locale": "ru",
+      "canonical_term": "кованая фактура",
+      "aliases": [
+        "молотковая фактура"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-RING-SHANK",
+      "concept_id": "ring_shank",
+      "locale": "en",
+      "canonical_term": "shank",
+      "aliases": [
+        "ring shank",
+        "band"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RING-SHANK",
+      "concept_id": "ring_shank",
+      "locale": "ru",
+      "canonical_term": "шинка",
+      "aliases": [
+        "обод кольца"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-RING-HEAD",
+      "concept_id": "ring_head",
+      "locale": "en",
+      "canonical_term": "ring head",
+      "aliases": [
+        "head"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RING-HEAD",
+      "concept_id": "ring_head",
+      "locale": "ru",
+      "canonical_term": "каст",
+      "aliases": [
+        "головка кольца"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-RING-SHOULDERS",
+      "concept_id": "ring_shoulders",
+      "locale": "en",
+      "canonical_term": "ring shoulders",
+      "aliases": [
+        "shoulders"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-RING-SHOULDERS",
+      "concept_id": "ring_shoulders",
+      "locale": "ru",
+      "canonical_term": "плечики кольца",
+      "aliases": [
+        "плечи кольца"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-BASKET-GALLERY",
+      "concept_id": "basket_gallery",
+      "locale": "en",
+      "canonical_term": "basket gallery",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-BASKET-GALLERY",
+      "concept_id": "basket_gallery",
+      "locale": "ru",
+      "canonical_term": "корзиночная галерея",
+      "aliases": [
+        "корзина"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SPLIT-SHANK",
+      "concept_id": "split_shank",
+      "locale": "en",
+      "canonical_term": "split shank",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SPLIT-SHANK",
+      "concept_id": "split_shank",
+      "locale": "ru",
+      "canonical_term": "раздвоенная шинка",
+      "aliases": [],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-SOLITAIRE",
+      "concept_id": "solitaire",
+      "locale": "en",
+      "canonical_term": "solitaire",
+      "aliases": [
+        "solitaire ring"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-SOLITAIRE",
+      "concept_id": "solitaire",
+      "locale": "ru",
+      "canonical_term": "солитер",
+      "aliases": [
+        "кольцо солитер",
+        "кольцо-солитер"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-THREE-STONE",
+      "concept_id": "three_stone",
+      "locale": "en",
+      "canonical_term": "three-stone",
+      "aliases": [
+        "three stone",
+        "three-stone ring"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-THREE-STONE",
+      "concept_id": "three_stone",
+      "locale": "ru",
+      "canonical_term": "кольцо с тремя камнями",
+      "aliases": [
+        "трехкаменное кольцо",
+        "трёхкаменное кольцо"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-HALO-STYLE",
+      "concept_id": "halo_style",
+      "locale": "en",
+      "canonical_term": "halo",
+      "aliases": [
+        "halo style",
+        "halo ring"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-HALO-STYLE",
+      "concept_id": "halo_style",
+      "locale": "ru",
+      "canonical_term": "гало",
+      "aliases": [
+        "стиль гало",
+        "кольцо гало"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CATHEDRAL-STYLE",
+      "concept_id": "cathedral_style",
+      "locale": "en",
+      "canonical_term": "cathedral",
+      "aliases": [
+        "cathedral style",
+        "cathedral setting style"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CATHEDRAL-STYLE",
+      "concept_id": "cathedral_style",
+      "locale": "ru",
+      "canonical_term": "кафедральный стиль",
+      "aliases": [
+        "кафедральная посадка"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-TOI-ET-MOI",
+      "concept_id": "toi_et_moi",
+      "locale": "en",
+      "canonical_term": "toi et moi",
+      "aliases": [
+        "toi-et-moi"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-TOI-ET-MOI",
+      "concept_id": "toi_et_moi",
+      "locale": "ru",
+      "canonical_term": "туа э муа",
+      "aliases": [
+        "toi et moi"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CLUSTER-STYLE",
+      "concept_id": "cluster_style",
+      "locale": "en",
+      "canonical_term": "cluster",
+      "aliases": [
+        "cluster style"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CLUSTER-STYLE",
+      "concept_id": "cluster_style",
+      "locale": "ru",
+      "canonical_term": "кластер",
+      "aliases": [
+        "кластерный стиль"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-MINIMALIST",
+      "concept_id": "minimalist",
+      "locale": "en",
+      "canonical_term": "minimalist",
+      "aliases": [
+        "minimal style"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-MINIMALIST",
+      "concept_id": "minimalist",
+      "locale": "ru",
+      "canonical_term": "минимализм",
+      "aliases": [
+        "минималистичный стиль"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-CLASSIC",
+      "concept_id": "classic",
+      "locale": "en",
+      "canonical_term": "classic",
+      "aliases": [
+        "classic style"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-CLASSIC",
+      "concept_id": "classic",
+      "locale": "ru",
+      "canonical_term": "классика",
+      "aliases": [
+        "классический стиль"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-MODERN",
+      "concept_id": "modern",
+      "locale": "en",
+      "canonical_term": "modern",
+      "aliases": [
+        "modern style"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-MODERN",
+      "concept_id": "modern",
+      "locale": "ru",
+      "canonical_term": "современный стиль",
+      "aliases": [
+        "современный"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-VINTAGE",
+      "concept_id": "vintage",
+      "locale": "en",
+      "canonical_term": "vintage",
+      "aliases": [
+        "vintage style"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-VINTAGE",
+      "concept_id": "vintage",
+      "locale": "ru",
+      "canonical_term": "винтаж",
+      "aliases": [
+        "винтажный стиль"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ORIENTATION-NORTH-SOUTH",
+      "concept_id": "orientation.north_south",
+      "locale": "en",
+      "canonical_term": "north-south",
+      "aliases": [
+        "north south"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ORIENTATION-NORTH-SOUTH",
+      "concept_id": "orientation.north_south",
+      "locale": "ru",
+      "canonical_term": "север-юг",
+      "aliases": [
+        "продольная ориентация"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-ORIENTATION-EAST-WEST",
+      "concept_id": "orientation.east_west",
+      "locale": "en",
+      "canonical_term": "east-west",
+      "aliases": [
+        "east west"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-ORIENTATION-EAST-WEST",
+      "concept_id": "orientation.east_west",
+      "locale": "ru",
+      "canonical_term": "восток-запад",
+      "aliases": [
+        "поперечная ориентация"
+      ],
+      "mapping_mode": "DIRECT",
+      "mapping_quality": "PREFERRED",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-COLORLESS",
+      "concept_id": "stone_color.colorless",
+      "locale": "en",
+      "canonical_term": "colorless",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-COLORLESS",
+      "concept_id": "stone_color.colorless",
+      "locale": "ru",
+      "canonical_term": "бесцветный",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-WHITE",
+      "concept_id": "stone_color.white",
+      "locale": "en",
+      "canonical_term": "white",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-WHITE",
+      "concept_id": "stone_color.white",
+      "locale": "ru",
+      "canonical_term": "белый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-YELLOW",
+      "concept_id": "stone_color.yellow",
+      "locale": "en",
+      "canonical_term": "yellow",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-YELLOW",
+      "concept_id": "stone_color.yellow",
+      "locale": "ru",
+      "canonical_term": "желтый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-PINK",
+      "concept_id": "stone_color.pink",
+      "locale": "en",
+      "canonical_term": "pink",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-PINK",
+      "concept_id": "stone_color.pink",
+      "locale": "ru",
+      "canonical_term": "розовый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-RED",
+      "concept_id": "stone_color.red",
+      "locale": "en",
+      "canonical_term": "red",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-RED",
+      "concept_id": "stone_color.red",
+      "locale": "ru",
+      "canonical_term": "красный",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-BLUE",
+      "concept_id": "stone_color.blue",
+      "locale": "en",
+      "canonical_term": "blue",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-BLUE",
+      "concept_id": "stone_color.blue",
+      "locale": "ru",
+      "canonical_term": "синий",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-GREEN",
+      "concept_id": "stone_color.green",
+      "locale": "en",
+      "canonical_term": "green",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-GREEN",
+      "concept_id": "stone_color.green",
+      "locale": "ru",
+      "canonical_term": "зеленый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-PURPLE",
+      "concept_id": "stone_color.purple",
+      "locale": "en",
+      "canonical_term": "purple",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-PURPLE",
+      "concept_id": "stone_color.purple",
+      "locale": "ru",
+      "canonical_term": "фиолетовый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-ORANGE",
+      "concept_id": "stone_color.orange",
+      "locale": "en",
+      "canonical_term": "orange",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-ORANGE",
+      "concept_id": "stone_color.orange",
+      "locale": "ru",
+      "canonical_term": "оранжевый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-BROWN",
+      "concept_id": "stone_color.brown",
+      "locale": "en",
+      "canonical_term": "brown",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-BROWN",
+      "concept_id": "stone_color.brown",
+      "locale": "ru",
+      "canonical_term": "коричневый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-BLACK",
+      "concept_id": "stone_color.black",
+      "locale": "en",
+      "canonical_term": "black",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-BLACK",
+      "concept_id": "stone_color.black",
+      "locale": "ru",
+      "canonical_term": "черный",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-EN-STONE-COLOR-GRAY",
+      "concept_id": "stone_color.gray",
+      "locale": "en",
+      "canonical_term": "gray",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-RU-STONE-COLOR-GRAY",
+      "concept_id": "stone_color.gray",
+      "locale": "ru",
+      "canonical_term": "серый",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "PREFERRED",
+      "context": "stone_color",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "POL-PROD-01-JEWELRY-TYPE",
+      "target": "jewelry_type",
+      "effect": "Normalize only explicit or accepted jewelry type; do not infer type from occasion or style.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-02-METAL-MATERIAL",
+      "target": "metal.material",
+      "effect": "Do not infer metal material from color, finish or visual appearance.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-03-METAL-COLOR",
+      "target": "metal.color",
+      "effect": "Preserve rose/red distinction; color does not imply coating and white gold does not imply rhodium.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-04-METAL-PURITY",
+      "target": "metal.purity",
+      "effect": "Preserve explicit purity value and unit; do not derive purity from material, color or appearance.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-05-METAL-FINISH",
+      "target": "metal.finish",
+      "effect": "Use only explicit or accepted finish vocabulary; do not infer finish from metal material.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-06-CENTER-STONE-MATERIAL",
+      "target": "center_stone.material",
+      "effect": "Center-stone role does not imply diamond or any material.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-07-CENTER-STONE-SHAPE",
+      "target": "center_stone.shape",
+      "effect": "Shape is independent from cut style; normalize only explicit or context-resolved shape.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-08-CENTER-STONE-CUT",
+      "target": "center_stone.cut",
+      "effect": "Cut style is independent from outline shape; do not infer brilliant or step cut from shape alone.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-09-CENTER-STONE-WEIGHT",
+      "target": "center_stone.weight",
+      "effect": "Carat weight is mass; do not infer dimensions from weight in the semantic catalog.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-10-CENTER-STONE-DIMENSIONS",
+      "target": "center_stone.dimensions",
+      "effect": "Dimensions require explicit or separately sourced quantitative evidence; do not infer from carat weight.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-11-CENTER-STONE-COLOR",
+      "target": "center_stone.color",
+      "effect": "Use explicit or accepted stone-color information; do not infer color from material.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-12-CENTER-STONE-SETTING",
+      "target": "center_stone.setting",
+      "effect": "Setting type is separate from prong count and overall design style.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-13-CENTER-STONE-ORIENTATION",
+      "target": "center_stone.orientation",
+      "effect": "Use explicit or accepted orientation only.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-14-CONSTRUCTION-SHANK",
+      "target": "construction.shank",
+      "effect": "Use explicit construction information; do not invent shank geometry.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-15-CONSTRUCTION-GALLERY",
+      "target": "construction.gallery",
+      "effect": "Use explicit construction information; do not infer gallery geometry from setting style.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-16-CONSTRUCTION-BASKET",
+      "target": "construction.basket",
+      "effect": "Use explicit construction information; do not infer basket geometry from stone shape.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-17-CONSTRUCTION-CLASP",
+      "target": "construction.clasp",
+      "effect": "Use explicit clasp information only.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-18-CONSTRUCTION-SETTING-HEIGHT",
+      "target": "construction.setting_height",
+      "effect": "Setting height requires explicit or separately sourced dimensional evidence.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-19-CONSTRUCTION-SHANK-WIDTH",
+      "target": "construction.shank_width",
+      "effect": "Do not translate qualitative width into universal millimetre thresholds.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-20-CONSTRUCTION-THICKNESS",
+      "target": "construction.thickness",
+      "effect": "Thickness requires explicit or separately sourced dimensional evidence.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-21-STYLE",
+      "target": "style",
+      "effect": "Style is separate from occasion and from the mechanical stone-setting method.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-22-SIDE-STONES-GROUP-ID-STONES-MATERIAL",
+      "target": "side_stones.{group_id}.stones.material",
+      "effect": "Bind only an existing stable side-stone group; do not infer material from center stone.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-23-SIDE-STONES-GROUP-ID-STONES-SHAPE",
+      "target": "side_stones.{group_id}.stones.shape",
+      "effect": "Bind only an existing stable side-stone group; shape is independent from cut style.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-24-SIDE-STONES-GROUP-ID-STONES-CUT",
+      "target": "side_stones.{group_id}.stones.cut",
+      "effect": "Bind only an existing stable side-stone group; do not infer cut from shape.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-25-SIDE-STONES-GROUP-ID-STONES-WEIGHT",
+      "target": "side_stones.{group_id}.stones.weight",
+      "effect": "Bind only an existing stable side-stone group; do not infer dimensions from weight.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-26-SIDE-STONES-GROUP-ID-STONES-DIMENSIONS",
+      "target": "side_stones.{group_id}.stones.dimensions",
+      "effect": "Bind only an existing stable side-stone group; dimensions require explicit or sourced quantitative evidence.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-27-SIDE-STONES-GROUP-ID-STONES-COLOR",
+      "target": "side_stones.{group_id}.stones.color",
+      "effect": "Bind only an existing stable side-stone group; do not infer color from material.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-28-SIDE-STONES-GROUP-ID-STONES-SETTING",
+      "target": "side_stones.{group_id}.stones.setting",
+      "effect": "Bind only an existing stable side-stone group; setting type is independent from prong count.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-29-SIDE-STONES-GROUP-ID-STONES-ORIENTATION",
+      "target": "side_stones.{group_id}.stones.orientation",
+      "effect": "Bind only an existing stable side-stone group; use explicit or accepted orientation only.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "POL-PROD-30-SIDE-STONES-GROUP-ID-QUANTITY",
+      "target": "side_stones.{group_id}.quantity",
+      "effect": "Bind quantity only to an existing stable side-stone group and preserve explicit scope.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-JEWELAI-PRODUCTION-CATALOG-V1"
+      ],
+      "lifecycle_status": "REVIEWED"
+    }
+  ]
+}

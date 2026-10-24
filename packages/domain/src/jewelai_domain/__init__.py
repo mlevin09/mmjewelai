@@ -18,6 +18,15 @@ from .knowledge_activation import (
     ProductionValidationStatus,
     promote_knowledge_runtime,
 )
+from .knowledge_base import (
+    KNOWLEDGE_BASE_SCHEMA_VERSION,
+    CalibratedSizeWeightRecord,
+    KnowledgeBaseValidationError,
+    ParametricKnowledgeBundle,
+    SpecificGravityRecord,
+    load_parametric_knowledge,
+    validate_parametric_knowledge,
+)
 from .knowledge_library import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
     KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
@@ -94,6 +103,7 @@ from .rules import (
 __all__ = [
     "DICTIONARY_SCHEMA_VERSION",
     "REQUIRED_PRODUCTION_VALIDATION_CHECKS",
+    "KNOWLEDGE_BASE_SCHEMA_VERSION",
     "KNOWLEDGE_LIBRARY_CONTRACT_VERSION",
     "KNOWLEDGE_LIBRARY_SCHEMA_VERSION",
     "KNOWLEDGE_RELEASE_QUALIFICATION_VERSION",
@@ -113,15 +123,19 @@ __all__ = [
     "DeriveDecision",
     "Gap",
     "GapState",
+    "CalibratedSizeWeightRecord",
     "CompiledKnowledgeLibrary",
     "CompilationManifest",
     "KnowledgeActivationError",
+    "KnowledgeBaseValidationError",
     "KnowledgeLibraryRegistry",
     "KnowledgeLibraryValidationError",
     "KnowledgeArtifactStorageError",
     "KnowledgeArtifactStore",
     "StoredKnowledgeArtifact",
+    "SpecificGravityRecord",
     "KnowledgePolicyEngine",
+    "ParametricKnowledgeBundle",
     "KnowledgeReleaseCandidateKind",
     "KnowledgeReleaseCandidateSelection",
     "KnowledgeReleaseQualification",
@@ -162,6 +176,7 @@ __all__ = [
     "lock_field",
     "load_domain_dictionary",
     "load_knowledge_library",
+    "load_parametric_knowledge",
     "load_question_catalog",
     "load_rules",
     "load_role_profiles",
@@ -170,4 +185,5 @@ __all__ = [
     "revise_design",
     "unlock_field",
     "validate_knowledge_library",
+    "validate_parametric_knowledge",
 ]
