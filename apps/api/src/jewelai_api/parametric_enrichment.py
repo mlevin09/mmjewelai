@@ -31,8 +31,7 @@ def select_parametric_references(
     if isinstance(stone.dimensions, KnownValue):
         return ()
     if not all(
-        isinstance(state, KnownValue)
-        for state in (stone.material, stone.shape, stone.weight)
+        isinstance(state, KnownValue) for state in (stone.material, stone.shape, stone.weight)
     ):
         return ()
 
