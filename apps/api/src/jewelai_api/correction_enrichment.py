@@ -325,7 +325,10 @@ def _evaluate(
         knowledge_artifact_version=request.knowledge_artifact_version,
         active_release=active_release,
         validation_report=validation_report,
-        parametric_knowledge=parametric_knowledge,
+        parametric_catalog_id=parametric_knowledge.catalog_id,
+        parametric_artifact_version=str(parametric_knowledge.artifact_version),
+        parametric_catalog_sha256=parametric_knowledge.sha256,
+        parametric_references=select_parametric_references(revision, parametric_knowledge),
         template_id=template_id,
     )
 
