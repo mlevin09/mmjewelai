@@ -13,6 +13,7 @@ from jewelai_domain import (
     RuntimeProvenance,
     RuntimeSemanticState,
     compile_knowledge_library,
+    load_parametric_knowledge,
     promote_knowledge_runtime,
 )
 from jewelai_domain.knowledge_storage import (
@@ -43,6 +44,7 @@ from test_persistence import NOW, build_service, create_persisted_session, next_
 ROOT = Path(__file__).resolve().parents[3]
 PACKAGE = ROOT / "data" / "knowledge" / "v1" / "three-stone-1.0.0.json"
 PROMPTS = ROOT / "data" / "prompts" / "v1.0.0.json"
+PARAMETRIC = ROOT / "data" / "knowledge-base" / "v1.0.0.json"
 
 
 def _bundle(*, version="1.0.0", suffix=""):
@@ -75,6 +77,7 @@ def _verified_result(store, revision, *, version="1.0.0", suffix=""):
     runtime, _ = compile_knowledge_library(payload)
     report = _report(runtime)
     active = promote_knowledge_runtime(runtime, report)
+    parametric = load_parametric_knowledge(PARAMETRIC)
     result = enrich_prompt_with_active_release(
         revision,
         load_prompt_templates(PROMPTS),
@@ -83,6 +86,9 @@ def _verified_result(store, revision, *, version="1.0.0", suffix=""):
         knowledge_artifact_version=stored.artifact_version,
         active_release=active,
         validation_report=report,
+        parametric_catalog_id=parametric.catalog_id,
+        parametric_artifact_version=str(parametric.artifact_version),
+        parametric_catalog_sha256=parametric.sha256,
         proposals=(
             EnrichmentProposal(
                 target="center_stone.setting",
