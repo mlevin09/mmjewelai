@@ -68,6 +68,7 @@ from .middleware import (
     RequestObservabilityMiddleware,
     configure_json_logger,
 )
+from .prompt_enrichment_composition import compose_prompt_enrichment_runtime
 from .prompt_enrichment_runtime import (
     InitialEnrichmentRequest,
     PersistedClarificationAnswerRequest,
@@ -201,9 +202,23 @@ def create_app(
                 "Cloud Tasks configuration is required when no generation publisher is injected"
             )
         generation_task_publisher = CloudTasksGenerationPublisher(settings.generation_tasks)
+    owns_engine = engine is None
     engine = engine or create_database_engine(settings.database_url)
     artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
     repository = PersistenceRepository(create_session_factory(engine))
+    if prompt_enrichment_service is None and settings.prompt_enrichment is not None:
+        try:
+            prompt_enrichment_service = compose_prompt_enrichment_runtime(
+                settings.prompt_enrichment,
+                repository,
+                artifacts,
+                clock=clock,
+                uuid_factory=uuid_factory,
+            )
+        except Exception:
+            if owns_engine:
+                engine.dispose()
+            raise
     configured_profiles = generation_profiles or GenerationProfileRegistry(
         settings.generation_profiles
     )

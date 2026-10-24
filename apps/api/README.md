@@ -48,6 +48,11 @@ alembic -c packages/persistence/alembic.ini upgrade head
 uvicorn jewelai_api.app:create_app --factory
 ```
 
+The controlled Prompt Enrichment routes remain absent unless
+`PROMPT_ENRICHMENT_ENABLED=true` is supplied with the complete exact release configuration
+documented in `docs/prompt-enrichment/step-14-production-readiness.md`. Merely setting release
+variables while the flag is absent or `false` does not load or qualify a Knowledge release.
+
 Production also configures `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, and
 `DB_POOL_RECYCLE_SECONDS`; these apply to non-SQLite engines only. Capacity must leave Cloud SQL
 headroom beyond the combined maximum API, worker, and job pools for operators.
@@ -177,13 +182,17 @@ adapter restores the latest matching revision, cycle, release hashes, artifacts,
 Rules result before calling Step #12 final-output assembly.
 
 The controlled `/v1/sessions/{session_id}/prompt-enrichment/` HTTP surface is registered only when
-`PromptEnrichmentRuntimeService` is explicitly injected into the application factory. It exposes
+`PromptEnrichmentRuntimeService` is explicitly injected into the application factory or the
+disabled-by-default exact-release composition succeeds. It exposes
 initial enrichment, current state, persisted-plan answers, persisted-message corrections and final
 output without duplicating business logic. State responses include the exact non-secret package,
 artifact, runtime-hash and validation-report-hash lineage, but clients cannot select or replace that
-server-pinned release. Default application composition does not inject it, so the existing Google
-Text Intake route, frontend, generation/provider behavior and live traffic are unchanged pending a
-separate rollout decision.
+server-pinned release. Enabled composition calls the existing release qualification and durable
+runtime loader before constructing that same service; incomplete, unreadable, mismatched, tampered,
+blocked, or non-qualified evidence fails startup. No latest lookup or external-mirror fallback
+exists. Default application composition does not inject it, so the existing Google Text Intake
+route, frontend, generation/provider behavior and live traffic are unchanged pending a separate
+rollout decision.
 
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,

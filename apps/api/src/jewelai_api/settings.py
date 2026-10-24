@@ -9,6 +9,11 @@ from urllib.parse import urlsplit
 from jewelai_assets_gcs import GcsAssetStorageConfig
 from jewelai_auth_identity_platform import IdentityPlatformConfig
 from jewelai_auth_oidc import OidcJwtConfig
+from jewelai_domain import (
+    KNOWLEDGE_RELEASE_QUALIFICATION_VERSION,
+    KnowledgeReleaseCandidateKind,
+    KnowledgeReleaseCandidateSelection,
+)
 from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
 from jewelai_text_understanding_google import GoogleTextUnderstandingConfig
 
@@ -31,6 +36,32 @@ class ArtifactVersions:
 
 
 @dataclass(frozen=True)
+class PromptEnrichmentRuntimeConfig:
+    """Exact, explicitly enabled release selection for controlled composition."""
+
+    artifact_root: Path
+    candidate: KnowledgeReleaseCandidateSelection
+    active_release_path: Path
+    validation_report_path: Path
+    qualification_contract_version: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.candidate, KnowledgeReleaseCandidateSelection):
+            raise ValueError("Prompt Enrichment candidate selection must be typed and complete")
+        if not all(
+            isinstance(path, Path)
+            for path in (
+                self.artifact_root,
+                self.active_release_path,
+                self.validation_report_path,
+            )
+        ):
+            raise ValueError("Prompt Enrichment artifact and evidence locations must be paths")
+        if self.qualification_contract_version != KNOWLEDGE_RELEASE_QUALIFICATION_VERSION:
+            raise ValueError("PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION is unsupported")
+
+
+@dataclass(frozen=True)
 class RuntimeSettings:
     database_url: str = "sqlite+pysqlite:///./jewelai-v2.db"
     repository_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[4])
@@ -49,6 +80,7 @@ class RuntimeSettings:
     generation_profiles: tuple[GenerationProfile, ...] = ()
     web_allowed_origins: tuple[str, ...] = ()
     text_understanding: GoogleTextUnderstandingConfig | None = None
+    prompt_enrichment: PromptEnrichmentRuntimeConfig | None = None
 
     def __post_init__(self) -> None:
         if isinstance(self.asset_upload_max_bytes, bool) or not isinstance(
@@ -80,6 +112,15 @@ class RuntimeSettings:
         _validate_web_origins(self.web_allowed_origins)
         if self.auth_provider not in {"oidc", "identity_platform"}:
             raise ValueError("AUTH_PROVIDER must be oidc or identity_platform")
+        if (
+            self.environment == "production"
+            and self.prompt_enrichment is not None
+            and self.prompt_enrichment.candidate.kind
+            != KnowledgeReleaseCandidateKind.PRODUCTION_INTENDED
+        ):
+            raise ValueError(
+                "Production Prompt Enrichment composition requires a PRODUCTION_INTENDED candidate"
+            )
 
     @classmethod
     def from_environment(
@@ -207,6 +248,7 @@ class RuntimeSettings:
                 if text_understanding_model
                 else None
             ),
+            prompt_enrichment=_parse_prompt_enrichment_config(),
         )
 
 
@@ -219,6 +261,47 @@ def _strict_bounded_integer(value: str | None, *, default: int, maximum: int, na
     if not 1 <= parsed <= maximum:
         raise ValueError(f"{name} must be between 1 and {maximum}")
     return parsed
+
+
+def _parse_prompt_enrichment_config() -> PromptEnrichmentRuntimeConfig | None:
+    enabled = os.getenv("PROMPT_ENRICHMENT_ENABLED")
+    if enabled in {None, "false"}:
+        return None
+    if enabled != "true":
+        raise ValueError("PROMPT_ENRICHMENT_ENABLED must be exactly true or false")
+
+    names = (
+        "PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT",
+        "PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID",
+        "PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION",
+        "PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH",
+        "PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH",
+        "PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION",
+        "PROMPT_ENRICHMENT_CANDIDATE_KIND",
+    )
+    values = {name: os.getenv(name) for name in names}
+    if any(value is None or value == "" for value in values.values()):
+        raise ValueError("Enabled Prompt Enrichment requires complete exact release configuration")
+    if any(value != value.strip() for value in values.values()):
+        raise ValueError(
+            "Prompt Enrichment release configuration must not contain outer whitespace"
+        )
+
+    try:
+        candidate = KnowledgeReleaseCandidateSelection(
+            package_id=values["PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID"],
+            artifact_version=values["PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION"],
+            kind=values["PROMPT_ENRICHMENT_CANDIDATE_KIND"],
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Prompt Enrichment release selection is invalid") from exc
+    return PromptEnrichmentRuntimeConfig(
+        artifact_root=Path(values["PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT"]),
+        candidate=candidate,
+        active_release_path=Path(values["PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH"]),
+        validation_report_path=Path(values["PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH"]),
+        qualification_contract_version=values["PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION"],
+    )
 
 
 def _parse_generation_profiles(value: str | None) -> tuple[GenerationProfile, ...]:
