@@ -75,7 +75,7 @@ def test_enrichment_matrix_is_deterministic_and_pinned(ring, templates, runtime)
     payload = first.model_dump(mode="json", exclude={"content_hash"})
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     assert first.content_hash == hashlib.sha256(canonical.encode()).hexdigest()
-    assert first.enrichment_version == "1.1.0"
+    assert first.enrichment_version == "1.2.0"
 
 
 def test_lower_precedence_enrichment_cannot_overwrite_user_shape(ring, templates, runtime):
