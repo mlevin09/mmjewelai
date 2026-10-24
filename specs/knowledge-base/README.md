@@ -60,11 +60,19 @@ silently corrected.
 - No manufacturing tolerance is invented.
 - Product State remains authoritative; this catalog is evidence for later deterministic enrichment.
 
-## Relationship to the semantic Knowledge Library
+## Relationship to Prompt Enrichment and the semantic Knowledge Library
 
 The semantic Knowledge Library owns terminology, concepts and product policy. This quantitative
-catalog owns sourced numeric references. Runtime integration between the two is a later explicit
-step and must preserve provenance and the existing precedence/lock rules.
+catalog owns sourced numeric references.
+
+Prompt Enrichment now loads this catalog as a separately version-pinned runtime artifact. It may
+select only exact material + shape + carat matches and carries the catalog ID, artifact version,
+SHA-256, record IDs, source IDs, applicability, and uncertainty into the immutable enrichment result.
+No interpolation or nearest-weight lookup is performed.
+
+Selected values are rendered only as **non-authoritative parametric references**. They do not mutate
+Product State, do not satisfy missing authoritative dimensions, and disappear when authoritative
+dimensions already exist. See [ADR 0030](../../docs/adr/0030-parametric-knowledge-prompt-enrichment-references.md).
 
 ## Verification
 
