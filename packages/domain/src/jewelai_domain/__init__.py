@@ -9,15 +9,7 @@ from .dictionary import (
     UnsupportedMatch,
     load_domain_dictionary,
 )
-from .knowledge_base import (
-    KNOWLEDGE_BASE_SCHEMA_VERSION,
-    CalibratedSizeWeightRecord,
-    KnowledgeBaseValidationError,
-    ParametricKnowledgeBundle,
-    SpecificGravityRecord,
-    load_parametric_knowledge,
-    validate_parametric_knowledge,
-)
+
 from .knowledge_activation import (
     REQUIRED_PRODUCTION_VALIDATION_CHECKS,
     ActiveKnowledgeRuntime,
@@ -27,7 +19,16 @@ from .knowledge_activation import (
     ProductionValidationStatus,
     promote_knowledge_runtime,
 )
-from .knowledge_library import (
+from .knowledge_base import (
+    KNOWLEDGE_BASE_SCHEMA_VERSION,
+    CalibratedSizeWeightRecord,
+    KnowledgeBaseValidationError,
+    ParametricKnowledgeBundle,
+    SpecificGravityRecord,
+    load_parametric_knowledge,
+    validate_parametric_knowledge,
+)
+rom .knowledge_library import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
     KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
     CompilationManifest,
