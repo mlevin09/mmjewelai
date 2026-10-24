@@ -52,8 +52,7 @@ def test_equal_dimensions_do_not_imply_equal_material_weight():
     round_65 = {
         item.material_id: item.weight_ct
         for item in catalog.find_calibrations(shape_id="round")
-        if item.dimensions_mm.diameter == 6.5
-        and item.source_id == "SRC-GEMSELECT-CALIBRATED"
+        if item.dimensions_mm.diameter == 6.5 and item.source_id == "SRC-GEMSELECT-CALIBRATED"
     }
 
     assert round_65["diamond"] == 1.0
