@@ -1,12 +1,13 @@
 # Prompt Enrichment Step 14 production-readiness foundation
 
 Status: `IN_PROGRESS`
-PR scope: 14A — release qualification and preflight
-Baseline: `jewelai-v2` at `3524d4181f9db60286cfd6b543de402e62cf813d`
+PR scope: 14A qualification foundation plus 14B controlled runtime composition
+14B baseline: `jewelai-v2` at `e34cee7c06369c91182de339c249ccbff9a2a9cd`
 
 Step 13 remains `INTERNAL_VALIDATION_PASSED`. That evidence proves the controlled internal flow, not
-production approval. Step 14A adds a read-only qualification operation and does not compose the
-controlled router, activate a catalog, apply a migration, deploy, or switch traffic.
+production approval. Step 14A added a read-only qualification operation. Step 14B adds an explicit,
+disabled-by-default application composition capability. Neither step activates a catalog, applies a
+migration, deploys, switches traffic, or authorizes production use.
 
 ## Qualification boundary
 
@@ -80,26 +81,83 @@ at this baseline is `NOT_EVALUATED`. Actual qualification requires all of:
 
 Synthetic unit and compatibility tests must never be relabeled as those inputs.
 
-## Future production configuration inventory
+## Controlled application composition
 
-Current production composition has no Knowledge Library release-selection settings and does not
-inject `PromptEnrichmentRuntimeService` into `create_app()`. No environment-variable names are
-invented by this PR.
+`RuntimeSettings.prompt_enrichment` is `None` by default. In that state `create_app()` does not call
+the qualifier or durable loader, does not construct `PromptEnrichmentRuntimeService`, and does not
+register any of the five `/v1/sessions/{session_id}/prompt-enrichment/*` routes. They are also absent
+from OpenAPI. Existing legacy routes, Google Text Intake, provider adapters, workers, and generation
+behavior are unchanged.
 
-Future controlled composition must explicitly provide the durable artifact root, exact package ID
-and artifact version, governed ACTIVE envelope and validation report, and the already pinned
-dictionary/question/rules/prompt artifact versions. It must retain organization-scoped HTTP
-authorization, PostgreSQL migration head `0014_clarification_plans`, fail-closed loader errors,
-structured non-secret observability, and a composition-only rollback that omits the controlled
-router without deleting append-only history. Existing identity, database, provider credentials,
-generation profiles, Model Gateway, workers, and provider-neutral `InternalFinalPrompt` handoff stay
-separate.
+When `PROMPT_ENRICHMENT_ENABLED` is exactly `true`, all of these settings are mandatory:
+
+- `PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT`
+- `PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID`
+- `PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION`
+- `PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH`
+- `PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH`
+- `PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION` (currently exactly `1.0.0`)
+- `PROMPT_ENRICHMENT_CANDIDATE_KIND` (`SYNTHETIC` or `PRODUCTION_INTENDED`)
+
+The existing `ROLE_ARTIFACT_VERSION`, `DICTIONARY_ARTIFACT_VERSION`,
+`QUESTION_ARTIFACT_VERSION`, `RULES_ARTIFACT_VERSION`, and `PROMPT_ARTIFACT_VERSION` pins remain the
+non-Knowledge runtime selections. Enabled composition reads the two configured governed evidence
+files, uses `KnowledgeArtifactStore` at the exact configured root, calls
+`qualify_knowledge_release()`, requires `QUALIFIED`, and constructs the existing
+`PromptEnrichmentRuntimeService`. The qualifier in turn uses the actual durable runtime loader, so
+source, runtime, manifest, checksums, deterministic recompilation, package/version, runtime hash,
+validation-report hash, ACTIVE state, and the six-category all-PASS gate are all verified before
+routes exist.
+
+There is no `latest`, current-release alias, wildcard, discovery scan, or Google Drive fallback.
+An enabled incomplete configuration fails during settings construction. Missing/corrupt evidence or
+a blocked/tampered release fails startup with a bounded configuration error; it does not silently
+disable the module or expose a partial router. An internally created database engine is disposed if
+controlled composition fails. Repeated application construction owns independent repositories and
+services and creates no global mutable release state.
+
+### Synthetic nonproduction example
+
+The following names illustrate controlled test composition only. They are not a production
+activation command and do not describe an approved real catalog:
+
+```text
+PROMPT_ENRICHMENT_ENABLED=true
+PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT=/test-fixtures/knowledge
+PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID=jewelai.validation.three_stone
+PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION=1.0.0
+PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH=/test-fixtures/evidence/active.json
+PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH=/test-fixtures/evidence/validation-report.json
+PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION=1.0.0
+PROMPT_ENRICHMENT_CANDIDATE_KIND=SYNTHETIC
+```
+
+`SYNTHETIC` is rejected when `JEWELAI_ENVIRONMENT=production`. Conversely, labeling a candidate
+`PRODUCTION_INTENDED` records intent only; it is not human approval, activation, deployment, or a
+go-live decision. The repository still contains no real governed production-intended catalog.
+
+### Pinning, authorization, and rollback
+
+The selected release supplied to the service is the release written into the existing session pin
+on the first enrichment cycle. Restart with the same selection restores exact package/version and
+hash lineage. Restart under a different configured release does not migrate an existing session;
+the existing repository pin and integrity checks reject the mismatch. Current single-release-per-app
+composition remains explicit rather than adding unapproved multi-release orchestration.
+
+The controlled endpoints retain the existing bearer authentication, current membership checks,
+organization/session repository scope, CAS, locks, durable clarification plans, correction history,
+constraint evidence, and provider-neutral Internal Final Prompt. Disabling the feature again means
+setting `PROMPT_ENRICHMENT_ENABLED=false` or omitting it and restarting the application. That removes
+only route composition and never deletes append-only history.
+
+PostgreSQL migration head remains `0014_clarification_plans`. No background task, release cache,
+provider handoff, deployment setting, or production route enablement is added by Step 14B.
 
 ## Remaining rollout sequence
 
 1. **PR 14A — Release qualification and preflight (this scope).** Read-only and fail-closed.
-2. **PR 14B — Controlled runtime composition.** Disabled-by-default deployment composition for an
-   exact already-qualified release; no implicit latest selection.
+2. **PR 14B — Controlled runtime composition (this scope).** Disabled-by-default application
+   composition for an exact qualified release; no implicit latest selection or live enablement.
 3. **PR 14C — Downstream Internal Final Prompt handoff.** A typed provider-neutral adapter boundary
    without silently replacing legacy `CompiledPrompt` behavior.
 4. **PR 14D — Preproduction rehearsal and release acceptance.** Migration and rollback rehearsal,
