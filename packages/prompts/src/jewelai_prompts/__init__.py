@@ -30,6 +30,13 @@ from .final_prompt import (
     UserReadableJewelryDescription,
     assemble_internal_final_prompt,
 )
+from .handoff import (
+    INTERNAL_FINAL_PROMPT_HANDOFF_SCHEMA_VERSION,
+    InternalFinalPromptHandoff,
+    InternalFinalPromptHandoffError,
+    InternalFinalPromptHandoffErrorCode,
+    build_internal_final_prompt_handoff,
+)
 from .loader import load_prompt_templates
 from .models import (
     PROMPT_COMPILER_VERSION,
@@ -65,6 +72,10 @@ __all__ = [
     "FinalPromptSnapshot",
     "FinalPromptUnresolvedDetail",
     "InternalFinalPrompt",
+    "INTERNAL_FINAL_PROMPT_HANDOFF_SCHEMA_VERSION",
+    "InternalFinalPromptHandoff",
+    "InternalFinalPromptHandoffError",
+    "InternalFinalPromptHandoffErrorCode",
     "KnowledgeReleaseReference",
     "PromptConstraint",
     "PromptDisclosure",
@@ -75,6 +86,7 @@ __all__ = [
     "SpecificationEntry",
     "UserReadableJewelryDescription",
     "assemble_internal_final_prompt",
+    "build_internal_final_prompt_handoff",
     "compile_prompt",
     "enrich_prompt",
     "enrich_prompt_with_active_release",

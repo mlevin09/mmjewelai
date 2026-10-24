@@ -44,8 +44,11 @@ from jewelai_prompts import (
     FinalPromptInputError,
     FinalPromptReadiness,
     FinalPromptSnapshot,
+    InternalFinalPromptHandoff,
+    InternalFinalPromptHandoffError,
     KnowledgeReleaseReference,
     assemble_internal_final_prompt,
+    build_internal_final_prompt_handoff,
     enrich_prompt_with_active_release,
 )
 
@@ -355,6 +358,25 @@ class PromptEnrichmentRuntimeService:
             raise PromptEnrichmentRuntimeError(
                 PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
                 "Durable enrichment or clarification history failed integrity verification",
+            ) from exc
+
+    def build_current_internal_final_prompt_handoff(
+        self, session_id: UUID, organization_id: UUID
+    ) -> InternalFinalPromptHandoff:
+        """Build a read-only downstream handoff from current organization-scoped durable state."""
+
+        state = self.get_current_state(session_id, organization_id)
+        if state.final_output is None:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+                "Authoritative final output is unavailable",
+            )
+        try:
+            return build_internal_final_prompt_handoff(state.final_output)
+        except InternalFinalPromptHandoffError as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+                "Authoritative final output failed handoff integrity validation",
             ) from exc
 
     def apply_scoped_user_correction(

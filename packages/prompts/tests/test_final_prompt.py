@@ -23,13 +23,18 @@ from jewelai_prompts import (
     FinalPromptInputErrorCode,
     FinalPromptReadiness,
     FinalPromptSnapshot,
+    InternalFinalPromptHandoff,
+    InternalFinalPromptHandoffError,
+    InternalFinalPromptHandoffErrorCode,
     KnowledgeReleaseReference,
     PromptEnrichmentResult,
     assemble_internal_final_prompt,
+    build_internal_final_prompt_handoff,
     enrich_prompt,
     load_prompt_templates,
 )
 from jewelai_prompts.final_schema import internal_final_prompt_json_schema
+from jewelai_prompts.handoff_schema import internal_final_prompt_handoff_json_schema
 
 ROOT = Path(__file__).resolve().parents[3]
 RING = ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json"
@@ -789,3 +794,193 @@ def test_decision_lineage_requires_stable_order(ring, templates, runtime):
     second = first.model_copy(update={"kind": "clarification", "decision_id": "a"})
     with pytest.raises(ValidationError, match="stable"):
         _snapshot(ring, enrichment, lineage=(first, second))
+
+
+def test_handoff_is_deterministic_and_binds_the_exact_authoritative_output(
+    ring, templates, runtime, dictionary
+):
+    assembly = _assemble(ring, templates, runtime, dictionary)
+
+    first = build_internal_final_prompt_handoff(assembly)
+    second = build_internal_final_prompt_handoff(assembly)
+
+    assert first == second
+    assert first.schema_version == "1.0.0"
+    assert first.organization_id == ORGANIZATION_ID
+    assert first.session_id == SESSION_ID
+    assert first.product_state_revision_id == ring.revision_id
+    assert first.enrichment_cycle_id == CYCLE_ID
+    assert first.knowledge_release == assembly.internal_final_prompt.knowledge_release
+    assert first.internal_final_prompt_schema_version == "1.1.0"
+    assert first.internal_final_prompt_content_hash == assembly.internal_final_prompt.content_hash
+    assert first.internal_final_prompt == assembly.internal_final_prompt
+    assert first.ready_for_downstream_preparation
+    assert first.content_hash == _hash(first.model_dump(mode="json", exclude={"content_hash"}))
+
+
+def test_handoff_preserves_constraints_decisions_and_unaccepted_recommendation(
+    ring, templates, runtime, dictionary
+):
+    replacement = _constraint_evidence(
+        ring,
+        evidence_id="constraint_222222222222222222222222",
+        kind="requirement",
+        instruction="Include a halo.",
+    )
+    superseded = _constraint_evidence(
+        ring,
+        status="superseded",
+        superseded_by=replacement.evidence_id,
+    )
+    lineage = (
+        FinalPromptDecisionLineage(
+            kind="clarification",
+            session_id=SESSION_ID,
+            decision_id="accepted-white-metal",
+            decision="ACCEPT",
+            outcome="APPLIED",
+            target="metal.color",
+            selected_value="white",
+            source_revision_id=ring.revision_id,
+            applies_to_revision_id=ring.revision_id,
+            knowledge_package_id="jewelai.test.final-prompt",
+            knowledge_artifact_version="1.0.0",
+            knowledge_runtime_sha256=runtime.sha256,
+            knowledge_validation_report_sha256=REPORT_HASH,
+            question_artifact_version="1.0.0",
+            rules_artifact_version="1.0.0",
+            content_hash="1" * 64,
+        ),
+    )
+    proposal = EnrichmentProposal(
+        target="center_stone.setting",
+        semantic_state=RuntimeSemanticState.RECOMMENDED,
+        provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
+        value="prong_setting",
+        source_id="REC-SETTING",
+    )
+    enrichment = _verified_enrichment(ring, templates, runtime, proposals=(proposal,))
+    assembly = assemble_internal_final_prompt(
+        _snapshot(
+            ring,
+            enrichment,
+            lineage=lineage,
+            constraint_evidence=(superseded, replacement),
+        ),
+        dictionary=dictionary,
+        templates=templates,
+    )
+
+    handoff = build_internal_final_prompt_handoff(assembly)
+    prompt = handoff.internal_final_prompt
+
+    assert prompt.decision_lineage == lineage
+    assert prompt.constraint_evidence == (superseded, replacement)
+    active = [item for item in prompt.constraints if item.target == "feature.halo"]
+    assert len(active) == 1
+    assert active[0].kind == "requirement"
+    assert "Do not include a halo" not in prompt.prompt_text
+    assert not any(
+        item.target == "center_stone.setting" and item.kind == "requirement"
+        for item in prompt.constraints
+    )
+    assert any(
+        item.target == "center_stone.setting" and item.classification == "unaccepted_recommendation"
+        for item in prompt.unresolved_details
+    )
+    assert handoff.readiness == FinalPromptReadiness.READY_WITH_UNRESOLVED
+    assert handoff.ready_for_downstream_preparation
+
+
+def test_blocked_handoff_is_valid_but_not_ready_for_downstream_preparation(
+    ring, templates, runtime, dictionary
+):
+    handoff = build_internal_final_prompt_handoff(
+        _assemble(ring, templates, runtime, dictionary, rule_decision=_blocked())
+    )
+
+    assert handoff.readiness == FinalPromptReadiness.BLOCKED
+    assert not handoff.ready_for_downstream_preparation
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    (
+        ("schema_version", "2.0.0", "Input should be '1.0.0'"),
+        ("session_id", "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "lineage mismatch"),
+        ("internal_final_prompt_content_hash", "0" * 64, "integrity mismatch"),
+        ("readiness", "blocked", "readiness mismatch"),
+        ("ready_for_downstream_preparation", False, "downstream readiness mismatch"),
+        ("content_hash", "0" * 64, "content hash mismatch"),
+    ),
+)
+def test_handoff_rejects_unsupported_version_scope_integrity_and_readiness_changes(
+    ring, templates, runtime, dictionary, field, value, error
+):
+    handoff = build_internal_final_prompt_handoff(_assemble(ring, templates, runtime, dictionary))
+    payload = handoff.model_dump(mode="json")
+    payload[field] = value
+
+    with pytest.raises(ValidationError, match=error):
+        InternalFinalPromptHandoff.model_validate(payload)
+
+
+def test_handoff_builder_revalidates_and_rejects_tampered_final_prompt(
+    ring, templates, runtime, dictionary
+):
+    assembly = _assemble(ring, templates, runtime, dictionary)
+    tampered_prompt = assembly.internal_final_prompt.model_copy(
+        update={"prompt_text": "tampered provider payload"}
+    )
+    tampered = assembly.model_copy(update={"internal_final_prompt": tampered_prompt})
+
+    with pytest.raises(InternalFinalPromptHandoffError) as caught:
+        build_internal_final_prompt_handoff(tampered)
+    assert caught.value.code == InternalFinalPromptHandoffErrorCode.INVALID_FINAL_OUTPUT
+
+
+def test_handoff_rejects_release_schema_and_constraint_evidence_tampering(
+    ring, templates, runtime, dictionary
+):
+    evidence = _constraint_evidence(ring)
+    assembly = assemble_internal_final_prompt(
+        _snapshot(
+            ring,
+            _verified_enrichment(ring, templates, runtime),
+            constraint_evidence=(evidence,),
+        ),
+        dictionary=dictionary,
+        templates=templates,
+    )
+    handoff = build_internal_final_prompt_handoff(assembly)
+
+    release = handoff.model_dump(mode="json")
+    release["knowledge_release"]["runtime_sha256"] = "0" * 64
+    with pytest.raises(ValidationError, match="Knowledge release mismatch"):
+        InternalFinalPromptHandoff.model_validate(release)
+
+    schema = handoff.model_dump(mode="json")
+    schema["internal_final_prompt"]["schema_version"] = "2.0.0"
+    with pytest.raises(ValidationError, match="Input should be '1.1.0'"):
+        InternalFinalPromptHandoff.model_validate(schema)
+
+    constraint = handoff.model_dump(mode="json")
+    constraint["internal_final_prompt"]["constraint_evidence"][0]["original_wording"] = "tampered"
+    with pytest.raises(ValidationError, match="constraint evidence content hash mismatch"):
+        InternalFinalPromptHandoff.model_validate(constraint)
+
+
+def test_handoff_schema_is_published_and_builder_has_no_provider_or_network_dependency():
+    schema = internal_final_prompt_handoff_json_schema()
+    assert schema["$id"] == "urn:jewelai:internal-final-prompt-handoff:1.0.0"
+    assert (
+        json.loads(
+            (ROOT / "specs" / "prompts" / "internal-final-prompt-handoff-schema.json").read_text()
+        )
+        == schema
+    )
+    source = inspect.getsource(build_internal_final_prompt_handoff)
+    assert "requests" not in source
+    assert "http" not in source
+    assert "google" not in source.casefold()
+    assert "openai" not in source.casefold()

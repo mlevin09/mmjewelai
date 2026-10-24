@@ -55,10 +55,27 @@ This new contract is intentionally distinct from `CompiledPrompt`; the existing 
 API/generation path are unchanged. Step #13 will provide reviewed runtime integration. The builder
 uses no network, provider, persistence, clock, random ID, or catalog fallback.
 
+## Internal Final Prompt handoff v1.0.0
+
+Step #14C adds `InternalFinalPromptHandoff` as a small downstream-facing envelope around the exact
+validated `InternalFinalPrompt` v1.1.0. It binds the embedded prompt to organization/session,
+authoritative Product State revision, latest enrichment cycle, exact Knowledge release and both
+release hashes, prompt schema/hash, readiness, and its own canonical hash. Accepted decision
+lineage, active constraints, supersession history, unresolved evidence, and unaccepted
+recommendations remain inside the embedded prompt without translation or duplicated authority.
+
+`ready_for_downstream_preparation` follows existing readiness semantics: `ready` and
+`ready_with_unresolved` are eligible for a later provider-specific preparation step, while
+`blocked` is not. This flag does not authorize generation. The application runtime can construct a
+handoff only by restoring current organization-scoped durable state; repeated/restarted reads are
+deterministic and do not persist another record. No route or current caller sends this handoff to a
+provider, and legacy `CompiledPrompt` generation is unchanged.
+
 ```sh
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
 python -m jewelai_prompts.schema specs/prompts/schema.json
 python -m jewelai_prompts.final_schema specs/prompts/internal-final-prompt-schema.json
+python -m jewelai_prompts.handoff_schema specs/prompts/internal-final-prompt-handoff-schema.json
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 ```

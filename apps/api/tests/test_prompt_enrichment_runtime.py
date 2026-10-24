@@ -20,6 +20,7 @@ from jewelai_api.correction_enrichment import UserCorrection
 from jewelai_api.prompt_enrichment_runtime import (
     InitialEnrichmentRequest,
     PersistedClarificationAnswerRequest,
+    PersistedUserCorrectionRequest,
     PromptEnrichmentRuntimeError,
     PromptEnrichmentRuntimeErrorCode,
     PromptEnrichmentRuntimeService,
@@ -111,6 +112,123 @@ def test_internal_parse_revision_enrichment_and_snapshot_are_one_coherent_flow(
     assert snapshot.enrichment_result == cycles[0].result
     assert snapshot.knowledge_release.runtime_sha256 == active.runtime_sha256
     assert result.workflow.final_output is not None
+
+
+def test_current_handoff_is_scoped_deterministic_restart_safe_and_read_only(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    foreign, _, _ = create_persisted_session(service)
+    runtime, store, active, report = _runtime(service, tmp_path)
+    runtime.start_initial_message(
+        _request(service, organization, session, "Create an oval ring without engraving.")
+    )
+    cycles_before = service.repository.list_enrichment_cycles(
+        session.session_id, organization.organization_id
+    )
+    revisions_before = service.repository.list_revisions(
+        session.session_id, organization.organization_id
+    )
+
+    first = runtime.build_current_internal_final_prompt_handoff(
+        session.session_id, organization.organization_id
+    )
+    repeated = runtime.build_current_internal_final_prompt_handoff(
+        session.session_id, organization.organization_id
+    )
+    restarted = PromptEnrichmentRuntimeService(
+        service.repository,
+        service.artifacts,
+        store,
+        knowledge_package_id=runtime.knowledge_package_id,
+        knowledge_artifact_version=runtime.knowledge_artifact_version,
+        active_release=active,
+        validation_report=report,
+        clock=lambda: NOW,
+        uuid_factory=uuid4,
+    )
+    restored = restarted.build_current_internal_final_prompt_handoff(
+        session.session_id, organization.organization_id
+    )
+
+    assert first == repeated == restored
+    assert first.organization_id == organization.organization_id
+    assert first.session_id == session.session_id
+    assert first.internal_final_prompt_content_hash == first.internal_final_prompt.content_hash
+    assert any(
+        item.target == "feature.engraving" and item.kind == "prohibition"
+        for item in first.internal_final_prompt.constraints
+    )
+    assert (
+        service.repository.list_enrichment_cycles(session.session_id, organization.organization_id)
+        == cycles_before
+    )
+    assert (
+        service.repository.list_revisions(session.session_id, organization.organization_id)
+        == revisions_before
+    )
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as cross_scope:
+        runtime.build_current_internal_final_prompt_handoff(
+            session.session_id, foreign.organization_id
+        )
+    assert cross_scope.value.code == PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as missing:
+        runtime.build_current_internal_final_prompt_handoff(uuid4(), organization.organization_id)
+    assert missing.value.code == PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND
+
+
+def test_current_handoff_reconstruction_is_concurrent_and_equivalent(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    runtime, *_ = _runtime(service, tmp_path)
+    runtime.start_initial_message(
+        _request(service, organization, session, "Create an oval white-gold ring.")
+    )
+
+    def build(_):
+        return runtime.build_current_internal_final_prompt_handoff(
+            session.session_id, organization.organization_id
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = tuple(pool.map(build, range(2)))
+
+    assert results[0] == results[1]
+
+
+def test_correction_changes_current_handoff_without_reusing_stale_authority(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    runtime, *_ = _runtime(service, tmp_path)
+    initial = runtime.start_initial_message(
+        _request(service, organization, session, "Create an oval white-gold ring.")
+    )
+    previous = runtime.build_current_internal_final_prompt_handoff(
+        session.session_id, organization.organization_id
+    )
+    message = service.create_message(
+        session.session_id,
+        organization.organization_id,
+        "Change the center stone to emerald cut.",
+    )
+
+    runtime.apply_persisted_user_correction(
+        organization.organization_id,
+        PersistedUserCorrectionRequest(
+            session_id=session.session_id,
+            expected_revision_id=initial.workflow.authoritative_revision_id,
+            message_id=message.message_id,
+        ),
+    )
+    current = runtime.build_current_internal_final_prompt_handoff(
+        session.session_id, organization.organization_id
+    )
+
+    assert current.product_state_revision_id != previous.product_state_revision_id
+    assert current.enrichment_cycle_id != previous.enrichment_cycle_id
+    assert current.internal_final_prompt_content_hash != previous.internal_final_prompt_content_hash
+    assert current.content_hash != previous.content_hash
 
 
 def test_stale_and_cross_organization_initial_requests_fail_closed(engine, tmp_path):
