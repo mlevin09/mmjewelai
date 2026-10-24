@@ -65,14 +65,20 @@ def test_selector_never_interpolates_or_rounds_weight():
     revision = DesignRevision.model_validate_json(RING.read_text(encoding="utf-8"))
     catalog = load_parametric_knowledge(PARAMETRIC)
 
-    assert select_parametric_references(
-        _diamond_round(revision, weight_ct=0.99),
-        catalog,
-    ) == ()
-    assert select_parametric_references(
-        _diamond_round(revision, weight_ct=1.01),
-        catalog,
-    ) == ()
+    assert (
+        select_parametric_references(
+            _diamond_round(revision, weight_ct=0.99),
+            catalog,
+        )
+        == ()
+    )
+    assert (
+        select_parametric_references(
+            _diamond_round(revision, weight_ct=1.01),
+            catalog,
+        )
+        == ()
+    )
 
 
 def test_authoritative_dimensions_suppress_parametric_reference():
@@ -87,7 +93,10 @@ def test_authoritative_dimensions_suppress_parametric_reference():
         },
     )
 
-    assert select_parametric_references(
-        _diamond_round(revision, dimensions=dimensions),
-        catalog,
-    ) == ()
+    assert (
+        select_parametric_references(
+            _diamond_round(revision, dimensions=dimensions),
+            catalog,
+        )
+        == ()
+    )
