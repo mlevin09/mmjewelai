@@ -1,13 +1,14 @@
 # Prompt Enrichment Step 14 production-readiness foundation
 
 Status: `IN_PROGRESS`
-PR scope: 14A qualification foundation plus 14B controlled runtime composition
+PR scope: 14A qualification foundation, 14B controlled runtime composition, and 14C typed handoff
 14B baseline: `jewelai-v2` at `e34cee7c06369c91182de339c249ccbff9a2a9cd`
 
 Step 13 remains `INTERNAL_VALIDATION_PASSED`. That evidence proves the controlled internal flow, not
 production approval. Step 14A added a read-only qualification operation. Step 14B adds an explicit,
-disabled-by-default application composition capability. Neither step activates a catalog, applies a
-migration, deploys, switches traffic, or authorizes production use.
+disabled-by-default application composition capability. Step 14C adds a read-only typed downstream
+handoff. None activates a catalog, applies a migration, deploys, switches traffic, or authorizes
+production use.
 
 ## Qualification boundary
 
@@ -153,13 +154,41 @@ only route composition and never deletes append-only history.
 PostgreSQL migration head remains `0014_clarification_plans`. No background task, release cache,
 provider handoff, deployment setting, or production route enablement is added by Step 14B.
 
+## Typed downstream handoff
+
+`InternalFinalPromptHandoff` v1.0.0 is the provider-neutral Step 14C boundary. It embeds the exact
+validated `InternalFinalPrompt` v1.1.0 and binds it to organization/session scope, current Product
+State revision, latest authoritative enrichment cycle, exact pinned Knowledge package/version and
+runtime/report hashes, prompt schema/hash, existing readiness, and a deterministic handoff hash.
+The embedded prompt remains the single semantic payload: accepted decisions, active prohibitions
+and preservation instructions, full constraint supersession history, unresolved ambiguity, and
+unaccepted recommendation evidence are neither translated nor copied into competing fields.
+
+`PromptEnrichmentRuntimeService.build_current_internal_final_prompt_handoff()` is an internal
+callable only. It first restores the existing current organization-scoped durable state and
+revalidates the pinned ACTIVE runtime, revision/cycle alignment, artifact versions, clarification
+and correction lineage, constraint evidence, and final-prompt hash. The handoff builder then
+revalidates the complete final output before binding its envelope. Missing, cross-organization,
+stale, mismatched, or tampered history fails closed through the existing bounded runtime errors.
+
+Construction is read-only: it writes no IDs or timestamps, creates no cycles or decisions, and is
+deterministic across repeated calls, concurrent readers, and runtime restart. A later correction
+produces different revision, cycle, prompt, and handoff hashes; constructing the current handoff
+therefore cannot silently return the historical object.
+
+Existing readiness semantics are preserved. `ready` and `ready_with_unresolved` are eligible for
+later downstream provider-specific preparation; `blocked` is not. Eligibility is not generation
+authorization. Step 14C adds no public endpoint, provider translation, task publication, Model
+Gateway request, worker invocation, catalog activation, or fallback. The legacy `CompiledPrompt`
+pipeline and all existing frontend generation actions remain untouched.
+
 ## Remaining rollout sequence
 
 1. **PR 14A — Release qualification and preflight (this scope).** Read-only and fail-closed.
 2. **PR 14B — Controlled runtime composition (this scope).** Disabled-by-default application
    composition for an exact qualified release; no implicit latest selection or live enablement.
-3. **PR 14C — Downstream Internal Final Prompt handoff.** A typed provider-neutral adapter boundary
-   without silently replacing legacy `CompiledPrompt` behavior.
+3. **PR 14C — Downstream Internal Final Prompt handoff (this scope).** A typed provider-neutral
+   adapter boundary without silently replacing legacy `CompiledPrompt` behavior.
 4. **PR 14D — Preproduction rehearsal and release acceptance.** Migration and rollback rehearsal,
    real-catalog verification, observability/security checks, end-to-end acceptance, and an explicit
    readiness decision.

@@ -51,3 +51,11 @@ session, organization, source message/span, Product State revision and enrichmen
 recommendations remain evidence rather than requirements. Input inconsistencies fail closed.
 Neither contract changes `CompiledPrompt`, selects a provider, calls a network service, activates a
 catalog, or changes generation behavior.
+
+Step #14C adds the independently versioned
+[Internal Final Prompt handoff schema](internal-final-prompt-handoff-schema.json) `1.0.0`. The
+handoff embeds one already-verified `InternalFinalPrompt` rather than translating or duplicating its
+semantic payload, and binds it to exact organization/session, Product State revision, enrichment
+cycle, Knowledge release hashes, readiness, and a canonical handoff SHA-256. Its internal runtime
+builder reconstructs this state from durable organization-scoped history. It is not a provider
+request, production-generation authorization, or replacement for legacy `CompiledPrompt`.
