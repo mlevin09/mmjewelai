@@ -7,6 +7,8 @@ on:
       - packages/domain/**
       - specs/jewelry-design-schema/**
       - specs/knowledge-library/**
+      - specs/knowledge-base/**
+      - data/knowledge-base/**
       - specs/roles/**
       - data/roles/**
       - specs/dictionary/**
@@ -22,6 +24,8 @@ on:
       - packages/domain/**
       - specs/jewelry-design-schema/**
       - specs/knowledge-library/**
+      - specs/knowledge-base/**
+      - data/knowledge-base/**
       - specs/roles/**
       - data/roles/**
       - specs/dictionary/**
