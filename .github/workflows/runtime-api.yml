@@ -22,6 +22,7 @@ on:
       - workers/generation/**
       - packages/domain/**
       - specs/knowledge-library/**
+      - specs/knowledge-base/**
       - specs/parser/**
       - specs/prompts/**
       - specs/model-gateway/**
@@ -32,6 +33,7 @@ on:
       - tests/test_knowledge_library_behavioral_regression.py
       - tests/test_knowledge_library_three_stone_vertical_slice.py
       - data/knowledge/**
+      - data/knowledge-base/**
       - data/prompts/**
       - data/roles/**
       - data/dictionary/**
@@ -62,6 +64,7 @@ on:
       - workers/generation/**
       - packages/domain/**
       - specs/knowledge-library/**
+      - specs/knowledge-base/**
       - specs/parser/**
       - specs/prompts/**
       - specs/model-gateway/**
@@ -72,6 +75,7 @@ on:
       - tests/test_knowledge_library_behavioral_regression.py
       - tests/test_knowledge_library_three_stone_vertical_slice.py
       - data/knowledge/**
+      - data/knowledge-base/**
       - data/prompts/**
       - data/roles/**
       - data/dictionary/**
