@@ -51,6 +51,27 @@ actual compiled runtime, and checks the runtime and report hashes before returni
 envelope rebuilt around that durable runtime. It never selects a latest release and has no external
 mirror or network fallback.
 
+`qualify_knowledge_release()` is the read-only release preflight around that boundary. It returns a
+versioned, content-hashed result with `QUALIFIED`, `BLOCKED`, or `NOT_EVALUATED` status; it never
+publishes, promotes, selects, or activates a release. A `QUALIFIED` synthetic fixture demonstrates
+only that the preflight mechanism and runtime are compatible. It is not evidence that a real
+production-intended catalog has been qualified or activated. The supported command is:
+
+```text
+python -m jewelai_domain.knowledge_preflight \
+  --artifact-root <durable-root> \
+  --package-id <package-id> \
+  --artifact-version <version> \
+  --active-release <active-envelope.json> \
+  --validation-report <production-validation-report.json> \
+  --source-commit <git-sha>
+```
+
+The command reads only the selected immutable release and supplied evidence. Exit status is `0` for
+`QUALIFIED`, `1` for `BLOCKED`, and `2` for `NOT_EVALUATED`. Omitting both candidate identity
+arguments deliberately produces `NOT_EVALUATED`; no latest-release lookup or external mirror
+fallback exists.
+
 
 ## Stable IDs and references
 
