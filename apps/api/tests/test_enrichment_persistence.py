@@ -95,7 +95,7 @@ def _verified_result(store, revision, *, version="1.0.0", suffix=""):
                 semantic_state=RuntimeSemanticState.RECOMMENDED,
                 provenance=RuntimeProvenance.JEWELAI_RECOMMENDED,
                 value="prong_setting",
-                source_id="SYNTHETIC-REC-1",
+                source_id="DEC-THREE-STONE-POLICY",
             ),
         ),
     )
@@ -155,7 +155,7 @@ def test_release_pin_and_enrichment_history_survive_repository_restart(engine, t
     assert pin.validation_report_sha256 == report.sha256
     assert restored_runtime.runtime_sha256 == pin.runtime_sha256
     assert restored_first.result == result
-    assert restored_first.result.decisions[0].proposal.source_id == "SYNTHETIC-REC-1"
+    assert restored_first.result.decisions[0].proposal.source_id == "DEC-THREE-STONE-POLICY"
     assert restored_first.result.final_matrix
     assert (
         service.repository.get_current_revision(session.session_id, organization.organization_id)

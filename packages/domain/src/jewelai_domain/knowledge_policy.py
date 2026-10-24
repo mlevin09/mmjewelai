@@ -13,6 +13,7 @@ from .models import (
     Explicit,
     ImmutableModel,
     NotApplicable,
+    Text,
     Unknown,
 )
 
@@ -45,6 +46,61 @@ class RuntimeProvenance(StrEnum):
 
 
 PROVENANCE_PRECEDENCE = tuple(RuntimeProvenance)
+
+_ALLOWED_PROPOSAL_PROVENANCE = {
+    RuntimeSemanticState.EXPLICIT: frozenset(
+        {
+            RuntimeProvenance.USER_CONFIRMED,
+            RuntimeProvenance.USER_EXPLICIT_LATEST,
+        }
+    ),
+    RuntimeSemanticState.NORMALIZED: frozenset(
+        {
+            RuntimeProvenance.USER_CONFIRMED,
+            RuntimeProvenance.NORMALIZED_FROM_USER,
+        }
+    ),
+    RuntimeSemanticState.AMBIGUOUS: frozenset(
+        {
+            RuntimeProvenance.NORMALIZED_FROM_USER,
+            RuntimeProvenance.KNOWLEDGE_INFERRED,
+        }
+    ),
+    RuntimeSemanticState.RECOMMENDED: frozenset(
+        {
+            RuntimeProvenance.KNOWLEDGE_INFERRED,
+            RuntimeProvenance.JEWELAI_RECOMMENDED,
+        }
+    ),
+    RuntimeSemanticState.ACCEPTED: frozenset({RuntimeProvenance.USER_ACCEPTED_RECOMMENDATION}),
+    RuntimeSemanticState.ASSUMED: frozenset(
+        {
+            RuntimeProvenance.USER_CONFIRMED,
+            RuntimeProvenance.VISUALIZATION_ASSUMPTION,
+        }
+    ),
+    RuntimeSemanticState.NOT_APPLICABLE: frozenset({RuntimeProvenance.USER_CONFIRMED}),
+}
+_KNOWLEDGE_LINEAGE_PROVENANCE = frozenset(
+    {
+        RuntimeProvenance.KNOWLEDGE_INFERRED,
+        RuntimeProvenance.JEWELAI_RECOMMENDED,
+        RuntimeProvenance.USER_ACCEPTED_RECOMMENDATION,
+    }
+)
+
+
+def validate_proposal_authority(
+    semantic_state: RuntimeSemanticState,
+    provenance: RuntimeProvenance,
+) -> None:
+    """Reject proposal state/provenance combinations that misstate their authority."""
+
+    allowed = _ALLOWED_PROPOSAL_PROVENANCE.get(semantic_state, frozenset())
+    if provenance not in allowed:
+        raise ValueError(
+            f"{semantic_state.value} proposal cannot use {provenance.value} provenance"
+        )
 
 
 class RuntimeParameterState(ImmutableModel):
@@ -108,11 +164,13 @@ class RuntimeStateProposal(ImmutableModel):
     semantic_state: RuntimeSemanticState
     provenance: RuntimeProvenance
     value: object | None = None
-    source_id: str
+    source_id: Text
     preservation: PreservationIntent = PreservationIntent.CHANGE
 
     @model_validator(mode="after")
     def validate_proposal(self):
+        if self.source_id != self.source_id.strip():
+            raise ValueError("runtime proposal source_id must be exact")
         if self.semantic_state == RuntimeSemanticState.MISSING:
             raise ValueError("MISSING is an observed state, not an update proposal")
         if (
@@ -124,6 +182,7 @@ class RuntimeStateProposal(ImmutableModel):
             and self.value is not None
         ):
             raise ValueError(f"{self.semantic_state.value} proposal cannot carry a value")
+        validate_proposal_authority(self.semantic_state, self.provenance)
         return self
 
 
@@ -307,6 +366,16 @@ class KnowledgePolicyEngine:
     def __init__(self, runtime: CompiledKnowledgeLibrary):
         self.runtime = CompiledKnowledgeLibrary.model_validate(runtime)
         self._policies = tuple(sorted(self.runtime.policies, key=lambda item: item.policy_id))
+        self._runtime_evidence_ids = (
+            frozenset(item.source_id for item in self.runtime.sources)
+            | frozenset(item.claim_id for item in self.runtime.claims)
+            | frozenset(item.concept_id for item in self.runtime.domain_knowledge)
+            | frozenset(item.mapping_id for item in self.runtime.language_mappings)
+            | frozenset(item.policy_id for item in self.runtime.policies)
+            | frozenset(
+                source_ref for item in self.runtime.policies for source_ref in item.source_refs
+            )
+        )
         self._precedence = {
             provenance: rank for rank, provenance in enumerate(PROVENANCE_PRECEDENCE)
         }
@@ -343,6 +412,11 @@ class KnowledgePolicyEngine:
             or state.runtime_sha256 != self.runtime.sha256
         ):
             raise ValueError("runtime state does not match the policy engine runtime")
+        if (
+            proposal.provenance in _KNOWLEDGE_LINEAGE_PROVENANCE
+            and proposal.source_id not in self._runtime_evidence_ids
+        ):
+            raise ValueError("knowledge proposal source_id does not belong to the selected runtime")
 
         current = state.get(proposal.target)
         if current is None:

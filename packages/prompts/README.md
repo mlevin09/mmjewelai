@@ -21,6 +21,12 @@ can retain attempted value, source, provenance and preservation intent. The resu
 evidence: it does not mutate `DesignRevision`, accept recommendations automatically, create repeated
 groups, interpret policy prose, or alter the backward-compatible `CompiledPrompt`.
 
+Proposal semantic state and provenance must use the authority combinations defined by the domain
+runtime. Knowledge-derived proposals must cite an identifier present in the exact selected compiled
+runtime; message/candidate identifiers for user-origin proposals are not reinterpreted as Knowledge
+Library IDs. Parametric references require explicit user material/shape/weight values or confirmed
+derived/assumed values, and are rejected when dimensions are known or explicitly not applicable.
+
 `enrich_prompt_with_active_release` is the production-pinning boundary for one in-memory enrichment
 cycle. Its caller must explicitly name a package ID and artifact version and supply the existing
 ACTIVE envelope and production-validation report. It delegates durable artifact and evidence checks

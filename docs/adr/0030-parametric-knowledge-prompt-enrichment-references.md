@@ -52,7 +52,12 @@ The provider-neutral Internal Final Prompt renders selected values only inside a
 - do not overwrite explicit, confirmed, or locked user state;
 - preserve source and uncertainty text.
 
-Authoritative dimensions suppress parametric references.
+Authoritative dimensions and explicit `NotApplicable` dimensions suppress parametric references.
+For material, shape, and weight, an explicit user value is authoritative even before a separate
+confirmation action. Derived or assumed values qualify only after confirmation; unaccepted
+recommendations and unconfirmed assumptions never provide selection context. The same eligibility
+check is enforced when references enter Prompt Enrichment so a caller cannot reintroduce guidance
+that deterministic selection correctly suppressed.
 
 The Rules Engine quantitative fact match context also includes stone shape, preventing a fact for one
 shape from being reused for another shape with the same material and carat weight.

@@ -7,8 +7,12 @@ from jewelai_domain.knowledge_base import (
     ParametricKnowledgeBundle,
     ReviewStatus,
 )
-from jewelai_domain.models import DesignRevision, KnownValue
-from jewelai_prompts import ParametricEnrichmentReference, ParametricReferenceDimensions
+from jewelai_domain.models import DesignRevision
+from jewelai_prompts import (
+    ParametricEnrichmentReference,
+    ParametricReferenceDimensions,
+    parametric_reference_context_is_eligible,
+)
 
 _KIND_PRIORITY = (
     EstimateKind.APPROXIMATE_CALIBRATION,
@@ -28,11 +32,7 @@ def select_parametric_references(
     revision = DesignRevision.model_validate(revision)
     catalog = ParametricKnowledgeBundle.model_validate(catalog)
     stone = revision.design.center_stone
-    if isinstance(stone.dimensions, KnownValue):
-        return ()
-    if not all(
-        isinstance(state, KnownValue) for state in (stone.material, stone.shape, stone.weight)
-    ):
+    if not parametric_reference_context_is_eligible(revision):
         return ()
 
     material_id = stone.material.value
