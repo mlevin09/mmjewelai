@@ -30,10 +30,10 @@ from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from pydantic import Field, JsonValue, StringConstraints, ValidationError, model_validator
 
 from .compiler import PromptValidationError, validate_compiled_prompt
-from .enrichment import PromptEnrichmentResult
+from .enrichment import ParametricEnrichmentReference, PromptEnrichmentResult
 from .models import PromptTemplateBundle, Sha256
 
-FINAL_PROMPT_SCHEMA_VERSION = "1.1.0"
+FINAL_PROMPT_SCHEMA_VERSION = "1.2.0"
 DESCRIPTION_SCHEMA_VERSION = "1.0.0"
 LongText = Annotated[str, StringConstraints(min_length=1, max_length=20_000, pattern=r"\S")]
 
@@ -75,6 +75,7 @@ class FinalPromptArtifactVersions(ImmutableModel):
     question_artifact_version: str
     rules_artifact_version: str
     prompt_template_artifact_version: str
+    knowledge_base_artifact_version: str
     enrichment_version: str
 
 
@@ -253,7 +254,7 @@ class UserReadableJewelryDescription(ImmutableModel):
 class InternalFinalPrompt(ImmutableModel):
     """Official provider-neutral Prompt Enrichment Module v1 handoff artifact."""
 
-    schema_version: Literal["1.1.0"] = FINAL_PROMPT_SCHEMA_VERSION
+    schema_version: Literal["1.2.0"] = FINAL_PROMPT_SCHEMA_VERSION
     session_id: UUID
     organization_id: UUID
     design_id: UUID
@@ -272,6 +273,10 @@ class InternalFinalPrompt(ImmutableModel):
     decision_lineage: tuple[FinalPromptDecisionLineage, ...]
     constraint_evidence: tuple[FinalPromptConstraintEvidence, ...]
     knowledge_release: KnowledgeReleaseReference
+    parametric_catalog_id: str | None = None
+    parametric_artifact_version: str | None = None
+    parametric_catalog_sha256: Sha256 | None = None
+    parametric_references: tuple[ParametricEnrichmentReference, ...] = ()
     artifact_versions: FinalPromptArtifactVersions
     enrichment_result_content_hash: Sha256
     content_hash: Sha256
@@ -329,6 +334,7 @@ def assemble_internal_final_prompt(
         constraints,
         unresolved,
         readiness,
+        snapshot.enrichment_result.parametric_references,
     )
     payload = {
         "schema_version": FINAL_PROMPT_SCHEMA_VERSION,
@@ -350,6 +356,10 @@ def assemble_internal_final_prompt(
         "decision_lineage": snapshot.decision_lineage,
         "constraint_evidence": snapshot.constraint_evidence,
         "knowledge_release": snapshot.knowledge_release,
+        "parametric_catalog_id": snapshot.enrichment_result.parametric_catalog_id,
+        "parametric_artifact_version": snapshot.enrichment_result.parametric_artifact_version,
+        "parametric_catalog_sha256": snapshot.enrichment_result.parametric_catalog_sha256,
+        "parametric_references": snapshot.enrichment_result.parametric_references,
         "artifact_versions": snapshot.artifact_versions,
         "enrichment_result_content_hash": snapshot.enrichment_result.content_hash,
     }
@@ -393,6 +403,11 @@ def _validate_snapshot(snapshot, *, dictionary, templates):
         or versions.rules_artifact_version != snapshot.rule_decision.rules_artifact_version
         or versions.prompt_template_artifact_version != templates.artifact_version
         or versions.prompt_template_artifact_version != compiled.template_artifact_version
+        or (
+            enrichment.parametric_artifact_version is not None
+            and versions.knowledge_base_artifact_version
+            != enrichment.parametric_artifact_version
+        )
         or versions.enrichment_version != enrichment.enrichment_version
     ):
         raise FinalPromptInputError(
@@ -974,7 +989,14 @@ def _classification_label(classification, locale):
     return labels[locale][classification]
 
 
-def _render_internal_prompt(description, facts, constraints, unresolved, readiness):
+def _render_internal_prompt(
+    description,
+    facts,
+    constraints,
+    unresolved,
+    readiness,
+    parametric_references,
+):
     lines = [
         f"JEWELAI INTERNAL FINAL PROMPT {FINAL_PROMPT_SCHEMA_VERSION}",
         f"READINESS: {readiness.value}",
@@ -998,12 +1020,29 @@ def _render_internal_prompt(description, facts, constraints, unresolved, readine
         f"instruction={json.dumps(item.instruction, ensure_ascii=False)}"
         for item in constraints
     )
+    lines.append("PARAMETRIC REFERENCES (NON-AUTHORITATIVE)")
+    lines.extend(_parametric_reference_text(item) for item in parametric_references)
     lines.append("UNRESOLVED DETAILS")
     lines.extend(
         f"{item.target}: {item.classification}; blocking={str(item.blocking).lower()}"
         for item in unresolved
     )
     return "\n".join(lines)
+
+
+def _parametric_reference_text(item: ParametricEnrichmentReference) -> str:
+    dimensions = json.dumps(
+        item.dimensions.model_dump(mode="json", exclude_none=True),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return (
+        f"REFERENCE ONLY: {item.target}; material={item.material_id}; shape={item.shape_id}; "
+        f"weight={_number(item.weight_ct)} ct; dimensions={dimensions}; "
+        f"estimate_kind={item.estimate_kind}; records={','.join(item.record_ids)}; "
+        f"sources={','.join(item.source_ids)}; uncertainty={' | '.join(item.uncertainty)}"
+    )
 
 
 def _json(value):
