@@ -68,6 +68,15 @@ from .middleware import (
     RequestObservabilityMiddleware,
     configure_json_logger,
 )
+from .prompt_enrichment_runtime import (
+    InitialEnrichmentRequest,
+    PersistedClarificationAnswerRequest,
+    PersistedUserCorrectionRequest,
+    PromptEnrichmentRuntimeError,
+    PromptEnrichmentRuntimeErrorCode,
+    PromptEnrichmentRuntimeService,
+    PromptEnrichmentWorkflowState,
+)
 from .schemas import (
     AssetListResponse,
     AssetResponse,
@@ -94,6 +103,15 @@ from .schemas import (
     ParserProposalRequest,
     ProjectListResponse,
     ProjectResponse,
+    PromptEnrichmentAnswerRequest,
+    PromptEnrichmentAnswerResponse,
+    PromptEnrichmentCorrectionRequest,
+    PromptEnrichmentCorrectionResponse,
+    PromptEnrichmentFinalOutputResponse,
+    PromptEnrichmentInitialRequest,
+    PromptEnrichmentOptionResponse,
+    PromptEnrichmentQuestionResponse,
+    PromptEnrichmentStateResponse,
     PromptRevisionListResponse,
     PromptRevisionResponse,
     RetryGenerationRunRequest,
@@ -144,6 +162,7 @@ def create_app(
     asset_object_store: PrivateObjectStore | None = None,
     generation_task_publisher: GenerationTaskPublisher | None = None,
     text_understanding_provider: TextUnderstandingProvider | None = None,
+    prompt_enrichment_service: PromptEnrichmentRuntimeService | None = None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
@@ -229,6 +248,7 @@ def create_app(
         gcp_project_id=settings.gcp_project_id,
     )
     app.state.service = service
+    app.state.prompt_enrichment_service = prompt_enrichment_service
     app.state.engine = engine
 
     @app.exception_handler(NotFoundError)
@@ -410,6 +430,11 @@ def create_app(
     @app.exception_handler(ArtifactConfigurationError)
     async def artifact_handler(_, exc):
         return _error_response(500, "invalid_artifact_configuration", str(exc))
+
+    @app.exception_handler(PromptEnrichmentRuntimeError)
+    async def prompt_enrichment_handler(_, exc):
+        status, code = _prompt_enrichment_error(exc.code)
+        return _error_response(status, code, str(exc))
 
     @app.get("/health")
     def health():
@@ -803,6 +828,110 @@ def create_app(
     ):
         return service.evaluate(session_id, organization_id, request)
 
+    if prompt_enrichment_service is not None:
+
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/initial",
+            response_model=PromptEnrichmentStateResponse,
+            status_code=201,
+        )
+        def start_prompt_enrichment(
+            session_id: UUID,
+            request: PromptEnrichmentInitialRequest,
+            organization_id: AuthorizedOrganization,
+        ):
+            result = prompt_enrichment_service.start_initial_message(
+                InitialEnrichmentRequest(
+                    session_id=session_id,
+                    organization_id=organization_id,
+                    expected_revision_id=request.expected_revision_id,
+                    message_id=request.message_id,
+                )
+            )
+            return _prompt_enrichment_state(result.workflow)
+
+        @app.get(
+            "/v1/sessions/{session_id}/prompt-enrichment/state",
+            response_model=PromptEnrichmentStateResponse,
+        )
+        def get_prompt_enrichment_state(
+            session_id: UUID,
+            organization_id: AuthorizedOrganization,
+        ):
+            return _prompt_enrichment_state(
+                prompt_enrichment_service.get_current_state(session_id, organization_id)
+            )
+
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/clarification-answers",
+            response_model=PromptEnrichmentAnswerResponse,
+        )
+        def answer_prompt_enrichment_clarification(
+            session_id: UUID,
+            request: PromptEnrichmentAnswerRequest,
+            organization_id: AuthorizedOrganization,
+        ):
+            result, state = prompt_enrichment_service.record_persisted_clarification_answer(
+                organization_id,
+                PersistedClarificationAnswerRequest(
+                    session_id=session_id,
+                    clarification_plan_id=request.clarification_plan_id,
+                    clarification_id=request.clarification_id,
+                    decision=request.decision,
+                    selected_option=request.selected_option,
+                    expected_revision_id=request.expected_revision_id,
+                    answer_id=request.answer_id,
+                    message_id=request.message_id,
+                ),
+            )
+            return PromptEnrichmentAnswerResponse(
+                answer_content_hash=result.content_hash,
+                outcome=result.outcome.value,
+                state=_prompt_enrichment_state(state),
+            )
+
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/corrections",
+            response_model=PromptEnrichmentCorrectionResponse,
+        )
+        def correct_prompt_enrichment(
+            session_id: UUID,
+            request: PromptEnrichmentCorrectionRequest,
+            organization_id: AuthorizedOrganization,
+        ):
+            result, state = prompt_enrichment_service.apply_persisted_user_correction(
+                organization_id,
+                PersistedUserCorrectionRequest(
+                    session_id=session_id,
+                    expected_revision_id=request.expected_revision_id,
+                    message_id=request.message_id,
+                ),
+            )
+            return PromptEnrichmentCorrectionResponse(
+                correction_content_hash=result.content_hash,
+                outcome=result.outcome.value,
+                state=_prompt_enrichment_state(state),
+            )
+
+        @app.get(
+            "/v1/sessions/{session_id}/prompt-enrichment/final-output",
+            response_model=PromptEnrichmentFinalOutputResponse,
+        )
+        def get_prompt_enrichment_final_output(
+            session_id: UUID,
+            organization_id: AuthorizedOrganization,
+        ):
+            state = prompt_enrichment_service.get_current_state(session_id, organization_id)
+            if state.final_output is None or state.status.value == "final_output_blocked":
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.FINAL_OUTPUT_BLOCKED,
+                    "Provider-neutral final output is not ready",
+                )
+            return PromptEnrichmentFinalOutputResponse(
+                description=state.final_output.description,
+                internal_final_prompt=state.final_output.internal_final_prompt,
+            )
+
     return app
 
 
@@ -816,6 +945,99 @@ def _error_response(
         content={"error": code, "detail": detail},
         headers=headers,
     )
+
+
+def _prompt_enrichment_state(
+    state: PromptEnrichmentWorkflowState,
+) -> PromptEnrichmentStateResponse:
+    plan = state.clarification_plan
+    final = state.final_output
+    return PromptEnrichmentStateResponse(
+        authoritative_revision_id=state.authoritative_revision_id,
+        enrichment_cycle_id=state.enrichment_cycle_id,
+        enrichment_cycle_number=state.enrichment_cycle_number,
+        status=state.status.value,
+        clarification_plan_id=state.clarification_plan_id,
+        clarification_plan_content_hash=plan.content_hash if plan is not None else None,
+        clarification_questions=(
+            tuple(
+                PromptEnrichmentQuestionResponse(
+                    clarification_id=question.clarification_id,
+                    semantic_question_id=question.semantic_question_id.value,
+                    category=question.category.value,
+                    importance=question.importance.value,
+                    text=question.text,
+                    target=question.target.value,
+                    options=tuple(
+                        PromptEnrichmentOptionResponse(value=item.value, label=item.label)
+                        for item in question.options
+                    ),
+                )
+                for question in plan.questions
+            )
+            if plan is not None
+            else ()
+        ),
+        can_continue_without_answers=(
+            plan.can_continue_without_answers if plan is not None else None
+        ),
+        description=final.description if final is not None else None,
+        internal_final_prompt_content_hash=(
+            final.internal_final_prompt.content_hash if final is not None else None
+        ),
+        internal_final_prompt_readiness=(
+            final.internal_final_prompt.readiness.value if final is not None else None
+        ),
+    )
+
+
+def _prompt_enrichment_error(code: PromptEnrichmentRuntimeErrorCode) -> tuple[int, str]:
+    mapping = {
+        PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND: (404, "not_found"),
+        PromptEnrichmentRuntimeErrorCode.STALE_REVISION: (409, "stale_revision"),
+        PromptEnrichmentRuntimeErrorCode.CONCURRENT_CONFLICT: (409, "concurrent_conflict"),
+        PromptEnrichmentRuntimeErrorCode.CLARIFICATION_CONFLICT: (
+            409,
+            "clarification_conflict",
+        ),
+        PromptEnrichmentRuntimeErrorCode.CORRECTION_CONFLICT: (409, "correction_conflict"),
+        PromptEnrichmentRuntimeErrorCode.STALE_CLARIFICATION_PLAN: (
+            409,
+            "stale_clarification_plan",
+        ),
+        PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_ANSWER: (
+            422,
+            "invalid_clarification_answer",
+        ),
+        PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_DECISION: (
+            422,
+            "invalid_clarification_decision",
+        ),
+        PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_OPTION: (
+            422,
+            "invalid_clarification_option",
+        ),
+        PromptEnrichmentRuntimeErrorCode.INVALID_CORRECTION: (422, "invalid_correction"),
+        PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN: (
+            409,
+            "invalid_clarification_plan",
+        ),
+        PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE: (
+            503,
+            "knowledge_release_unavailable",
+        ),
+        PromptEnrichmentRuntimeErrorCode.ARTIFACT_MISMATCH: (409, "artifact_mismatch"),
+        PromptEnrichmentRuntimeErrorCode.ENRICHMENT_CYCLE_MISMATCH: (
+            409,
+            "enrichment_cycle_mismatch",
+        ),
+        PromptEnrichmentRuntimeErrorCode.FINAL_OUTPUT_BLOCKED: (
+            409,
+            "final_output_not_ready",
+        ),
+        PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY: (500, "invalid_durable_history"),
+    }
+    return mapping[code]
 
 
 def _asset_content_type(value: str | None) -> AssetContentType:

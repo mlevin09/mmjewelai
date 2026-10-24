@@ -345,6 +345,115 @@ def plan_clarifications(
     return ClarificationPlan(**payload, content_hash=_hash(_json(payload)))
 
 
+def continue_clarification_plan(
+    previous_plan: ClarificationPlan,
+    revision: DesignRevision,
+    *,
+    answered_clarification_ids: tuple[str, ...],
+    questions: QuestionCatalog,
+    rules: RuleRegistry,
+) -> ClarificationPlan:
+    """Advance one durable plan without replaying parsing or accepting client plan content."""
+
+    plan = ClarificationPlan.model_validate(previous_plan)
+    revision = DesignRevision.model_validate(revision)
+    answered = set(answered_clarification_ids)
+    rule_decision = rules.evaluate(revision, plan.role_id)
+    retained = [
+        _rebind_question(item, revision.revision_id)
+        for item in plan.questions
+        if item.clarification_id not in answered and not _is_confirmed(revision, item.target)
+    ]
+    if isinstance(rule_decision, AskDecision) and not any(
+        item.semantic_question_id == rule_decision.question_id for item in retained
+    ):
+        retained.append(
+            _rule_question_from_plan(
+                plan,
+                revision.revision_id,
+                rule_decision,
+                questions=questions,
+                rules=rules,
+            )
+        )
+    ordered = tuple(
+        sorted(
+            retained,
+            key=lambda item: (
+                -_importance_rank(item.importance),
+                -item.priority,
+                item.semantic_question_id.value,
+                item.clarification_id,
+            ),
+        )
+    )
+    payload = {
+        "plan_version": CLARIFICATION_PLAN_VERSION,
+        "design_revision_id": str(revision.revision_id),
+        "knowledge_package_id": plan.knowledge_package_id,
+        "knowledge_artifact_version": plan.knowledge_artifact_version,
+        "knowledge_runtime_sha256": plan.knowledge_runtime_sha256,
+        "knowledge_validation_report_sha256": plan.knowledge_validation_report_sha256,
+        "question_artifact_version": questions.artifact_version,
+        "rules_artifact_version": rules.artifact_version,
+        "locale": plan.locale,
+        "role_id": plan.role_id,
+        "rule_decision": rule_decision,
+        "questions": ordered,
+        "unasked_evidence": plan.unasked_evidence,
+        "can_continue_without_answers": not isinstance(rule_decision, BlockDecision)
+        and not any(item.importance == ClarificationImportance.BLOCKING for item in ordered),
+    }
+    return ClarificationPlan(**payload, content_hash=_hash(_json(payload)))
+
+
+def _rebind_question(question: ClarificationQuestion, revision_id) -> ClarificationQuestion:
+    payload = question.model_dump(mode="json")
+    payload["design_revision_id"] = str(revision_id)
+    identity = dict(payload)
+    identity.pop("clarification_id")
+    payload["clarification_id"] = f"clarification_{_hash(identity)[:24]}"
+    return ClarificationQuestion.model_validate(payload)
+
+
+def _rule_question_from_plan(plan, revision_id, rule, *, questions, rules):
+    rendered = questions.render(rule.question_id, plan.role_id, plan.locale.value)
+    identity = {
+        "design_revision_id": str(revision_id),
+        "knowledge_package_id": plan.knowledge_package_id,
+        "knowledge_artifact_version": plan.knowledge_artifact_version,
+        "knowledge_runtime_sha256": plan.knowledge_runtime_sha256,
+        "knowledge_validation_report_sha256": plan.knowledge_validation_report_sha256,
+        "question_artifact_version": questions.artifact_version,
+        "rules_artifact_version": rules.artifact_version,
+        "semantic_question_id": rule.question_id,
+        "category": ClarificationCategory.REQUIRED_INFORMATION,
+        "locale": plan.locale,
+        "rule_id": rule.rule_id,
+        "rule_version": rule.rule_version,
+    }
+    return ClarificationQuestion(
+        clarification_id=f"clarification_{_hash(_json(identity))[:24]}",
+        semantic_question_id=rule.question_id,
+        category=ClarificationCategory.REQUIRED_INFORMATION,
+        importance=ClarificationImportance.BLOCKING,
+        priority=rule.priority,
+        text=rendered.wording,
+        locale=plan.locale,
+        target=rendered.target,
+        reason=_reason(ClarificationCategory.REQUIRED_INFORMATION, rule),
+        design_revision_id=str(revision_id),
+        knowledge_package_id=plan.knowledge_package_id,
+        knowledge_artifact_version=plan.knowledge_artifact_version,
+        knowledge_runtime_sha256=plan.knowledge_runtime_sha256,
+        knowledge_validation_report_sha256=plan.knowledge_validation_report_sha256,
+        question_artifact_version=questions.artifact_version,
+        rules_artifact_version=rules.artifact_version,
+        rule_id=rule.rule_id,
+        rule_version=rule.rule_version,
+    )
+
+
 def _record_unasked(disposition, question_id, unasked):
     reason = disposition.reason
     if reason in {
