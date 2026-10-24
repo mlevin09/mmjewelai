@@ -108,7 +108,7 @@ class CalibratedSizeWeightRecord(ImmutableModel):
     def reject_exactness_claim(self):
         lowered = self.uncertainty.casefold()
         if "exact" in lowered or "measured" in lowered:
-            raise ValueError("calibrated size/weight records cannot claim exact measured dimensions")
+            raise ValueError(\n                "calibrated size/weight records cannot claim exact measured dimensions"\n            )
         return self
 
 
