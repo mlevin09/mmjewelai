@@ -42,9 +42,7 @@ class ParametricReferenceDimensions(ImmutableModel):
         fancy_geometry = self.length_mm is not None or self.width_mm is not None
         if round_geometry and fancy_geometry:
             raise ValueError("parametric reference must use diameter or length/width, not both")
-        if not round_geometry and not (
-            self.length_mm is not None and self.width_mm is not None
-        ):
+        if not round_geometry and not (self.length_mm is not None and self.width_mm is not None):
             raise ValueError("parametric reference requires diameter or both length and width")
         return self
 
@@ -291,9 +289,7 @@ def enrich_prompt(
         "parametric_catalog_id": parametric_catalog_id,
         "parametric_artifact_version": parametric_artifact_version,
         "parametric_catalog_sha256": parametric_catalog_sha256,
-        "parametric_references": [
-            item.model_dump(mode="json") for item in parametric_references
-        ],
+        "parametric_references": [item.model_dump(mode="json") for item in parametric_references],
         "initial_matrix": [item.model_dump(mode="json") for item in initial_matrix],
         "decisions": [item.model_dump(mode="json") for item in decisions],
         "final_matrix": [item.model_dump(mode="json") for item in final_matrix],
