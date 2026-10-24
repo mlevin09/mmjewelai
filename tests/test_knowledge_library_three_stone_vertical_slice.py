@@ -2,12 +2,15 @@ import json
 from pathlib import Path
 
 from jewelai_domain import (
+    KnowledgeReleaseCandidateSelection,
+    KnowledgeReleaseQualificationStatus,
     ProductionValidationCheck,
     ProductionValidationReport,
     RuntimeProvenance,
     RuntimeSemanticState,
     compile_knowledge_library,
     promote_knowledge_runtime,
+    qualify_knowledge_release,
 )
 from jewelai_domain.knowledge_activation import ValidationOutcome
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
@@ -70,7 +73,7 @@ def test_three_stone_slice_compiles_matches_and_persists(tmp_path):
     assert ru.candidate.concept_id == "style.three_stone"
 
 
-def test_three_stone_slice_exercises_group_binding_enrichment_and_activation_gate():
+def test_three_stone_slice_exercises_group_binding_enrichment_and_qualification_gate(tmp_path):
     runtime, _ = _runtime()
     ring = DesignRevision.model_validate_json(RING.read_text(encoding="utf-8"))
     templates = load_prompt_templates(PROMPTS)
@@ -104,3 +107,18 @@ def test_three_stone_slice_exercises_group_binding_enrichment_and_activation_gat
     active = promote_knowledge_runtime(runtime, _report(runtime))
     assert active.runtime_sha256 == runtime.sha256
     assert active.active_for_production is True
+
+    store = KnowledgeArtifactStore(tmp_path)
+    stored = store.publish(json.loads(PACKAGE.read_text(encoding="utf-8")))
+    qualification = qualify_knowledge_release(
+        store,
+        KnowledgeReleaseCandidateSelection(
+            package_id=stored.package_id,
+            artifact_version=stored.artifact_version,
+            kind="SYNTHETIC",
+        ),
+        active_release=active,
+        validation_report=_report(runtime),
+    )
+    assert qualification.status == KnowledgeReleaseQualificationStatus.QUALIFIED
+    assert qualification.runtime_loader_compatible is True
