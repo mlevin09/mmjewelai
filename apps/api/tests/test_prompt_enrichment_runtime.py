@@ -940,6 +940,74 @@ def test_postgres_concurrent_persisted_answers_commit_one_cycle_and_plan(tmp_pat
 
 
 @pytest.mark.postgres
+def test_postgres_answer_listing_uses_one_consistent_session_snapshot(tmp_path):
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    pg_engine = create_database_engine(database_url)
+    Base.metadata.drop_all(pg_engine)
+    Base.metadata.create_all(pg_engine)
+    try:
+        service = build_service(pg_engine)
+        organization, _, session = create_persisted_session(service)
+        runtime, *_ = _runtime(service, tmp_path)
+        initial = runtime.start_initial_message(
+            _request(service, organization, session, "I want a white or yellow gold ring.")
+        )
+        plan = initial.workflow.clarification_plan
+        question = next(item for item in plan.questions if len(item.options) >= 2)
+        message = service.create_message(
+            session.session_id,
+            organization.organization_id,
+            question.options[0].value,
+        )
+        request = PersistedClarificationAnswerRequest(
+            session_id=session.session_id,
+            clarification_plan_id=initial.workflow.clarification_plan_id,
+            clarification_id=question.clarification_id,
+            decision=ClarificationDecision.SELECT_OPTION,
+            selected_option=question.options[0].value,
+            expected_revision_id=initial.workflow.authoritative_revision_id,
+            answer_id=uuid4(),
+            message_id=message.message_id,
+        )
+        committed_between_query_execution_and_fetch = False
+
+        def commit_after_read_snapshot_started(
+            _connection, _cursor, statement, _parameters, _context, _executemany
+        ):
+            nonlocal committed_between_query_execution_and_fetch
+            if (
+                not committed_between_query_execution_and_fetch
+                and "LEFT OUTER JOIN clarification_answer" in statement
+            ):
+                committed_between_query_execution_and_fetch = True
+                runtime.record_persisted_clarification_answer(organization.organization_id, request)
+
+        event.listen(pg_engine, "after_cursor_execute", commit_after_read_snapshot_started)
+        try:
+            snapshot = service.repository.list_clarification_answers(
+                session.session_id, organization.organization_id
+            )
+        finally:
+            event.remove(pg_engine, "after_cursor_execute", commit_after_read_snapshot_started)
+
+        assert committed_between_query_execution_and_fetch is True
+        assert snapshot == ()
+        assert (
+            len(
+                service.repository.list_clarification_answers(
+                    session.session_id, organization.organization_id
+                )
+            )
+            == 1
+        )
+    finally:
+        Base.metadata.drop_all(pg_engine)
+        pg_engine.dispose()
+
+
+@pytest.mark.postgres
 def test_postgres_conflicting_corrections_commit_no_partial_constraint_history(tmp_path):
     database_url = os.getenv("TEST_POSTGRES_URL")
     if not database_url:
