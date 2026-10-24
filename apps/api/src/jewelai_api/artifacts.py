@@ -5,10 +5,12 @@ from pathlib import Path
 
 from jewelai_domain import (
     DictionaryRegistry,
+    ParametricKnowledgeBundle,
     QuestionCatalog,
     RoleRegistry,
     RuleRegistry,
     load_domain_dictionary,
+    load_parametric_knowledge,
     load_question_catalog,
     load_role_profiles,
     load_rules,
@@ -29,6 +31,7 @@ class RuntimeArtifacts:
     questions: QuestionCatalog
     rules: RuleRegistry
     prompts: PromptTemplateBundle
+    parametric_knowledge: ParametricKnowledgeBundle
     versions: ArtifactVersions
 
 
@@ -39,6 +42,7 @@ def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArt
         "questions": root / "data" / "questions" / f"v{versions.questions}.json",
         "rules": root / "data" / "rules" / f"v{versions.rules}.json",
         "prompts": root / "data" / "prompts" / f"v{versions.prompts}.json",
+        "knowledge_base": root / "data" / "knowledge-base" / f"v{versions.knowledge_base}.json",
     }
     missing = tuple(str(path) for path in paths.values() if not path.is_file())
     if missing:
@@ -49,6 +53,7 @@ def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArt
         questions = load_question_catalog(paths["questions"], roles=roles, dictionary=dictionary)
         rules = load_rules(paths["rules"], roles=roles, dictionary=dictionary, questions=questions)
         prompts = load_prompt_templates(paths["prompts"])
+        parametric_knowledge = load_parametric_knowledge(paths["knowledge_base"])
     except (ValueError, KeyError) as exc:
         raise ArtifactConfigurationError("Configured artifacts failed cross-validation") from exc
     actual = ArtifactVersions(
@@ -57,9 +62,18 @@ def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArt
         questions=questions.artifact_version,
         rules=rules.artifact_version,
         prompts=prompts.artifact_version,
+        knowledge_base=parametric_knowledge.artifact_version,
     )
     if actual != versions:
         raise ArtifactConfigurationError(
             f"Configured artifact versions {versions} do not match loaded versions {actual}"
         )
-    return RuntimeArtifacts(roles, dictionary, questions, rules, prompts, versions)
+    return RuntimeArtifacts(
+        roles,
+        dictionary,
+        questions,
+        rules,
+        prompts,
+        parametric_knowledge,
+        versions,
+    )
