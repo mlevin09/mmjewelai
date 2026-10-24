@@ -219,6 +219,44 @@ class EnrichmentCycleRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class ClarificationPlanRow(Base):
+    __tablename__ = "clarification_plan"
+    __table_args__ = (
+        UniqueConstraint("enrichment_cycle_id", name="uq_clarification_plan_enrichment_cycle"),
+        Index("ix_clarification_plan_session_created", "session_id", "created_at"),
+        Index(
+            "ix_clarification_plan_session_revision",
+            "session_id",
+            "specification_revision_id",
+        ),
+    )
+
+    clarification_plan_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT"), index=True
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    enrichment_cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("enrichment_cycle.enrichment_cycle_id", ondelete="RESTRICT"), index=True
+    )
+    specification_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"), index=True
+    )
+    plan_version: Mapped[str] = mapped_column(String(32))
+    knowledge_package_id: Mapped[str] = mapped_column(String(200))
+    knowledge_artifact_version: Mapped[str] = mapped_column(String(32))
+    knowledge_runtime_sha256: Mapped[str] = mapped_column(String(64))
+    knowledge_validation_report_sha256: Mapped[str] = mapped_column(String(64))
+    dictionary_artifact_version: Mapped[str] = mapped_column(String(32))
+    question_artifact_version: Mapped[str] = mapped_column(String(32))
+    rules_artifact_version: Mapped[str] = mapped_column(String(32))
+    plan_payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class ClarificationAnswerRow(Base):
     __tablename__ = "clarification_answer"
     __table_args__ = (
@@ -232,6 +270,11 @@ class ClarificationAnswerRow(Base):
     )
 
     answer_record_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    clarification_plan_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("clarification_plan.clarification_plan_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
     session_id: Mapped[UUID] = mapped_column(
         ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
     )

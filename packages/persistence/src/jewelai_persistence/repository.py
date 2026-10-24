@@ -46,6 +46,7 @@ from .models import (
     AssetRow,
     AuthPrincipalRow,
     ClarificationAnswerRow,
+    ClarificationPlanRow,
     DesignSessionRow,
     EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
@@ -113,6 +114,14 @@ class ClarificationDecisionConflictError(PersistenceError):
 
 
 class ClarificationDecisionIntegrityError(PersistenceError):
+    pass
+
+
+class ClarificationPlanConflictError(PersistenceError):
+    pass
+
+
+class ClarificationPlanIntegrityError(PersistenceError):
     pass
 
 
@@ -227,6 +236,7 @@ class EnrichmentCycleRecord:
 @dataclass(frozen=True)
 class ClarificationAnswerRecord:
     answer_record_id: UUID
+    clarification_plan_id: UUID | None
     session_id: UUID
     plan_content_hash: str
     clarification_id: str
@@ -234,6 +244,18 @@ class ClarificationAnswerRecord:
     new_revision_id: UUID | None
     answer_hash: str
     result_payload: dict
+    content_hash: str
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ClarificationPlanRecord:
+    clarification_plan_id: UUID
+    organization_id: UUID
+    session_id: UUID
+    enrichment_cycle_id: UUID
+    specification_revision_id: UUID
+    plan_payload: dict
     content_hash: str
     created_at: datetime
 
@@ -888,6 +910,8 @@ class PersistenceRepository:
         resulting_revision: DesignRevision | None,
         result: PromptEnrichmentResult,
         created_at: datetime,
+        clarification_plan_id: UUID | None = None,
+        clarification_plan_payload: dict | None = None,
     ) -> EnrichmentCycleRecord:
         """Atomically commit the optional first edit, release pin, and first cycle."""
 
@@ -920,6 +944,13 @@ class PersistenceRepository:
             enrichment.knowledge_artifact_version,
             enrichment.knowledge_runtime_sha256,
             enrichment.knowledge_validation_report_sha256,
+        )
+        plan_payload = self._prepare_clarification_plan(
+            clarification_plan_id=clarification_plan_id,
+            clarification_plan_payload=clarification_plan_payload,
+            session_id=session_id,
+            specification_revision_id=authoritative_revision_id,
+            release_identity=pin_identity,
         )
         try:
             with self._session_factory.begin() as db:
@@ -982,6 +1013,17 @@ class PersistenceRepository:
                 )
                 db.add(row)
                 db.flush()
+                if plan_payload is not None:
+                    self._add_clarification_plan(
+                        db,
+                        clarification_plan_id=clarification_plan_id,
+                        organization_id=organization_id,
+                        session=session,
+                        cycle=row,
+                        payload=plan_payload,
+                        created_at=created_at,
+                    )
+                    db.flush()
         except IntegrityError as exc:
             raise EnrichmentCycleConflictError(
                 "initial revision or enrichment cycle already exists"
@@ -1056,10 +1098,73 @@ class PersistenceRepository:
             ).all()
             return tuple(self._enrichment_cycle_record(row, pin) for row in rows)
 
+    def get_clarification_plan(
+        self,
+        session_id: UUID,
+        clarification_plan_id: UUID,
+        organization_id: UUID,
+    ) -> ClarificationPlanRecord:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Clarification plan not found in organization scope")
+            row = db.scalar(
+                select(ClarificationPlanRow).where(
+                    ClarificationPlanRow.clarification_plan_id == clarification_plan_id,
+                    ClarificationPlanRow.session_id == session_id,
+                    ClarificationPlanRow.organization_id == organization_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("Clarification plan not found")
+            return self._clarification_plan_record(db, row, session)
+
+    def get_clarification_plan_for_cycle(
+        self,
+        session_id: UUID,
+        enrichment_cycle_id: UUID,
+        organization_id: UUID,
+    ) -> ClarificationPlanRecord:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Clarification plan not found in organization scope")
+            row = db.scalar(
+                select(ClarificationPlanRow).where(
+                    ClarificationPlanRow.session_id == session_id,
+                    ClarificationPlanRow.organization_id == organization_id,
+                    ClarificationPlanRow.enrichment_cycle_id == enrichment_cycle_id,
+                )
+            )
+            if row is None:
+                raise NotFoundError("Clarification plan not found")
+            return self._clarification_plan_record(db, row, session)
+
+    def list_clarification_plans(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[ClarificationPlanRecord, ...]:
+        with self._session_factory() as db:
+            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            if session is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            rows = db.scalars(
+                select(ClarificationPlanRow)
+                .where(
+                    ClarificationPlanRow.session_id == session_id,
+                    ClarificationPlanRow.organization_id == organization_id,
+                )
+                .order_by(
+                    ClarificationPlanRow.created_at,
+                    ClarificationPlanRow.clarification_plan_id,
+                )
+            ).all()
+            return tuple(self._clarification_plan_record(db, row, session) for row in rows)
+
     def commit_clarification_answer(
         self,
         *,
         answer_record_id: UUID,
+        clarification_plan_id: UUID | None = None,
         session_id: UUID,
         organization_id: UUID,
         expected_revision_id: UUID,
@@ -1067,6 +1172,8 @@ class PersistenceRepository:
         created_at: datetime,
         next_enrichment_cycle_id: UUID | None = None,
         next_enrichment_result: PromptEnrichmentResult | None = None,
+        next_clarification_plan_id: UUID | None = None,
+        next_clarification_plan_payload: dict | None = None,
     ) -> ClarificationAnswerRecord:
         """Atomically record one validated answer and its optional revision transition."""
 
@@ -1117,9 +1224,9 @@ class PersistenceRepository:
                 raise ClarificationDecisionIntegrityError(
                     "clarification re-enrichment result is invalid"
                 ) from exc
+            authoritative_revision_id = new_revision_id or expected_revision_id
             if (
-                new_revision_id is None
-                or next_enrichment.design_revision_id != str(new_revision_id)
+                next_enrichment.design_revision_id != str(authoritative_revision_id)
                 or next_enrichment.knowledge_package_id != payload["knowledge_package_id"]
                 or next_enrichment.knowledge_artifact_version
                 != payload["knowledge_artifact_version"]
@@ -1130,6 +1237,22 @@ class PersistenceRepository:
                 raise ClarificationDecisionIntegrityError(
                     "clarification re-enrichment lineage does not match the answer"
                 )
+        next_plan_payload = self._prepare_clarification_plan(
+            clarification_plan_id=next_clarification_plan_id,
+            clarification_plan_payload=next_clarification_plan_payload,
+            session_id=session_id,
+            specification_revision_id=new_revision_id or expected_revision_id,
+            release_identity=(
+                payload["knowledge_package_id"],
+                payload["knowledge_artifact_version"],
+                payload["knowledge_runtime_sha256"],
+                payload["knowledge_validation_report_sha256"],
+            ),
+        )
+        if next_plan_payload is not None and next_enrichment is None:
+            raise ClarificationDecisionIntegrityError(
+                "a clarification plan requires its enrichment cycle"
+            )
 
         try:
             with self._session_factory.begin() as db:
@@ -1159,6 +1282,18 @@ class PersistenceRepository:
                             "clarification question already has a different decision"
                         )
                     return self._clarification_answer_record(db, existing, session)
+                if clarification_plan_id is not None:
+                    plan = db.scalar(
+                        select(ClarificationPlanRow).where(
+                            ClarificationPlanRow.clarification_plan_id == clarification_plan_id,
+                            ClarificationPlanRow.session_id == session_id,
+                            ClarificationPlanRow.organization_id == organization_id,
+                        )
+                    )
+                    if plan is None or plan.content_hash != payload["plan_content_hash"]:
+                        raise ClarificationDecisionIntegrityError(
+                            "clarification answer does not match its durable plan"
+                        )
                 if session.current_revision_id != expected_revision_id:
                     raise StaleRevisionError(
                         "Current Product State revision changed before answer commit"
@@ -1188,27 +1323,38 @@ class PersistenceRepository:
                     session.updated_at = resulting_revision.created_at
                     db.flush()
                 if next_enrichment is not None:
-                    db.add(
-                        EnrichmentCycleRow(
-                            enrichment_cycle_id=next_enrichment_cycle_id,
-                            session_id=session_id,
-                            cycle_number=latest_cycle.cycle_number + 1,
-                            specification_revision_id=new_revision_id,
-                            knowledge_package_id=payload["knowledge_package_id"],
-                            knowledge_artifact_version=payload["knowledge_artifact_version"],
-                            knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
-                            knowledge_validation_report_sha256=payload[
-                                "knowledge_validation_report_sha256"
-                            ],
-                            enrichment_version=next_enrichment.enrichment_version,
-                            result_payload=next_enrichment.model_dump(mode="json"),
-                            content_hash=next_enrichment.content_hash,
+                    next_cycle = EnrichmentCycleRow(
+                        enrichment_cycle_id=next_enrichment_cycle_id,
+                        session_id=session_id,
+                        cycle_number=latest_cycle.cycle_number + 1,
+                        specification_revision_id=new_revision_id or expected_revision_id,
+                        knowledge_package_id=payload["knowledge_package_id"],
+                        knowledge_artifact_version=payload["knowledge_artifact_version"],
+                        knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
+                        knowledge_validation_report_sha256=payload[
+                            "knowledge_validation_report_sha256"
+                        ],
+                        enrichment_version=next_enrichment.enrichment_version,
+                        result_payload=next_enrichment.model_dump(mode="json"),
+                        content_hash=next_enrichment.content_hash,
+                        created_at=created_at,
+                    )
+                    db.add(next_cycle)
+                    db.flush()
+                    if next_plan_payload is not None:
+                        self._add_clarification_plan(
+                            db,
+                            clarification_plan_id=next_clarification_plan_id,
+                            organization_id=organization_id,
+                            session=session,
+                            cycle=next_cycle,
+                            payload=next_plan_payload,
                             created_at=created_at,
                         )
-                    )
-                    db.flush()
+                        db.flush()
                 row = ClarificationAnswerRow(
                     answer_record_id=answer_record_id,
+                    clarification_plan_id=clarification_plan_id,
                     session_id=session_id,
                     plan_content_hash=payload["plan_content_hash"],
                     clarification_id=payload["clarification_id"],
@@ -1285,6 +1431,8 @@ class PersistenceRepository:
         expected_revision_id: UUID,
         result_payload: dict,
         created_at: datetime,
+        next_clarification_plan_id: UUID | None = None,
+        next_clarification_plan_payload: dict | None = None,
     ) -> UserCorrectionRecord:
         """Atomically record a correction, optional revision, and next enrichment cycle."""
 
@@ -1323,6 +1471,18 @@ class PersistenceRepository:
             raise UserCorrectionIntegrityError(
                 "correction lineage does not match the commit request"
             )
+        next_plan_payload = self._prepare_clarification_plan(
+            clarification_plan_id=next_clarification_plan_id,
+            clarification_plan_payload=next_clarification_plan_payload,
+            session_id=session_id,
+            specification_revision_id=expected_authoritative_id,
+            release_identity=(
+                payload["knowledge_package_id"],
+                payload["knowledge_artifact_version"],
+                payload["knowledge_runtime_sha256"],
+                payload["knowledge_validation_report_sha256"],
+            ),
+        )
         try:
             source_identity_hash = self._canonical_hash(
                 {"kind": source["kind"], "message_id": source["message_id"]}
@@ -1412,6 +1572,17 @@ class PersistenceRepository:
                 )
                 db.add(next_cycle)
                 db.flush()
+                if next_plan_payload is not None:
+                    self._add_clarification_plan(
+                        db,
+                        clarification_plan_id=next_clarification_plan_id,
+                        organization_id=organization_id,
+                        session=session,
+                        cycle=next_cycle,
+                        payload=next_plan_payload,
+                        created_at=created_at,
+                    )
+                    db.flush()
                 row = UserCorrectionRow(
                     correction_record_id=correction_record_id,
                     session_id=session_id,
@@ -2494,6 +2665,154 @@ class PersistenceRepository:
             created_at=PersistenceRepository._utc(row.created_at),
         )
 
+    @classmethod
+    def _prepare_clarification_plan(
+        cls,
+        *,
+        clarification_plan_id: UUID | None,
+        clarification_plan_payload: dict | None,
+        session_id: UUID,
+        specification_revision_id: UUID,
+        release_identity: tuple[str, str, str, str],
+    ) -> dict | None:
+        if (clarification_plan_id is None) != (clarification_plan_payload is None):
+            raise ClarificationPlanIntegrityError(
+                "clarification plan identity and payload must be supplied together"
+            )
+        if clarification_plan_payload is None:
+            return None
+        payload = cls._verified_payload_hash(
+            clarification_plan_payload,
+            hash_field="content_hash",
+            error_type=ClarificationPlanIntegrityError,
+        )
+        try:
+            supplied_release = (
+                payload["knowledge_package_id"],
+                payload["knowledge_artifact_version"],
+                payload["knowledge_runtime_sha256"],
+                payload["knowledge_validation_report_sha256"],
+            )
+            valid = (
+                payload["plan_version"] == "1.0.0"
+                and UUID(payload["design_revision_id"]) == specification_revision_id
+                and supplied_release == release_identity
+                and isinstance(payload["question_artifact_version"], str)
+                and isinstance(payload["rules_artifact_version"], str)
+                and isinstance(payload["questions"], list)
+                and isinstance(payload["unasked_evidence"], list)
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ClarificationPlanIntegrityError("clarification plan payload is invalid") from exc
+        if not valid:
+            raise ClarificationPlanIntegrityError(
+                "clarification plan lineage does not match its enrichment cycle"
+            )
+        return payload
+
+    @staticmethod
+    def _add_clarification_plan(
+        db: Session,
+        *,
+        clarification_plan_id: UUID,
+        organization_id: UUID,
+        session: DesignSessionRow,
+        cycle: EnrichmentCycleRow,
+        payload: dict,
+        created_at: datetime,
+    ) -> None:
+        if (
+            payload["question_artifact_version"] != session.question_artifact_version
+            or payload["rules_artifact_version"] != session.rules_artifact_version
+        ):
+            raise ClarificationPlanIntegrityError(
+                "clarification plan artifacts do not match the session"
+            )
+        db.add(
+            ClarificationPlanRow(
+                clarification_plan_id=clarification_plan_id,
+                organization_id=organization_id,
+                session_id=session.session_id,
+                enrichment_cycle_id=cycle.enrichment_cycle_id,
+                specification_revision_id=cycle.specification_revision_id,
+                plan_version=payload["plan_version"],
+                knowledge_package_id=payload["knowledge_package_id"],
+                knowledge_artifact_version=payload["knowledge_artifact_version"],
+                knowledge_runtime_sha256=payload["knowledge_runtime_sha256"],
+                knowledge_validation_report_sha256=payload["knowledge_validation_report_sha256"],
+                dictionary_artifact_version=session.dictionary_artifact_version,
+                question_artifact_version=payload["question_artifact_version"],
+                rules_artifact_version=payload["rules_artifact_version"],
+                plan_payload=payload,
+                content_hash=payload["content_hash"],
+                created_at=created_at,
+            )
+        )
+
+    @classmethod
+    def _clarification_plan_record(
+        cls,
+        db: Session,
+        row: ClarificationPlanRow,
+        session: DesignSessionRow,
+    ) -> ClarificationPlanRecord:
+        payload = cls._verified_payload_hash(
+            row.plan_payload,
+            hash_field="content_hash",
+            error_type=ClarificationPlanIntegrityError,
+        )
+        cls._validate_release_identity(session, payload)
+        cycle = db.scalar(
+            select(EnrichmentCycleRow).where(
+                EnrichmentCycleRow.enrichment_cycle_id == row.enrichment_cycle_id,
+                EnrichmentCycleRow.session_id == row.session_id,
+            )
+        )
+        organization_id = db.scalar(
+            select(ProjectRow.organization_id).where(ProjectRow.project_id == session.project_id)
+        )
+        if cycle is None:
+            raise ClarificationPlanIntegrityError(
+                "stored clarification plan has no authoritative enrichment cycle"
+            )
+        try:
+            mirrors = (
+                row.organization_id == organization_id,
+                row.session_id == session.session_id,
+                cycle.specification_revision_id == row.specification_revision_id,
+                row.plan_version == payload["plan_version"],
+                row.specification_revision_id == UUID(payload["design_revision_id"]),
+                row.knowledge_package_id == payload["knowledge_package_id"],
+                row.knowledge_artifact_version == payload["knowledge_artifact_version"],
+                row.knowledge_runtime_sha256 == payload["knowledge_runtime_sha256"],
+                row.knowledge_validation_report_sha256
+                == payload["knowledge_validation_report_sha256"],
+                row.dictionary_artifact_version == session.dictionary_artifact_version,
+                row.question_artifact_version == payload["question_artifact_version"],
+                row.question_artifact_version == session.question_artifact_version,
+                row.rules_artifact_version == payload["rules_artifact_version"],
+                row.rules_artifact_version == session.rules_artifact_version,
+                row.content_hash == payload["content_hash"],
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ClarificationPlanIntegrityError(
+                "stored clarification plan metadata is invalid"
+            ) from exc
+        if not all(mirrors):
+            raise ClarificationPlanIntegrityError(
+                "stored clarification plan metadata does not match its payload"
+            )
+        return ClarificationPlanRecord(
+            clarification_plan_id=row.clarification_plan_id,
+            organization_id=row.organization_id,
+            session_id=row.session_id,
+            enrichment_cycle_id=row.enrichment_cycle_id,
+            specification_revision_id=row.specification_revision_id,
+            plan_payload=payload,
+            content_hash=row.content_hash,
+            created_at=cls._utc(row.created_at),
+        )
+
     @staticmethod
     def _canonical_hash(payload: object) -> str:
         canonical = json.dumps(
@@ -2627,6 +2946,7 @@ class PersistenceRepository:
             )
         return ClarificationAnswerRecord(
             answer_record_id=row.answer_record_id,
+            clarification_plan_id=row.clarification_plan_id,
             session_id=row.session_id,
             plan_content_hash=row.plan_content_hash,
             clarification_id=row.clarification_id,

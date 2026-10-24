@@ -21,9 +21,14 @@ from jewelai_domain import (
 from jewelai_domain.models import MessageSource
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import ParserCandidate, ParserProposal
-from jewelai_prompts import CompiledPrompt
+from jewelai_prompts import (
+    CompiledPrompt,
+    InternalFinalPrompt,
+    UserReadableJewelryDescription,
+)
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from .clarification_answers import ClarificationDecision
 from .generation import ProfileId
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
@@ -184,6 +189,72 @@ class TextIntakeResponse(ApiModel):
     proposal: ParserProposal
     revision: DesignRevision
     evaluation: "EvaluationResponse"
+
+
+class PromptEnrichmentInitialRequest(ApiModel):
+    expected_revision_id: UUID
+    message_id: UUID
+
+
+class PromptEnrichmentAnswerRequest(ApiModel):
+    clarification_plan_id: UUID
+    clarification_id: str
+    decision: ClarificationDecision
+    selected_option: str | None = None
+    expected_revision_id: UUID
+    answer_id: UUID
+    message_id: UUID
+
+
+class PromptEnrichmentCorrectionRequest(ApiModel):
+    expected_revision_id: UUID
+    message_id: UUID
+
+
+class PromptEnrichmentOptionResponse(ApiModel):
+    value: str
+    label: str
+
+
+class PromptEnrichmentQuestionResponse(ApiModel):
+    clarification_id: str
+    semantic_question_id: str
+    category: str
+    importance: str
+    text: str
+    target: str
+    options: tuple[PromptEnrichmentOptionResponse, ...]
+
+
+class PromptEnrichmentStateResponse(ApiModel):
+    authoritative_revision_id: UUID
+    enrichment_cycle_id: UUID
+    enrichment_cycle_number: int
+    status: str
+    clarification_plan_id: UUID | None = None
+    clarification_plan_content_hash: str | None = None
+    clarification_questions: tuple[PromptEnrichmentQuestionResponse, ...] = ()
+    can_continue_without_answers: bool | None = None
+    description: UserReadableJewelryDescription | None = None
+    internal_final_prompt_content_hash: str | None = None
+    internal_final_prompt_readiness: str | None = None
+
+
+class PromptEnrichmentAnswerResponse(ApiModel):
+    answer_content_hash: str
+    outcome: str
+    state: PromptEnrichmentStateResponse
+
+
+class PromptEnrichmentCorrectionResponse(ApiModel):
+    correction_content_hash: str
+    outcome: str
+    state: PromptEnrichmentStateResponse
+
+
+class PromptEnrichmentFinalOutputResponse(ApiModel):
+    description: UserReadableJewelryDescription
+    internal_final_prompt: InternalFinalPrompt
 
 
 class IterativeEditRequest(ApiModel):

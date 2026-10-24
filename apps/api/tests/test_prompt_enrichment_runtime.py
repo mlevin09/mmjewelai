@@ -9,7 +9,7 @@ from jewelai_domain import compile_knowledge_library, promote_knowledge_runtime
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import MessageSource
 from jewelai_persistence import Base, create_database_engine, create_session_factory
-from jewelai_persistence.models import EnrichmentCycleRow
+from jewelai_persistence.models import ClarificationPlanRow, EnrichmentCycleRow
 from sqlalchemy import event, func, select
 from test_enrichment_persistence import _report
 from test_persistence import NOW, build_service, create_persisted_session, next_revision
@@ -18,6 +18,7 @@ from jewelai_api.clarification_answers import ClarificationAnswer, Clarification
 from jewelai_api.correction_enrichment import UserCorrection
 from jewelai_api.prompt_enrichment_runtime import (
     InitialEnrichmentRequest,
+    PersistedClarificationAnswerRequest,
     PromptEnrichmentRuntimeError,
     PromptEnrichmentRuntimeErrorCode,
     PromptEnrichmentRuntimeService,
@@ -166,6 +167,204 @@ def test_initial_revision_and_cycle_roll_back_together(engine, tmp_path):
     )
     with create_session_factory(engine)() as db:
         assert db.scalar(select(func.count()).select_from(EnrichmentCycleRow)) == 0
+
+
+def test_complete_plan_is_persisted_and_restored_after_runtime_restart(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want a white or yellow gold ring.")
+    runtime, store, active, report = _runtime(service, tmp_path)
+
+    initial = runtime.start_initial_message(request)
+    plan = initial.workflow.clarification_plan
+    assert plan is not None
+    assert initial.workflow.clarification_plan_id is not None
+    restarted = PromptEnrichmentRuntimeService(
+        service.repository,
+        service.artifacts,
+        store,
+        knowledge_package_id=runtime.knowledge_package_id,
+        knowledge_artifact_version=runtime.knowledge_artifact_version,
+        active_release=active,
+        validation_report=report,
+        clock=lambda: NOW,
+        uuid_factory=uuid4,
+    )
+
+    restored = restarted.restore_clarification_plan(
+        session.session_id,
+        organization.organization_id,
+        initial.workflow.clarification_plan_id,
+        require_current=True,
+    )
+    state = restarted.get_current_state(session.session_id, organization.organization_id)
+
+    assert restored == plan
+    assert restored.content_hash == plan.content_hash
+    assert restored.questions == plan.questions
+    assert restored.questions[0].options == plan.questions[0].options
+    assert restored.questions[0].evidence == plan.questions[0].evidence
+    assert state.clarification_plan == plan
+    assert state.clarification_plan_id == initial.workflow.clarification_plan_id
+
+
+def test_plan_insert_failure_rolls_back_revision_pin_and_cycle(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(
+        service,
+        organization,
+        session,
+        "I want a white-gold engagement ring with an oval center stone.",
+    )
+    runtime, *_ = _runtime(service, tmp_path)
+    original = service.repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+
+    def reject_plan(mapper, connection, target):
+        raise RuntimeError("simulated plan write failure")
+
+    event.listen(ClarificationPlanRow, "before_insert", reject_plan)
+    try:
+        with pytest.raises(RuntimeError, match="simulated plan write failure"):
+            runtime.start_initial_message(request)
+    finally:
+        event.remove(ClarificationPlanRow, "before_insert", reject_plan)
+
+    assert (
+        service.repository.get_current_revision(session.session_id, organization.organization_id)
+        == original
+    )
+    assert service.repository.list_revisions(session.session_id, organization.organization_id) == (
+        original,
+    )
+    with create_session_factory(engine)() as db:
+        assert db.scalar(select(func.count()).select_from(EnrichmentCycleRow)) == 0
+        assert db.scalar(select(func.count()).select_from(ClarificationPlanRow)) == 0
+
+
+def test_persisted_answer_is_restart_safe_idempotent_and_rejects_conflict(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    request = _request(service, organization, session, "I want a white or yellow gold ring.")
+    runtime, store, active, report = _runtime(service, tmp_path)
+    initial = runtime.start_initial_message(request)
+    plan = initial.workflow.clarification_plan
+    assert plan is not None
+    question = next(item for item in plan.questions if len(item.options) >= 2)
+    message = service.create_message(
+        session.session_id, organization.organization_id, question.options[0].value
+    )
+    answer_id = uuid4()
+    persisted = PersistedClarificationAnswerRequest(
+        session_id=session.session_id,
+        clarification_plan_id=initial.workflow.clarification_plan_id,
+        clarification_id=question.clarification_id,
+        decision=ClarificationDecision.SELECT_OPTION,
+        selected_option=question.options[0].value,
+        expected_revision_id=initial.workflow.authoritative_revision_id,
+        answer_id=answer_id,
+        message_id=message.message_id,
+    )
+    restarted = PromptEnrichmentRuntimeService(
+        service.repository,
+        service.artifacts,
+        store,
+        knowledge_package_id=runtime.knowledge_package_id,
+        knowledge_artifact_version=runtime.knowledge_artifact_version,
+        active_release=active,
+        validation_report=report,
+        clock=lambda: NOW,
+        uuid_factory=uuid4,
+    )
+
+    result, state = restarted.record_persisted_clarification_answer(
+        organization.organization_id, persisted
+    )
+    retry, retry_state = restarted.record_persisted_clarification_answer(
+        organization.organization_id, persisted
+    )
+
+    assert retry == result
+    assert retry_state == state
+    assert (
+        len(
+            service.repository.list_clarification_answers(
+                session.session_id, organization.organization_id
+            )
+        )
+        == 1
+    )
+    assert (
+        len(
+            service.repository.list_enrichment_cycles(
+                session.session_id, organization.organization_id
+            )
+        )
+        == 2
+    )
+    assert (
+        len(
+            service.repository.list_clarification_plans(
+                session.session_id, organization.organization_id
+            )
+        )
+        == 2
+    )
+
+    conflicting = persisted.model_copy(
+        update={"selected_option": question.options[1].value, "answer_id": uuid4()}
+    )
+    with pytest.raises(PromptEnrichmentRuntimeError) as conflict:
+        restarted.record_persisted_clarification_answer(organization.organization_id, conflicting)
+    assert conflict.value.code == PromptEnrichmentRuntimeErrorCode.CLARIFICATION_CONFLICT
+
+    stale_question = next(
+        item for item in plan.questions if item.clarification_id != question.clarification_id
+    )
+    stale_message = service.create_message(
+        session.session_id, organization.organization_id, "I do not know."
+    )
+    stale = PersistedClarificationAnswerRequest(
+        session_id=session.session_id,
+        clarification_plan_id=initial.workflow.clarification_plan_id,
+        clarification_id=stale_question.clarification_id,
+        decision=ClarificationDecision.UNKNOWN,
+        expected_revision_id=state.authoritative_revision_id,
+        answer_id=uuid4(),
+        message_id=stale_message.message_id,
+    )
+    with pytest.raises(PromptEnrichmentRuntimeError) as stale_error:
+        restarted.record_persisted_clarification_answer(organization.organization_id, stale)
+    assert stale_error.value.code == PromptEnrichmentRuntimeErrorCode.STALE_CLARIFICATION_PLAN
+
+
+def test_tampered_and_cross_organization_plans_fail_closed(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    foreign, _, _ = create_persisted_session(service)
+    runtime, *_ = _runtime(service, tmp_path)
+    initial = runtime.start_initial_message(
+        _request(service, organization, session, "I want a white or yellow gold ring.")
+    )
+    plan_id = initial.workflow.clarification_plan_id
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as cross_scope:
+        runtime.restore_clarification_plan(
+            session.session_id, foreign.organization_id, plan_id, require_current=False
+        )
+    assert cross_scope.value.code == PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND
+
+    with create_session_factory(engine).begin() as db:
+        row = db.get(ClarificationPlanRow, plan_id)
+        row.plan_payload = {**row.plan_payload, "content_hash": "0" * 64}
+
+    with pytest.raises(PromptEnrichmentRuntimeError) as corrupt:
+        runtime.restore_clarification_plan(
+            session.session_id, organization.organization_id, plan_id, require_current=False
+        )
+    assert corrupt.value.code == PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN
 
 
 def test_snapshot_rejects_a_cycle_from_an_old_revision(engine, tmp_path):
@@ -405,7 +604,89 @@ def test_postgres_concurrent_initial_orchestration_commits_one_complete_history(
             session.session_id, organization.organization_id
         )
         assert len(cycles) == 1
+        plans = service.repository.list_clarification_plans(
+            session.session_id, organization.organization_id
+        )
+        assert len(plans) == 1
+        assert plans[0].enrichment_cycle_id == cycles[0].enrichment_cycle_id
         assert len(revisions) == 2
         assert cycles[0].specification_revision_id == revisions[-1].revision_id
     finally:
+        pg_engine.dispose()
+
+
+@pytest.mark.postgres
+def test_postgres_concurrent_persisted_answers_commit_one_cycle_and_plan(tmp_path):
+    database_url = os.getenv("TEST_POSTGRES_URL")
+    if not database_url:
+        pytest.skip("TEST_POSTGRES_URL is required for PostgreSQL concurrency coverage")
+    pg_engine = create_database_engine(database_url)
+    Base.metadata.drop_all(pg_engine)
+    Base.metadata.create_all(pg_engine)
+    try:
+        service = build_service(pg_engine)
+        organization, _, session = create_persisted_session(service)
+        runtime, *_ = _runtime(service, tmp_path)
+        initial = runtime.start_initial_message(
+            _request(service, organization, session, "I want a white or yellow gold ring.")
+        )
+        plan = initial.workflow.clarification_plan
+        question = next(item for item in plan.questions if len(item.options) >= 2)
+        messages = tuple(
+            service.create_message(session.session_id, organization.organization_id, option.value)
+            for option in question.options[:2]
+        )
+
+        def answer(index):
+            request = PersistedClarificationAnswerRequest(
+                session_id=session.session_id,
+                clarification_plan_id=initial.workflow.clarification_plan_id,
+                clarification_id=question.clarification_id,
+                decision=ClarificationDecision.SELECT_OPTION,
+                selected_option=question.options[index].value,
+                expected_revision_id=initial.workflow.authoritative_revision_id,
+                answer_id=uuid4(),
+                message_id=messages[index].message_id,
+            )
+            try:
+                runtime.record_persisted_clarification_answer(organization.organization_id, request)
+                return "success"
+            except PromptEnrichmentRuntimeError as exc:
+                assert exc.code in {
+                    PromptEnrichmentRuntimeErrorCode.CLARIFICATION_CONFLICT,
+                    PromptEnrichmentRuntimeErrorCode.CONCURRENT_CONFLICT,
+                    PromptEnrichmentRuntimeErrorCode.STALE_CLARIFICATION_PLAN,
+                }
+                return "conflict"
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcomes = tuple(pool.map(answer, range(2)))
+
+        assert sorted(outcomes) == ["conflict", "success"]
+        assert (
+            len(
+                service.repository.list_clarification_answers(
+                    session.session_id, organization.organization_id
+                )
+            )
+            == 1
+        )
+        assert (
+            len(
+                service.repository.list_enrichment_cycles(
+                    session.session_id, organization.organization_id
+                )
+            )
+            == 2
+        )
+        assert (
+            len(
+                service.repository.list_clarification_plans(
+                    session.session_id, organization.organization_id
+                )
+            )
+            == 2
+        )
+    finally:
+        Base.metadata.drop_all(pg_engine)
         pg_engine.dispose()

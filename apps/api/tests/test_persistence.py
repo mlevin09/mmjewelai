@@ -940,6 +940,7 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "alembic_version",
         "auth_principal",
         "clarification_answer",
+        "clarification_plan",
         "design_session",
         "enrichment_cycle",
         "generation_run",

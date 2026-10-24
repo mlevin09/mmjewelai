@@ -26,6 +26,7 @@ from jewelai_parser import FullMessageParseResult, ParserProposal, parse_full_me
 from jewelai_persistence import (
     ClarificationDecisionConflictError,
     ClarificationDecisionIntegrityError,
+    ClarificationPlanIntegrityError,
     EnrichmentCycleConflictError,
     EnrichmentIntegrityError,
     KnowledgeReleasePinConflictError,
@@ -49,11 +50,18 @@ from jewelai_prompts import (
 )
 
 from .artifacts import RuntimeArtifacts
-from .clarification import ClarificationImportance, ClarificationPlan, plan_clarifications
+from .clarification import (
+    ClarificationImportance,
+    ClarificationPlan,
+    continue_clarification_plan,
+    plan_clarifications,
+)
 from .clarification_answers import (
     ClarificationAnswer,
     ClarificationAnswerError,
+    ClarificationAnswerErrorCode,
     ClarificationAnswerResult,
+    ClarificationDecision,
     process_clarification_answer,
 )
 from .correction_enrichment import (
@@ -84,7 +92,11 @@ class PromptEnrichmentRuntimeErrorCode(StrEnum):
     CONCURRENT_CONFLICT = "concurrent_conflict"
     FINAL_OUTPUT_BLOCKED = "final_output_blocked"
     INVALID_CLARIFICATION_ANSWER = "invalid_clarification_answer"
+    INVALID_CLARIFICATION_DECISION = "invalid_clarification_decision"
+    INVALID_CLARIFICATION_OPTION = "invalid_clarification_option"
     CLARIFICATION_CONFLICT = "clarification_conflict"
+    INVALID_CLARIFICATION_PLAN = "invalid_clarification_plan"
+    STALE_CLARIFICATION_PLAN = "stale_clarification_plan"
     INVALID_CORRECTION = "invalid_correction"
     CORRECTION_CONFLICT = "correction_conflict"
 
@@ -116,6 +128,23 @@ class InitialEnrichmentRequest(ImmutableModel):
     message_id: UUID
 
 
+class PersistedClarificationAnswerRequest(ImmutableModel):
+    session_id: UUID
+    clarification_plan_id: UUID
+    clarification_id: str
+    decision: ClarificationDecision
+    selected_option: str | None = None
+    expected_revision_id: UUID
+    answer_id: UUID
+    message_id: UUID
+
+
+class PersistedUserCorrectionRequest(ImmutableModel):
+    session_id: UUID
+    expected_revision_id: UUID
+    message_id: UUID
+
+
 class PromptEnrichmentWorkflowState(ImmutableModel):
     session_id: UUID
     organization_id: UUID
@@ -124,6 +153,7 @@ class PromptEnrichmentWorkflowState(ImmutableModel):
     enrichment_cycle_number: int
     knowledge_release: KnowledgeReleaseReference
     status: PromptEnrichmentWorkflowStatus
+    clarification_plan_id: UUID | None = None
     clarification_plan: ClarificationPlan | None = None
     final_output: FinalPromptAssembly | None = None
 
@@ -214,15 +244,8 @@ class PromptEnrichmentRuntimeService:
                 if resulting_revision is not None
                 else first
             )
-            cycle = self.repository.commit_initial_enrichment(
-                enrichment_cycle_id=self._uuid(),
-                session_id=request.session_id,
-                organization_id=request.organization_id,
-                expected_revision_id=request.expected_revision_id,
-                resulting_revision=resulting_revision,
-                result=enrichment.enrichment_result,
-                created_at=self._clock(),
-            )
+            cycle_id = self._uuid()
+            clarification_plan_id = self._uuid()
             clarification = plan_clarifications(
                 authoritative,
                 enrichment,
@@ -231,10 +254,22 @@ class PromptEnrichmentRuntimeService:
                 questions=self.artifacts.questions,
                 rules=self.artifacts.rules,
             )
+            cycle = self.repository.commit_initial_enrichment(
+                enrichment_cycle_id=cycle_id,
+                session_id=request.session_id,
+                organization_id=request.organization_id,
+                expected_revision_id=request.expected_revision_id,
+                resulting_revision=resulting_revision,
+                result=enrichment.enrichment_result,
+                created_at=self._clock(),
+                clarification_plan_id=clarification_plan_id,
+                clarification_plan_payload=clarification.model_dump(mode="json"),
+            )
             workflow = self._state_from_cycle(
                 session_id=request.session_id,
                 organization_id=request.organization_id,
                 cycle=cycle,
+                clarification_plan_id=clarification_plan_id,
                 clarification_plan=clarification,
             )
             return InitialEnrichmentRuntimeResult(
@@ -265,6 +300,11 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.CONCURRENT_CONFLICT,
                 "Concurrent Product State or enrichment-cycle update detected",
             ) from exc
+        except ClarificationPlanIntegrityError as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                "Clarification plan failed durable validation",
+            ) from exc
 
     def get_current_state(
         self, session_id: UUID, organization_id: UUID
@@ -278,11 +318,15 @@ class PromptEnrichmentRuntimeService:
                     PromptEnrichmentRuntimeErrorCode.ENRICHMENT_CYCLE_MISMATCH,
                     "Session has no durable enrichment cycle",
                 )
+            plan_id, plan = self._restore_plan_for_cycle(
+                session_id, organization_id, cycles[-1].enrichment_cycle_id
+            )
             return self._state_from_cycle(
                 session_id=session_id,
                 organization_id=organization_id,
                 cycle=cycles[-1],
-                clarification_plan=None,
+                clarification_plan_id=plan_id,
+                clarification_plan=plan,
             )
         except PromptEnrichmentRuntimeError:
             raise
@@ -296,10 +340,10 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE,
                 "Pinned ACTIVE Knowledge release failed integrity verification",
             ) from exc
-        except EnrichmentIntegrityError as exc:
+        except (EnrichmentIntegrityError, ClarificationPlanIntegrityError) as exc:
             raise PromptEnrichmentRuntimeError(
                 PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
-                "Durable enrichment history failed integrity verification",
+                "Durable enrichment or clarification history failed integrity verification",
             ) from exc
 
     def apply_scoped_user_correction(
@@ -329,18 +373,27 @@ class PromptEnrichmentRuntimeService:
             duplicate = _matching_correction(corrections, request)
             if duplicate is not None:
                 return duplicate, self.get_current_state(request.session_id, organization_id)
+            cycle_answers = _answers_after_cycle(cycles[-1], answers)
             result = process_user_correction(
                 request,
                 authoritative_session_id=request.session_id,
                 current_revision=current,
                 previous_cycle=cycles[-1],
-                prior_answer_results=answers,
+                prior_answer_results=cycle_answers,
                 dictionary=self.artifacts.dictionary,
                 templates=self.artifacts.prompts,
                 artifact_store=self.artifact_store,
                 active_release=self.active_release,
                 validation_report=self.validation_report,
                 created_at=self._clock(),
+            )
+            next_plan = plan_clarifications(
+                result.authoritative_revision,
+                result.post_transition_evaluation,
+                role_id=session.role_id,
+                dictionary=self.artifacts.dictionary,
+                questions=self.artifacts.questions,
+                rules=self.artifacts.rules,
             )
             commit_user_correction_result(
                 self.repository,
@@ -350,6 +403,8 @@ class PromptEnrichmentRuntimeService:
                 expected_revision_id=request.expected_revision_id,
                 result=result,
                 created_at=self._clock(),
+                next_clarification_plan_id=self._uuid(),
+                next_clarification_plan=next_plan,
             )
             return result, self.get_current_state(request.session_id, organization_id)
         except PromptEnrichmentRuntimeError:
@@ -389,12 +444,67 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
                 "Correction history failed integrity validation",
             ) from exc
+        except ClarificationPlanIntegrityError as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                "Correction clarification plan failed durable validation",
+            ) from exc
+
+    def apply_persisted_user_correction(
+        self,
+        organization_id: UUID,
+        request: PersistedUserCorrectionRequest,
+    ) -> tuple[CorrectionReenrichmentResult, PromptEnrichmentWorkflowState]:
+        """Build a correction only from an organization-scoped persisted message."""
+
+        request = PersistedUserCorrectionRequest.model_validate(request)
+        try:
+            session = self.repository.get_design_session(request.session_id, organization_id)
+            message = self.repository.get_message(
+                request.session_id, request.message_id, organization_id
+            )
+            cycles = self.repository.list_enrichment_cycles(request.session_id, organization_id)
+            if not cycles:
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.ENRICHMENT_CYCLE_MISMATCH,
+                    "Correction requires an authoritative enrichment cycle",
+                )
+            latest = cycles[-1]
+            pin = latest.release_pin
+            correction = UserCorrection(
+                session_id=request.session_id,
+                expected_revision_id=request.expected_revision_id,
+                correction_text=message.content,
+                locale=session.locale,
+                source=MessageSource(
+                    message_id=str(message.message_id), recorded_at=_aware(message.created_at)
+                ),
+                previous_enrichment_cycle_id=latest.enrichment_cycle_id,
+                previous_enrichment_cycle_number=latest.cycle_number,
+                previous_enrichment_content_hash=latest.result.content_hash,
+                knowledge_package_id=pin.package_id,
+                knowledge_artifact_version=pin.artifact_version,
+                knowledge_runtime_sha256=pin.runtime_sha256,
+                knowledge_validation_report_sha256=pin.validation_report_sha256,
+                dictionary_artifact_version=session.dictionary_artifact_version,
+                prompt_template_artifact_version=session.prompt_artifact_version,
+            )
+            return self.apply_scoped_user_correction(organization_id, correction)
+        except PromptEnrichmentRuntimeError:
+            raise
+        except (OwnershipMismatchError, NotFoundError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
+                "Session or correction message was not found in organization scope",
+            ) from exc
 
     def record_clarification_answer(
         self,
         organization_id: UUID,
         plan: ClarificationPlan,
         answer: ClarificationAnswer,
+        *,
+        answer_record_id: UUID | None = None,
     ) -> tuple[ClarificationAnswerResult, PromptEnrichmentWorkflowState]:
         """Validate an answer, then atomically persist its revision and re-enrichment."""
 
@@ -411,6 +521,17 @@ class PromptEnrichmentRuntimeService:
                     "Clarification answer requires an authoritative enrichment cycle",
                 )
             latest = cycles[-1]
+            plan_records = self.repository.list_clarification_plans(
+                answer.session_id, organization_id
+            )
+            plan_record = next(
+                (item for item in plan_records if item.content_hash == plan.content_hash), None
+            )
+            if plan_record is None:
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                    "Clarification plan is not part of durable session history",
+                )
             verified = self.repository.restore_pinned_knowledge_runtime(
                 answer.session_id,
                 organization_id,
@@ -454,10 +575,8 @@ class PromptEnrichmentRuntimeService:
                 created_at=self._clock(),
                 previous_results=previous,
             )
-            next_cycle_id = None
-            next_enrichment = None
+            next_cycle_id = self._uuid()
             if result.resulting_revision is not None:
-                next_cycle_id = self._uuid()
                 proposals = tuple(item.proposal for item in latest.result.decisions)
                 next_enrichment = enrich_prompt_with_active_release(
                     result.resulting_revision,
@@ -469,15 +588,32 @@ class PromptEnrichmentRuntimeService:
                     validation_report=self.validation_report,
                     proposals=proposals,
                 )
+                authoritative = result.resulting_revision
+            else:
+                next_enrichment = latest.result
+                authoritative = current
+            answered_ids = tuple(item.clarification_id for item in previous) + (
+                result.clarification_id,
+            )
+            next_plan = continue_clarification_plan(
+                plan,
+                authoritative,
+                answered_clarification_ids=answered_ids,
+                questions=self.artifacts.questions,
+                rules=self.artifacts.rules,
+            )
             commit_clarification_answer_result(
                 self.repository,
-                answer_record_id=self._uuid(),
+                answer_record_id=answer_record_id or self._uuid(),
+                clarification_plan_id=plan_record.clarification_plan_id,
                 organization_id=organization_id,
                 expected_revision_id=answer.expected_revision_id,
                 result=result,
                 created_at=self._clock(),
                 next_enrichment_cycle_id=next_cycle_id,
                 next_enrichment_result=next_enrichment,
+                next_clarification_plan_id=self._uuid(),
+                next_clarification_plan=next_plan,
             )
             state = self.get_current_state(answer.session_id, organization_id)
             return result, state.model_copy(
@@ -486,8 +622,25 @@ class PromptEnrichmentRuntimeService:
         except PromptEnrichmentRuntimeError:
             raise
         except ClarificationAnswerError as exc:
+            mapped = {
+                ClarificationAnswerErrorCode.INVALID_DECISION: (
+                    PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_DECISION
+                ),
+                ClarificationAnswerErrorCode.INVALID_OPTION: (
+                    PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_OPTION
+                ),
+                ClarificationAnswerErrorCode.STALE_REVISION: (
+                    PromptEnrichmentRuntimeErrorCode.STALE_REVISION
+                ),
+                ClarificationAnswerErrorCode.PLAN_MISMATCH: (
+                    PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN
+                ),
+                ClarificationAnswerErrorCode.INVALID_PLAN: (
+                    PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN
+                ),
+            }.get(exc.code, PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_ANSWER)
             raise PromptEnrichmentRuntimeError(
-                PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_ANSWER,
+                mapped,
                 "Clarification answer failed deterministic validation",
             ) from exc
         except ClarificationDecisionConflictError as exc:
@@ -520,6 +673,209 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.CONCURRENT_CONFLICT,
                 "Concurrent Product State or enrichment-cycle update detected",
             ) from exc
+        except ClarificationPlanIntegrityError as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                "Clarification plan failed durable validation",
+            ) from exc
+
+    def record_persisted_clarification_answer(
+        self,
+        organization_id: UUID,
+        request: PersistedClarificationAnswerRequest,
+    ) -> tuple[ClarificationAnswerResult, PromptEnrichmentWorkflowState]:
+        """Restore the authoritative plan and process a bounded client decision."""
+
+        request = PersistedClarificationAnswerRequest.model_validate(request)
+        try:
+            plan = self.restore_clarification_plan(
+                request.session_id,
+                organization_id,
+                request.clarification_plan_id,
+                require_current=False,
+            )
+            message = self.repository.get_message(
+                request.session_id, request.message_id, organization_id
+            )
+            answer = ClarificationAnswer(
+                session_id=request.session_id,
+                plan_content_hash=plan.content_hash,
+                clarification_id=request.clarification_id,
+                decision=request.decision,
+                selected_option=request.selected_option,
+                expected_revision_id=request.expected_revision_id,
+                knowledge_package_id=plan.knowledge_package_id,
+                knowledge_artifact_version=plan.knowledge_artifact_version,
+                knowledge_runtime_sha256=plan.knowledge_runtime_sha256,
+                knowledge_validation_report_sha256=(plan.knowledge_validation_report_sha256),
+                source=MessageSource(
+                    message_id=str(message.message_id), recorded_at=_aware(message.created_at)
+                ),
+            )
+            previous = list_clarification_answer_results(
+                self.repository,
+                session_id=request.session_id,
+                organization_id=organization_id,
+            )
+            duplicate = next(
+                (
+                    item
+                    for item in previous
+                    if item.plan_content_hash == plan.content_hash
+                    and item.clarification_id == request.clarification_id
+                ),
+                None,
+            )
+            if duplicate is not None:
+                if duplicate.answer_hash != _hash(answer.model_dump(mode="json")):
+                    raise PromptEnrichmentRuntimeError(
+                        PromptEnrichmentRuntimeErrorCode.CLARIFICATION_CONFLICT,
+                        "Clarification question already has a different durable decision",
+                    )
+                state = self.get_current_state(request.session_id, organization_id)
+                return duplicate, state.model_copy(
+                    update={"status": PromptEnrichmentWorkflowStatus.CLARIFICATION_ANSWER_RECORDED}
+                )
+            self.restore_clarification_plan(
+                request.session_id,
+                organization_id,
+                request.clarification_plan_id,
+                require_current=True,
+            )
+            return self.record_clarification_answer(
+                organization_id,
+                plan,
+                answer,
+                answer_record_id=request.answer_id,
+            )
+        except PromptEnrichmentRuntimeError:
+            raise
+        except (OwnershipMismatchError, NotFoundError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
+                "Session, plan, or answer message was not found in organization scope",
+            ) from exc
+
+    def restore_clarification_plan(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        clarification_plan_id: UUID,
+        *,
+        require_current: bool,
+    ) -> ClarificationPlan:
+        """Restore and verify an immutable plan without rerunning clarification planning."""
+
+        try:
+            session = self.repository.get_design_session(session_id, organization_id)
+            self._validate_session_artifacts(session)
+            record = self.repository.get_clarification_plan(
+                session_id, clarification_plan_id, organization_id
+            )
+            cycle = self.repository.get_enrichment_cycle(
+                session_id, record.enrichment_cycle_id, organization_id
+            )
+            plan = ClarificationPlan.model_validate(record.plan_payload)
+            if (
+                record.content_hash != plan.content_hash
+                or record.specification_revision_id != cycle.specification_revision_id
+                or plan.design_revision_id != str(cycle.specification_revision_id)
+                or plan.knowledge_package_id != cycle.release_pin.package_id
+                or plan.knowledge_artifact_version != cycle.release_pin.artifact_version
+                or plan.knowledge_runtime_sha256 != cycle.release_pin.runtime_sha256
+                or plan.knowledge_validation_report_sha256
+                != cycle.release_pin.validation_report_sha256
+                or plan.question_artifact_version != session.question_artifact_version
+                or plan.rules_artifact_version != session.rules_artifact_version
+            ):
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                    "Clarification plan lineage failed integrity validation",
+                )
+            verified = self.repository.restore_pinned_knowledge_runtime(
+                session_id,
+                organization_id,
+                self.artifact_store,
+                active_release=self.active_release,
+                validation_report=self.validation_report,
+            )
+            if (
+                verified.runtime_sha256 != plan.knowledge_runtime_sha256
+                or verified.validation_report_sha256 != plan.knowledge_validation_report_sha256
+            ):
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE,
+                    "Clarification plan release is not the verified session release",
+                )
+            for question in plan.questions:
+                catalog_question = self.artifacts.questions.get_question(
+                    question.semantic_question_id
+                )
+                if (
+                    question.design_revision_id != plan.design_revision_id
+                    or question.target != catalog_question.target
+                    or question.question_artifact_version != plan.question_artifact_version
+                    or question.rules_artifact_version != plan.rules_artifact_version
+                ):
+                    raise PromptEnrichmentRuntimeError(
+                        PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                        "Clarification question lineage failed integrity validation",
+                    )
+            answers = list_clarification_answer_results(
+                self.repository, session_id=session_id, organization_id=organization_id
+            )
+            question_ids = {item.clarification_id for item in plan.questions}
+            if any(
+                item.plan_content_hash == plan.content_hash
+                and item.clarification_id not in question_ids
+                for item in answers
+            ):
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+                    "Clarification decisions do not match their durable plan",
+                )
+            if require_current:
+                cycles = self.repository.list_enrichment_cycles(session_id, organization_id)
+                if (
+                    not cycles
+                    or cycles[-1].enrichment_cycle_id != record.enrichment_cycle_id
+                    or session.current_revision_id != record.specification_revision_id
+                ):
+                    raise PromptEnrichmentRuntimeError(
+                        PromptEnrichmentRuntimeErrorCode.STALE_CLARIFICATION_PLAN,
+                        "Clarification plan is historical and no longer actionable",
+                    )
+            return plan
+        except PromptEnrichmentRuntimeError:
+            raise
+        except (OwnershipMismatchError, NotFoundError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
+                "Clarification plan was not found in organization scope",
+            ) from exc
+        except (ClarificationPlanIntegrityError, ValueError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
+                "Clarification plan failed integrity validation",
+            ) from exc
+
+    def _restore_plan_for_cycle(self, session_id, organization_id, enrichment_cycle_id):
+        try:
+            record = self.repository.get_clarification_plan_for_cycle(
+                session_id, enrichment_cycle_id, organization_id
+            )
+        except NotFoundError as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+                "Authoritative enrichment cycle has no durable clarification plan",
+            ) from exc
+        plan = self.restore_clarification_plan(
+            session_id,
+            organization_id,
+            record.clarification_plan_id,
+            require_current=False,
+        )
+        return record.clarification_plan_id, plan
 
     def _evaluate(self, revision, parsed, source):
         return enrich_parsed_candidates_with_active_release(
@@ -564,7 +920,15 @@ class PromptEnrichmentRuntimeService:
                 "Session artifact pins do not match the supplied runtime artifacts",
             )
 
-    def _state_from_cycle(self, *, session_id, organization_id, cycle, clarification_plan):
+    def _state_from_cycle(
+        self,
+        *,
+        session_id,
+        organization_id,
+        cycle,
+        clarification_plan_id,
+        clarification_plan,
+    ):
         snapshot = build_final_prompt_snapshot(
             self.repository,
             session_id=session_id,
@@ -594,6 +958,7 @@ class PromptEnrichmentRuntimeService:
             enrichment_cycle_number=cycle.cycle_number,
             knowledge_release=snapshot.knowledge_release,
             status=status,
+            clarification_plan_id=clarification_plan_id,
             clarification_plan=clarification_plan,
             final_output=assembly,
         )
@@ -797,3 +1162,17 @@ def _matching_correction(corrections, request):
                 )
             return item
     return None
+
+
+def _answers_after_cycle(cycle, answers):
+    """Return only decisions not already represented by the selected enrichment cycle."""
+
+    cursor = cycle.specification_revision_id
+    selected = []
+    for answer in answers:
+        if answer.previous_revision_id != cursor:
+            continue
+        selected.append(answer)
+        if answer.new_revision_id is not None:
+            cursor = answer.new_revision_id
+    return tuple(selected)

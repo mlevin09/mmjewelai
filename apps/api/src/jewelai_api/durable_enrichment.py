@@ -15,6 +15,7 @@ from jewelai_persistence import (
 )
 from jewelai_prompts import PromptEnrichmentResult
 
+from .clarification import ClarificationPlan
 from .clarification_answers import ClarificationAnswerResult
 from .correction_enrichment import CorrectionReenrichmentResult
 
@@ -23,18 +24,22 @@ def commit_clarification_answer_result(
     repository: PersistenceRepository,
     *,
     answer_record_id: UUID,
+    clarification_plan_id: UUID | None = None,
     organization_id: UUID,
     expected_revision_id: UUID,
     result: ClarificationAnswerResult,
     created_at: datetime,
     next_enrichment_cycle_id: UUID | None = None,
     next_enrichment_result: PromptEnrichmentResult | None = None,
+    next_clarification_plan_id: UUID | None = None,
+    next_clarification_plan: ClarificationPlan | None = None,
 ) -> ClarificationAnswerResult:
     """Validate and atomically persist one authoritative clarification result."""
 
     validated = ClarificationAnswerResult.model_validate(result)
     record = repository.commit_clarification_answer(
         answer_record_id=answer_record_id,
+        clarification_plan_id=clarification_plan_id,
         session_id=validated.session_id,
         organization_id=organization_id,
         expected_revision_id=expected_revision_id,
@@ -42,6 +47,12 @@ def commit_clarification_answer_result(
         created_at=created_at,
         next_enrichment_cycle_id=next_enrichment_cycle_id,
         next_enrichment_result=next_enrichment_result,
+        next_clarification_plan_id=next_clarification_plan_id,
+        next_clarification_plan_payload=(
+            next_clarification_plan.model_dump(mode="json")
+            if next_clarification_plan is not None
+            else None
+        ),
     )
     return _answer_result(record)
 
@@ -84,6 +95,8 @@ def commit_user_correction_result(
     expected_revision_id: UUID,
     result: CorrectionReenrichmentResult,
     created_at: datetime,
+    next_clarification_plan_id: UUID | None = None,
+    next_clarification_plan: ClarificationPlan | None = None,
 ) -> CorrectionReenrichmentResult:
     """Validate and atomically persist one correction and its prepared next cycle."""
 
@@ -96,6 +109,12 @@ def commit_user_correction_result(
         expected_revision_id=expected_revision_id,
         result_payload=validated.model_dump(mode="json"),
         created_at=created_at,
+        next_clarification_plan_id=next_clarification_plan_id,
+        next_clarification_plan_payload=(
+            next_clarification_plan.model_dump(mode="json")
+            if next_clarification_plan is not None
+            else None
+        ),
     )
     return _correction_result(record)
 

@@ -161,12 +161,21 @@ The internal-only `PromptEnrichmentRuntimeService` composes these approved bound
 future initial-creation flow. It starts from an already persisted organization-scoped message,
 runs JewelAI full-message parsing before any external provider, applies supported changes only via
 the existing revision transition, verifies one explicitly selected ACTIVE Knowledge release, and
-atomically persists the first revision/release pin/enrichment cycle. Clarification answers that
-change Product State commit their answer, revision, and re-enrichment cycle together; corrections
-reuse the existing durable correction CAS boundary. A fail-closed snapshot adapter restores the
-latest matching revision, cycle, release hashes, artifacts, decisions, and Rules result before
-calling Step #12 final-output assembly. This service is not registered in FastAPI and does not
-change the existing Google Text Intake route, generation behavior, or runtime configuration.
+atomically persists the first revision/release pin/enrichment cycle and complete immutable
+clarification plan. Plans retain their exact ordered questions, options, evidence, artifact pins,
+revision/cycle binding and canonical hash, so answer processing restores server-owned semantics
+after restart rather than trusting client options or rerunning planning with newer artifacts.
+Clarification answers commit their decision, next cycle, and next plan together; corrections reuse
+the existing durable correction CAS boundary and append their resulting plan. A fail-closed snapshot
+adapter restores the latest matching revision, cycle, release hashes, artifacts, decisions, and
+Rules result before calling Step #12 final-output assembly.
+
+The controlled `/v1/sessions/{session_id}/prompt-enrichment/` HTTP surface is registered only when
+`PromptEnrichmentRuntimeService` is explicitly injected into the application factory. It exposes
+initial enrichment, current state, persisted-plan answers, persisted-message corrections and final
+output without duplicating business logic. Default application composition does not inject it, so
+the existing Google Text Intake route, frontend, generation/provider behavior and live traffic are
+unchanged pending a separate rollout decision.
 
 Prompt compilation evaluates the pinned Rules Engine directly and requires `READY` without creating
 a question event. It compiles the exact current revision with the session-pinned prompt artifact,
