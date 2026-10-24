@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jewelai.local/specs/knowledge-base/schema.json",
+  "title": "JewelAI Parametric Gemstone Knowledge Base v1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "catalog_id",
+    "artifact_version",
+    "sources",
+    "specific_gravity",
+    "calibrated_size_weight"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "catalog_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]+$"
+    },
+    "artifact_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source"
+      },
+      "uniqueItems": true
+    },
+    "specific_gravity": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/specificGravity"
+      },
+      "uniqueItems": true
+    },
+    "calibrated_size_weight": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/calibration"
+      },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "reviewStatus": {
+      "enum": [
+        "REVIEWED",
+        "DRAFT",
+        "REJECTED"
+      ]
+    },
+    "evidenceTier": {
+      "enum": [
+        "PRIMARY",
+        "SECONDARY",
+        "CORROBORATIVE"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "uri",
+        "evidence_tier",
+        "review_status"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_tier": {
+          "$ref": "#/$defs/evidenceTier"
+        },
+        "source_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "retrieved_on": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review_status": {
+          "$ref": "#/$defs/reviewStatus"
+        }
+      }
+    },
+    "specificGravity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "material_id",
+        "nominal",
+        "source_id",
+        "applicability",
+        "uncertainty",
+        "review_status"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"
+        },
+        "material_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "nominal": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "maximum": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"
+        },
+        "applicability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "$ref": "#/$defs/reviewStatus"
+        }
+      }
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "diameter": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "length": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "depth": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "diameter"
+          ]
+        },
+        {
+          "required": [
+            "length",
+            "width"
+          ]
+        }
+      ]
+    },
+    "calibration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "material_id",
+        "shape_id",
+        "weight_ct",
+        "dimensions_mm",
+        "estimate_kind",
+        "source_id",
+        "applicability",
+        "uncertainty",
+        "review_status"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"
+        },
+        "material_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "shape_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "weight_ct": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "dimensions_mm": {
+          "$ref": "#/$defs/dimensions"
+        },
+        "estimate_kind": {
+          "enum": [
+            "SOURCE_REFERENCE",
+            "APPROXIMATE_CALIBRATION",
+            "STANDARD_PROPORTION_REFERENCE"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_.-]+$"
+        },
+        "applicability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_status": {
+          "$ref": "#/$defs/reviewStatus"
+        }
+      }
+    }
+  }
+}
