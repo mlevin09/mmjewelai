@@ -1206,7 +1206,6 @@ def build_final_prompt_snapshot(
             question_artifact_version=session.question_artifact_version,
             rules_artifact_version=session.rules_artifact_version,
             prompt_template_artifact_version=session.prompt_artifact_version,
-            knowledge_base_artifact_version=artifacts.versions.knowledge_base,
             enrichment_version=latest.result.enrichment_version,
         ),
         rule_decision=artifacts.rules.evaluate(revision, session.role_id),
