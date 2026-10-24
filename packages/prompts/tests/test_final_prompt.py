@@ -152,7 +152,6 @@ def _snapshot(revision, enrichment, *, locale="en", lineage=(), **changes):
             question_artifact_version="1.0.0",
             rules_artifact_version="1.0.0",
             prompt_template_artifact_version="1.0.0",
-            knowledge_base_artifact_version="1.0.0",
             enrichment_version=enrichment.enrichment_version,
         ),
         "rule_decision": _ready(),
@@ -222,7 +221,7 @@ def test_builds_deterministic_provider_neutral_outputs(ring, templates, runtime,
 
     assert first == second
     prompt = first.internal_final_prompt
-    assert prompt.schema_version == "1.2.0"
+    assert prompt.schema_version == "1.1.0"
     assert prompt.product_state_revision_id == ring.revision_id
     assert prompt.knowledge_release.runtime_sha256 == runtime.sha256
     assert prompt.description_content_hash == first.description.content_hash
@@ -263,10 +262,10 @@ def test_parametric_reference_is_source_backed_guidance_not_authoritative_fact(
     )
     prompt = result.internal_final_prompt
 
-    assert prompt.parametric_catalog_id == "jewelai.production.parametric_gemstones"
-    assert prompt.parametric_artifact_version == "1.0.0"
-    assert prompt.parametric_catalog_sha256 == "b" * 64
-    assert prompt.parametric_references == (reference,)
+    assert enrichment.parametric_catalog_id == "jewelai.production.parametric_gemstones"
+    assert enrichment.parametric_artifact_version == "1.0.0"
+    assert enrichment.parametric_catalog_sha256 == "b" * 64
+    assert enrichment.parametric_references == (reference,)
     assert "PARAMETRIC REFERENCES (NON-AUTHORITATIVE)" in prompt.prompt_text
     assert "REFERENCE ONLY: center_stone.dimensions" in prompt.prompt_text
     assert "SRC-CALIBRATED" in prompt.prompt_text
