@@ -19,6 +19,7 @@ from jewelai_domain.knowledge_activation import (
     ProductionValidationReport,
     Sha256,
 )
+from jewelai_domain.knowledge_base import ParametricKnowledgeBundle
 from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
     KnowledgeArtifactStore,
@@ -34,6 +35,7 @@ from jewelai_prompts import PromptEnrichmentResult, PromptTemplateBundle
 from pydantic import Field, model_validator
 
 from .clarification_answers import ClarificationAnswerResult
+from .parametric_enrichment import select_parametric_references
 from .parsed_enrichment import (
     CandidateDispositionOutcome,
     CandidateDispositionReason,
@@ -175,6 +177,7 @@ def process_user_correction(
     artifact_store: KnowledgeArtifactStore,
     active_release: ActiveKnowledgeRuntime | object,
     validation_report: ProductionValidationReport | object,
+    parametric_knowledge: ParametricKnowledgeBundle,
     created_at: datetime,
     template_id: str = "jewelry_visualization",
 ) -> CorrectionReenrichmentResult:
@@ -183,6 +186,7 @@ def process_user_correction(
     request = UserCorrection.model_validate(correction)
     revision = DesignRevision.model_validate(current_revision)
     templates = PromptTemplateBundle.model_validate(templates)
+    parametric_knowledge = ParametricKnowledgeBundle.model_validate(parametric_knowledge)
     answers = tuple(ClarificationAnswerResult.model_validate(item) for item in prior_answer_results)
 
     if request.session_id != authoritative_session_id:
@@ -197,6 +201,7 @@ def process_user_correction(
         )
     _validate_artifacts(request, dictionary, templates)
     _validate_previous_cycle(request, previous_cycle)
+    _validate_parametric_lineage(previous_cycle.result, parametric_knowledge)
     _validate_answer_lineage(request, previous_cycle, answers, revision)
     verified = _load_pinned_release(
         request,
@@ -221,6 +226,7 @@ def process_user_correction(
         artifact_store=artifact_store,
         active_release=verified,
         validation_report=validation_report,
+        parametric_knowledge=parametric_knowledge,
         template_id=template_id,
     )
     authoritative = revision
@@ -305,6 +311,7 @@ def _evaluate(
     artifact_store,
     active_release,
     validation_report,
+    parametric_knowledge,
     template_id,
 ):
     return enrich_parsed_candidates_with_active_release(
@@ -318,6 +325,7 @@ def _evaluate(
         knowledge_artifact_version=request.knowledge_artifact_version,
         active_release=active_release,
         validation_report=validation_report,
+        parametric_knowledge=parametric_knowledge,
         template_id=template_id,
     )
 
@@ -355,6 +363,21 @@ def _validate_previous_cycle(request, cycle):
         raise CorrectionInputError(
             CorrectionErrorCode.ARTIFACT_MISMATCH,
             "previous enrichment cycle used a different Prompt Template artifact",
+        )
+
+
+def _validate_parametric_lineage(result, catalog):
+    result = PromptEnrichmentResult.model_validate(result)
+    expected = (catalog.catalog_id, str(catalog.artifact_version), catalog.sha256)
+    actual = (
+        result.parametric_catalog_id,
+        result.parametric_artifact_version,
+        result.parametric_catalog_sha256,
+    )
+    if actual != expected:
+        raise CorrectionInputError(
+            CorrectionErrorCode.ARTIFACT_MISMATCH,
+            "previous enrichment cycle used a different Parametric Knowledge catalog",
         )
 
 
