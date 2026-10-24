@@ -307,6 +307,7 @@ class Gap(ImmutableModel):
 class KnowledgeMatchContext(ImmutableModel):
     jewelry_type: DomainId
     center_stone_material: DomainId
+    center_stone_shape: DomainId
     center_stone_weight: Weight
 
 
@@ -565,6 +566,7 @@ class RuleRegistry(Mapping[str, Rule]):
         references = (
             (fact.match.jewelry_type, DictionaryCategory.JEWELRY_TYPE),
             (fact.match.center_stone_material, DictionaryCategory.GEMSTONE_MATERIAL),
+            (fact.match.center_stone_shape, DictionaryCategory.STONE_SHAPE),
         )
         for value, category in references:
             try:
@@ -584,12 +586,14 @@ class RuleRegistry(Mapping[str, Rule]):
         design = revision.design
         jewelry_type = self._known_value(design.jewelry_type)
         material = self._known_value(design.center_stone.material)
+        shape = self._known_value(design.center_stone.shape)
         weight = self._known_value(design.center_stone.weight)
         matches = (
             fact
             for fact in facts
             if fact.match.jewelry_type == jewelry_type
             and fact.match.center_stone_material == material
+            and fact.match.center_stone_shape == shape
             and fact.match.center_stone_weight == weight
         )
         return tuple(sorted(matches, key=lambda item: (item.source.record_id, item.source.version)))

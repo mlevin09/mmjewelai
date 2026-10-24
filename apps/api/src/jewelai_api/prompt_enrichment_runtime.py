@@ -81,6 +81,7 @@ from .durable_enrichment import (
     list_clarification_answer_results,
     list_user_correction_results,
 )
+from .parametric_enrichment import select_parametric_references
 from .parsed_enrichment import (
     ParsedCandidateEnrichmentResult,
     enrich_parsed_candidates_with_active_release,
@@ -406,6 +407,7 @@ class PromptEnrichmentRuntimeService:
             duplicate = _matching_correction(corrections, request)
             if duplicate is not None:
                 return duplicate, self.get_current_state(request.session_id, organization_id)
+            self._validate_parametric_lineage(cycles[-1].result)
             cycle_answers = _answers_after_cycle(cycles[-1], answers)
             _, previous_plan = self._restore_plan_for_cycle(
                 request.session_id,
@@ -423,6 +425,7 @@ class PromptEnrichmentRuntimeService:
                 artifact_store=self.artifact_store,
                 active_release=self.active_release,
                 validation_report=self.validation_report,
+                parametric_knowledge=self.artifacts.parametric_knowledge,
                 created_at=self._clock(),
             )
             next_cycle_id = self._uuid()
@@ -575,6 +578,7 @@ class PromptEnrichmentRuntimeService:
                     "Clarification answer requires an authoritative enrichment cycle",
                 )
             latest = cycles[-1]
+            self._validate_parametric_lineage(latest.result)
             plan_records = self.repository.list_clarification_plans(
                 answer.session_id, organization_id
             )
@@ -641,6 +645,7 @@ class PromptEnrichmentRuntimeService:
                     active_release=verified,
                     validation_report=self.validation_report,
                     proposals=proposals,
+                    **self._parametric_kwargs(result.resulting_revision),
                 )
                 authoritative = result.resulting_revision
             else:
@@ -960,7 +965,35 @@ class PromptEnrichmentRuntimeService:
             knowledge_artifact_version=self.knowledge_artifact_version,
             active_release=self.active_release,
             validation_report=self.validation_report,
+            **self._parametric_kwargs(revision),
         )
+
+    def _parametric_kwargs(self, revision):
+        catalog = self.artifacts.parametric_knowledge
+        return {
+            "parametric_catalog_id": catalog.catalog_id,
+            "parametric_artifact_version": str(catalog.artifact_version),
+            "parametric_catalog_sha256": catalog.sha256,
+            "parametric_references": select_parametric_references(revision, catalog),
+        }
+
+    def _validate_parametric_lineage(self, result):
+        catalog = self.artifacts.parametric_knowledge
+        expected = (
+            catalog.catalog_id,
+            str(catalog.artifact_version),
+            catalog.sha256,
+        )
+        actual = (
+            result.parametric_catalog_id,
+            result.parametric_artifact_version,
+            result.parametric_catalog_sha256,
+        )
+        if actual != expected:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.ARTIFACT_MISMATCH,
+                "Parametric Knowledge catalog does not match durable enrichment lineage",
+            )
 
     def _load_release(self):
         return self.artifact_store.load_active_runtime(
@@ -1076,6 +1109,22 @@ def build_final_prompt_snapshot(
         raise PromptEnrichmentRuntimeError(
             PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE,
             "Verified Knowledge runtime does not match durable cycle lineage",
+        )
+    catalog = artifacts.parametric_knowledge
+    actual_parametric = (
+        latest.result.parametric_catalog_id,
+        latest.result.parametric_artifact_version,
+        latest.result.parametric_catalog_sha256,
+    )
+    expected_parametric = (
+        catalog.catalog_id,
+        str(catalog.artifact_version),
+        catalog.sha256,
+    )
+    if actual_parametric != expected_parametric:
+        raise PromptEnrichmentRuntimeError(
+            PromptEnrichmentRuntimeErrorCode.ARTIFACT_MISMATCH,
+            "Parametric Knowledge catalog does not match durable enrichment lineage",
         )
     expected_artifacts = (
         artifacts.versions.roles,

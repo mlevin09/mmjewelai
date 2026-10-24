@@ -504,6 +504,7 @@ def _correction_result(
         artifact_store=store,
         active_release=active,
         validation_report=report,
+        parametric_knowledge=service.artifacts.parametric_knowledge,
         created_at=NOW,
     )
     return organization, session, revision, result

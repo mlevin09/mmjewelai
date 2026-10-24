@@ -27,6 +27,8 @@ from jewelai_prompts import (
     InternalFinalPromptHandoffError,
     InternalFinalPromptHandoffErrorCode,
     KnowledgeReleaseReference,
+    ParametricEnrichmentReference,
+    ParametricReferenceDimensions,
     PromptEnrichmentResult,
     assemble_internal_final_prompt,
     build_internal_final_prompt_handoff,
@@ -93,8 +95,8 @@ def _hash(payload):
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _verified_enrichment(revision, templates, runtime, *, proposals=()):
-    result = enrich_prompt(revision, templates, runtime, proposals=proposals)
+def _verified_enrichment(revision, templates, runtime, *, proposals=(), **kwargs):
+    result = enrich_prompt(revision, templates, runtime, proposals=proposals, **kwargs)
     payload = result.model_dump(mode="json", exclude={"content_hash"})
     payload["knowledge_validation_report_sha256"] = REPORT_HASH
     return PromptEnrichmentResult(**payload, content_hash=_hash(payload))
@@ -227,6 +229,51 @@ def test_builds_deterministic_provider_neutral_outputs(ring, templates, runtime,
     assert "google" not in prompt.prompt_text.casefold()
     assert "openai" not in prompt.prompt_text.casefold()
     assert "model" not in prompt.model_dump_json().casefold()
+
+
+def test_parametric_reference_is_source_backed_guidance_not_authoritative_fact(
+    ring, templates, runtime, dictionary
+):
+    reference = ParametricEnrichmentReference(
+        target="center_stone.dimensions",
+        material_id="emerald",
+        shape_id="oval",
+        weight_ct=3.0,
+        dimensions=ParametricReferenceDimensions(length_mm=12.0, width_mm=10.0),
+        estimate_kind="APPROXIMATE_CALIBRATION",
+        record_ids=("CAL-EMERALD-OVAL-3CT",),
+        source_ids=("SRC-CALIBRATED",),
+        applicability=("Loose faceted gemstone in a calibrated cutting context.",),
+        uncertainty=("Approximate reference; actual proportions and depth vary.",),
+    )
+    enrichment = _verified_enrichment(
+        ring,
+        templates,
+        runtime,
+        parametric_catalog_id="jewelai.production.parametric_gemstones",
+        parametric_artifact_version="1.0.0",
+        parametric_catalog_sha256="b" * 64,
+        parametric_references=(reference,),
+    )
+    result = assemble_internal_final_prompt(
+        _snapshot(ring, enrichment),
+        dictionary=dictionary,
+        templates=templates,
+    )
+    prompt = result.internal_final_prompt
+
+    assert enrichment.parametric_catalog_id == "jewelai.production.parametric_gemstones"
+    assert enrichment.parametric_artifact_version == "1.0.0"
+    assert enrichment.parametric_catalog_sha256 == "b" * 64
+    assert enrichment.parametric_references == (reference,)
+    assert "PARAMETRIC REFERENCES (NON-AUTHORITATIVE)" in prompt.prompt_text
+    assert "REFERENCE ONLY: center_stone.dimensions" in prompt.prompt_text
+    assert "SRC-CALIBRATED" in prompt.prompt_text
+    assert "center_stone.dimensions" not in {item.target for item in prompt.design_facts}
+    assert "center_stone.dimensions" not in {
+        item.target for item in prompt.constraints if item.kind == "requirement"
+    }
+    assert "REFERENCE ONLY" not in result.description.text
 
 
 def test_english_and_russian_descriptions_share_meaning_without_internal_ids(

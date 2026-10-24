@@ -642,6 +642,7 @@ def test_derive_decision_returns_proposal_without_applying_it(client):
         "match": {
             "jewelry_type": "ring",
             "center_stone_material": "emerald",
+            "center_stone_shape": "oval",
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         },
     }

@@ -33,6 +33,7 @@ class ArtifactVersions:
     questions: str = "1.0.0"
     rules: str = "1.0.0"
     prompts: str = "1.0.0"
+    knowledge_base: str = "1.0.0"
 
 
 @dataclass(frozen=True)
@@ -190,6 +191,7 @@ class RuntimeSettings:
                 questions=os.getenv("QUESTION_ARTIFACT_VERSION", "1.0.0"),
                 rules=os.getenv("RULES_ARTIFACT_VERSION", "1.0.0"),
                 prompts=os.getenv("PROMPT_ARTIFACT_VERSION", "1.0.0"),
+                knowledge_base=os.getenv("KNOWLEDGE_BASE_ARTIFACT_VERSION", "1.0.0"),
             ),
             oidc=(
                 OidcJwtConfig(

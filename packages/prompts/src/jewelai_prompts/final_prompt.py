@@ -30,7 +30,7 @@ from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from pydantic import Field, JsonValue, StringConstraints, ValidationError, model_validator
 
 from .compiler import PromptValidationError, validate_compiled_prompt
-from .enrichment import PromptEnrichmentResult
+from .enrichment import ParametricEnrichmentReference, PromptEnrichmentResult
 from .models import PromptTemplateBundle, Sha256
 
 FINAL_PROMPT_SCHEMA_VERSION = "1.1.0"
@@ -329,6 +329,7 @@ def assemble_internal_final_prompt(
         constraints,
         unresolved,
         readiness,
+        snapshot.enrichment_result.parametric_references,
     )
     payload = {
         "schema_version": FINAL_PROMPT_SCHEMA_VERSION,
@@ -974,7 +975,14 @@ def _classification_label(classification, locale):
     return labels[locale][classification]
 
 
-def _render_internal_prompt(description, facts, constraints, unresolved, readiness):
+def _render_internal_prompt(
+    description,
+    facts,
+    constraints,
+    unresolved,
+    readiness,
+    parametric_references,
+):
     lines = [
         f"JEWELAI INTERNAL FINAL PROMPT {FINAL_PROMPT_SCHEMA_VERSION}",
         f"READINESS: {readiness.value}",
@@ -998,12 +1006,29 @@ def _render_internal_prompt(description, facts, constraints, unresolved, readine
         f"instruction={json.dumps(item.instruction, ensure_ascii=False)}"
         for item in constraints
     )
+    lines.append("PARAMETRIC REFERENCES (NON-AUTHORITATIVE)")
+    lines.extend(_parametric_reference_text(item) for item in parametric_references)
     lines.append("UNRESOLVED DETAILS")
     lines.extend(
         f"{item.target}: {item.classification}; blocking={str(item.blocking).lower()}"
         for item in unresolved
     )
     return "\n".join(lines)
+
+
+def _parametric_reference_text(item: ParametricEnrichmentReference) -> str:
+    dimensions = json.dumps(
+        item.dimensions.model_dump(mode="json", exclude_none=True),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return (
+        f"REFERENCE ONLY: {item.target}; material={item.material_id}; shape={item.shape_id}; "
+        f"weight={_number(item.weight_ct)} ct; dimensions={dimensions}; "
+        f"estimate_kind={item.estimate_kind}; records={','.join(item.record_ids)}; "
+        f"sources={','.join(item.source_ids)}; uncertainty={' | '.join(item.uncertainty)}"
+    )
 
 
 def _json(value):

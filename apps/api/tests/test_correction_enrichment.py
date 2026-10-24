@@ -12,6 +12,7 @@ from jewelai_domain import (
     ProductionValidationReport,
     compile_knowledge_library,
     load_domain_dictionary,
+    load_parametric_knowledge,
     promote_knowledge_runtime,
 )
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
@@ -47,6 +48,7 @@ ROOT = Path(__file__).resolve().parents[3]
 KNOWLEDGE = ROOT / "data" / "knowledge" / "v1" / "three-stone-1.0.0.json"
 DICTIONARY = ROOT / "data" / "dictionary" / "v1.0.0.json"
 PROMPTS = ROOT / "data" / "prompts" / "v1.0.0.json"
+PARAMETRIC = ROOT / "data" / "knowledge-base" / "v1.0.0.json"
 RING = ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json"
 NOW = datetime(2026, 10, 23, 14, 0, tzinfo=UTC)
 SESSION_ID = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
@@ -88,6 +90,7 @@ def active_context(tmp_path, revision, templates):
         ),
     )
     active = promote_knowledge_runtime(runtime, report)
+    parametric = load_parametric_knowledge(PARAMETRIC)
     result = enrich_prompt_with_active_release(
         revision,
         templates,
@@ -96,6 +99,9 @@ def active_context(tmp_path, revision, templates):
         knowledge_artifact_version=stored.artifact_version,
         active_release=active,
         validation_report=report,
+        parametric_catalog_id=parametric.catalog_id,
+        parametric_artifact_version=str(parametric.artifact_version),
+        parametric_catalog_sha256=parametric.sha256,
     )
     pin = KnowledgeReleasePinRecord(
         session_id=SESSION_ID,
@@ -154,6 +160,7 @@ def _process(request, revision, context, dictionary, templates, **changes):
         "artifact_store": store,
         "active_release": active,
         "validation_report": report,
+        "parametric_knowledge": load_parametric_knowledge(PARAMETRIC),
         "created_at": NOW,
     }
     options.update(changes)
@@ -162,6 +169,7 @@ def _process(request, revision, context, dictionary, templates, **changes):
 
 def _context_for_revision(context, revision, templates):
     store, stored, report, active, cycle = context
+    parametric = load_parametric_knowledge(PARAMETRIC)
     result = enrich_prompt_with_active_release(
         revision,
         templates,
@@ -170,6 +178,9 @@ def _context_for_revision(context, revision, templates):
         knowledge_artifact_version=stored.artifact_version,
         active_release=active,
         validation_report=report,
+        parametric_catalog_id=parametric.catalog_id,
+        parametric_artifact_version=str(parametric.artifact_version),
+        parametric_catalog_sha256=parametric.sha256,
     )
     return (
         store,

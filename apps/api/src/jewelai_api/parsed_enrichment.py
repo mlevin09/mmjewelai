@@ -34,6 +34,7 @@ from jewelai_parser.models import QuantityCandidate, StyleTermsCandidate, TermCa
 from jewelai_prompts import (
     EnrichmentDecision,
     EnrichmentProposal,
+    ParametricEnrichmentReference,
     PromptEnrichmentResult,
     PromptTemplateBundle,
     enrich_prompt_with_active_release,
@@ -136,6 +137,10 @@ def enrich_parsed_candidates_with_active_release(
     knowledge_artifact_version: str,
     active_release: ActiveKnowledgeRuntime | object,
     validation_report: ProductionValidationReport | object,
+    parametric_catalog_id: str | None = None,
+    parametric_artifact_version: str | None = None,
+    parametric_catalog_sha256: str | None = None,
+    parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
 ) -> ParsedCandidateEnrichmentResult:
     """Evaluate safe parsed candidates without mutating the authoritative revision."""
@@ -268,6 +273,10 @@ def enrich_parsed_candidates_with_active_release(
         active_release=active_release,
         validation_report=validation_report,
         proposals=tuple(proposals),
+        parametric_catalog_id=parametric_catalog_id,
+        parametric_artifact_version=parametric_artifact_version,
+        parametric_catalog_sha256=parametric_catalog_sha256,
+        parametric_references=parametric_references,
         template_id=template_id,
     )
     decisions = {item.proposal.source_id: item for item in enrichment_result.decisions}
