@@ -105,9 +105,9 @@ from .schemas import (
     VisualizationDecisionRequest,
     VisualizationIterationListResponse,
     VisualizationIterationResponse,
-    VisualizationVerificationListResponse,
     VisualizationResult,
     VisualizationSelection,
+    VisualizationVerificationListResponse,
 )
 from .text_understanding import TextUnderstandingProvider
 
