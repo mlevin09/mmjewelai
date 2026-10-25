@@ -595,7 +595,7 @@ class ReferenceBindingRow(Base):
         ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
     )
     asset_id: Mapped[UUID] = mapped_column(
-        ForeignKey("asset.asset_id", ondelete="RESTRICT"), index=True
+        ForeignKey("asset.asset_id", ondelete="RESTRICT")
     )
     contract_version: Mapped[str] = mapped_column(String(32))
     payload: Mapped[dict] = mapped_column(JSON)
@@ -619,10 +619,10 @@ class VisualizationVerificationRow(Base):
         ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
     )
     generation_run_id: Mapped[UUID] = mapped_column(
-        ForeignKey("generation_run.generation_run_id", ondelete="RESTRICT"), index=True
+        ForeignKey("generation_run.generation_run_id", ondelete="RESTRICT")
     )
     asset_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("asset.asset_id", ondelete="RESTRICT"), nullable=True, index=True
+        ForeignKey("asset.asset_id", ondelete="RESTRICT"), nullable=True
     )
     design_revision_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"),
