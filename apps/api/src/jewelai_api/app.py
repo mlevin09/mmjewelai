@@ -32,7 +32,12 @@ from jewelai_auth import (
 )
 from jewelai_auth_identity_platform import IdentityPlatformTokenVerifier
 from jewelai_auth_oidc import OidcJwtVerifier
-from jewelai_domain import ReferenceBinding, UnknownRoleError, UnsupportedLocaleError, VisualizationVerificationResult
+from jewelai_domain import (
+    ReferenceBinding,
+    UnknownRoleError,
+    UnsupportedLocaleError,
+    VisualizationVerificationResult,
+)
 from jewelai_generation_queue import GenerationTaskPublisher
 from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
