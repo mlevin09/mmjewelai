@@ -1,6 +1,7 @@
 """Knowledge policy runtime for Knowledge Library Contract v1.1.0."""
 
 from .knowledge_library_v1_1 import CompiledKnowledgeLibraryV1_1, CompiledPolicyV1_1
+from .knowledge_targets_v1_1 import POLICY_TARGET_TEMPLATES_V1_1
 from .knowledge_policy import (
     PROVENANCE_PRECEDENCE,
     KnowledgeRuntimeState,
@@ -23,17 +24,23 @@ def build_knowledge_runtime_state_v1_1(
 ) -> KnowledgeRuntimeState:
     runtime = CompiledKnowledgeLibraryV1_1.model_validate(runtime)
     revision = validate_design_revision(revision)
-    parameters = [
-        _from_design_state(target, state)
+    parameters = {
+        target: _from_design_state(target, state)
         for target, state in iter_knowledge_state_fields(revision)
-    ]
+    }
+    for target in POLICY_TARGET_TEMPLATES_V1_1:
+        if "{" not in target and target not in parameters:
+            parameters[target] = RuntimeParameterState(
+                target=target,
+                semantic_state=RuntimeSemanticState.MISSING,
+            )
     group_ids = tuple(sorted(group.group_id for group in revision.design.side_stones))
     return KnowledgeRuntimeState(
         package_id=runtime.package_id,
         artifact_version=str(runtime.artifact_version),
         runtime_sha256=runtime.sha256,
         existing_group_ids=group_ids,
-        parameters=tuple(sorted(parameters, key=lambda item: item.target)),
+        parameters=tuple(sorted(parameters.values(), key=lambda item: item.target)),
     )
 
 
