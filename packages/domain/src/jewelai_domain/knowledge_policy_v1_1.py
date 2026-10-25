@@ -2,6 +2,7 @@
 
 from .knowledge_library_v1_1 import CompiledKnowledgeLibraryV1_1, CompiledPolicyV1_1
 from .knowledge_policy import (
+    _KNOWLEDGE_LINEAGE_PROVENANCE,
     PROVENANCE_PRECEDENCE,
     KnowledgeRuntimeState,
     PolicyEvaluation,
@@ -10,7 +11,6 @@ from .knowledge_policy import (
     RuntimeProvenance,
     RuntimeSemanticState,
     RuntimeStateProposal,
-    _KNOWLEDGE_LINEAGE_PROVENANCE,
     _from_design_state,
 )
 from .knowledge_targets_v1_1 import POLICY_TARGET_TEMPLATES_V1_1
