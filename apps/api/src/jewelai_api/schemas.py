@@ -18,6 +18,7 @@ from jewelai_domain import (
     ReadyDecision,
     ReferenceBinding,
     RenderedQuestion,
+    SchemaV1_1MigrationEligibility,
     VisualizationVerificationResult,
 )
 from jewelai_domain.models import MessageSource
@@ -162,6 +163,10 @@ class DictionaryOptionsResponse(ApiModel):
     artifact_version: str
     locale: Literal["en", "ru"]
     options: tuple[DictionaryOption, ...]
+
+
+class UpgradeSchemaV1_1Request(ApiModel):
+    expected_revision_id: UUID
 
 
 class CreateMessageRequest(ApiModel):
