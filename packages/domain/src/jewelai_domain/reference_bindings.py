@@ -85,20 +85,12 @@ class ReferenceBinding(ImmutableModel):
 
     @model_validator(mode="after")
     def validate_deterministic_bindings(self):
-        feature_keys = [
-            (item.feature_path, item.relation.value)
-            for item in self.feature_bindings
-        ]
+        feature_keys = [(item.feature_path, item.relation.value) for item in self.feature_bindings]
         if len(set(feature_keys)) != len(feature_keys):
-            raise ValueError(
-                "feature bindings must be unique by feature_path and relation"
-            )
+            raise ValueError("feature bindings must be unique by feature_path and relation")
         presentation_keys = [
-            (item.parameter.value, item.relation.value)
-            for item in self.presentation_bindings
+            (item.parameter.value, item.relation.value) for item in self.presentation_bindings
         ]
         if len(set(presentation_keys)) != len(presentation_keys):
-            raise ValueError(
-                "presentation bindings must be unique by parameter and relation"
-            )
+            raise ValueError("presentation bindings must be unique by parameter and relation")
         return self
