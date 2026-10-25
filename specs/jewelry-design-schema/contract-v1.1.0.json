@@ -1,0 +1,24 @@
+{
+  "contract_id": "jewelai.jewelry_design_schema.v1_1_target_ownership",
+  "schema_version": "1.1.0",
+  "status": "FROZEN_FIELD_OWNERSHIP_IMPLEMENTATION_PENDING",
+  "base_schema_version": "1.0.0",
+  "compatibility": "ADDITIVE_MINOR",
+  "current_v1_targets": 30,
+  "additive_v1_1_targets": 118,
+  "total_product_state_target_families": 148,
+  "historical_snapshot_policy": "Existing 1.0.0 revisions remain immutable and are never silently rewritten as 1.1.0.",
+  "new_field_population_policy": "New fields begin absent/unknown unless supplied or derived through a versioned permitted rule with provenance; content availability alone never populates Product State.",
+  "collection_identity_policy": "Repeated components use stable semantic IDs; array position is not identity.",
+  "target_registry_file": "target-registry-v1.1.0.json",
+  "implementation_status": "PENDING_P0_17",
+  "migration_invariants": [
+    "Schema 1.0.0 snapshots remain immutable and valid historical artifacts.",
+    "No new v1.1 field is populated merely because source knowledge exists.",
+    "No lower-precedence knowledge overwrites explicit/confirmed/locked user state.",
+    "Reference Binding does not mutate Product State by itself.",
+    "Visualization Verification does not become Product State.",
+    "Presentation parameters remain outside Product State.",
+    "Quantitative values are not invented from qualitative language or unscaled imagery."
+  ]
+}
