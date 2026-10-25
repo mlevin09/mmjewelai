@@ -7,10 +7,10 @@ from typing import Annotated, Literal
 from pydantic import Field, StringConstraints, model_validator
 
 from .knowledge_activation import (
+    REQUIRED_PRODUCTION_VALIDATION_CHECKS,
     KnowledgeActivationError,
     ProductionValidationCheck,
     ProductionValidationStatus,
-    REQUIRED_PRODUCTION_VALIDATION_CHECKS,
     ValidationOutcome,
 )
 from .knowledge_library_v1_1 import (
