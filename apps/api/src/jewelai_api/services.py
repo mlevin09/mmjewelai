@@ -614,6 +614,42 @@ class RuntimeService:
             created_at=edit.created_at,
         )
 
+    def _apply_parser_proposal_revision(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        proposal: ParserProposal,
+        reason: str,
+    ):
+        current = self.repository.get_current_revision(session_id, organization_id)
+        if isinstance(current, DesignRevisionV1_1):
+            revision = revise_parser_design_v1_1(
+                current,
+                proposal.proposed_design,
+                expected_revision_id=expected_revision_id,
+                source=proposal.source,
+                reason=reason,
+                created_at=self._clock(),
+            )
+            return self.repository.append_revision_cas(
+                session_id,
+                organization_id,
+                expected_revision_id,
+                revision,
+            )
+        return self.transition_revision(
+            session_id,
+            organization_id,
+            EditRevisionRequest(
+                action="edit",
+                expected_revision_id=expected_revision_id,
+                proposed_design=proposal.proposed_design,
+                source=proposal.source,
+                reason=reason,
+            ),
+        )
+
     def transition_revision(self, session_id: UUID, organization_id: UUID, request):
         current = self.repository.get_current_revision(session_id, organization_id)
         now = self._clock()
