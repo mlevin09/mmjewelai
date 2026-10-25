@@ -43,6 +43,17 @@ from .knowledge_base import (
     load_parametric_knowledge,
     validate_parametric_knowledge,
 )
+from .knowledge_library import (
+    KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
+    KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
+    CompilationManifest,
+    CompiledKnowledgeLibrary,
+    KnowledgeLibraryRegistry,
+    KnowledgeLibraryValidationError,
+    compile_knowledge_library,
+    load_knowledge_library,
+    validate_knowledge_library,
+)
 from .knowledge_library_v1_1 import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION_V1_1,
     KNOWLEDGE_LIBRARY_SCHEMA_VERSION_V1_1,
@@ -54,17 +65,6 @@ from .knowledge_library_v1_1 import (
     PolicyV1_1,
     compile_knowledge_library_v1_1,
     validate_knowledge_library_v1_1,
-)
-from .knowledge_library import (
-    KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
-    KNOWLEDGE_LIBRARY_SCHEMA_VERSION,
-    CompilationManifest,
-    CompiledKnowledgeLibrary,
-    KnowledgeLibraryRegistry,
-    KnowledgeLibraryValidationError,
-    compile_knowledge_library,
-    load_knowledge_library,
-    validate_knowledge_library,
 )
 from .knowledge_policy import (
     KnowledgePolicyEngine,
