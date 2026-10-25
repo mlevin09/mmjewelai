@@ -578,6 +578,7 @@ class AssetRow(Base):
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+
 class ReferenceBindingRow(Base):
     __tablename__ = "reference_binding"
     __table_args__ = (
