@@ -12,8 +12,7 @@ from typing import Literal
 
 from jewelai_domain.dictionary import DictionaryLocale, DictionaryRegistry, EntryLifecycle
 from jewelai_domain.knowledge_policy import RuntimeProvenance
-from jewelai_domain.models import ImmutableModel, KnownValue, Text
-from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
+from jewelai_domain.models import DesignRevision, ImmutableModel, KnownValue, Text
 from jewelai_domain.questions import QuestionCatalog, QuestionId, QuestionLocale, SchemaTarget
 from jewelai_domain.roles import RoleId
 from jewelai_domain.rules import AskDecision, BlockDecision, RuleDecision, RuleRegistry
