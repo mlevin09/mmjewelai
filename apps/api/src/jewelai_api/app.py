@@ -43,7 +43,7 @@ from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_generation_queue import GenerationTaskPublisher
 from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
-from jewelai_parser import ParserProposal
+from jewelai_parser import AnyParserProposal
 from jewelai_persistence import (
     GenerationRetryNotAllowedError,
     GenerationStateConflictError,
@@ -620,7 +620,7 @@ def create_app(
     ):
         return service.create_message(session_id, organization_id, request.content)
 
-    @app.post("/sessions/{session_id}/parser-proposals", response_model=ParserProposal)
+    @app.post("/sessions/{session_id}/parser-proposals", response_model=AnyParserProposal)
     def create_parser_proposal(
         session_id: UUID,
         request: ParserProposalRequest,
