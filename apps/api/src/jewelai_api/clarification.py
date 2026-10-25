@@ -12,7 +12,8 @@ from typing import Literal
 
 from jewelai_domain.dictionary import DictionaryLocale, DictionaryRegistry, EntryLifecycle
 from jewelai_domain.knowledge_policy import RuntimeProvenance
-from jewelai_domain.models import DesignRevision, ImmutableModel, KnownValue, Text
+from jewelai_domain.models import ImmutableModel, KnownValue, Text
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_domain.questions import QuestionCatalog, QuestionId, QuestionLocale, SchemaTarget
 from jewelai_domain.roles import RoleId
 from jewelai_domain.rules import AskDecision, BlockDecision, RuleDecision, RuleRegistry
@@ -161,7 +162,7 @@ _UNSUPPORTED_REASONS = {
 
 
 def plan_clarifications(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     enrichment: ParsedCandidateEnrichmentResult,
     *,
     role_id: RoleId | str,
@@ -172,7 +173,7 @@ def plan_clarifications(
 ) -> ClarificationPlan:
     """Build a minimal immutable plan without accepting evidence or changing Product State."""
 
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     enrichment = ParsedCandidateEnrichmentResult.model_validate(enrichment)
     role_id = RoleId(role_id)
     constraint_evidence = tuple(
@@ -362,7 +363,7 @@ def plan_clarifications(
 
 def continue_clarification_plan(
     previous_plan: ClarificationPlan,
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     *,
     answered_clarification_ids: tuple[str, ...],
     questions: QuestionCatalog,
@@ -371,7 +372,7 @@ def continue_clarification_plan(
     """Advance one durable plan without replaying parsing or accepting client plan content."""
 
     plan = ClarificationPlan.model_validate(previous_plan)
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     answered = set(answered_clarification_ids)
     rule_decision = rules.evaluate(revision, plan.role_id)
     retained = [
@@ -497,7 +498,7 @@ def _unasked(disposition, reason):
 def _effective_revision(revision, enrichment):
     payload = revision.model_dump(mode="json")
     payload["design"] = enrichment.parser_proposal.proposed_design.model_dump(mode="json")
-    return DesignRevision.model_validate(payload)
+    return validate_design_revision(payload)
 
 
 def _is_confirmed(revision, target):
