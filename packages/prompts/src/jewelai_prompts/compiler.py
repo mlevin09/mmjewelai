@@ -69,7 +69,7 @@ def compile_prompt(
 
 def validate_compiled_prompt(
     compiled: CompiledPrompt,
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     templates: PromptTemplateBundle,
 ) -> CompiledPrompt:
     compiled = CompiledPrompt.model_validate(compiled)
