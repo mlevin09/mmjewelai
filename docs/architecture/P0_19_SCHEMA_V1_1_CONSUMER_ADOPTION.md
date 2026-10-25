@@ -1,6 +1,6 @@
 # P0-19 Schema v1.1 Consumer Coverage & Controlled Adoption
 
-Status: **IMPLEMENTED ON FEATURE BRANCH — CI PENDING**  
+Status: **IMPLEMENTED — MERGE GATED BY FULL CI**  
 Date: **2026-10-25**
 
 ## Purpose
@@ -46,6 +46,17 @@ A session already on v1.1 is not migration-eligible again.
 
 New sessions continue to start on v1.0.0. There is no bulk migration and no
 automatic migration during reads, edits, or deployment.
+
+
+### Runtime compatibility gate
+
+Prompt Enrichment remains a v1.0-only consumer chain in P0-19. When that runtime
+service is configured, migration eligibility is explicitly blocked with
+`PROMPT_ENRICHMENT_RUNTIME_V1_1_UNSUPPORTED`.
+
+This prevents a session from being migrated into a state that the configured
+clarification / enrichment / correction workflow cannot safely consume. P0-19 does
+not partially upgrade that chain or silently bypass the blocker.
 
 ## Parser adoption
 
