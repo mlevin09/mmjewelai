@@ -1,0 +1,895 @@
+{
+  "registry_id": "jewelai.jewelry_design_schema.target_registry",
+  "schema_version": "1.1.0",
+  "status": "FROZEN",
+  "targets": [
+    {
+      "target": "jewelry_type",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "metal.material",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "metal.color",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "metal.purity",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "metal.finish",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.material",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.shape",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.cut",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.weight",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.dimensions",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.color",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.setting",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "center_stone.orientation",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.shank",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.gallery",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.basket",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.clasp",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.setting_height",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.shank_width",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "construction.thickness",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "style",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.material",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.shape",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.cut",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.weight",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.dimensions",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.color",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.setting",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.orientation",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.quantity",
+      "ownership": "EXISTING_V1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "REPOSITORY_EXACT"
+    },
+    {
+      "target": "prong_count",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "prong_style",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.role",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "side_stones.{group_id}.arrangement",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "side_stones.{group_id}.location",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "side_stones.{group_id}.coverage",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "halo.enabled",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "halo.type",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "pave.enabled",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "pave.location",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "pave.coverage",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "decorative_elements",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "composition",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "ORIGINAL_MATRIX",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.sieve_system",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-1",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.sieve_designation",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-1",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.diameter_range_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-1",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "center_stone.variety_or_type",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.variety_or_type",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "center_stone.material_origin_status",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.material_origin_status",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "center_stone.geographic_origin",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.geographic_origin",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "center_stone.treatment_status",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.treatment_status",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "center_stone.treatments",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.treatments",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-2",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "center_stone.cut_style_class",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-3",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.stones.cut_style_class",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-3",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "prong_configuration",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-4",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "side_stones.{group_id}.total_carat_weight",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-5",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "halo.location",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-5",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "halo.row_count",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-5",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "halo.outline_relation",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-5",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "pave.row_count",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-5",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.alloy_system",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.coating.material",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.coating.coverage",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.coating.method",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.coating.color_or_effect",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.coating.thickness",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.surface_treatment",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.components",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "metal.components[].role_or_location",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].material",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].color",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].purity",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].alloy_system",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].finish",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].coating",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "metal.components[].surface_treatment",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-6",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.head",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.shoulders",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bridge",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.sizing_area",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.shank_configuration",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.solidity",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.post_or_wire",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.back_or_closure",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.hinge_or_latch",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.connector",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.pair_scope",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.pendant.bail",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.pendant.bail_mobility",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.pendant.connector",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.base_type",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.chain_style",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.strand_count",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.strand_progression",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.end_components",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bracelet.structure",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bracelet.hinge",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bracelet.secondary_safety",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bracelet.articulation",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.brooch.fastening_system",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.brooch.pin_stem",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.brooch.joint",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.brooch.catch",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-7",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "product.overall_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "product.dimension_scope",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.ring.size",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.ring.size_system",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.ring.inner_diameter_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.ring.inner_circumference_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.ring.head_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.overall_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.drop_length_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.inside_diameter_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.earring.outside_diameter_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.earring.post_length_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.earring.post_thickness_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.pendant.overall_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.pendant.body_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.pendant.bail_inside_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.pendant.chain_passage_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.wearable_length_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.necklace.strand_lengths_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bracelet.wearable_length_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.bracelet.inner_circumference_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.bracelet.inner_dimensions_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.bracelet.width_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.bracelet.thickness_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.bracelet.cuff_gap_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.brooch.overall_dimensions",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "construction.brooch.thickness_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.brooch.pin_stem_length_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "CANONICALIZED_FROM_EXPLICIT_SOURCE_SEMANTICS"
+    },
+    {
+      "target": "construction.brooch.fastening_span_mm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-9",
+      "source_resolution": "TRANSCRIPT_EXACT"
+    },
+    {
+      "target": "style_period_or_movement",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "style_influences",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "style_descriptors",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "decorative_elements[].technique",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "decorative_elements[].motif",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "decorative_elements[].location",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "decorative_elements[].prominence",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "composition.symmetry_mode",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "composition.organization",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "composition.focal_hierarchy",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "composition.negative_space_intent",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    },
+    {
+      "target": "composition.rhythm",
+      "ownership": "ADDITIVE_V1_1",
+      "source_step": "P0-10",
+      "source_resolution": "ARTIFACT_EXACT"
+    }
+  ]
+}
