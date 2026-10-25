@@ -952,10 +952,12 @@ def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch
         "project",
         "prompt_revision",
         "question_event",
+        "reference_binding",
         "specification_revision",
         "user_correction",
         "visualization_iteration",
         "visualization_selection",
+        "visualization_verification",
     }
     session_columns = {column["name"] for column in inspect(engine).get_columns("design_session")}
     assert {
