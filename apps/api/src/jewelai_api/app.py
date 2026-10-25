@@ -32,7 +32,12 @@ from jewelai_auth import (
 )
 from jewelai_auth_identity_platform import IdentityPlatformTokenVerifier
 from jewelai_auth_oidc import OidcJwtVerifier
-from jewelai_domain import UnknownRoleError, UnsupportedLocaleError
+from jewelai_domain import (
+    ReferenceBinding,
+    UnknownRoleError,
+    UnsupportedLocaleError,
+    VisualizationVerificationResult,
+)
 from jewelai_generation_queue import GenerationTaskPublisher
 from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
@@ -41,8 +46,12 @@ from jewelai_persistence import (
     GenerationRetryNotAllowedError,
     GenerationStateConflictError,
     NotFoundError,
+    ReferenceBindingConflictError,
+    ReferenceBindingIntegrityError,
     StaleRevisionError,
     VisualizationSelectionConflictError,
+    VisualizationVerificationConflictError,
+    VisualizationVerificationIntegrityError,
     create_database_engine,
     create_session_factory,
 )
@@ -115,6 +124,7 @@ from .schemas import (
     PromptEnrichmentStateResponse,
     PromptRevisionListResponse,
     PromptRevisionResponse,
+    ReferenceBindingListResponse,
     RetryGenerationRunRequest,
     RevisionListResponse,
     RevisionTransitionRequest,
@@ -127,6 +137,7 @@ from .schemas import (
     VisualizationDecisionRequest,
     VisualizationIterationListResponse,
     VisualizationIterationResponse,
+    VisualizationVerificationListResponse,
 )
 from .services import (
     AssetUploadUnavailableError,
@@ -405,6 +416,22 @@ def create_app(
     @app.exception_handler(VisualizationSelectionConflictError)
     async def visualization_selection_handler(_, exc):
         return _error_response(409, "visualization_selection_conflict", str(exc))
+
+    @app.exception_handler(ReferenceBindingConflictError)
+    async def reference_binding_conflict_handler(_, exc):
+        return _error_response(409, "reference_binding_conflict", str(exc))
+
+    @app.exception_handler(ReferenceBindingIntegrityError)
+    async def reference_binding_integrity_handler(_, exc):
+        return _error_response(422, "reference_binding_invalid", str(exc))
+
+    @app.exception_handler(VisualizationVerificationConflictError)
+    async def verification_conflict_handler(_, exc):
+        return _error_response(409, "visualization_verification_conflict", str(exc))
+
+    @app.exception_handler(VisualizationVerificationIntegrityError)
+    async def verification_integrity_handler(_, exc):
+        return _error_response(422, "visualization_verification_invalid", str(exc))
 
     @app.exception_handler(LockedFieldConflictError)
     async def locked_handler(_, exc):
@@ -758,6 +785,72 @@ def create_app(
             principal.principal_id,
             request,
         )
+
+    @app.post(
+        "/sessions/{session_id}/reference-bindings",
+        response_model=ReferenceBinding,
+        status_code=201,
+    )
+    def create_reference_binding(
+        session_id: UUID,
+        binding: ReferenceBinding,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.create_reference_binding(session_id, organization_id, binding)
+
+    @app.get(
+        "/sessions/{session_id}/reference-bindings",
+        response_model=ReferenceBindingListResponse,
+    )
+    def list_reference_bindings(
+        session_id: UUID,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.list_reference_bindings(session_id, organization_id)
+
+    @app.get(
+        "/sessions/{session_id}/reference-bindings/{binding_id}",
+        response_model=ReferenceBinding,
+    )
+    def get_reference_binding(
+        session_id: UUID,
+        binding_id: str,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.get_reference_binding(session_id, binding_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/visualization-verifications",
+        response_model=VisualizationVerificationResult,
+        status_code=201,
+    )
+    def create_visualization_verification(
+        session_id: UUID,
+        result: VisualizationVerificationResult,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.create_visualization_verification(session_id, organization_id, result)
+
+    @app.get(
+        "/sessions/{session_id}/visualization-verifications",
+        response_model=VisualizationVerificationListResponse,
+    )
+    def list_visualization_verifications(
+        session_id: UUID,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.list_visualization_verifications(session_id, organization_id)
+
+    @app.get(
+        "/sessions/{session_id}/visualization-verifications/{verification_id}",
+        response_model=VisualizationVerificationResult,
+    )
+    def get_visualization_verification(
+        session_id: UUID,
+        verification_id: str,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.get_visualization_verification(session_id, verification_id, organization_id)
 
     @app.get("/sessions/{session_id}/assets", response_model=AssetListResponse)
     def list_assets(

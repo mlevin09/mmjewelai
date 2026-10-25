@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:reference-binding:1.0.0",
+  "title": "JewelAI Reference Binding Contract v1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "binding_id",
+    "asset_id",
+    "reference_role",
+    "feature_bindings"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "binding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reference_role": {
+      "enum": [
+        "base_design",
+        "feature_donor",
+        "style_inspiration",
+        "existing_product_constraint",
+        "companion_product",
+        "stone_reference",
+        "setting_reference",
+        "proportion_reference",
+        "material_color_reference",
+        "composition_reference",
+        "presentation_reference",
+        "comparison_reference"
+      ]
+    },
+    "feature_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/feature_binding"
+      },
+      "minItems": 1
+    },
+    "presentation_bindings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/presentation_binding"
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "feature_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature_path",
+        "relation",
+        "provenance",
+        "observability"
+      ],
+      "properties": {
+        "feature_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "enum": [
+            "KEEP",
+            "CHANGE",
+            "LOCKED",
+            "INSPIRATION",
+            "UNKNOWN"
+          ]
+        },
+        "target": {},
+        "raw_user_language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance": {
+          "enum": [
+            "user_text",
+            "voice",
+            "confirmed_context",
+            "system_state",
+            "image_derived_observation"
+          ]
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "observability": {
+          "enum": [
+            "EXPLICIT",
+            "OBSERVABLE",
+            "REFERENCE_ONLY",
+            "UNVERIFIABLE"
+          ]
+        }
+      }
+    },
+    "presentation_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "parameter",
+        "relation"
+      ],
+      "properties": {
+        "parameter": {
+          "enum": [
+            "camera_view",
+            "framing",
+            "lighting",
+            "background",
+            "render_context",
+            "scale_instruction"
+          ]
+        },
+        "relation": {
+          "enum": [
+            "KEEP",
+            "CHANGE",
+            "LOCKED",
+            "INSPIRATION",
+            "UNKNOWN"
+          ]
+        },
+        "value": {}
+      }
+    }
+  }
+}

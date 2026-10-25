@@ -577,3 +577,59 @@ class AssetRow(Base):
     failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class ReferenceBindingRow(Base):
+    __tablename__ = "reference_binding"
+    __table_args__ = (
+        Index("ix_reference_binding_session_created", "session_id", "created_at"),
+        Index("ix_reference_binding_asset", "asset_id"),
+    )
+
+    binding_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT"), index=True
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    asset_id: Mapped[UUID] = mapped_column(ForeignKey("asset.asset_id", ondelete="RESTRICT"))
+    contract_version: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class VisualizationVerificationRow(Base):
+    __tablename__ = "visualization_verification"
+    __table_args__ = (
+        Index("ix_visualization_verification_session_created", "session_id", "created_at"),
+        Index("ix_visualization_verification_generation_run", "generation_run_id"),
+        Index("ix_visualization_verification_asset", "asset_id"),
+    )
+
+    verification_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT"), index=True
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
+    )
+    generation_run_id: Mapped[UUID] = mapped_column(
+        ForeignKey("generation_run.generation_run_id", ondelete="RESTRICT")
+    )
+    asset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("asset.asset_id", ondelete="RESTRICT"), nullable=True
+    )
+    design_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    previous_asset_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("asset.asset_id", ondelete="RESTRICT"), nullable=True
+    )
+    contract_version: Mapped[str] = mapped_column(String(32))
+    payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

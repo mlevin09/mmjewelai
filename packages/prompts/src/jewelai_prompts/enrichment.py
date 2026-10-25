@@ -25,13 +25,13 @@ from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import (
     Assumed,
     Derived,
-    DesignRevision,
     Explicit,
     ImmutableModel,
     KnownValue,
     NotApplicable,
     Text,
 )
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from pydantic import Field, JsonValue, field_validator, model_validator
 
 from .compiler import compile_prompt
@@ -226,7 +226,7 @@ def _is_authoritative_parametric_input(state: object | None) -> bool:
     return isinstance(state, (Derived, Assumed)) and state.confirmed
 
 
-def parametric_reference_context_is_eligible(revision: DesignRevision) -> bool:
+def parametric_reference_context_is_eligible(revision: AnyDesignRevision | object) -> bool:
     """Return whether Product State can safely select center-stone size guidance.
 
     Explicit values are user authority even before a separate confirmation action. Derived and
@@ -234,7 +234,7 @@ def parametric_reference_context_is_eligible(revision: DesignRevision) -> bool:
     always suppress advisory dimensional references.
     """
 
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     stone = revision.design.center_stone
     if isinstance(stone.dimensions, (KnownValue, NotApplicable)):
         return False
@@ -245,7 +245,7 @@ def parametric_reference_context_is_eligible(revision: DesignRevision) -> bool:
 
 
 def enrich_prompt(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     templates: PromptTemplateBundle,
     knowledge_runtime: CompiledKnowledgeLibrary,
     *,
@@ -261,7 +261,7 @@ def enrich_prompt(
     Step 12 deliberately does not mutate DesignRevision. Matrix/policy results are structured
     derived output, while Prompt Compiler remains anchored to the immutable canonical revision.
     """
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     templates = PromptTemplateBundle.model_validate(templates)
     runtime = CompiledKnowledgeLibrary.model_validate(knowledge_runtime)
     engine = KnowledgePolicyEngine(runtime)
@@ -346,7 +346,7 @@ def enrich_prompt(
 
 
 def enrich_prompt_with_active_release(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     templates: PromptTemplateBundle,
     artifact_store: KnowledgeArtifactStore,
     *,

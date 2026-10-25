@@ -90,3 +90,17 @@ DATABASE_URL=postgresql+psycopg://... \
 
 `GENERATION_STALE_AFTER_SECONDS` defaults to 1800 and is bounded to 900–86400;
 `GENERATION_RECOVERY_BATCH_SIZE` defaults to 100 and is bounded to 1–100.
+
+
+The `0015_reference_verification` migration adds two append-only runtime-evidence stores.
+`reference_binding` links one frozen Reference Binding v1.0.0 payload to an existing reference Asset
+inside the same organization/session scope. `visualization_verification` stores frozen Visualization
+Verification v1.0.0 payloads with explicit GenerationRun and optional Asset/Product State revision
+lineage. Repository writes validate the full lineage before insert, persist a canonical content hash,
+and revalidate relational mirrors on read.
+
+Persistence is also version-aware for Jewelry Design Schema v1.1.0. Existing v1.0.0 snapshots remain
+immutable. The repository supports a single explicit atomic v1.0 -> v1.1 session migration that appends
+a new revision and updates the session schema pin in the same transaction. Normal revision CAS still
+requires the child to use the same schema as its parent; schema transition is therefore impossible
+through the ordinary edit path.
