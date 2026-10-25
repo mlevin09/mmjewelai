@@ -295,8 +295,7 @@ def build_knowledge_runtime_state(
     runtime = CompiledKnowledgeLibrary.model_validate(runtime)
     revision = validate_design_revision(revision)
     parameters = [
-        _from_design_state(target, state)
-        for target, state in iter_knowledge_state_fields(revision)
+        _from_design_state(target, state) for target, state in iter_knowledge_state_fields(revision)
     ]
     group_ids = tuple(sorted(group.group_id for group in revision.design.side_stones))
 
