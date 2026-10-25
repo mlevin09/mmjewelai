@@ -221,12 +221,7 @@ __all__ = [
     "unlock_field",
     "validate_knowledge_library",
     "validate_parametric_knowledge",
-]
-
-
-__all__.extend(
-    [
-        "SCHEMA_VERSION_V1_1",
+"SCHEMA_VERSION_V1_1",
         "SCHEMA_TARGET_VERSION_V1_1",
         "REFERENCE_BINDING_CONTRACT_VERSION",
         "VISUALIZATION_VERIFICATION_CONTRACT_VERSION",
@@ -253,5 +248,4 @@ __all__.extend(
         "validate_design_revision",
         "is_allowed_product_state_target_v1_1",
         "target_family_from_concrete",
-    ]
-)
+]
