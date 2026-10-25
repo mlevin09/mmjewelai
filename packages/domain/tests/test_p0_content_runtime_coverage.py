@@ -10,7 +10,6 @@ from jewelai_domain.knowledge_library import (
     Policy,
 )
 
-
 ROOT = Path(__file__).resolve().parents[3]
 COVERAGE = ROOT / "data" / "knowledge" / "v1" / "p0-content-runtime-coverage-1.0.0.json"
 CATALOG = ROOT / "data" / "knowledge" / "v1" / "jewelry-core-1.0.0.json"
