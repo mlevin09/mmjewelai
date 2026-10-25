@@ -199,7 +199,6 @@ def test_reordering_groups_uses_stable_ids(current):
     assert not unlocked.design.side_stones[1].quantity.locked
 
 
-
 def test_v1_1_nested_state_obeys_confirm_lock_and_edit_invariants(current):
     upgraded = upgrade_design_revision_v1_to_v1_1(current)
     data = upgraded.design.model_dump(mode="json")
