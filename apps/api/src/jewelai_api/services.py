@@ -36,6 +36,8 @@ from jewelai_domain import (
     ReadyDecision,
     ReferenceBinding,
     RevisionConflict,
+    SchemaV1_1MigrationEligibility,
+    assess_schema_v1_1_migration_eligibility,
     VisualizationVerificationResult,
     confirm_field,
     lock_field,
@@ -44,6 +46,7 @@ from jewelai_domain import (
 )
 from jewelai_domain.dictionary import DictionaryCategory, DictionaryLocale, EntryLifecycle
 from jewelai_domain.models import MessageSource, RevisionEvent
+from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
 from jewelai_generation_queue import GenerationTaskPublisher, GenerationTaskPublishError
 from jewelai_model_gateway import GenerationRun, GenerationStatus
 from jewelai_parser import ParserProposal, build_parser_proposal
@@ -102,6 +105,7 @@ from .schemas import (
     TextIntakeResponse,
     UiCatalogResponse,
     UnlockRevisionRequest,
+    UpgradeSchemaV1_1Request,
     VisualizationDecisionRequest,
     VisualizationIterationListResponse,
     VisualizationIterationResponse,
@@ -379,6 +383,48 @@ class RuntimeService:
     def get_session(self, session_id: UUID, organization_id: UUID) -> SessionResponse:
         row = self.repository.get_design_session(session_id, organization_id)
         return self._session_response(row)
+
+    def get_schema_v1_1_migration_eligibility(
+        self, session_id: UUID, organization_id: UUID
+    ) -> SchemaV1_1MigrationEligibility:
+        revision = self.repository.get_current_revision(session_id, organization_id)
+        return assess_schema_v1_1_migration_eligibility(revision)
+
+    def upgrade_session_schema_v1_1(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: UpgradeSchemaV1_1Request,
+    ):
+        session = self.repository.get_design_session(session_id, organization_id)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before schema migration")
+        current = self.repository.get_revision(
+            session_id, request.expected_revision_id, organization_id
+        )
+        eligibility = assess_schema_v1_1_migration_eligibility(current)
+        if not eligibility.eligible:
+            raise InvalidTransitionError(
+                "Schema v1.1 migration blocked: " + ", ".join(eligibility.blockers)
+            )
+        now = self._clock()
+        migrated = migrate_design_revision_v1_to_v1_1(
+            current,
+            revision_id=self._uuid(),
+            created_at=now,
+            source=MessageSource(
+                message_id=f"session:{session_id}:schema-1.1",
+                recorded_at=now,
+            ),
+            reason="Explicit controlled migration to Jewelry Design Schema v1.1.0",
+        )
+        return self.repository.upgrade_design_session_schema_v1_1(
+            session_id,
+            organization_id,
+            request.expected_revision_id,
+            migrated,
+        )
+
 
     def create_message(
         self, session_id: UUID, organization_id: UUID, content: str
