@@ -11,10 +11,17 @@ from .models import (
     Design,
     DesignRevision,
     Explicit,
+    KnownValue,
     MessageSource,
     NotApplicable,
     RevisionEvent,
     Unknown,
+)
+from .models_v1_1 import (
+    AnyDesignRevision,
+    DesignRevisionV1_1,
+    DesignV1_1,
+    validate_design_revision,
 )
 
 FIELD_TYPES = (Unknown, NotApplicable, Explicit, Derived, Assumed)
