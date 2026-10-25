@@ -178,9 +178,7 @@ def test_visualization_verification_api_persists_generation_lineage(client):
     assert created.status_code == 201
     assert created.json() == payload
     assert client.get(url, headers=headers).json() == {"verifications": [payload]}
-    assert client.get(
-        f"{url}/{payload['verification_id']}", headers=headers
-    ).json() == payload
+    assert client.get(f"{url}/{payload['verification_id']}", headers=headers).json() == payload
 
     invalid_lineage = {
         **payload,
