@@ -164,7 +164,6 @@ class RuntimeService:
         asset_access_policy: AssetAccessPolicy | None = None,
         asset_ingestion_policy: AssetIngestionPolicy | None = None,
         text_understanding_provider: TextUnderstandingProvider | None = None,
-        schema_v1_1_migration_blocker: str | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -178,7 +177,6 @@ class RuntimeService:
         self._asset_ingestion_policy = asset_ingestion_policy or AssetIngestionPolicy()
         self._generation_task_publisher = generation_task_publisher
         self._text_understanding_provider = text_understanding_provider
-        self._schema_v1_1_migration_blocker = schema_v1_1_migration_blocker
 
     def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
         row = self.repository.get_or_create_principal(identity, self._uuid(), self._clock())
@@ -392,15 +390,7 @@ class RuntimeService:
         self, session_id: UUID, organization_id: UUID
     ) -> SchemaV1_1MigrationEligibility:
         revision = self.repository.get_current_revision(session_id, organization_id)
-        eligibility = assess_schema_v1_1_migration_eligibility(revision)
-        if self._schema_v1_1_migration_blocker is None:
-            return eligibility
-        return eligibility.model_copy(
-            update={
-                "eligible": False,
-                "blockers": (*eligibility.blockers, self._schema_v1_1_migration_blocker),
-            }
-        )
+        return assess_schema_v1_1_migration_eligibility(revision)
 
     def upgrade_session_schema_v1_1(
         self,
