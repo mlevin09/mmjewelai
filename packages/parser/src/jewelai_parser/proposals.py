@@ -25,13 +25,13 @@ from jewelai_domain.models_v1_1 import DesignV1_1, validate_design_revision
 
 from .models import (
     AcceptedUpdate,
+    AnyParserProposal,
     CandidateUpdate,
     DimensionsCandidate,
     DimensionsScaleCandidate,
     ParserCandidate,
     ParserIssue,
     ParserIssueCode,
-    AnyParserProposal,
     ParserProposal,
     ParserProposalV1_1,
     ParserTarget,
