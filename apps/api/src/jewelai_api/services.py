@@ -30,6 +30,7 @@ from jewelai_auth import (
 )
 from jewelai_domain import (
     SCHEMA_VERSION,
+    SCHEMA_VERSION_V1_1,
     AskDecision,
     Design,
     DesignRevision,
@@ -1092,8 +1093,11 @@ class RuntimeService:
 
     def _assert_artifact_pins(self, row: DesignSessionRow) -> None:
         versions = self.artifacts.versions
+        if row.design_schema_version not in {SCHEMA_VERSION, SCHEMA_VERSION_V1_1}:
+            raise ArtifactConfigurationError(
+                "Session design schema pin is unavailable in the configured runtime"
+            )
         stored = (
-            row.design_schema_version,
             row.role_artifact_version,
             row.dictionary_artifact_version,
             row.question_artifact_version,
@@ -1101,7 +1105,6 @@ class RuntimeService:
             row.prompt_artifact_version,
         )
         loaded = (
-            SCHEMA_VERSION,
             versions.roles,
             versions.dictionary,
             versions.questions,
