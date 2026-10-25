@@ -653,6 +653,10 @@ class RuntimeService:
 
     def transition_revision(self, session_id: UUID, organization_id: UUID, request):
         current = self.repository.get_current_revision(session_id, organization_id)
+        if isinstance(current, DesignRevisionV1_1):
+            raise InvalidTransitionError(
+                "Generic revision transitions are not enabled for Schema v1.1"
+            )
         now = self._clock()
         common = {
             "expected_revision_id": request.expected_revision_id,
