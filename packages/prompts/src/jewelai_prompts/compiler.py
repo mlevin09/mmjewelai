@@ -166,8 +166,7 @@ def _disclosures(
     return tuple(
         disclosure
         for path, state in iter_prompt_state_fields(revision)
-        if path in by_path
-        and (disclosure := _state_disclosure(path, state)) is not None
+        if path in by_path and (disclosure := _state_disclosure(path, state)) is not None
     )
 
 
