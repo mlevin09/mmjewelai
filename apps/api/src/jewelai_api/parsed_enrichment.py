@@ -16,6 +16,7 @@ from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import ImmutableModel, MessageSource
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_parser import (
+    AnyParserProposal,
     CandidateApplication,
     CandidateCertainty,
     CandidateClassification,
@@ -25,7 +26,6 @@ from jewelai_parser import (
     NormalizationSource,
     ParserCandidate,
     ParserIssueCode,
-    AnyParserProposal,
     ParserTarget,
     StructuredCandidate,
     StructuredTarget,
