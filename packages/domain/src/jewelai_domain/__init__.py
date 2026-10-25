@@ -302,5 +302,4 @@ __all__ = [
     "validate_knowledge_library_v1_1",
     "KnowledgeArtifactStoreV1_1",
     "qualify_knowledge_release_v1_1",
-
 ]
