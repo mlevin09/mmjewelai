@@ -977,7 +977,7 @@ class PersistenceRepository:
         session_id: UUID,
         organization_id: UUID,
         expected_revision_id: UUID,
-        resulting_revision: DesignRevision | None,
+        resulting_revision: AnyDesignRevision | object | None,
         result: PromptEnrichmentResult,
         created_at: datetime,
         clarification_plan_id: UUID | None = None,
@@ -988,7 +988,7 @@ class PersistenceRepository:
         try:
             enrichment = PromptEnrichmentResult.model_validate(result)
             revision = (
-                DesignRevision.model_validate(resulting_revision)
+                validate_design_revision(resulting_revision)
                 if resulting_revision is not None
                 else None
             )
@@ -1259,7 +1259,7 @@ class PersistenceRepository:
                 UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
             )
             resulting_revision = (
-                DesignRevision.model_validate(payload["resulting_revision"])
+                validate_design_revision(payload["resulting_revision"])
                 if payload["resulting_revision"] is not None
                 else None
             )
@@ -1536,7 +1536,7 @@ class PersistenceRepository:
             new_revision_id = (
                 UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
             )
-            authoritative_revision = DesignRevision.model_validate(
+            authoritative_revision = validate_design_revision(
                 payload["authoritative_revision"]
             )
             next_enrichment = PromptEnrichmentResult.model_validate(
@@ -3276,7 +3276,7 @@ class PersistenceRepository:
         try:
             previous = cls._locked_revision(db, row.session_id, row.previous_revision_id)
             resulting = (
-                DesignRevision.model_validate(payload["resulting_revision"])
+                validate_design_revision(payload["resulting_revision"])
                 if payload["resulting_revision"] is not None
                 else None
             )
@@ -3348,7 +3348,7 @@ class PersistenceRepository:
         cls._validate_release_identity(session, payload)
         try:
             previous = cls._locked_revision(db, row.session_id, row.previous_revision_id)
-            authoritative = DesignRevision.model_validate(payload["authoritative_revision"])
+            authoritative = validate_design_revision(payload["authoritative_revision"])
             source = payload["source"]
             previous_cycle = db.get(EnrichmentCycleRow, row.previous_enrichment_cycle_id)
             next_cycle = db.get(EnrichmentCycleRow, row.next_enrichment_cycle_id)
