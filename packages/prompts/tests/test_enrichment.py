@@ -10,6 +10,7 @@ from jewelai_domain.knowledge_policy import (
     RuntimeSemanticState,
 )
 from jewelai_domain.models import DesignRevision
+from jewelai_domain.models_v1_1 import upgrade_design_revision_v1_to_v1_1
 from pydantic import ValidationError
 
 from jewelai_prompts import (
@@ -17,6 +18,8 @@ from jewelai_prompts import (
     EnrichmentMatrixCell,
     EnrichmentProposal,
     enrich_prompt,
+    enrich_prompt_v1_1,
+    enrich_prompt_with_active_release_v1_1,
     load_prompt_templates,
 )
 
@@ -378,3 +381,104 @@ def test_blocked_proposal_source_remains_part_of_enrichment_content_hash(ring, t
     assert first.decisions[0].proposal.source_id == "MESSAGE-1"
     assert second.decisions[0].proposal.source_id == "MESSAGE-2"
     assert first.content_hash != second.content_hash
+
+
+
+def test_v1_1_enrichment_runtime_uses_separate_knowledge_contract(ring, templates):
+    from jewelai_domain.knowledge_library_v1_1 import compile_knowledge_library_v1_1
+
+    runtime, _ = compile_knowledge_library_v1_1(
+        {
+            "contract_version": "1.1.0",
+            "package_id": "jewelai.test.prompt-enrichment-v1-1",
+            "artifact_version": "1.0.0",
+            "sources": [
+                {
+                    "source_id": "DEC-V11",
+                    "title": "Reviewed v1.1 policy",
+                    "source_type": "INTERNAL_DECISION",
+                    "evidence_tier": "INTERNAL",
+                    "lifecycle_status": "REVIEWED",
+                    "language": "not_applicable",
+                }
+            ],
+            "claims": [],
+            "domain_knowledge": [],
+            "language_mappings": [],
+            "policies": [
+                {
+                    "policy_id": "POL-COMPOSITION",
+                    "target": "composition.symmetry_mode",
+                    "effect": "Keep composition semantics separate from legacy style.",
+                    "source_kind": "INTERNAL_PRODUCT_DECISION",
+                    "source_refs": ["DEC-V11"],
+                    "lifecycle_status": "REVIEWED",
+                }
+            ],
+        }
+    )
+    revision = upgrade_design_revision_v1_to_v1_1(ring)
+
+    result = enrich_prompt_v1_1(revision, templates, runtime)
+
+    assert result.knowledge_package_id == runtime.package_id
+    assert result.knowledge_runtime_sha256 == runtime.sha256
+    matrix = {item.target: item for item in result.final_matrix}
+    assert "composition.symmetry_mode" in matrix
+    assert matrix["composition.symmetry_mode"].semantic_state == RuntimeSemanticState.MISSING
+
+
+
+def test_v1_1_active_release_enrichment_requires_exact_durable_evidence(
+    ring, templates, tmp_path
+):
+    from jewelai_domain.knowledge_activation import ProductionValidationCheck
+    from jewelai_domain.knowledge_activation_v1_1 import (
+        REQUIRED_PRODUCTION_VALIDATION_CHECKS_V1_1,
+        ProductionValidationReportV1_1,
+        promote_knowledge_runtime_v1_1,
+    )
+    from jewelai_domain.knowledge_library_v1_1 import compile_knowledge_library_v1_1
+    from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
+
+    payload = {
+        "contract_version": "1.1.0",
+        "package_id": "jewelai.test.prompt-enrichment-active-v1-1",
+        "artifact_version": "1.0.0",
+        "sources": [],
+        "claims": [],
+        "domain_knowledge": [],
+        "language_mappings": [],
+        "policies": [],
+    }
+    runtime, _ = compile_knowledge_library_v1_1(payload)
+    report = ProductionValidationReportV1_1(
+        package_id=runtime.package_id,
+        artifact_version=runtime.artifact_version,
+        runtime_sha256=runtime.sha256,
+        checks=tuple(
+            ProductionValidationCheck(
+                name=name,
+                outcome="PASS",
+                evidence_ref=f"ci://v1.1/{name}",
+            )
+            for name in REQUIRED_PRODUCTION_VALIDATION_CHECKS_V1_1
+        ),
+    )
+    active = promote_knowledge_runtime_v1_1(runtime, report)
+    store = KnowledgeArtifactStoreV1_1(tmp_path)
+    store.publish(payload)
+    revision = upgrade_design_revision_v1_to_v1_1(ring)
+
+    result = enrich_prompt_with_active_release_v1_1(
+        revision,
+        templates,
+        store,
+        knowledge_package_id=runtime.package_id,
+        knowledge_artifact_version=str(runtime.artifact_version),
+        active_release=active,
+        validation_report=report,
+    )
+
+    assert result.knowledge_runtime_sha256 == runtime.sha256
+    assert result.knowledge_validation_report_sha256 == report.sha256
