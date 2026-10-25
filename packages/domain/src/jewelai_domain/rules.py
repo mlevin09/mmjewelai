@@ -26,6 +26,7 @@ from .models import (
     Version,
     Weight,
 )
+from .models_v1_1 import AnyDesignRevision, validate_design_revision
 from .questions import QuestionCatalog, QuestionId, SchemaTarget
 from .roles import DerivationMode, RoleId, RoleRegistry
 
@@ -421,7 +422,7 @@ RuleDecision = Annotated[
 ]
 
 
-def _state_for_target(revision: DesignRevision, target: SchemaTarget):
+def _state_for_target(revision: AnyDesignRevision | object, target: SchemaTarget):
     design = revision.design
     if target == SchemaTarget.CENTER_STONE_SHAPE:
         return ((target.value, design.center_stone.shape, None),)
@@ -448,13 +449,13 @@ def _gap_state(state) -> GapState:
 
 
 def analyze_gaps(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     *,
     questions: QuestionCatalog,
     required_targets: tuple[SchemaTarget, ...] = tuple(SchemaTarget),
 ) -> tuple[Gap, ...]:
     """Inspect only the five bounded v1 targets; collection groups sort by stable group_id."""
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     required = set(required_targets)
     gaps: list[Gap] = []
     for target in SchemaTarget:
@@ -581,7 +582,7 @@ class RuleRegistry(Mapping[str, Rule]):
         return state.value if isinstance(state, KnownValue) else None
 
     def _matching_facts(
-        self, revision: DesignRevision, facts: tuple[AvailableKnowledgeFact, ...]
+        self, revision: AnyDesignRevision | object, facts: tuple[AvailableKnowledgeFact, ...]
     ) -> tuple[AvailableKnowledgeFact, ...]:
         design = revision.design
         jewelry_type = self._known_value(design.jewelry_type)
@@ -599,7 +600,7 @@ class RuleRegistry(Mapping[str, Rule]):
         return tuple(sorted(matches, key=lambda item: (item.source.record_id, item.source.version)))
 
     def _locked_conflict(
-        self, revision: DesignRevision, update: ProposedDomainUpdate | None
+        self, revision: AnyDesignRevision | object, update: ProposedDomainUpdate | None
     ) -> bool:
         if update is None:
             return False
@@ -614,13 +615,13 @@ class RuleRegistry(Mapping[str, Rule]):
 
     def evaluate(
         self,
-        revision: DesignRevision,
+        revision: AnyDesignRevision | object,
         role_id: RoleId | str,
         *,
         knowledge_facts: tuple[AvailableKnowledgeFact, ...] = (),
         proposed_update: ProposedDomainUpdate | None = None,
     ) -> RuleDecision:
-        revision = DesignRevision.model_validate(revision)
+        revision = validate_design_revision(revision)
         profile = self._roles.get_profile(role_id)
         facts = tuple(AvailableKnowledgeFact.model_validate(item) for item in knowledge_facts)
         for fact in facts:
