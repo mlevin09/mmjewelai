@@ -1,7 +1,6 @@
 """Knowledge policy runtime for Knowledge Library Contract v1.1.0."""
 
 from .knowledge_library_v1_1 import CompiledKnowledgeLibraryV1_1, CompiledPolicyV1_1
-from .knowledge_targets_v1_1 import POLICY_TARGET_TEMPLATES_V1_1
 from .knowledge_policy import (
     PROVENANCE_PRECEDENCE,
     KnowledgeRuntimeState,
@@ -11,9 +10,10 @@ from .knowledge_policy import (
     RuntimeProvenance,
     RuntimeSemanticState,
     RuntimeStateProposal,
-    _from_design_state,
     _KNOWLEDGE_LINEAGE_PROVENANCE,
+    _from_design_state,
 )
+from .knowledge_targets_v1_1 import POLICY_TARGET_TEMPLATES_V1_1
 from .models_v1_1 import AnyDesignRevision, validate_design_revision
 from .state_paths import iter_knowledge_state_fields
 
