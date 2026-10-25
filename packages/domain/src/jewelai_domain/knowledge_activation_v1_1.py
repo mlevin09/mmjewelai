@@ -112,9 +112,7 @@ def validate_for_production_v1_1(
     checks = {check.name.value: check for check in report.checks}
     missing = sorted(set(REQUIRED_PRODUCTION_VALIDATION_CHECKS) - checks.keys())
     if missing:
-        raise KnowledgeActivationError(
-            f"missing required production validation checks: {missing}"
-        )
+        raise KnowledgeActivationError(f"missing required production validation checks: {missing}")
     non_pass = sorted(
         (check.name.value, check.outcome.value)
         for check in report.checks
