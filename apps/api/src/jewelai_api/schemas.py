@@ -24,7 +24,7 @@ from jewelai_domain import (
 from jewelai_domain.models import MessageSource
 from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_model_gateway import GenerationRun
-from jewelai_parser import ParserCandidate, ParserProposal
+from jewelai_parser import AnyParserProposal, ParserCandidate
 from jewelai_prompts import (
     CompiledPrompt,
     InternalFinalPrompt,
@@ -195,7 +195,7 @@ class TextIntakeRequest(ApiModel):
 
 class TextIntakeResponse(ApiModel):
     message: MessageResponse
-    proposal: ParserProposal
+    proposal: AnyParserProposal
     revision: DesignRevision | DesignRevisionV1_1
     evaluation: "EvaluationResponse"
 
@@ -278,7 +278,7 @@ class IterativeEditResponse(ApiModel):
     starting_revision_id: UUID
     initial_message_id: UUID
     message: MessageResponse
-    proposal: ParserProposal
+    proposal: AnyParserProposal
     revision: DesignRevision | DesignRevisionV1_1
     evaluation: "EvaluationResponse"
     iteration: "VisualizationIterationResponse | None" = None
