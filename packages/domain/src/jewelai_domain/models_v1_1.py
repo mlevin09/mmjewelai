@@ -74,7 +74,10 @@ class MetalV1_1(ImmutableModel):
 
     @model_validator(mode="after")
     def unique_components(self):
-        if self.components is not None and getattr(self.components, "availability", None) == "value":
+        if (
+            self.components is not None
+            and getattr(self.components, "availability", None) == "value"
+        ):
             ids = [item.component_id for item in self.components.value]
             if len(set(ids)) != len(ids):
                 raise ValueError("metal component IDs must be unique")
