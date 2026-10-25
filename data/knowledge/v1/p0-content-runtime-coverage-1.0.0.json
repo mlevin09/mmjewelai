@@ -1,0 +1,60 @@
+{
+  "artifact_id": "jewelai.p0_content_runtime_coverage",
+  "artifact_version": "1.0.0",
+  "status": "PARTIAL_BY_SCHEMA",
+  "content_baseline": {
+    "source": "P0-13 Final Content Closure",
+    "content_governed_target_path_family_count": 166,
+    "blocking_content_gaps": 0,
+    "runtime_execution_claimed": false
+  },
+  "current_runtime": {
+    "jewelry_design_schema_version": "1.0.0",
+    "knowledge_library_contract_version": "1.0.0",
+    "knowledge_library_scalar_policy_target_family_count": 21,
+    "knowledge_library_collection_policy_target_family_count": 9,
+    "knowledge_library_policy_target_family_count": 30
+  },
+  "integration_layers": {
+    "semantic_catalog_core": {
+      "status": "PARTIAL_INTEGRATION",
+      "note": "Current production-intended jewelry-core catalog covers the existing Design Schema semantic boundary: jewelry type, metal, gemstone material, shape, cut, setting, orientation, color, style and selected construction terminology."
+    },
+    "parametric_knowledge": {
+      "status": "INTEGRATED_AS_SEPARATE_NON_AUTHORITATIVE_LAYER",
+      "note": "ADR 0030 keeps sourced quantitative references separate from authoritative Product State and semantic Knowledge Library."
+    },
+    "style_design_language_p0_10": {
+      "status": "PARTIAL_BY_SCHEMA",
+      "note": "Some concepts can normalize into current style/construction fields, but structural style, historical period, descriptive aesthetic, decorative technique, motif, composition and creative intent cannot be represented losslessly as independent current Product State targets."
+    },
+    "terminology_normalization_p0_11": {
+      "status": "PARTIAL_BY_CONCEPT_COVERAGE",
+      "note": "RU/EN mappings can use Knowledge Library language mappings when a canonical concept already exists. False-friend and ambiguity rules remain constrained by the current concept set."
+    },
+    "reference_semantics_p0_11": {
+      "status": "NOT_FULLY_REPRESENTABLE",
+      "note": "Current AssetReference supports purpose design/material/style/proportion only; feature-level KEEP/CHANGE/LOCKED/INSPIRATION/UNKNOWN bindings are not part of Design Schema v1.0.0."
+    },
+    "visualization_verification_p0_12": {
+      "status": "SEPARATE_RUNTIME_CONTRACT_REQUIRED",
+      "note": "PASS/FAIL/UNVERIFIABLE/NOT_APPLICABLE, severity, evidence, actions and error taxonomy are verification state, not authoritative Product State and not representable by Knowledge Library v1 bundle records alone."
+    }
+  },
+  "guardrails": [
+    "Do not claim the 166 content-governed target paths/families are implemented in Jewelry Design Schema v1.0.0.",
+    "Do not collapse distinct P0-10 semantic layers into the single style field without an explicit schema decision.",
+    "Do not encode P0-12 verification outcomes as Product State facts.",
+    "Do not activate or promote a knowledge release merely because content baseline coverage is complete.",
+    "Exact runtime integration requires versioned schema/contract changes plus executable migration and regression validation."
+  ],
+  "next_versioned_slices": [
+    "Recover and consolidate all P0-1 through P0-12 source artifacts into a canonical source package.",
+    "Produce an explicit mapping table from each content-governed target/path family to current Design Schema v1.0.0, an additive future schema field, interpretation metadata, reference binding metadata, verification state, or intentionally non-runtime content.",
+    "Version the Jewelry Design Schema additively for approved new Product State fields.",
+    "Version Knowledge Library policy target grammar to match the approved schema additions.",
+    "Add feature-level reference bindings without weakening existing reference lineage.",
+    "Introduce a separate visualization-verification result contract for P0-12.",
+    "Convert P0 semantic mini-tests and closure tests into executable runtime regression tests."
+  ]
+}
