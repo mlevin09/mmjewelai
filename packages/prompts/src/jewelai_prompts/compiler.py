@@ -3,10 +3,11 @@
 import hashlib
 import json
 
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
+from jewelai_domain.state_paths import iter_prompt_state_fields
 from jewelai_domain.models import (
     Assumed,
     Derived,
-    DesignRevision,
     Explicit,
     KnownValue,
     NotApplicable,
@@ -29,35 +30,13 @@ class PromptValidationError(ValueError):
     pass
 
 
-_METAL_FIELDS = ("material", "color", "purity", "finish")
-_STONE_FIELDS = (
-    "material",
-    "shape",
-    "cut",
-    "weight",
-    "dimensions",
-    "color",
-    "setting",
-    "orientation",
-)
-_CONSTRUCTION_FIELDS = (
-    "shank",
-    "gallery",
-    "basket",
-    "clasp",
-    "setting_height",
-    "shank_width",
-    "thickness",
-)
-
-
 def compile_prompt(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     templates: PromptTemplateBundle,
     *,
     template_id: str = "jewelry_visualization",
 ) -> CompiledPrompt:
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     templates = PromptTemplateBundle.model_validate(templates)
     template = _template(templates, template_id)
     entries = _entries(revision)
@@ -134,31 +113,15 @@ def _state_entry(path: str, state) -> SpecificationEntry | None:
     )
 
 
-def _entries(revision: DesignRevision) -> tuple[SpecificationEntry, ...]:
-    design = revision.design
-    states = [("jewelry_type", design.jewelry_type)]
-    states.extend((f"metal.{field}", getattr(design.metal, field)) for field in _METAL_FIELDS)
-    states.extend(
-        (f"center_stone.{field}", getattr(design.center_stone, field)) for field in _STONE_FIELDS
+def _entries(
+    revision: AnyDesignRevision | object,
+) -> tuple[SpecificationEntry, ...]:
+    revision = validate_design_revision(revision)
+    return tuple(
+        item
+        for path, state in iter_prompt_state_fields(revision)
+        if (item := _state_entry(path, state)) is not None
     )
-    for group in sorted(design.side_stones, key=lambda item: item.group_id):
-        states.extend(
-            (f"side_stones.{group.group_id}.stones.{field}", getattr(group.stones, field))
-            for field in _STONE_FIELDS
-        )
-        states.append((f"side_stones.{group.group_id}.quantity", group.quantity))
-    states.extend(
-        (f"construction.{field}", getattr(design.construction, field))
-        for field in _CONSTRUCTION_FIELDS
-    )
-    states.extend(
-        (
-            ("style", design.style),
-            ("references", design.references),
-            ("visual_constraints", design.visual_constraints),
-        )
-    )
-    return tuple(item for path, state in states if (item := _state_entry(path, state)) is not None)
 
 
 def _source_reference(source) -> PromptSourceReference:
@@ -195,35 +158,16 @@ def _state_disclosure(path: str, state) -> PromptDisclosure | None:
     return None
 
 
-def _disclosures(revision: DesignRevision) -> tuple[PromptDisclosure, ...]:
+def _disclosures(
+    revision: AnyDesignRevision | object,
+) -> tuple[PromptDisclosure, ...]:
+    revision = validate_design_revision(revision)
     by_path = {item.concrete_target: item for item in _entries(revision)}
-    design = revision.design
-    states = [("jewelry_type", design.jewelry_type)]
-    states.extend((f"metal.{field}", getattr(design.metal, field)) for field in _METAL_FIELDS)
-    states.extend(
-        (f"center_stone.{field}", getattr(design.center_stone, field)) for field in _STONE_FIELDS
-    )
-    for group in sorted(design.side_stones, key=lambda item: item.group_id):
-        states.extend(
-            (f"side_stones.{group.group_id}.stones.{field}", getattr(group.stones, field))
-            for field in _STONE_FIELDS
-        )
-        states.append((f"side_stones.{group.group_id}.quantity", group.quantity))
-    states.extend(
-        (f"construction.{field}", getattr(design.construction, field))
-        for field in _CONSTRUCTION_FIELDS
-    )
-    states.extend(
-        (
-            ("style", design.style),
-            ("references", design.references),
-            ("visual_constraints", design.visual_constraints),
-        )
-    )
     return tuple(
         disclosure
-        for path, state in states
-        if path in by_path and (disclosure := _state_disclosure(path, state)) is not None
+        for path, state in iter_prompt_state_fields(revision)
+        if path in by_path
+        and (disclosure := _state_disclosure(path, state)) is not None
     )
 
 

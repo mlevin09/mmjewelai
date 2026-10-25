@@ -65,6 +65,41 @@ from .knowledge_storage import (
     StoredKnowledgeArtifact,
 )
 from .models import SCHEMA_VERSION, Design, DesignRevision
+from .models_v1_1 import (
+    SCHEMA_VERSION_V1_1,
+    AnyDesignRevision,
+    DesignRevisionV1_1,
+    DesignV1_1,
+    upgrade_design_revision_v1_to_v1_1,
+    validate_design_revision,
+)
+from .knowledge_targets_v1_1 import (
+    POLICY_TARGET_TEMPLATES_V1_1,
+    PRODUCT_STATE_TARGET_FAMILIES_V1_1,
+    SCHEMA_TARGET_VERSION_V1_1,
+    is_allowed_product_state_target_v1_1,
+    target_family_from_concrete,
+)
+from .reference_bindings import (
+    REFERENCE_BINDING_CONTRACT_VERSION,
+    FeatureBinding,
+    PresentationBinding,
+    ReferenceBinding,
+    ReferenceObservability,
+    ReferenceProvenance,
+    ReferenceRelation,
+    ReferenceRole,
+)
+from .visualization_verification import (
+    VISUALIZATION_VERIFICATION_CONTRACT_VERSION,
+    VerificationAction,
+    VerificationCheck,
+    VerificationDimension,
+    VerificationSeverity,
+    VerificationStatus,
+    VerificationSubject,
+    VisualizationVerificationResult,
+)
 from .questions import (
     QUESTION_SCHEMA_VERSION,
     QuestionCatalog,
@@ -187,3 +222,36 @@ __all__ = [
     "validate_knowledge_library",
     "validate_parametric_knowledge",
 ]
+
+
+__all__.extend(
+    [
+        "SCHEMA_VERSION_V1_1",
+        "SCHEMA_TARGET_VERSION_V1_1",
+        "REFERENCE_BINDING_CONTRACT_VERSION",
+        "VISUALIZATION_VERIFICATION_CONTRACT_VERSION",
+        "AnyDesignRevision",
+        "DesignV1_1",
+        "DesignRevisionV1_1",
+        "PRODUCT_STATE_TARGET_FAMILIES_V1_1",
+        "POLICY_TARGET_TEMPLATES_V1_1",
+        "FeatureBinding",
+        "PresentationBinding",
+        "ReferenceBinding",
+        "ReferenceObservability",
+        "ReferenceProvenance",
+        "ReferenceRelation",
+        "ReferenceRole",
+        "VerificationAction",
+        "VerificationCheck",
+        "VerificationDimension",
+        "VerificationSeverity",
+        "VerificationStatus",
+        "VerificationSubject",
+        "VisualizationVerificationResult",
+        "upgrade_design_revision_v1_to_v1_1",
+        "validate_design_revision",
+        "is_allowed_product_state_target_v1_1",
+        "target_family_from_concrete",
+    ]
+)
