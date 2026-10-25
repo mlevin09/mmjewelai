@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:jewelai:visualization-verification:1.0.0-draft",
+  "title": "JewelAI Visualization Verification Result Contract v1 draft",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "verification_id",
+    "subject",
+    "overall_status",
+    "action",
+    "checks"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "1.0.0"
+    },
+    "verification_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_run_id"
+      ],
+      "properties": {
+        "generation_run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asset_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "design_revision_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "previous_asset_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "overall_status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNVERIFIABLE",
+        "NOT_APPLICABLE"
+      ]
+    },
+    "action": {
+      "enum": [
+        "ACCEPT",
+        "RETRY",
+        "ASK",
+        "CAD_3D_FALLBACK",
+        "DO_NOT_CLAIM"
+      ]
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/check"
+      },
+      "minItems": 1
+    },
+    "error_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": []
+    }
+  },
+  "$defs": {
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "check_id",
+        "dimension",
+        "status"
+      ],
+      "properties": {
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dimension": {
+          "enum": [
+            "product_state_fidelity",
+            "geometry_proportion_fidelity",
+            "structural_plausibility",
+            "setting_stone_relationship",
+            "gemstone_appearance_plausibility",
+            "metal_finish_plausibility",
+            "edit_identity_preservation",
+            "reference_fidelity",
+            "cross_view_consistency",
+            "presentation_scene_plausibility",
+            "output_profile_usability",
+            "observability_confidence"
+          ]
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "UNVERIFIABLE",
+            "NOT_APPLICABLE"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "BLOCKER",
+            "MAJOR",
+            "MINOR",
+            null
+          ]
+        },
+        "feature_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "error_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "confidence": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
