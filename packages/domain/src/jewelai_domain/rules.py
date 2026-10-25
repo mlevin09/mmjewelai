@@ -14,7 +14,6 @@ from .models import (
     SCHEMA_VERSION,
     Assumed,
     Derived,
-    DesignRevision,
     Dimensions,
     DomainId,
     ImmutableModel,
