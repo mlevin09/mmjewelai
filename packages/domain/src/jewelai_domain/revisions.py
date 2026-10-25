@@ -83,7 +83,9 @@ def _new_revision(current, design, source, reason, action, created_at):
     created_at = TypeAdapter(AwareDatetime).validate_python(created_at)
     if created_at < current.created_at:
         raise RevisionConflict("Revision timestamp cannot move backwards")
-    revision_type = DesignRevisionV1_1 if isinstance(current, DesignRevisionV1_1) else DesignRevision
+    revision_type = (
+        DesignRevisionV1_1 if isinstance(current, DesignRevisionV1_1) else DesignRevision
+    )
     return revision_type(
         schema_version=current.schema_version,
         design_id=current.design_id,
