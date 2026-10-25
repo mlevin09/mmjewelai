@@ -73,7 +73,7 @@ def _fields(model, prefix=()):
 
 
 def _check_current(current, expected_revision_id):
-    current = DesignRevision.model_validate(current)
+    current = validate_design_revision(current)
     if current.revision_id != expected_revision_id:
         raise RevisionConflict("Stale revision: reload current state before editing")
     return current
@@ -83,7 +83,8 @@ def _new_revision(current, design, source, reason, action, created_at):
     created_at = TypeAdapter(AwareDatetime).validate_python(created_at)
     if created_at < current.created_at:
         raise RevisionConflict("Revision timestamp cannot move backwards")
-    return DesignRevision(
+    revision_type = DesignRevisionV1_1 if isinstance(current, DesignRevisionV1_1) else DesignRevision
+    return revision_type(
         schema_version=current.schema_version,
         design_id=current.design_id,
         revision_id=uuid4(),
