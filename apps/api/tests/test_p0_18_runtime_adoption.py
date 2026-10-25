@@ -11,7 +11,6 @@ from jewelai_assets import (
 )
 from jewelai_domain.models import MessageSource
 from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
-from jewelai_persistence import DuplicateRevisionError
 from test_api import create_ready_prompt
 
 
@@ -228,7 +227,7 @@ def test_persistence_can_atomically_migrate_one_session_to_schema_v1_1(client, a
     assert [item.schema_version for item in revisions] == ["1.0.0", "1.1.0"]
     assert revisions[1].parent_revision_id == revisions[0].revision_id
 
-    with pytest.raises(DuplicateRevisionError, match="not pinned"):
+    with pytest.raises(ValueError, match="parent"):
         repository.upgrade_design_session_schema_v1_1(
             session_id,
             organization_uuid,
