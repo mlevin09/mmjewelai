@@ -5,7 +5,6 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from jewelai_domain import Design
-from jewelai_domain.models_v1_1 import DesignV1_1
 from jewelai_domain.dictionary import MatchCandidate, MatchKind
 from jewelai_domain.models import (
     Dimensions,
@@ -18,6 +17,7 @@ from jewelai_domain.models import (
     Text,
     Weight,
 )
+from jewelai_domain.models_v1_1 import DesignV1_1
 from pydantic import Field, StringConstraints, field_validator, model_validator
 
 PARSER_SCHEMA_VERSION = "1.0.0"
