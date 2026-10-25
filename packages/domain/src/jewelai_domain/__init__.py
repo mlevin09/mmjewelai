@@ -34,6 +34,15 @@ from .knowledge_activation_v1_1 import (
     promote_knowledge_runtime_v1_1,
     validate_for_production_v1_1,
 )
+from .knowledge_base import (
+    KNOWLEDGE_BASE_SCHEMA_VERSION,
+    CalibratedSizeWeightRecord,
+    KnowledgeBaseValidationError,
+    ParametricKnowledgeBundle,
+    SpecificGravityRecord,
+    load_parametric_knowledge,
+    validate_parametric_knowledge,
+)
 from .knowledge_library_v1_1 import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION_V1_1,
     KNOWLEDGE_LIBRARY_SCHEMA_VERSION_V1_1,
@@ -45,20 +54,6 @@ from .knowledge_library_v1_1 import (
     PolicyV1_1,
     compile_knowledge_library_v1_1,
     validate_knowledge_library_v1_1,
-)
-from .knowledge_policy_v1_1 import (
-    KnowledgePolicyEngineV1_1,
-    build_knowledge_runtime_state_v1_1,
-)
-from .knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
-from .knowledge_base import (
-    KNOWLEDGE_BASE_SCHEMA_VERSION,
-    CalibratedSizeWeightRecord,
-    KnowledgeBaseValidationError,
-    ParametricKnowledgeBundle,
-    SpecificGravityRecord,
-    load_parametric_knowledge,
-    validate_parametric_knowledge,
 )
 from .knowledge_library import (
     KNOWLEDGE_LIBRARY_CONTRACT_VERSION,
@@ -82,6 +77,10 @@ from .knowledge_policy import (
     RuntimeStateProposal,
     build_knowledge_runtime_state,
 )
+from .knowledge_policy_v1_1 import (
+    KnowledgePolicyEngineV1_1,
+    build_knowledge_runtime_state_v1_1,
+)
 from .knowledge_qualification import (
     KNOWLEDGE_RELEASE_QUALIFICATION_VERSION,
     KnowledgeReleaseCandidateKind,
@@ -97,6 +96,7 @@ from .knowledge_storage import (
     KnowledgeArtifactStore,
     StoredKnowledgeArtifact,
 )
+from .knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
 from .knowledge_targets_v1_1 import (
     POLICY_TARGET_TEMPLATES_V1_1,
     PRODUCT_STATE_TARGET_FAMILIES_V1_1,
