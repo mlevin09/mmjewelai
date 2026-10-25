@@ -180,7 +180,14 @@ def _transition(current, path, expected_revision_id, source, reason, created_at,
     else:
         leaf["locked"] = action == "lock"
     design_type = DesignV1_1 if isinstance(current, DesignRevisionV1_1) else Design
-    return _new_revision(current, design_type.model_validate(data), source, reason, action, created_at)
+    return _new_revision(
+        current,
+        design_type.model_validate(data),
+        source,
+        reason,
+        action,
+        created_at,
+    )
 
 
 def confirm_field(
