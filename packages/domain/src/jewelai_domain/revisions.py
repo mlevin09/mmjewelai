@@ -97,8 +97,8 @@ def _new_revision(current, design, source, reason, action, created_at):
 
 
 def revise_design(
-    current: DesignRevision,
-    proposed: Design,
+    current: AnyDesignRevision | object,
+    proposed: Design | DesignV1_1 | object,
     *,
     expected_revision_id: UUID,
     source: MessageSource,
@@ -107,7 +107,11 @@ def revise_design(
 ) -> DesignRevision:
     """Apply an unconfirmed proposal while retaining every locked leaf, including deletions."""
     current = _check_current(current, expected_revision_id)
-    proposed = Design.model_validate(proposed)
+    proposed = (
+        DesignV1_1.model_validate(proposed)
+        if isinstance(current, DesignRevisionV1_1)
+        else Design.model_validate(proposed)
+    )
     before, after = _fields(current.design), _fields(proposed)
     if current.design == proposed:
         raise RevisionConflict("No state change")
@@ -158,7 +162,7 @@ def _transition(current, path, expected_revision_id, source, reason, created_at,
 
 
 def confirm_field(
-    current: DesignRevision,
+    current: AnyDesignRevision | object,
     path: str,
     *,
     expected_revision_id: UUID,
@@ -171,7 +175,7 @@ def confirm_field(
 
 
 def lock_field(
-    current: DesignRevision,
+    current: AnyDesignRevision | object,
     path: str,
     *,
     expected_revision_id: UUID,
@@ -184,7 +188,7 @@ def lock_field(
 
 
 def unlock_field(
-    current: DesignRevision,
+    current: AnyDesignRevision | object,
     path: str,
     *,
     expected_revision_id: UUID,
