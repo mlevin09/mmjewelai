@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
+from test_knowledge_library import bundle as bundle_v1
 
 from jewelai_domain.knowledge_activation import ProductionValidationCheck
 from jewelai_domain.knowledge_activation_v1_1 import (
@@ -22,8 +23,6 @@ from jewelai_domain.knowledge_policy_v1_1 import (
 from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
 from jewelai_domain.models import DesignRevision
 from jewelai_domain.models_v1_1 import upgrade_design_revision_v1_to_v1_1
-
-from test_knowledge_library import bundle as bundle_v1
 
 ROOT = Path(__file__).resolve().parents[3]
 RING = ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json"
