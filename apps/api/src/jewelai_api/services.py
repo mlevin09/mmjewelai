@@ -574,16 +574,12 @@ class RuntimeService:
             ),
         )
         if proposal.has_changes:
-            revision = self.transition_revision(
+            revision = self._apply_parser_proposal_revision(
                 session.session_id,
                 organization_id,
-                EditRevisionRequest(
-                    action="edit",
-                    expected_revision_id=expected_revision_id,
-                    proposed_design=proposal.proposed_design,
-                    source=proposal.source,
-                    reason="Applied supported iterative-edit changes",
-                ),
+                expected_revision_id,
+                proposal,
+                "Applied supported iterative-edit changes",
             )
         else:
             revision = self.repository.get_current_revision(session.session_id, organization_id)
