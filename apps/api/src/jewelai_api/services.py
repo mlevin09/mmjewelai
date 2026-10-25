@@ -862,17 +862,13 @@ class RuntimeService:
         binding_id: str,
         organization_id: UUID,
     ) -> ReferenceBinding:
-        return self.repository.get_reference_binding(
-            session_id, binding_id, organization_id
-        )
+        return self.repository.get_reference_binding(session_id, binding_id, organization_id)
 
     def list_reference_bindings(
         self, session_id: UUID, organization_id: UUID
     ) -> ReferenceBindingListResponse:
         return ReferenceBindingListResponse(
-            bindings=self.repository.list_reference_bindings(
-                session_id, organization_id
-            )
+            bindings=self.repository.list_reference_bindings(session_id, organization_id)
         )
 
     def create_visualization_verification(
