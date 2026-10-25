@@ -25,9 +25,7 @@ def json_schema_v1_1() -> dict:
             "then": {
                 "properties": {
                     "parent_revision_id": {"type": "null"},
-                    "event": {
-                        "properties": {"action": {"const": "create"}}
-                    },
+                    "event": {"properties": {"action": {"const": "create"}}},
                 }
             },
             "else": {
@@ -37,11 +35,7 @@ def json_schema_v1_1() -> dict:
                         "type": "string",
                         "format": "uuid",
                     },
-                    "event": {
-                        "properties": {
-                            "action": {"not": {"const": "create"}}
-                        }
-                    },
+                    "event": {"properties": {"action": {"not": {"const": "create"}}}},
                 },
             },
         }
