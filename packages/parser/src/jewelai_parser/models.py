@@ -215,7 +215,6 @@ class ParserProposal(ImmutableModel):
         return self
 
 
-
 class ParserProposalV1_1(ImmutableModel):
     schema_version: Literal["1.1.0"] = "1.1.0"
     expected_revision_id: UUID
