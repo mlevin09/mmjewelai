@@ -84,9 +84,7 @@ class KnowledgeArtifactStoreV1_1:
     @staticmethod
     def _verify_existing(release_path: Path, expected: dict[str, str]) -> None:
         if not release_path.is_dir():
-            raise KnowledgeArtifactStorageError(
-                f"artifact path is not a directory: {release_path}"
-            )
+            raise KnowledgeArtifactStorageError(f"artifact path is not a directory: {release_path}")
         missing = [name for name in expected if not (release_path / name).is_file()]
         if missing:
             raise KnowledgeArtifactStorageError(
@@ -103,14 +101,10 @@ class KnowledgeArtifactStoreV1_1:
                 + ", ".join(sorted(changed))
             )
 
-    def publish(
-        self, bundle: KnowledgeLibraryBundleV1_1 | object
-    ) -> StoredKnowledgeArtifact:
+    def publish(self, bundle: KnowledgeLibraryBundleV1_1 | object) -> StoredKnowledgeArtifact:
         validated = validate_knowledge_library_v1_1(bundle).bundle
         if validated.artifact_version is None:
-            raise KnowledgeArtifactStorageError(
-                "artifact_version is required for durable storage"
-            )
+            raise KnowledgeArtifactStorageError("artifact_version is required for durable storage")
         payloads, _ = self._payloads(validated)
         version = str(validated.artifact_version)
         release_path = self._release_path(validated.package_id, version)
@@ -120,9 +114,7 @@ class KnowledgeArtifactStoreV1_1:
             return self.load(validated.package_id, version)
 
         release_path.parent.mkdir(parents=True, exist_ok=True)
-        temporary = Path(
-            tempfile.mkdtemp(prefix=f".{version}-", dir=str(release_path.parent))
-        )
+        temporary = Path(tempfile.mkdtemp(prefix=f".{version}-", dir=str(release_path.parent)))
         try:
             for name, payload in payloads.items():
                 (temporary / name).write_text(payload, encoding="utf-8")
@@ -154,12 +146,8 @@ class KnowledgeArtifactStoreV1_1:
         }
         try:
             source = KnowledgeLibraryBundleV1_1.model_validate_json(raw["source.json"])
-            stored_runtime = CompiledKnowledgeLibraryV1_1.model_validate_json(
-                raw["runtime.json"]
-            )
-            stored_manifest = CompilationManifestV1_1.model_validate_json(
-                raw["manifest.json"]
-            )
+            stored_runtime = CompiledKnowledgeLibraryV1_1.model_validate_json(raw["runtime.json"])
+            stored_manifest = CompilationManifestV1_1.model_validate_json(raw["manifest.json"])
             checksums = json.loads(raw["checksums.json"])
         except (ValidationError, json.JSONDecodeError) as exc:
             raise KnowledgeArtifactStorageError(
@@ -173,9 +161,7 @@ class KnowledgeArtifactStoreV1_1:
             "manifest_sha256": _sha256(raw["manifest.json"]),
         }
         if checksums != expected_checksums:
-            raise KnowledgeArtifactStorageError(
-                "stored knowledge artifact checksum mismatch"
-            )
+            raise KnowledgeArtifactStorageError("stored knowledge artifact checksum mismatch")
         if stored_runtime != expected_runtime:
             raise KnowledgeArtifactStorageError(
                 "stored runtime does not match deterministic v1.1 compiler"
@@ -190,13 +176,9 @@ class KnowledgeArtifactStoreV1_1:
             or stored_runtime.package_id != package_id
             or str(stored_runtime.artifact_version) != artifact_version
         ):
-            raise KnowledgeArtifactStorageError(
-                "stored artifact identity does not match its path"
-            )
+            raise KnowledgeArtifactStorageError("stored artifact identity does not match its path")
         if stored_manifest.runtime_sha256 != stored_runtime.sha256:
-            raise KnowledgeArtifactStorageError(
-                "stored runtime SHA-256 does not match manifest"
-            )
+            raise KnowledgeArtifactStorageError("stored runtime SHA-256 does not match manifest")
 
         return (
             StoredKnowledgeArtifact(
