@@ -34,7 +34,9 @@ from jewelai_domain import (
     Design,
     DesignRevision,
     ReadyDecision,
+    ReferenceBinding,
     RevisionConflict,
+    VisualizationVerificationResult,
     confirm_field,
     lock_field,
     revise_design,
@@ -90,6 +92,7 @@ from .schemas import (
     ProjectListResponse,
     ProjectResponse,
     PromptRevisionListResponse,
+    ReferenceBindingListResponse,
     PromptRevisionResponse,
     RetryGenerationRunRequest,
     RoleCatalogItem,
@@ -101,6 +104,7 @@ from .schemas import (
     UnlockRevisionRequest,
     VisualizationDecisionRequest,
     VisualizationIterationListResponse,
+    VisualizationVerificationListResponse,
     VisualizationIterationResponse,
     VisualizationResult,
     VisualizationSelection,
@@ -837,6 +841,70 @@ class RuntimeService:
     ) -> GenerationRunListResponse:
         return GenerationRunListResponse(
             generation_runs=self.repository.list_generation_runs(session_id, organization_id)
+        )
+
+    def create_reference_binding(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        binding: ReferenceBinding,
+    ) -> ReferenceBinding:
+        return self.repository.create_reference_binding(
+            binding,
+            session_id=session_id,
+            organization_id=organization_id,
+            created_at=self._clock(),
+        )
+
+    def get_reference_binding(
+        self,
+        session_id: UUID,
+        binding_id: str,
+        organization_id: UUID,
+    ) -> ReferenceBinding:
+        return self.repository.get_reference_binding(
+            session_id, binding_id, organization_id
+        )
+
+    def list_reference_bindings(
+        self, session_id: UUID, organization_id: UUID
+    ) -> ReferenceBindingListResponse:
+        return ReferenceBindingListResponse(
+            bindings=self.repository.list_reference_bindings(
+                session_id, organization_id
+            )
+        )
+
+    def create_visualization_verification(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        result: VisualizationVerificationResult,
+    ) -> VisualizationVerificationResult:
+        return self.repository.create_visualization_verification(
+            result,
+            session_id=session_id,
+            organization_id=organization_id,
+            created_at=self._clock(),
+        )
+
+    def get_visualization_verification(
+        self,
+        session_id: UUID,
+        verification_id: str,
+        organization_id: UUID,
+    ) -> VisualizationVerificationResult:
+        return self.repository.get_visualization_verification(
+            session_id, verification_id, organization_id
+        )
+
+    def list_visualization_verifications(
+        self, session_id: UUID, organization_id: UUID
+    ) -> VisualizationVerificationListResponse:
+        return VisualizationVerificationListResponse(
+            verifications=self.repository.list_visualization_verifications(
+                session_id, organization_id
+            )
         )
 
     def get_asset(self, session_id: UUID, asset_id: UUID, organization_id: UUID) -> AssetResponse:
