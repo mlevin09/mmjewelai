@@ -10,8 +10,8 @@ from jewelai_assets import (
     Asset,
     AssetConflictError,
     AssetErrorCode,
-    AssetLineageError,
     AssetKind,
+    AssetLineageError,
     AssetStatus,
     validate_asset_object_key,
 )
