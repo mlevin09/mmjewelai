@@ -198,7 +198,6 @@ def test_v1_1_rejects_unknown_policy_target():
         validate_knowledge_library_v1_1(payload)
 
 
-
 def test_v1_1_release_qualification_uses_v1_1_loader(tmp_path):
     payload = bundle_v1_1()
     runtime, _ = compile_knowledge_library_v1_1(payload)
