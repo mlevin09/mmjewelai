@@ -28,9 +28,7 @@ from jewelai_domain.visualization_verification import (
 ROOT = Path(__file__).resolve().parents[3]
 RING = ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json"
 REFERENCE_SCHEMA = ROOT / "specs" / "reference-bindings" / "schema-v1.0.0.json"
-VERIFICATION_SCHEMA = (
-    ROOT / "specs" / "visualization-verification" / "schema-v1.0.0.json"
-)
+VERIFICATION_SCHEMA = ROOT / "specs" / "visualization-verification" / "schema-v1.0.0.json"
 
 
 def runtime():
@@ -122,9 +120,7 @@ def test_reference_binding_runtime_matches_frozen_json_schema():
     )
     schema = json.loads(REFERENCE_SCHEMA.read_text(encoding="utf-8"))
     Draft202012Validator.check_schema(schema)
-    Draft202012Validator(schema).validate(
-        binding.model_dump(mode="json", exclude_none=True)
-    )
+    Draft202012Validator(schema).validate(binding.model_dump(mode="json", exclude_none=True))
 
     with pytest.raises(ValidationError, match="feature bindings must be unique"):
         ReferenceBinding(
