@@ -78,6 +78,7 @@ from .knowledge_policy import (
     RuntimeStateProposal,
     build_knowledge_runtime_state,
 )
+from .knowledge_qualification_v1_1 import qualify_knowledge_release_v1_1
 from .knowledge_qualification import (
     KNOWLEDGE_RELEASE_QUALIFICATION_VERSION,
     KnowledgeReleaseCandidateKind,
@@ -299,5 +300,6 @@ __all__ = [
     "compile_knowledge_library_v1_1",
     "load_knowledge_library_v1_1",
     "validate_knowledge_library_v1_1",
-    "KnowledgeArtifactStoreV1_1",
+    "KnowledgeArtifactStoreV1_1",    "qualify_knowledge_release_v1_1",
+
 ]
