@@ -16,8 +16,8 @@ from jewelai_domain import (
     DesignRevision,
     ProposedDomainUpdate,
     ReadyDecision,
-    RenderedQuestion,
     ReferenceBinding,
+    RenderedQuestion,
     VisualizationVerificationResult,
 )
 from jewelai_domain.models import MessageSource
