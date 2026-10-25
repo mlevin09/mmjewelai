@@ -1535,9 +1535,7 @@ class PersistenceRepository:
             new_revision_id = (
                 UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
             )
-            authoritative_revision = validate_design_revision(
-                payload["authoritative_revision"]
-            )
+            authoritative_revision = validate_design_revision(payload["authoritative_revision"])
             next_enrichment = PromptEnrichmentResult.model_validate(
                 payload["next_enrichment_result"]
             )
