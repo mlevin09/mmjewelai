@@ -30,13 +30,16 @@ from jewelai_auth import (
 )
 from jewelai_domain import (
     SCHEMA_VERSION,
+    SCHEMA_VERSION_V1_1,
     AskDecision,
     Design,
     DesignRevision,
     ReadyDecision,
     ReferenceBinding,
     RevisionConflict,
+    SchemaV1_1MigrationEligibility,
     VisualizationVerificationResult,
+    assess_schema_v1_1_migration_eligibility,
     confirm_field,
     lock_field,
     revise_design,
@@ -44,9 +47,11 @@ from jewelai_domain import (
 )
 from jewelai_domain.dictionary import DictionaryCategory, DictionaryLocale, EntryLifecycle
 from jewelai_domain.models import MessageSource, RevisionEvent
+from jewelai_domain.models_v1_1 import DesignRevisionV1_1, migrate_design_revision_v1_to_v1_1
+from jewelai_domain.revise_v1_1 import revise_parser_design_v1_1
 from jewelai_generation_queue import GenerationTaskPublisher, GenerationTaskPublishError
 from jewelai_model_gateway import GenerationRun, GenerationStatus
-from jewelai_parser import ParserProposal, build_parser_proposal
+from jewelai_parser import AnyParserProposal, build_parser_proposal
 from jewelai_persistence.models import (
     DesignSessionRow,
     MessageRow,
@@ -102,6 +107,7 @@ from .schemas import (
     TextIntakeResponse,
     UiCatalogResponse,
     UnlockRevisionRequest,
+    UpgradeSchemaV1_1Request,
     VisualizationDecisionRequest,
     VisualizationIterationListResponse,
     VisualizationIterationResponse,
@@ -158,6 +164,7 @@ class RuntimeService:
         asset_access_policy: AssetAccessPolicy | None = None,
         asset_ingestion_policy: AssetIngestionPolicy | None = None,
         text_understanding_provider: TextUnderstandingProvider | None = None,
+        schema_v1_1_migration_blocker: str | None = None,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -171,6 +178,7 @@ class RuntimeService:
         self._asset_ingestion_policy = asset_ingestion_policy or AssetIngestionPolicy()
         self._generation_task_publisher = generation_task_publisher
         self._text_understanding_provider = text_understanding_provider
+        self._schema_v1_1_migration_blocker = schema_v1_1_migration_blocker
 
     def resolve_identity(self, identity: VerifiedIdentity) -> AuthenticatedPrincipal:
         row = self.repository.get_or_create_principal(identity, self._uuid(), self._clock())
@@ -380,6 +388,55 @@ class RuntimeService:
         row = self.repository.get_design_session(session_id, organization_id)
         return self._session_response(row)
 
+    def get_schema_v1_1_migration_eligibility(
+        self, session_id: UUID, organization_id: UUID
+    ) -> SchemaV1_1MigrationEligibility:
+        revision = self.repository.get_current_revision(session_id, organization_id)
+        eligibility = assess_schema_v1_1_migration_eligibility(revision)
+        if self._schema_v1_1_migration_blocker is None:
+            return eligibility
+        return eligibility.model_copy(
+            update={
+                "eligible": False,
+                "blockers": (*eligibility.blockers, self._schema_v1_1_migration_blocker),
+            }
+        )
+
+    def upgrade_session_schema_v1_1(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        request: UpgradeSchemaV1_1Request,
+    ):
+        session = self.repository.get_design_session(session_id, organization_id)
+        if session.current_revision_id != request.expected_revision_id:
+            raise StaleRevisionError("Current revision changed before schema migration")
+        current = self.repository.get_revision(
+            session_id, request.expected_revision_id, organization_id
+        )
+        eligibility = self.get_schema_v1_1_migration_eligibility(session_id, organization_id)
+        if not eligibility.eligible:
+            raise InvalidTransitionError(
+                "Schema v1.1 migration blocked: " + ", ".join(eligibility.blockers)
+            )
+        now = self._clock()
+        migrated = migrate_design_revision_v1_to_v1_1(
+            current,
+            revision_id=self._uuid(),
+            created_at=now,
+            source=MessageSource(
+                message_id=f"session:{session_id}:schema-1.1",
+                recorded_at=now,
+            ),
+            reason="Explicit controlled migration to Jewelry Design Schema v1.1.0",
+        )
+        return self.repository.upgrade_design_session_schema_v1_1(
+            session_id,
+            organization_id,
+            request.expected_revision_id,
+            migrated,
+        )
+
     def create_message(
         self, session_id: UUID, organization_id: UUID, content: str
     ) -> MessageResponse:
@@ -399,7 +456,7 @@ class RuntimeService:
         session_id: UUID,
         organization_id: UUID,
         request: ParserProposalRequest,
-    ) -> ParserProposal:
+    ) -> AnyParserProposal:
         session = self.repository.get_design_session(session_id, organization_id)
         self._assert_artifact_pins(session)
         if session.current_revision_id != request.expected_revision_id:
@@ -448,16 +505,12 @@ class RuntimeService:
             ),
         )
         if proposal.has_changes:
-            revision = self.transition_revision(
+            revision = self._apply_parser_proposal_revision(
                 session_id,
                 organization_id,
-                EditRevisionRequest(
-                    action="edit",
-                    expected_revision_id=request.expected_revision_id,
-                    proposed_design=proposal.proposed_design,
-                    source=proposal.source,
-                    reason="Applied supported facts from natural-language intake",
-                ),
+                request.expected_revision_id,
+                proposal,
+                "Applied supported facts from natural-language intake",
             )
         else:
             revision = self.repository.get_current_revision(session_id, organization_id)
@@ -531,16 +584,12 @@ class RuntimeService:
             ),
         )
         if proposal.has_changes:
-            revision = self.transition_revision(
+            revision = self._apply_parser_proposal_revision(
                 session.session_id,
                 organization_id,
-                EditRevisionRequest(
-                    action="edit",
-                    expected_revision_id=expected_revision_id,
-                    proposed_design=proposal.proposed_design,
-                    source=proposal.source,
-                    reason="Applied supported iterative-edit changes",
-                ),
+                expected_revision_id,
+                proposal,
+                "Applied supported iterative-edit changes",
             )
         else:
             revision = self.repository.get_current_revision(session.session_id, organization_id)
@@ -575,8 +624,48 @@ class RuntimeService:
             created_at=edit.created_at,
         )
 
+    def _apply_parser_proposal_revision(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        proposal: AnyParserProposal,
+        reason: str,
+    ):
+        current = self.repository.get_current_revision(session_id, organization_id)
+        if isinstance(current, DesignRevisionV1_1):
+            revision = revise_parser_design_v1_1(
+                current,
+                proposal.proposed_design,
+                expected_revision_id=expected_revision_id,
+                source=proposal.source,
+                reason=reason,
+                created_at=self._clock(),
+            )
+            return self.repository.append_revision_cas(
+                session_id,
+                organization_id,
+                expected_revision_id,
+                revision,
+            )
+        return self.transition_revision(
+            session_id,
+            organization_id,
+            EditRevisionRequest(
+                action="edit",
+                expected_revision_id=expected_revision_id,
+                proposed_design=proposal.proposed_design,
+                source=proposal.source,
+                reason=reason,
+            ),
+        )
+
     def transition_revision(self, session_id: UUID, organization_id: UUID, request):
         current = self.repository.get_current_revision(session_id, organization_id)
+        if isinstance(current, DesignRevisionV1_1):
+            raise InvalidTransitionError(
+                "Generic revision transitions are not enabled for Schema v1.1"
+            )
         now = self._clock()
         common = {
             "expected_revision_id": request.expected_revision_id,
@@ -1017,8 +1106,11 @@ class RuntimeService:
 
     def _assert_artifact_pins(self, row: DesignSessionRow) -> None:
         versions = self.artifacts.versions
+        if row.design_schema_version not in {SCHEMA_VERSION, SCHEMA_VERSION_V1_1}:
+            raise ArtifactConfigurationError(
+                "Session design schema pin is unavailable in the configured runtime"
+            )
         stored = (
-            row.design_schema_version,
             row.role_artifact_version,
             row.dictionary_artifact_version,
             row.question_artifact_version,
@@ -1026,7 +1118,6 @@ class RuntimeService:
             row.prompt_artifact_version,
         )
         loaded = (
-            SCHEMA_VERSION,
             versions.roles,
             versions.dictionary,
             versions.questions,

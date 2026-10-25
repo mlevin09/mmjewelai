@@ -21,9 +21,11 @@ from jewelai_domain.models import (
     StoneQuantity,
     Weight,
 )
+from jewelai_domain.models_v1_1 import DesignV1_1, validate_design_revision
 
 from .models import (
     AcceptedUpdate,
+    AnyParserProposal,
     CandidateUpdate,
     DimensionsCandidate,
     DimensionsScaleCandidate,
@@ -31,6 +33,7 @@ from .models import (
     ParserIssue,
     ParserIssueCode,
     ParserProposal,
+    ParserProposalV1_1,
     ParserTarget,
     ParserWarning,
     ParserWarningCode,
@@ -59,15 +62,15 @@ _CATEGORIES = {
 
 
 def build_parser_proposal(
-    revision: DesignRevision,
+    revision: DesignRevision | object,
     *,
     expected_revision_id,
     source: MessageSource,
     locale: str,
     dictionary: DictionaryRegistry,
     candidate: ParserCandidate,
-) -> ParserProposal:
-    revision = DesignRevision.model_validate(revision)
+) -> AnyParserProposal:
+    revision = validate_design_revision(revision)
     candidate = ParserCandidate.model_validate(candidate)
     source = MessageSource.model_validate(source)
     if revision.revision_id != expected_revision_id:
@@ -160,8 +163,13 @@ def build_parser_proposal(
     accepted.sort(key=lambda item: item.concrete_target)
     issues.sort(key=lambda item: (item.concrete_target, item.code.value))
     warnings.sort(key=lambda item: (item.concrete_target, item.code.value, item.canonical_id))
-    proposed = Design.model_validate(data)
-    return ParserProposal(
+    proposed = (
+        DesignV1_1.model_validate(data)
+        if revision.schema_version == "1.1.0"
+        else Design.model_validate(data)
+    )
+    proposal_type = ParserProposalV1_1 if revision.schema_version == "1.1.0" else ParserProposal
+    return proposal_type(
         expected_revision_id=revision.revision_id,
         source=source,
         locale=locale,

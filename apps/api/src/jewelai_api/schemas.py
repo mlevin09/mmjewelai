@@ -21,8 +21,9 @@ from jewelai_domain import (
     VisualizationVerificationResult,
 )
 from jewelai_domain.models import MessageSource
+from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_model_gateway import GenerationRun
-from jewelai_parser import ParserCandidate, ParserProposal
+from jewelai_parser import AnyParserProposal, ParserCandidate
 from jewelai_prompts import (
     CompiledPrompt,
     InternalFinalPrompt,
@@ -164,6 +165,10 @@ class DictionaryOptionsResponse(ApiModel):
     options: tuple[DictionaryOption, ...]
 
 
+class UpgradeSchemaV1_1Request(ApiModel):
+    expected_revision_id: UUID
+
+
 class CreateMessageRequest(ApiModel):
     content: MessageContent
 
@@ -189,8 +194,8 @@ class TextIntakeRequest(ApiModel):
 
 class TextIntakeResponse(ApiModel):
     message: MessageResponse
-    proposal: ParserProposal
-    revision: DesignRevision
+    proposal: AnyParserProposal
+    revision: DesignRevision | DesignRevisionV1_1
     evaluation: "EvaluationResponse"
 
 
@@ -272,8 +277,8 @@ class IterativeEditResponse(ApiModel):
     starting_revision_id: UUID
     initial_message_id: UUID
     message: MessageResponse
-    proposal: ParserProposal
-    revision: DesignRevision
+    proposal: AnyParserProposal
+    revision: DesignRevision | DesignRevisionV1_1
     evaluation: "EvaluationResponse"
     iteration: "VisualizationIterationResponse | None" = None
     created_at: datetime
@@ -451,7 +456,7 @@ class EvaluationResponse(ApiModel):
 
 
 class RevisionListResponse(ApiModel):
-    revisions: tuple[DesignRevision, ...]
+    revisions: tuple[DesignRevision | DesignRevisionV1_1, ...]
 
 
 IterativeEditResponse.model_rebuild()

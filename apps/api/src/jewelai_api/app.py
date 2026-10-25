@@ -34,14 +34,16 @@ from jewelai_auth_identity_platform import IdentityPlatformTokenVerifier
 from jewelai_auth_oidc import OidcJwtVerifier
 from jewelai_domain import (
     ReferenceBinding,
+    SchemaV1_1MigrationEligibility,
     UnknownRoleError,
     UnsupportedLocaleError,
     VisualizationVerificationResult,
 )
+from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_generation_queue import GenerationTaskPublisher
 from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
-from jewelai_parser import ParserProposal
+from jewelai_parser import AnyParserProposal
 from jewelai_persistence import (
     GenerationRetryNotAllowedError,
     GenerationStateConflictError,
@@ -134,6 +136,7 @@ from .schemas import (
     TextIntakeResponse,
     UiCatalogResponse,
     UpdateMembershipRequest,
+    UpgradeSchemaV1_1Request,
     VisualizationDecisionRequest,
     VisualizationIterationListResponse,
     VisualizationIterationResponse,
@@ -254,6 +257,11 @@ def create_app(
         asset_ingestion_policy=AssetIngestionPolicy(max_bytes=settings.asset_upload_max_bytes),
         generation_task_publisher=generation_task_publisher,
         text_understanding_provider=text_understanding_provider,
+        schema_v1_1_migration_blocker=(
+            "PROMPT_ENRICHMENT_RUNTIME_V1_1_UNSUPPORTED"
+            if prompt_enrichment_service is not None
+            else None
+        ),
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
     if settings.web_allowed_origins:
@@ -588,6 +596,27 @@ def create_app(
     ):
         return service.get_session(session_id, organization_id)
 
+    @app.get(
+        "/sessions/{session_id}/schema-v1-1-eligibility",
+        response_model=SchemaV1_1MigrationEligibility,
+    )
+    def get_schema_v1_1_migration_eligibility(
+        session_id: UUID,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.get_schema_v1_1_migration_eligibility(session_id, organization_id)
+
+    @app.post(
+        "/sessions/{session_id}/schema-v1-1-upgrade",
+        response_model=DesignRevisionV1_1,
+    )
+    def upgrade_session_schema_v1_1(
+        session_id: UUID,
+        request: UpgradeSchemaV1_1Request,
+        organization_id: AuthorizedOrganization,
+    ):
+        return service.upgrade_session_schema_v1_1(session_id, organization_id, request)
+
     @app.post("/sessions/{session_id}/messages", response_model=MessageResponse, status_code=201)
     def create_message(
         session_id: UUID,
@@ -596,7 +625,7 @@ def create_app(
     ):
         return service.create_message(session_id, organization_id, request.content)
 
-    @app.post("/sessions/{session_id}/parser-proposals", response_model=ParserProposal)
+    @app.post("/sessions/{session_id}/parser-proposals", response_model=AnyParserProposal)
     def create_parser_proposal(
         session_id: UUID,
         request: ParserProposalRequest,

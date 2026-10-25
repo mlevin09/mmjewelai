@@ -1,5 +1,13 @@
 """Jewelry design contracts. Import concrete types from jewelai_domain.models."""
 
+from .consumer_coverage_v1_1 import (
+    CONSUMER_COVERAGE_VERSION_V1_1,
+    SchemaV1_1ConsumerCoverage,
+    SchemaV1_1MigrationEligibility,
+    TargetConsumerCoverage,
+    assess_schema_v1_1_migration_eligibility,
+    build_schema_v1_1_consumer_coverage,
+)
 from .dictionary import (
     DICTIONARY_SCHEMA_VERSION,
     AmbiguousMatch,
@@ -248,4 +256,10 @@ __all__ = [
     "validate_design_revision",
     "is_allowed_product_state_target_v1_1",
     "target_family_from_concrete",
+    "CONSUMER_COVERAGE_VERSION_V1_1",
+    "SchemaV1_1ConsumerCoverage",
+    "SchemaV1_1MigrationEligibility",
+    "TargetConsumerCoverage",
+    "assess_schema_v1_1_migration_eligibility",
+    "build_schema_v1_1_consumer_coverage",
 ]
