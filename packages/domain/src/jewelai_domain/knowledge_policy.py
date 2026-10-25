@@ -6,10 +6,11 @@ from typing import Literal
 from pydantic import BaseModel, StrictBool, model_validator
 
 from .knowledge_library import CompiledKnowledgeLibrary, CompiledPolicy, PolicyTarget
+from .models_v1_1 import AnyDesignRevision, validate_design_revision
+from .state_paths import iter_knowledge_state_fields
 from .models import (
     Assumed,
     Derived,
-    DesignRevision,
     Explicit,
     ImmutableModel,
     NotApplicable,
@@ -282,55 +283,22 @@ def _from_design_state(target: str, state: object | None) -> RuntimeParameterSta
 
 def build_knowledge_runtime_state(
     runtime: CompiledKnowledgeLibrary,
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
 ) -> KnowledgeRuntimeState:
-    """Project one immutable DesignRevision into Knowledge Library runtime state."""
+    """Project one immutable DesignRevision into Knowledge Library runtime state.
+
+    Schema v1.0.0 preserves the historical projection exactly. Schema v1.1.0
+    adds the frozen P0-16 Product State targets through the shared version-aware
+    traversal; Reference Binding and Visualization Verification remain outside
+    this state.
+    """
     runtime = CompiledKnowledgeLibrary.model_validate(runtime)
-    revision = DesignRevision.model_validate(revision)
-    design = revision.design
-
-    scalar = {
-        "jewelry_type": design.jewelry_type,
-        "metal.material": design.metal.material,
-        "metal.color": design.metal.color,
-        "metal.purity": design.metal.purity,
-        "metal.finish": design.metal.finish,
-        "center_stone.material": design.center_stone.material,
-        "center_stone.shape": design.center_stone.shape,
-        "center_stone.cut": design.center_stone.cut,
-        "center_stone.weight": design.center_stone.weight,
-        "center_stone.dimensions": design.center_stone.dimensions,
-        "center_stone.color": design.center_stone.color,
-        "center_stone.setting": design.center_stone.setting,
-        "center_stone.orientation": design.center_stone.orientation,
-        "construction.shank": design.construction.shank,
-        "construction.gallery": design.construction.gallery,
-        "construction.basket": design.construction.basket,
-        "construction.clasp": design.construction.clasp,
-        "construction.setting_height": design.construction.setting_height,
-        "construction.shank_width": design.construction.shank_width,
-        "construction.thickness": design.construction.thickness,
-        "style": design.style,
-    }
-    parameters = [_from_design_state(target, state) for target, state in scalar.items()]
-
-    group_ids = tuple(sorted(group.group_id for group in design.side_stones))
-    for group in design.side_stones:
-        prefix = f"side_stones.{group.group_id}"
-        group_states = {
-            f"{prefix}.stones.material": group.stones.material,
-            f"{prefix}.stones.shape": group.stones.shape,
-            f"{prefix}.stones.cut": group.stones.cut,
-            f"{prefix}.stones.weight": group.stones.weight,
-            f"{prefix}.stones.dimensions": group.stones.dimensions,
-            f"{prefix}.stones.color": group.stones.color,
-            f"{prefix}.stones.setting": group.stones.setting,
-            f"{prefix}.stones.orientation": group.stones.orientation,
-            f"{prefix}.quantity": group.quantity,
-        }
-        parameters.extend(
-            _from_design_state(target, state) for target, state in group_states.items()
-        )
+    revision = validate_design_revision(revision)
+    parameters = [
+        _from_design_state(target, state)
+        for target, state in iter_knowledge_state_fields(revision)
+    ]
+    group_ids = tuple(sorted(group.group_id for group in revision.design.side_stones))
 
     return KnowledgeRuntimeState(
         package_id=runtime.package_id,
