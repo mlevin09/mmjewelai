@@ -116,6 +116,7 @@ def test_reference_binding_runtime_matches_frozen_json_schema():
                 feature_path="center_stone.shape",
                 relation="KEEP",
                 provenance="user_text",
+                observability="EXPLICIT",
             ),
         ),
     )
