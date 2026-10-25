@@ -326,3 +326,30 @@ def upgrade_design_revision_v1_to_v1_1(
 
 def snapshot_json_v1_1(revision: DesignRevisionV1_1 | object) -> str:
     return DesignRevisionV1_1.model_validate(revision).model_dump_json(indent=2)
+
+
+def migrate_design_revision_v1_to_v1_1(
+    revision: DesignRevision | object,
+    *,
+    revision_id: UUID,
+    created_at: AwareDatetime,
+    source,
+    reason: str,
+) -> DesignRevisionV1_1:
+    """Create a new immutable v1.1 revision that continues a v1.0 lineage."""
+    revision = DesignRevision.model_validate(revision)
+    payload = revision.design.model_dump(mode="json")
+    return DesignRevisionV1_1(
+        schema_version="1.1.0",
+        design_id=revision.design_id,
+        revision_id=revision_id,
+        revision=revision.revision + 1,
+        parent_revision_id=revision.revision_id,
+        created_at=created_at,
+        event=RevisionEvent(
+            action="edit",
+            source=source,
+            reason=reason,
+        ),
+        design=DesignV1_1.model_validate(payload),
+    )
