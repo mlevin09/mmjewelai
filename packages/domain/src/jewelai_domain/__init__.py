@@ -282,7 +282,8 @@ __all__ = [
     "SchemaV1_1MigrationEligibility",
     "TargetConsumerCoverage",
     "assess_schema_v1_1_migration_eligibility",
-    "build_schema_v1_1_consumer_coverage",    "ActiveKnowledgeRuntimeV1_1",
+    "build_schema_v1_1_consumer_coverage",
+    "ActiveKnowledgeRuntimeV1_1",
     "ProductionValidationReportV1_1",
     "promote_knowledge_runtime_v1_1",
     "validate_for_production_v1_1",
@@ -299,5 +300,4 @@ __all__ = [
     "load_knowledge_library_v1_1",
     "validate_knowledge_library_v1_1",
     "KnowledgeArtifactStoreV1_1",
-
 ]
