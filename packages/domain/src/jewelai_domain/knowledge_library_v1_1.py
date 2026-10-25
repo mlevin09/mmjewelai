@@ -221,9 +221,7 @@ class KnowledgeLibraryRegistryV1_1:
                     f"DIRECT/AMBIGUOUS collision for {locale}/{context}/{surface!r}"
                 )
             resolved = {
-                item.concept_id
-                for item in mappings
-                if item.mapping_mode.value != "AMBIGUOUS"
+                item.concept_id for item in mappings if item.mapping_mode.value != "AMBIGUOUS"
             }
             if len(resolved) > 1:
                 raise KnowledgeLibraryV1_1ValidationError(
@@ -314,9 +312,7 @@ class KnowledgeLibraryRegistryV1_1:
         ]
         for policy in reviewed_policies:
             valid = (
-                reviewed_concepts
-                if policy.source_kind == "DOMAIN_KNOWLEDGE"
-                else reviewed_sources
+                reviewed_concepts if policy.source_kind == "DOMAIN_KNOWLEDGE" else reviewed_sources
             )
             if any(ref not in valid for ref in policy.source_refs):
                 raise KnowledgeLibraryV1_1ValidationError(
