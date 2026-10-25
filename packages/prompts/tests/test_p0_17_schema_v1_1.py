@@ -2,6 +2,7 @@ from pathlib import Path
 
 from jewelai_domain.models import DesignRevision
 from jewelai_domain.models_v1_1 import upgrade_design_revision_v1_to_v1_1
+
 from jewelai_prompts import compile_prompt, load_prompt_templates
 
 ROOT = Path(__file__).resolve().parents[3]
