@@ -22,7 +22,6 @@ from jewelai_domain.knowledge_policy import (
     validate_proposal_authority,
 )
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
-from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_domain.models import (
     Assumed,
     Derived,
@@ -32,6 +31,7 @@ from jewelai_domain.models import (
     NotApplicable,
     Text,
 )
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from pydantic import Field, JsonValue, field_validator, model_validator
 
 from .compiler import compile_prompt
