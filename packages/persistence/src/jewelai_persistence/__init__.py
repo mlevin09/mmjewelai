@@ -10,7 +10,9 @@ from .models import (
     EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
     OrganizationMembershipRow,
+    ReferenceBindingRow,
     UserCorrectionRow,
+    VisualizationVerificationRow,
 )
 from .recovery import (
     DEFAULT_STALE_AFTER_SECONDS,
@@ -42,6 +44,8 @@ from .repository import (
     NotFoundError,
     OwnershipMismatchError,
     PersistenceRepository,
+    ReferenceBindingConflictError,
+    ReferenceBindingIntegrityError,
     StaleGenerationRunCandidate,
     StaleRevisionError,
     UserCorrectionConflictError,
@@ -49,6 +53,8 @@ from .repository import (
     UserCorrectionRecord,
     VisualizationIterationRecord,
     VisualizationSelectionConflictError,
+    VisualizationVerificationConflictError,
+    VisualizationVerificationIntegrityError,
 )
 
 __all__ = [
@@ -74,6 +80,9 @@ __all__ = [
     "GenerationStateConflictError",
     "VisualizationIterationRecord",
     "VisualizationSelectionConflictError",
+    "VisualizationVerificationRow",
+    "VisualizationVerificationConflictError",
+    "VisualizationVerificationIntegrityError",
     "GenerationAssetMaintenanceCandidate",
     "GenerationEditContextRecord",
     "GenerationDispatchOutboxRow",
@@ -87,6 +96,9 @@ __all__ = [
     "OwnershipMismatchError",
     "OrganizationMembershipRow",
     "PersistenceRepository",
+    "ReferenceBindingRow",
+    "ReferenceBindingConflictError",
+    "ReferenceBindingIntegrityError",
     "StaleGenerationRunCandidate",
     "StaleGenerationRecoverySummary",
     "StaleRevisionError",
