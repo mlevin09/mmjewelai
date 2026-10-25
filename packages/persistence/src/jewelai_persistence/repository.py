@@ -1856,9 +1856,7 @@ class PersistenceRepository:
                 else None
             )
             previous_asset_id = (
-                UUID(result.subject.previous_asset_id)
-                if result.subject.previous_asset_id
-                else None
+                UUID(result.subject.previous_asset_id) if result.subject.previous_asset_id else None
             )
         except ValueError as exc:
             raise VisualizationVerificationIntegrityError(
@@ -1951,9 +1949,7 @@ class PersistenceRepository:
                 )
             )
             if row is None:
-                raise OwnershipMismatchError(
-                    "Verification not found in session organization scope"
-                )
+                raise OwnershipMismatchError("Verification not found in session organization scope")
             return self._visualization_verification(row)
 
     def list_visualization_verifications(
