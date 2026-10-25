@@ -21,7 +21,16 @@ from jewelai_domain.knowledge_library_v1_1 import (
     compile_knowledge_library_v1_1,
     validate_knowledge_library_v1_1,
 )
-from jewelai_domain.knowledge_policy import KnowledgePolicyEngine
+from jewelai_domain.knowledge_policy import (
+    KnowledgePolicyEngine,
+    build_knowledge_runtime_state,
+)
+from jewelai_domain.knowledge_qualification import (
+    KnowledgeReleaseCandidateKind,
+    KnowledgeReleaseCandidateSelection,
+    KnowledgeReleaseQualificationStatus,
+)
+from jewelai_domain.knowledge_qualification_v1_1 import qualify_knowledge_release_v1_1
 from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
 from jewelai_domain.models import Design, DesignRevision, MessageSource, RevisionEvent
 from jewelai_domain.models_v1_1 import upgrade_design_revision_v1_to_v1_1
@@ -143,9 +152,7 @@ def test_v1_1_policy_engine_matches_new_target_template_and_projects_state():
     revision = revision_v1_1()
     engine = KnowledgePolicyEngine(runtime)
 
-    state = __import__(
-        "jewelai_domain.knowledge_policy", fromlist=["build_knowledge_runtime_state"]
-    ).build_knowledge_runtime_state(runtime, revision)
+    state = build_knowledge_runtime_state(runtime, revision)
 
     assert state.get("composition.symmetry_mode").value == "asymmetrical"
     policies = engine.policies_for("composition.symmetry_mode")
@@ -191,3 +198,29 @@ def test_v1_1_rejects_unknown_policy_target():
         match="unavailable Design Schema v1.1 field",
     ):
         validate_knowledge_library_v1_1(payload)
+
+
+
+def test_v1_1_release_qualification_uses_v1_1_loader(tmp_path):
+    payload = bundle_v1_1()
+    runtime, _ = compile_knowledge_library_v1_1(payload)
+    validation = report(runtime)
+    active = promote_knowledge_runtime_v1_1(runtime, validation)
+    store = KnowledgeArtifactStoreV1_1(tmp_path)
+    stored = store.publish(payload)
+
+    result = qualify_knowledge_release_v1_1(
+        store,
+        KnowledgeReleaseCandidateSelection(
+            package_id=stored.package_id,
+            artifact_version=stored.artifact_version,
+            kind=KnowledgeReleaseCandidateKind.SYNTHETIC,
+        ),
+        active_release=active,
+        validation_report=validation,
+        source_commit="abcdef1",
+    )
+
+    assert result.status == KnowledgeReleaseQualificationStatus.QUALIFIED
+    assert result.runtime_loader_compatible is True
+    assert result.runtime_sha256 == runtime.sha256
