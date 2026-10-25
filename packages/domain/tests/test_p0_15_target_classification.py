@@ -39,9 +39,7 @@ def test_non_product_state_layers_stay_out_of_schema_proposal():
         if item["runtime_layer"] == "PRODUCT_STATE_VNEXT"
     }
     excluded = {
-        target
-        for values in proposal["excluded_from_product_state"].values()
-        for target in values
+        target for values in proposal["excluded_from_product_state"].values() for target in values
     }
 
     assert proposal["candidate_product_state_vnext_target_count"] == len(product_targets)
