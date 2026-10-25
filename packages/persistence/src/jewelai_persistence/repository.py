@@ -11,6 +11,7 @@ from jewelai_assets import (
     AssetConflictError,
     AssetErrorCode,
     AssetLineageError,
+    AssetKind,
     AssetStatus,
     validate_asset_object_key,
 )
@@ -67,9 +68,9 @@ from .models import (
     QuestionEventRow,
     SpecificationRevisionRow,
     UserCorrectionRow,
+    ReferenceBindingRow,
     VisualizationIterationRow,
     VisualizationSelectionRow,
-    ReferenceBindingRow,
     VisualizationVerificationRow,
 )
 
