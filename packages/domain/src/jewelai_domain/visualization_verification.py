@@ -74,9 +74,7 @@ class VerificationCheck(ImmutableModel):
 
 
 class VisualizationVerificationResult(ImmutableModel):
-    contract_version: Literal["1.0.0"] = (
-        VISUALIZATION_VERIFICATION_CONTRACT_VERSION
-    )
+    contract_version: Literal["1.0.0"] = VISUALIZATION_VERIFICATION_CONTRACT_VERSION
     verification_id: NonEmpty
     subject: VerificationSubject
     overall_status: VerificationStatus
