@@ -61,9 +61,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["organization_id"], ["organization.organization_id"], ondelete="RESTRICT"
         ),
-        sa.ForeignKeyConstraint(
-            ["session_id"], ["design_session.session_id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["session_id"], ["design_session.session_id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
             ["generation_run_id"], ["generation_run.generation_run_id"], ondelete="RESTRICT"
         ),
