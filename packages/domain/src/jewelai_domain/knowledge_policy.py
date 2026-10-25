@@ -6,8 +6,6 @@ from typing import Literal
 from pydantic import BaseModel, StrictBool, model_validator
 
 from .knowledge_library import CompiledKnowledgeLibrary, CompiledPolicy, PolicyTarget
-from .models_v1_1 import AnyDesignRevision, validate_design_revision
-from .state_paths import iter_knowledge_state_fields
 from .models import (
     Assumed,
     Derived,
@@ -17,6 +15,8 @@ from .models import (
     Text,
     Unknown,
 )
+from .models_v1_1 import AnyDesignRevision, validate_design_revision
+from .state_paths import iter_knowledge_state_fields
 
 
 class RuntimeSemanticState(StrEnum):
