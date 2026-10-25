@@ -27,6 +27,13 @@ from jewelai_domain.knowledge_activation import (
 )
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import DesignRevision
+from jewelai_domain.models_v1_1 import (
+    AnyDesignRevision,
+    DesignRevisionV1_1,
+    validate_design_revision,
+)
+from jewelai_domain.reference_bindings import ReferenceBinding
+from jewelai_domain.visualization_verification import VisualizationVerificationResult
 from jewelai_generation_queue import GenerationTaskEnvelope, PendingGenerationDispatch
 from jewelai_model_gateway import (
     GenerationErrorCode,
@@ -62,6 +69,8 @@ from .models import (
     UserCorrectionRow,
     VisualizationIterationRow,
     VisualizationSelectionRow,
+    ReferenceBindingRow,
+    VisualizationVerificationRow,
 )
 
 
@@ -106,6 +115,22 @@ class EnrichmentCycleConflictError(PersistenceError):
 
 
 class EnrichmentIntegrityError(PersistenceError):
+    pass
+
+
+class ReferenceBindingConflictError(PersistenceError):
+    pass
+
+
+class ReferenceBindingIntegrityError(PersistenceError):
+    pass
+
+
+class VisualizationVerificationConflictError(PersistenceError):
+    pass
+
+
+class VisualizationVerificationIntegrityError(PersistenceError):
     pass
 
 
@@ -539,11 +564,11 @@ class PersistenceRepository:
     def create_design_session(
         self,
         row: DesignSessionRow,
-        initial_revision: DesignRevision,
+        initial_revision: AnyDesignRevision | object,
         *,
         organization_id: UUID,
     ) -> DesignSessionRow:
-        revision = DesignRevision.model_validate(initial_revision)
+        revision = validate_design_revision(initial_revision)
         if row.current_revision_id != revision.revision_id:
             raise ValueError("Session current revision must match the initial revision")
         with self._session_factory.begin() as db:
@@ -588,11 +613,13 @@ class PersistenceRepository:
                 db.expunge(row)
             return tuple(rows)
 
-    def get_current_revision(self, session_id: UUID, organization_id: UUID) -> DesignRevision:
+    def get_current_revision(self, session_id: UUID, organization_id: UUID) -> AnyDesignRevision:
         session = self.get_design_session(session_id, organization_id)
         return self.get_revision(session_id, session.current_revision_id, organization_id)
 
-    def list_revisions(self, session_id: UUID, organization_id: UUID) -> tuple[DesignRevision, ...]:
+    def list_revisions(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[AnyDesignRevision, ...]:
         self.get_design_session(session_id, organization_id)
         with self._session_factory() as db:
             rows = db.scalars(
@@ -604,7 +631,7 @@ class PersistenceRepository:
 
     def get_revision(
         self, session_id: UUID, revision_id: UUID, organization_id: UUID
-    ) -> DesignRevision:
+    ) -> AnyDesignRevision:
         self.get_design_session(session_id, organization_id)
         with self._session_factory() as db:
             row = db.scalar(
@@ -622,9 +649,9 @@ class PersistenceRepository:
         session_id: UUID,
         organization_id: UUID,
         expected_revision_id: UUID,
-        revision: DesignRevision,
-    ) -> DesignRevision:
-        revision = DesignRevision.model_validate(revision)
+        revision: AnyDesignRevision | object,
+    ) -> AnyDesignRevision:
+        revision = validate_design_revision(revision)
         if revision.parent_revision_id != expected_revision_id:
             raise ValueError("New revision parent must equal expected revision")
         try:
@@ -667,6 +694,48 @@ class PersistenceRepository:
         except IntegrityError as exc:
             raise DuplicateRevisionError(
                 "Revision lineage violates a uniqueness constraint"
+            ) from exc
+        return revision
+
+    def upgrade_design_session_schema_v1_1(
+        self,
+        session_id: UUID,
+        organization_id: UUID,
+        expected_revision_id: UUID,
+        revision: DesignRevisionV1_1 | object,
+    ) -> DesignRevisionV1_1:
+        """Atomically append the explicit v1.0 -> v1.1 migration revision."""
+        revision = DesignRevisionV1_1.model_validate(revision)
+        if revision.parent_revision_id != expected_revision_id:
+            raise ValueError("Schema migration parent must equal expected revision")
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
+                if session.current_revision_id != expected_revision_id:
+                    raise StaleRevisionError("Current revision changed before schema migration")
+                if session.design_schema_version != "1.0.0":
+                    raise DuplicateRevisionError("Session is not pinned to Design Schema v1.0.0")
+                parent = self._locked_revision(db, session_id, expected_revision_id)
+                if (
+                    parent.schema_version != "1.0.0"
+                    or revision.schema_version != "1.1.0"
+                    or revision.design_id != parent.design_id
+                    or revision.revision != parent.revision_number + 1
+                ):
+                    raise DuplicateRevisionError(
+                        "Schema migration must continue the stored v1.0 design as v1.1"
+                    )
+                db.add(self._revision_row(session_id, revision))
+                session.current_revision_id = revision.revision_id
+                session.design_schema_version = "1.1.0"
+                session.updated_at = revision.created_at
+        except IntegrityError as exc:
+            raise DuplicateRevisionError(
+                "Schema migration revision violates a uniqueness constraint"
             ) from exc
         return revision
 
@@ -1670,6 +1739,240 @@ class PersistenceRepository:
             ).all()
             return tuple(self._user_correction_record(db, row, session) for row in rows)
 
+    def create_reference_binding(
+        self,
+        binding: ReferenceBinding | object,
+        *,
+        session_id: UUID,
+        organization_id: UUID,
+        created_at: datetime,
+    ) -> ReferenceBinding:
+        binding = ReferenceBinding.model_validate(binding)
+        payload = binding.model_dump(mode="json")
+        content_hash = self._canonical_hash(payload)
+        try:
+            asset_id = UUID(binding.asset_id)
+        except ValueError as exc:
+            raise ReferenceBindingIntegrityError(
+                "reference binding asset_id must be a UUID"
+            ) from exc
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(self._scoped_session_query(session_id, organization_id))
+                asset = db.scalar(
+                    select(AssetRow).where(
+                        AssetRow.asset_id == asset_id,
+                        AssetRow.session_id == session_id,
+                        AssetRow.organization_id == organization_id,
+                        AssetRow.kind == AssetKind.REFERENCE.value,
+                    )
+                )
+                if session is None or asset is None:
+                    raise OwnershipMismatchError(
+                        "Reference binding asset is outside session organization scope"
+                    )
+                existing = db.get(ReferenceBindingRow, binding.binding_id)
+                if existing is not None:
+                    if (
+                        existing.session_id == session_id
+                        and existing.organization_id == organization_id
+                        and existing.content_hash == content_hash
+                    ):
+                        return self._reference_binding(existing)
+                    raise ReferenceBindingConflictError(
+                        "reference binding ID already exists with different content or scope"
+                    )
+                db.add(
+                    ReferenceBindingRow(
+                        binding_id=binding.binding_id,
+                        organization_id=organization_id,
+                        session_id=session_id,
+                        asset_id=asset_id,
+                        contract_version=binding.contract_version,
+                        payload=payload,
+                        content_hash=content_hash,
+                        created_at=created_at,
+                    )
+                )
+        except IntegrityError as exc:
+            raise ReferenceBindingConflictError(
+                "reference binding identity already exists"
+            ) from exc
+        return binding
+
+    def get_reference_binding(
+        self,
+        session_id: UUID,
+        binding_id: str,
+        organization_id: UUID,
+    ) -> ReferenceBinding:
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(ReferenceBindingRow).where(
+                    ReferenceBindingRow.binding_id == binding_id,
+                    ReferenceBindingRow.session_id == session_id,
+                    ReferenceBindingRow.organization_id == organization_id,
+                )
+            )
+            if row is None:
+                raise OwnershipMismatchError(
+                    "Reference binding not found in session organization scope"
+                )
+            return self._reference_binding(row)
+
+    def list_reference_bindings(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[ReferenceBinding, ...]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            rows = db.scalars(
+                select(ReferenceBindingRow)
+                .where(
+                    ReferenceBindingRow.session_id == session_id,
+                    ReferenceBindingRow.organization_id == organization_id,
+                )
+                .order_by(ReferenceBindingRow.created_at, ReferenceBindingRow.binding_id)
+            ).all()
+            return tuple(self._reference_binding(row) for row in rows)
+
+    def create_visualization_verification(
+        self,
+        result: VisualizationVerificationResult | object,
+        *,
+        session_id: UUID,
+        organization_id: UUID,
+        created_at: datetime,
+    ) -> VisualizationVerificationResult:
+        result = VisualizationVerificationResult.model_validate(result)
+        payload = result.model_dump(mode="json")
+        content_hash = self._canonical_hash(payload)
+        try:
+            run_id = UUID(result.subject.generation_run_id)
+            asset_id = UUID(result.subject.asset_id) if result.subject.asset_id else None
+            revision_id = (
+                UUID(result.subject.design_revision_id)
+                if result.subject.design_revision_id
+                else None
+            )
+            previous_asset_id = (
+                UUID(result.subject.previous_asset_id)
+                if result.subject.previous_asset_id
+                else None
+            )
+        except ValueError as exc:
+            raise VisualizationVerificationIntegrityError(
+                "verification lineage IDs must be UUIDs"
+            ) from exc
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(self._scoped_session_query(session_id, organization_id))
+                run = db.scalar(
+                    select(GenerationRunRow).where(
+                        GenerationRunRow.generation_run_id == run_id,
+                        GenerationRunRow.session_id == session_id,
+                    )
+                )
+                if session is None or run is None:
+                    raise OwnershipMismatchError(
+                        "Verification generation run is outside session organization scope"
+                    )
+                for candidate, label in (
+                    (asset_id, "asset"),
+                    (previous_asset_id, "previous asset"),
+                ):
+                    if candidate is not None:
+                        asset = db.scalar(
+                            select(AssetRow.asset_id).where(
+                                AssetRow.asset_id == candidate,
+                                AssetRow.session_id == session_id,
+                                AssetRow.organization_id == organization_id,
+                            )
+                        )
+                        if asset is None:
+                            raise OwnershipMismatchError(
+                                f"Verification {label} is outside session organization scope"
+                            )
+                if revision_id is not None:
+                    revision = db.scalar(
+                        select(SpecificationRevisionRow.revision_id).where(
+                            SpecificationRevisionRow.revision_id == revision_id,
+                            SpecificationRevisionRow.session_id == session_id,
+                        )
+                    )
+                    if revision is None:
+                        raise OwnershipMismatchError(
+                            "Verification design revision is outside session scope"
+                        )
+                existing = db.get(VisualizationVerificationRow, result.verification_id)
+                if existing is not None:
+                    if (
+                        existing.session_id == session_id
+                        and existing.organization_id == organization_id
+                        and existing.content_hash == content_hash
+                    ):
+                        return self._visualization_verification(existing)
+                    raise VisualizationVerificationConflictError(
+                        "verification ID already exists with different content or scope"
+                    )
+                db.add(
+                    VisualizationVerificationRow(
+                        verification_id=result.verification_id,
+                        organization_id=organization_id,
+                        session_id=session_id,
+                        generation_run_id=run_id,
+                        asset_id=asset_id,
+                        design_revision_id=revision_id,
+                        previous_asset_id=previous_asset_id,
+                        contract_version=result.contract_version,
+                        payload=payload,
+                        content_hash=content_hash,
+                        created_at=created_at,
+                    )
+                )
+        except IntegrityError as exc:
+            raise VisualizationVerificationConflictError(
+                "verification identity already exists"
+            ) from exc
+        return result
+
+    def get_visualization_verification(
+        self,
+        session_id: UUID,
+        verification_id: str,
+        organization_id: UUID,
+    ) -> VisualizationVerificationResult:
+        with self._session_factory() as db:
+            row = db.scalar(
+                select(VisualizationVerificationRow).where(
+                    VisualizationVerificationRow.verification_id == verification_id,
+                    VisualizationVerificationRow.session_id == session_id,
+                    VisualizationVerificationRow.organization_id == organization_id,
+                )
+            )
+            if row is None:
+                raise OwnershipMismatchError(
+                    "Verification not found in session organization scope"
+                )
+            return self._visualization_verification(row)
+
+    def list_visualization_verifications(
+        self, session_id: UUID, organization_id: UUID
+    ) -> tuple[VisualizationVerificationResult, ...]:
+        self.get_design_session(session_id, organization_id)
+        with self._session_factory() as db:
+            rows = db.scalars(
+                select(VisualizationVerificationRow)
+                .where(
+                    VisualizationVerificationRow.session_id == session_id,
+                    VisualizationVerificationRow.organization_id == organization_id,
+                )
+                .order_by(
+                    VisualizationVerificationRow.created_at,
+                    VisualizationVerificationRow.verification_id,
+                )
+            ).all()
+            return tuple(self._visualization_verification(row) for row in rows)
+
     def create_generation_run(self, run: GenerationRun, organization_id: UUID) -> GenerationRun:
         run = GenerationRun.model_validate(run)
         with self._session_factory.begin() as db:
@@ -2569,7 +2872,10 @@ class PersistenceRepository:
             return tuple(rows)
 
     @staticmethod
-    def _revision_row(session_id: UUID, revision: DesignRevision) -> SpecificationRevisionRow:
+    def _revision_row(
+        session_id: UUID, revision: AnyDesignRevision | object
+    ) -> SpecificationRevisionRow:
+        revision = validate_design_revision(revision)
         payload = revision.model_dump(mode="json")
         return SpecificationRevisionRow(
             revision_id=revision.revision_id,
@@ -2584,8 +2890,11 @@ class PersistenceRepository:
         )
 
     @staticmethod
-    def _domain_revision(row: SpecificationRevisionRow) -> DesignRevision:
-        return DesignRevision.model_validate(row.snapshot)
+    def _domain_revision(row: SpecificationRevisionRow) -> AnyDesignRevision:
+        revision = validate_design_revision(row.snapshot)
+        if revision.schema_version != row.schema_version:
+            raise ValueError("Stored revision schema version does not match snapshot")
+        return revision
 
     @staticmethod
     def _validate_prompt_row(row: PromptRevisionRow, compiled: CompiledPrompt) -> None:
@@ -2617,6 +2926,52 @@ class PersistenceRepository:
         compiled = CompiledPrompt.model_validate(row.structured_payload)
         cls._validate_prompt_row(row, compiled)
         return compiled
+
+    @classmethod
+    def _reference_binding(cls, row: ReferenceBindingRow) -> ReferenceBinding:
+        try:
+            binding = ReferenceBinding.model_validate(row.payload)
+        except ValidationError as exc:
+            raise ReferenceBindingIntegrityError(
+                "stored reference binding payload is invalid"
+            ) from exc
+        if (
+            binding.binding_id != row.binding_id
+            or binding.asset_id != str(row.asset_id)
+            or binding.contract_version != row.contract_version
+            or cls._canonical_hash(binding.model_dump(mode="json")) != row.content_hash
+        ):
+            raise ReferenceBindingIntegrityError(
+                "stored reference binding metadata does not match payload"
+            )
+        return binding
+
+    @classmethod
+    def _visualization_verification(
+        cls, row: VisualizationVerificationRow
+    ) -> VisualizationVerificationResult:
+        try:
+            result = VisualizationVerificationResult.model_validate(row.payload)
+        except ValidationError as exc:
+            raise VisualizationVerificationIntegrityError(
+                "stored verification payload is invalid"
+            ) from exc
+        subject = result.subject
+        expected = (
+            subject.generation_run_id == str(row.generation_run_id),
+            subject.asset_id == (str(row.asset_id) if row.asset_id else None),
+            subject.design_revision_id
+            == (str(row.design_revision_id) if row.design_revision_id else None),
+            subject.previous_asset_id
+            == (str(row.previous_asset_id) if row.previous_asset_id else None),
+            result.contract_version == row.contract_version,
+            cls._canonical_hash(result.model_dump(mode="json")) == row.content_hash,
+        )
+        if not all(expected):
+            raise VisualizationVerificationIntegrityError(
+                "stored verification metadata does not match payload"
+            )
+        return result
 
     @staticmethod
     def _knowledge_release_pin(session: DesignSessionRow) -> KnowledgeReleasePinRecord:
@@ -2894,7 +3249,10 @@ class PersistenceRepository:
         return row
 
     @staticmethod
-    def _validate_next_revision(parent: SpecificationRevisionRow, revision: DesignRevision) -> None:
+    def _validate_next_revision(
+        parent: SpecificationRevisionRow, revision: AnyDesignRevision | object
+    ) -> None:
+        revision = validate_design_revision(revision)
         if (
             revision.parent_revision_id != parent.revision_id
             or revision.design_id != parent.design_id
