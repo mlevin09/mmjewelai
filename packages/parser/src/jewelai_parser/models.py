@@ -202,7 +202,7 @@ class ParserProposal(ImmutableModel):
     source: MessageSource
     locale: Literal["en", "ru"]
     dictionary_artifact_version: str
-    proposed_design: Design | DesignV1_1
+    proposed_design: Design
     accepted_updates: tuple[AcceptedUpdate, ...] = ()
     issues: tuple[ParserIssue, ...] = ()
     warnings: tuple[ParserWarning, ...] = ()
@@ -213,3 +213,26 @@ class ParserProposal(ImmutableModel):
         if self.has_changes != bool(self.accepted_updates):
             raise ValueError("has_changes must match accepted updates")
         return self
+
+
+
+class ParserProposalV1_1(ImmutableModel):
+    schema_version: Literal["1.1.0"] = "1.1.0"
+    expected_revision_id: UUID
+    source: MessageSource
+    locale: Literal["en", "ru"]
+    dictionary_artifact_version: str
+    proposed_design: DesignV1_1
+    accepted_updates: tuple[AcceptedUpdate, ...] = ()
+    issues: tuple[ParserIssue, ...] = ()
+    warnings: tuple[ParserWarning, ...] = ()
+    has_changes: bool
+
+    @model_validator(mode="after")
+    def validate_change_flag(self):
+        if self.has_changes != bool(self.accepted_updates):
+            raise ValueError("has_changes must match accepted updates")
+        return self
+
+
+type AnyParserProposal = ParserProposal | ParserProposalV1_1
