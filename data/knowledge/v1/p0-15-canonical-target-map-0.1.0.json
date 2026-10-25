@@ -1,0 +1,1556 @@
+{
+  "artifact_id": "jewelai.p0_15.canonical_target_classification",
+  "artifact_version": "0.1.0",
+  "status": "WORKING_CLASSIFICATION_COMPLETE_WITH_SOURCE_RECOVERY_GAP",
+  "basis": {
+    "p0_13_content_governed_target_count": 166,
+    "current_repository_contract": "Knowledge Library v1.0.0 / Jewelry Design Schema v1.0.0",
+    "source_boundary": "P0-10..P0-13 current JSON artifacts; P0-1..P0-9 prior-chat transcript/completion summaries; live jewelai-v2 repository for implemented target grammar.",
+    "important_limitation": "Original 56-target Matrix artifact and individual P0-1..P0-9 JSON/MD artifacts are not present in this workspace. Reconstructed canonical IDs are explicitly labeled and must be reconciled before normative schema freeze."
+  },
+  "counts": {
+    "total": 166,
+    "by_runtime_layer": {
+      "CURRENT_PRODUCT_STATE_V1": 30,
+      "PRODUCT_STATE_VNEXT": 118,
+      "INTERPRETATION_METADATA": 5,
+      "REFERENCE_BINDING": 1,
+      "AI_GENERATION_STATE": 3,
+      "OUTPUT_PROFILE": 4,
+      "VERIFICATION_RESULT": 4,
+      "DERIVED_RUNTIME_METADATA": 1
+    },
+    "by_source_step": {
+      "ORIGINAL_MATRIX": 56,
+      "P0-1": 3,
+      "P0-2": 10,
+      "P0-3": 2,
+      "P0-4": 1,
+      "P0-5": 5,
+      "P0-6": 16,
+      "P0-7": 27,
+      "P0-9": 31,
+      "P0-10": 15
+    },
+    "current_product_state_v1": 30,
+    "requires_product_state_vnext": 118,
+    "not_product_state_total": 18
+  },
+  "layer_rules": {
+    "CURRENT_PRODUCT_STATE_V1": "Already represented by current authoritative Design Schema / Knowledge Library target grammar.",
+    "PRODUCT_STATE_VNEXT": "Intrinsic or explicitly chosen design/product property that requires additive schema support.",
+    "INTERPRETATION_METADATA": "User-intent or scale/semantic evidence used to understand/compile a design but not itself an objective Product State fact.",
+    "REFERENCE_BINDING": "Feature-level semantics for how a reference constrains or informs a target design.",
+    "AI_GENERATION_STATE": "Presentation/execution state such as camera, scale instruction or lighting.",
+    "OUTPUT_PROFILE": "Requested presentation/output characteristics, not jewelry design truth.",
+    "VERIFICATION_RESULT": "Evaluation of generated media against design/reference constraints.",
+    "DERIVED_RUNTIME_METADATA": "Deterministically calculated comparison/preservation metadata; does not silently become authoritative Product State."
+  },
+  "targets": [
+    {
+      "target": "jewelry_type",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.material",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.color",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.purity",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.finish",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.material",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.shape",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.cut",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.weight",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.dimensions",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.color",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.setting",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.orientation",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.shank",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.gallery",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.basket",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.clasp",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.setting_height",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.shank_width",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.thickness",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "style",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.material",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.shape",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.cut",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.weight",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.dimensions",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.color",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.setting",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.orientation",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.quantity",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "CURRENT_PRODUCT_STATE_V1",
+      "migration_action": "KEEP_V1",
+      "evidence_status": "EXACT_REPOSITORY",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "prong_count",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "prong_style",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.role",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.arrangement",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.location",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.coverage",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "halo.enabled",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "halo.type",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "pave.enabled",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "pave.location",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "pave.coverage",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "decorative_elements",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "composition",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "creative_intent",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "INTERPRETATION_METADATA",
+      "migration_action": "MOVE_TO_DESIGN_INTENT_METADATA",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "references.feature_bindings",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "REFERENCE_BINDING",
+      "migration_action": "REFERENCE_BINDING_CONTRACT_V1",
+      "evidence_status": "RECONSTRUCTED_PHASE2_SUMMARY_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "presentation.camera_view",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "AI_GENERATION_STATE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "presentation.framing",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "OUTPUT_PROFILE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "presentation.lighting",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "AI_GENERATION_STATE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "presentation.background",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "OUTPUT_PROFILE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "presentation.realism",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "OUTPUT_PROFILE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "verification.geometry_plausibility",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "VERIFICATION_RESULT",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "presentation.additional_views",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "OUTPUT_PROFILE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_PHASE2",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "presentation.scale",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "AI_GENERATION_STATE",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "RECONSTRUCTED_VISUALIZATION_SUMMARY",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "verification.metal_realism",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "VERIFICATION_RESULT",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_VALIDATION_SUMMARY",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "verification.stone_realism",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "VERIFICATION_RESULT",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "EXPLICIT_VALIDATION_SUMMARY",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "verification.common_errors",
+      "source_step": "ORIGINAL_MATRIX",
+      "runtime_layer": "VERIFICATION_RESULT",
+      "migration_action": "KEEP_OUT_OF_PRODUCT_STATE",
+      "evidence_status": "RECONSTRUCTED_VISUALIZATION_SUMMARY",
+      "canonicalization_status": "RUNTIME_CANONICALIZATION_PROPOSAL",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.sieve_system",
+      "source_step": "P0-1",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.sieve_designation",
+      "source_step": "P0-1",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.diameter_range_mm",
+      "source_step": "P0-1",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.variety_or_type",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.variety_or_type",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.material_origin_status",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.material_origin_status",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.geographic_origin",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.geographic_origin",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.treatment_status",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.treatment_status",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.treatments",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.treatments",
+      "source_step": "P0-2",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "center_stone.cut_style_class",
+      "source_step": "P0-3",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.stones.cut_style_class",
+      "source_step": "P0-3",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "prong_configuration",
+      "source_step": "P0-4",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "side_stones.{group_id}.total_carat_weight",
+      "source_step": "P0-5",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "halo.location",
+      "source_step": "P0-5",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "halo.row_count",
+      "source_step": "P0-5",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "halo.outline_relation",
+      "source_step": "P0-5",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "pave.row_count",
+      "source_step": "P0-5",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.alloy_system",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.coating.material",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.coating.coverage",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.coating.method",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.coating.color_or_effect",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.coating.thickness",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.surface_treatment",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.components",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].role_or_location",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].material",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].color",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].purity",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].alloy_system",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].finish",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].coating",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "metal.components[].surface_treatment",
+      "source_step": "P0-6",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_EXACT_FAMILY_COUNT_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.head",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.shoulders",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bridge",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.sizing_area",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.shank_configuration",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.solidity",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.post_or_wire",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.back_or_closure",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.hinge_or_latch",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.connector",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.pair_scope",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.bail",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.bail_mobility",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.connector",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.base_type",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.chain_style",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.strand_count",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.strand_progression",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.end_components",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.structure",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.hinge",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.secondary_safety",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.articulation",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.fastening_system",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.pin_stem",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.joint",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.catch",
+      "source_step": "P0-7",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_TRANSCRIPT_COMPLETION",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "product.overall_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "product.dimension_scope",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.ring.size",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.ring.size_system",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.ring.inner_diameter_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.ring.inner_circumference_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.ring.head_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.overall_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.drop_length_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.inside_diameter_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.outside_diameter_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.post_length_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.earring.post_thickness_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.overall_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.body_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.bail_inside_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.pendant.chain_passage_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.wearable_length_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.necklace.strand_lengths_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.wearable_length_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.inner_circumference_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.inner_dimensions_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.width_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.thickness_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.bracelet.cuff_gap_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.overall_dimensions",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.thickness_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.pin_stem_length_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "construction.brooch.fastening_span_mm",
+      "source_step": "P0-9",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXPLICIT_TRANSCRIPT_PATH",
+      "canonicalization_status": "NAMED",
+      "note": ""
+    },
+    {
+      "target": "proportions.relative_ratios",
+      "source_step": "P0-9",
+      "runtime_layer": "DERIVED_RUNTIME_METADATA",
+      "migration_action": "DERIVE_FROM_AUTHORITATIVE_OR_REFERENCE_DIMENSIONS",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "proportions.scale_anchor",
+      "source_step": "P0-9",
+      "runtime_layer": "INTERPRETATION_METADATA",
+      "migration_action": "STORE_SCALE_EVIDENCE_NOT_PRODUCT_FACT",
+      "evidence_status": "RECONSTRUCTED_P0_9_COMPLETION_HIGH",
+      "canonicalization_status": "RECONSTRUCTED_CANONICAL_ID",
+      "note": ""
+    },
+    {
+      "target": "style_period_or_movement",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Separates historical/movement reference from structural/product style without replacing existing style."
+    },
+    {
+      "target": "style_influences",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Allows mixed influences without forcing one exclusive style label."
+    },
+    {
+      "target": "style_descriptors",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Stores descriptive aesthetics such as minimalist, delicate, bold or geometric."
+    },
+    {
+      "target": "decorative_elements[].technique",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Separates physical decorative process from motif/content."
+    },
+    {
+      "target": "decorative_elements[].motif",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Preserves subject/pattern independently of technique."
+    },
+    {
+      "target": "decorative_elements[].location",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Decoration is location-specific and must not spread automatically."
+    },
+    {
+      "target": "decorative_elements[].prominence",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Distinguishes subtle accent from dominant decoration without inventing dimensions."
+    },
+    {
+      "target": "composition.symmetry_mode",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Explicitly preserves symmetrical/asymmetrical intent."
+    },
+    {
+      "target": "composition.organization",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Stores linear/radial/clustered/distributed/graduated/etc. structure."
+    },
+    {
+      "target": "composition.focal_hierarchy",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Preserves which element is visually dominant when explicit."
+    },
+    {
+      "target": "composition.negative_space_intent",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Prevents intentional openings from being silently filled."
+    },
+    {
+      "target": "composition.rhythm",
+      "source_step": "P0-10",
+      "runtime_layer": "PRODUCT_STATE_VNEXT",
+      "migration_action": "ADD_SCHEMA_VNEXT",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Stores repetition/alternation/graduation semantics without inventing counts."
+    },
+    {
+      "target": "creative_intent_raw",
+      "source_step": "P0-10",
+      "runtime_layer": "INTERPRETATION_METADATA",
+      "migration_action": "MOVE_TO_DESIGN_INTENT_METADATA",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Preserves user's original expressive wording verbatim/near-verbatim."
+    },
+    {
+      "target": "creative_intent_descriptors",
+      "source_step": "P0-10",
+      "runtime_layer": "INTERPRETATION_METADATA",
+      "migration_action": "MOVE_TO_DESIGN_INTENT_METADATA",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Adds searchable/usable normalized semantics without replacing raw intent."
+    },
+    {
+      "target": "creative_intent_axes",
+      "source_step": "P0-10",
+      "runtime_layer": "INTERPRETATION_METADATA",
+      "migration_action": "MOVE_TO_DESIGN_INTENT_METADATA",
+      "evidence_status": "EXACT_CURRENT_JSON_ARTIFACT",
+      "canonicalization_status": "NAMED",
+      "note": "Represents multi-dimensional intent without forcing a single style tag."
+    }
+  ],
+  "freeze_gate": {
+    "normative_schema_freeze_allowed": false,
+    "blockers": [
+      "Recover/reconcile original 56-target Matrix artifact exact canonical IDs.",
+      "Recover/reconcile individual P0-1..P0-9 artifacts, especially exact P0-9 31-path registry.",
+      "Approve additive Product State vNext field set after reconciliation."
+    ],
+    "non_blocking_for_proposal": [
+      "Reference Binding and Verification contracts can be drafted now because their layer ownership is already explicit."
+    ]
+  }
+}
