@@ -63,9 +63,7 @@ class KnowledgePolicyEngineV1_1:
 
     def __init__(self, runtime: CompiledKnowledgeLibraryV1_1 | object):
         self.runtime = CompiledKnowledgeLibraryV1_1.model_validate(runtime)
-        self._policies = tuple(
-            sorted(self.runtime.policies, key=lambda item: item.policy_id)
-        )
+        self._policies = tuple(sorted(self.runtime.policies, key=lambda item: item.policy_id))
         self._runtime_evidence_ids = (
             frozenset(item.source_id for item in self.runtime.sources)
             | frozenset(item.claim_id for item in self.runtime.claims)
@@ -73,14 +71,11 @@ class KnowledgePolicyEngineV1_1:
             | frozenset(item.mapping_id for item in self.runtime.language_mappings)
             | frozenset(item.policy_id for item in self.runtime.policies)
             | frozenset(
-                source_ref
-                for item in self.runtime.policies
-                for source_ref in item.source_refs
+                source_ref for item in self.runtime.policies for source_ref in item.source_refs
             )
         )
         self._precedence = {
-            provenance: rank
-            for rank, provenance in enumerate(PROVENANCE_PRECEDENCE)
+            provenance: rank for rank, provenance in enumerate(PROVENANCE_PRECEDENCE)
         }
 
     def policies_for(
