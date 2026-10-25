@@ -414,9 +414,7 @@ class RuntimeService:
         current = self.repository.get_revision(
             session_id, request.expected_revision_id, organization_id
         )
-        eligibility = self.get_schema_v1_1_migration_eligibility(
-            session_id, organization_id
-        )
+        eligibility = self.get_schema_v1_1_migration_eligibility(session_id, organization_id)
         if not eligibility.eligible:
             raise InvalidTransitionError(
                 "Schema v1.1 migration blocked: " + ", ".join(eligibility.blockers)
@@ -438,7 +436,6 @@ class RuntimeService:
             request.expected_revision_id,
             migrated,
         )
-
 
     def create_message(
         self, session_id: UUID, organization_id: UUID, content: str
