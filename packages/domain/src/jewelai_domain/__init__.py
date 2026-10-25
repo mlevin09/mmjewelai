@@ -64,6 +64,13 @@ from .knowledge_storage import (
     KnowledgeArtifactStore,
     StoredKnowledgeArtifact,
 )
+from .knowledge_targets_v1_1 import (
+    POLICY_TARGET_TEMPLATES_V1_1,
+    PRODUCT_STATE_TARGET_FAMILIES_V1_1,
+    SCHEMA_TARGET_VERSION_V1_1,
+    is_allowed_product_state_target_v1_1,
+    target_family_from_concrete,
+)
 from .models import SCHEMA_VERSION, Design, DesignRevision
 from .models_v1_1 import (
     SCHEMA_VERSION_V1_1,
@@ -73,12 +80,14 @@ from .models_v1_1 import (
     upgrade_design_revision_v1_to_v1_1,
     validate_design_revision,
 )
-from .knowledge_targets_v1_1 import (
-    POLICY_TARGET_TEMPLATES_V1_1,
-    PRODUCT_STATE_TARGET_FAMILIES_V1_1,
-    SCHEMA_TARGET_VERSION_V1_1,
-    is_allowed_product_state_target_v1_1,
-    target_family_from_concrete,
+from .questions import (
+    QUESTION_SCHEMA_VERSION,
+    QuestionCatalog,
+    QuestionId,
+    RenderedQuestion,
+    SchemaTarget,
+    UnknownQuestionError,
+    load_question_catalog,
 )
 from .reference_bindings import (
     REFERENCE_BINDING_CONTRACT_VERSION,
@@ -89,25 +98,6 @@ from .reference_bindings import (
     ReferenceProvenance,
     ReferenceRelation,
     ReferenceRole,
-)
-from .visualization_verification import (
-    VISUALIZATION_VERIFICATION_CONTRACT_VERSION,
-    VerificationAction,
-    VerificationCheck,
-    VerificationDimension,
-    VerificationSeverity,
-    VerificationStatus,
-    VerificationSubject,
-    VisualizationVerificationResult,
-)
-from .questions import (
-    QUESTION_SCHEMA_VERSION,
-    QuestionCatalog,
-    QuestionId,
-    RenderedQuestion,
-    SchemaTarget,
-    UnknownQuestionError,
-    load_question_catalog,
 )
 from .revisions import RevisionConflict, confirm_field, lock_field, revise_design, unlock_field
 from .roles import (
@@ -133,6 +123,16 @@ from .rules import (
     RuleRegistry,
     analyze_gaps,
     load_rules,
+)
+from .visualization_verification import (
+    VISUALIZATION_VERIFICATION_CONTRACT_VERSION,
+    VerificationAction,
+    VerificationCheck,
+    VerificationDimension,
+    VerificationSeverity,
+    VerificationStatus,
+    VerificationSubject,
+    VisualizationVerificationResult,
 )
 
 __all__ = [
