@@ -46,7 +46,8 @@ from jewelai_domain import (
 )
 from jewelai_domain.dictionary import DictionaryCategory, DictionaryLocale, EntryLifecycle
 from jewelai_domain.models import MessageSource, RevisionEvent
-from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
+from jewelai_domain.models_v1_1 import DesignRevisionV1_1, migrate_design_revision_v1_to_v1_1
+from jewelai_domain.revise_v1_1 import revise_parser_design_v1_1
 from jewelai_generation_queue import GenerationTaskPublisher, GenerationTaskPublishError
 from jewelai_model_gateway import GenerationRun, GenerationStatus
 from jewelai_parser import ParserProposal, build_parser_proposal
