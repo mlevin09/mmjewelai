@@ -6,6 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, StrictBool, model_validator
 
 from .knowledge_library import CompiledKnowledgeLibrary, CompiledPolicy, PolicyTarget
+from .knowledge_library_v1_1 import CompiledKnowledgeLibraryV1_1, CompiledPolicyV1_1
 from .models import (
     Assumed,
     Derived,
@@ -282,7 +283,7 @@ def _from_design_state(target: str, state: object | None) -> RuntimeParameterSta
 
 
 def build_knowledge_runtime_state(
-    runtime: CompiledKnowledgeLibrary,
+    runtime: CompiledKnowledgeLibrary | CompiledKnowledgeLibraryV1_1,
     revision: AnyDesignRevision | object,
 ) -> KnowledgeRuntimeState:
     """Project one immutable DesignRevision into Knowledge Library runtime state.
@@ -292,7 +293,7 @@ def build_knowledge_runtime_state(
     traversal; Reference Binding and Visualization Verification remain outside
     this state.
     """
-    runtime = CompiledKnowledgeLibrary.model_validate(runtime)
+    runtime = _validate_compiled_runtime(runtime)
     revision = validate_design_revision(revision)
     parameters = [
         _from_design_state(target, state) for target, state in iter_knowledge_state_fields(revision)
@@ -308,18 +309,34 @@ def build_knowledge_runtime_state(
     )
 
 
-def _collection_group(template: str, target: str) -> str | None:
+def _validate_compiled_runtime(
+    runtime: CompiledKnowledgeLibrary | CompiledKnowledgeLibraryV1_1 | object,
+) -> CompiledKnowledgeLibrary | CompiledKnowledgeLibraryV1_1:
+    contract_version = (
+        runtime.get("contract_version")
+        if isinstance(runtime, dict)
+        else getattr(runtime, "contract_version", None)
+    )
+    if contract_version == "1.1.0":
+        return CompiledKnowledgeLibraryV1_1.model_validate(runtime)
+    return CompiledKnowledgeLibrary.model_validate(runtime)
+
+
+_PLACEHOLDERS = frozenset({"{group_id}", "{component_id}", "{element_id}"})
+
+
+def _template_bindings(template: str, target: str) -> dict[str, str] | None:
     template_parts = template.split(".")
     target_parts = target.split(".")
     if len(template_parts) != len(target_parts):
         return None
-    group_id = None
+    bindings = {}
     for expected, actual in zip(template_parts, target_parts, strict=True):
-        if expected == "{group_id}":
-            group_id = actual
+        if expected in _PLACEHOLDERS:
+            bindings[expected] = actual
         elif expected != actual:
             return None
-    return group_id
+    return bindings
 
 
 class KnowledgePolicyEngine:
@@ -330,8 +347,11 @@ class KnowledgePolicyEngine:
     preservation, lock, stable-group and provenance-precedence semantics.
     """
 
-    def __init__(self, runtime: CompiledKnowledgeLibrary):
-        self.runtime = CompiledKnowledgeLibrary.model_validate(runtime)
+    def __init__(
+        self,
+        runtime: CompiledKnowledgeLibrary | CompiledKnowledgeLibraryV1_1 | object,
+    ):
+        self.runtime = _validate_compiled_runtime(runtime)
         self._policies = tuple(sorted(self.runtime.policies, key=lambda item: item.policy_id))
         self._runtime_evidence_ids = (
             frozenset(item.source_id for item in self.runtime.sources)
@@ -352,18 +372,20 @@ class KnowledgePolicyEngine:
         target: str,
         *,
         existing_group_ids: tuple[str, ...] = (),
-    ) -> tuple[CompiledPolicy, ...]:
+    ) -> tuple[CompiledPolicy | CompiledPolicyV1_1, ...]:
         matches = []
         groups = frozenset(existing_group_ids)
         for policy in self._policies:
             if policy.target == target:
                 matches.append(policy)
                 continue
-            if "{group_id}" not in policy.target:
+            bindings = _template_bindings(policy.target, target)
+            if bindings is None:
                 continue
-            group_id = _collection_group(policy.target, target)
-            if group_id is not None and group_id in groups:
-                matches.append(policy)
+            group_id = bindings.get("{group_id}")
+            if group_id is not None and group_id not in groups:
+                continue
+            matches.append(policy)
         return tuple(matches)
 
     def evaluate(
