@@ -27,7 +27,6 @@ from jewelai_domain.knowledge_activation import (
     ProductionValidationReport,
 )
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
-from jewelai_domain.models import DesignRevision
 from jewelai_domain.models_v1_1 import (
     AnyDesignRevision,
     DesignRevisionV1_1,
