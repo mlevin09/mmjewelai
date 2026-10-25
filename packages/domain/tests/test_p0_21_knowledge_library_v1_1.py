@@ -1,4 +1,6 @@
 import json
+from datetime import UTC, datetime
+from uuid import UUID
 
 import pytest
 
@@ -21,18 +23,8 @@ from jewelai_domain.knowledge_library_v1_1 import (
 )
 from jewelai_domain.knowledge_policy import KnowledgePolicyEngine
 from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
-from jewelai_domain.models import (
-    Design,
-    DesignRevision,
-    Explicit,
-    MessageSource,
-    RevisionEvent,
-)
+from jewelai_domain.models import Design, DesignRevision, MessageSource, RevisionEvent
 from jewelai_domain.models_v1_1 import upgrade_design_revision_v1_to_v1_1
-
-from datetime import UTC, datetime
-from uuid import UUID
-
 
 NOW = datetime(2026, 10, 25, 18, 0, tzinfo=UTC)
 SOURCE = MessageSource(message_id="p0-21", recorded_at=NOW)
