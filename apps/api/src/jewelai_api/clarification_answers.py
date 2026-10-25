@@ -13,7 +13,8 @@ from uuid import UUID
 
 from jewelai_domain.dictionary import DictionaryCategory, DictionaryRegistry, EntryLifecycle
 from jewelai_domain.knowledge_activation import ActiveKnowledgeRuntime
-from jewelai_domain.models import DesignRevision, ImmutableModel, MessageSource
+from jewelai_domain.models import ImmutableModel, MessageSource
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_domain.questions import DictionaryAnswerContract, QuestionCatalog, QuestionId
 from jewelai_domain.revisions import RevisionConflict, revise_design
 from jewelai_domain.rules import AskDecision, RuleRegistry
@@ -128,7 +129,7 @@ class ClarificationAnswerResult(ImmutableModel):
     subject: str | None = None
     previous_revision_id: UUID
     new_revision_id: UUID | None = None
-    resulting_revision: DesignRevision | None = None
+    resulting_revision: AnyDesignRevision | None = None
     knowledge_package_id: str
     knowledge_artifact_version: str
     knowledge_runtime_sha256: str
@@ -176,7 +177,7 @@ def process_clarification_answer(
     answer: ClarificationAnswer,
     *,
     authoritative_session_id: UUID,
-    current_revision: DesignRevision,
+    current_revision: AnyDesignRevision | object,
     active_release: ActiveKnowledgeRuntime,
     dictionary: DictionaryRegistry,
     questions: QuestionCatalog,
@@ -194,7 +195,7 @@ def process_clarification_answer(
             "clarification plan failed integrity validation",
         ) from exc
     answer = ClarificationAnswer.model_validate(answer)
-    current_revision = DesignRevision.model_validate(current_revision)
+    current_revision = validate_design_revision(current_revision)
     release = ActiveKnowledgeRuntime.model_validate(active_release)
 
     if answer.session_id != authoritative_session_id:
