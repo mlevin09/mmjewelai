@@ -1094,7 +1094,6 @@ def test_postgres_conflicting_corrections_commit_no_partial_constraint_history(t
         pg_engine.dispose()
 
 
-
 def test_prompt_enrichment_preserves_additive_state_on_schema_v1_1(engine, tmp_path):
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
