@@ -592,9 +592,7 @@ class ReferenceBindingRow(Base):
     session_id: Mapped[UUID] = mapped_column(
         ForeignKey("design_session.session_id", ondelete="RESTRICT"), index=True
     )
-    asset_id: Mapped[UUID] = mapped_column(
-        ForeignKey("asset.asset_id", ondelete="RESTRICT")
-    )
+    asset_id: Mapped[UUID] = mapped_column(ForeignKey("asset.asset_id", ondelete="RESTRICT"))
     contract_version: Mapped[str] = mapped_column(String(32))
     payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
