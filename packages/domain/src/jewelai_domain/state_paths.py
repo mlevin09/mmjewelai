@@ -123,19 +123,14 @@ def iter_knowledge_state_fields(
     revision = validate_design_revision(revision)
     design = revision.design
     states = [("jewelry_type", design.jewelry_type)]
+    states.extend((f"metal.{name}", getattr(design.metal, name)) for name in _BASE_METAL_FIELDS)
     states.extend(
-        (f"metal.{name}", getattr(design.metal, name))
-        for name in _BASE_METAL_FIELDS
-    )
-    states.extend(
-        (f"center_stone.{name}", getattr(design.center_stone, name))
-        for name in _BASE_STONE_FIELDS
+        (f"center_stone.{name}", getattr(design.center_stone, name)) for name in _BASE_STONE_FIELDS
     )
     for group in sorted(design.side_stones, key=lambda item: item.group_id):
         prefix = f"side_stones.{group.group_id}"
         states.extend(
-            (f"{prefix}.stones.{name}", getattr(group.stones, name))
-            for name in _BASE_STONE_FIELDS
+            (f"{prefix}.stones.{name}", getattr(group.stones, name)) for name in _BASE_STONE_FIELDS
         )
         states.append((f"{prefix}.quantity", group.quantity))
     states.extend(
@@ -147,19 +142,14 @@ def iter_knowledge_state_fields(
         return tuple(states)
 
     states.extend(
-        (f"center_stone.{name}", getattr(design.center_stone, name))
-        for name in _STONE_V1_1_FIELDS
+        (f"center_stone.{name}", getattr(design.center_stone, name)) for name in _STONE_V1_1_FIELDS
     )
     for group in sorted(design.side_stones, key=lambda item: item.group_id):
         prefix = f"side_stones.{group.group_id}"
         states.extend(
-            (f"{prefix}.stones.{name}", getattr(group.stones, name))
-            for name in _STONE_V1_1_FIELDS
+            (f"{prefix}.stones.{name}", getattr(group.stones, name)) for name in _STONE_V1_1_FIELDS
         )
-        states.extend(
-            (f"{prefix}.{name}", getattr(group, name))
-            for name in _SIDE_V1_1_FIELDS
-        )
+        states.extend((f"{prefix}.{name}", getattr(group, name)) for name in _SIDE_V1_1_FIELDS)
     states.extend(
         (f"metal.{name}", getattr(design.metal, name))
         for name in ("alloy_system", "surface_treatment")
@@ -188,10 +178,7 @@ def iter_knowledge_state_fields(
     )
     for section, names in _NESTED_CONSTRUCTION_FIELDS.items():
         obj = getattr(design.construction, section)
-        states.extend(
-            (f"construction.{section}.{name}", getattr(obj, name))
-            for name in names
-        )
+        states.extend((f"construction.{section}.{name}", getattr(obj, name)) for name in names)
     states.extend(
         (
             ("prong_count", design.prong_count),
