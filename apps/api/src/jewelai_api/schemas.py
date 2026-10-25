@@ -17,6 +17,8 @@ from jewelai_domain import (
     ProposedDomainUpdate,
     ReadyDecision,
     RenderedQuestion,
+    ReferenceBinding,
+    VisualizationVerificationResult,
 )
 from jewelai_domain.models import MessageSource
 from jewelai_model_gateway import GenerationRun
@@ -381,6 +383,14 @@ class AssetResponse(ApiModel):
 
 class AssetListResponse(ApiModel):
     assets: tuple[AssetResponse, ...]
+
+
+class ReferenceBindingListResponse(ApiModel):
+    bindings: tuple[ReferenceBinding, ...]
+
+
+class VisualizationVerificationListResponse(ApiModel):
+    verifications: tuple[VisualizationVerificationResult, ...]
 
 
 VisualizationResult.model_rebuild()
