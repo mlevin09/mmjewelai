@@ -31,7 +31,9 @@ from .models import (
     ParserCandidate,
     ParserIssue,
     ParserIssueCode,
+    AnyParserProposal,
     ParserProposal,
+    ParserProposalV1_1,
     ParserTarget,
     ParserWarning,
     ParserWarningCode,
@@ -67,7 +69,7 @@ def build_parser_proposal(
     locale: str,
     dictionary: DictionaryRegistry,
     candidate: ParserCandidate,
-) -> ParserProposal:
+) -> AnyParserProposal:
     revision = validate_design_revision(revision)
     candidate = ParserCandidate.model_validate(candidate)
     source = MessageSource.model_validate(source)
@@ -166,7 +168,8 @@ def build_parser_proposal(
         if revision.schema_version == "1.1.0"
         else Design.model_validate(data)
     )
-    return ParserProposal(
+    proposal_type = ParserProposalV1_1 if revision.schema_version == "1.1.0" else ParserProposal
+    return proposal_type(
         expected_revision_id=revision.revision_id,
         source=source,
         locale=locale,
