@@ -7,7 +7,7 @@ from jewelai_domain.knowledge_base import (
     ParametricKnowledgeBundle,
     ReviewStatus,
 )
-from jewelai_domain.models import DesignRevision
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_prompts import (
     ParametricEnrichmentReference,
     ParametricReferenceDimensions,
@@ -22,14 +22,14 @@ _KIND_PRIORITY = (
 
 
 def select_parametric_references(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     catalog: ParametricKnowledgeBundle,
 ) -> tuple[ParametricEnrichmentReference, ...]:
     """Select exact-context calibrated references without interpolation
     or Product State mutation.
     """
 
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     catalog = ParametricKnowledgeBundle.model_validate(catalog)
     stone = revision.design.center_stone
     if not parametric_reference_context_is_eligible(revision):
