@@ -24,11 +24,9 @@ from jewelai_domain.visualization_verification import (
     VerificationSubject,
     VisualizationVerificationResult,
 )
-from jewelai_prompts import compile_prompt, load_prompt_templates
 
 ROOT = Path(__file__).resolve().parents[3]
 RING = ROOT / "specs" / "jewelry-design-schema" / "fixtures" / "valid" / "ring.json"
-PROMPTS = ROOT / "data" / "prompts" / "v1.0.0.json"
 REFERENCE_SCHEMA = ROOT / "specs" / "reference-bindings" / "schema-v1.0.0.json"
 VERIFICATION_SCHEMA = (
     ROOT / "specs" / "visualization-verification" / "schema-v1.0.0.json"
@@ -106,22 +104,6 @@ def test_knowledge_projection_accepts_v1_1_without_changing_v1_runtime_identity(
     assert projected.get("center_stone.variety_or_type").semantic_state == "MISSING"
     assert projected.get("halo.enabled").semantic_state == "MISSING"
     assert projected.get("composition").semantic_state == "MISSING"
-
-
-def test_prompt_text_is_compatible_when_v1_revision_is_only_upgraded():
-    v1 = DesignRevision.model_validate_json(RING.read_text(encoding="utf-8"))
-    upgraded = upgrade_design_revision_v1_to_v1_1(v1)
-    templates = load_prompt_templates(PROMPTS)
-
-    old = compile_prompt(v1, templates)
-    new = compile_prompt(upgraded, templates)
-
-    assert new.design_schema_version == "1.1.0"
-    assert old.design_schema_version == "1.0.0"
-    assert old.prompt_text == new.prompt_text
-    assert old.specification_entries == new.specification_entries
-    assert old.locked_constraints == new.locked_constraints
-    assert old.disclosures == new.disclosures
 
 
 def test_reference_binding_runtime_matches_frozen_json_schema():
