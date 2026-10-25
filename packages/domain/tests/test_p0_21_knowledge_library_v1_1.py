@@ -5,8 +5,8 @@ from uuid import UUID
 import pytest
 
 from jewelai_domain.knowledge_activation import (
-    ProductionValidationCheck,
     REQUIRED_PRODUCTION_VALIDATION_CHECKS,
+    ProductionValidationCheck,
 )
 from jewelai_domain.knowledge_activation_v1_1 import (
     ProductionValidationReportV1_1,
