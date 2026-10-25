@@ -313,7 +313,11 @@ class KnowledgeLibraryRegistryV1_1:
             item for item in self.bundle.policies if item.lifecycle_status == Lifecycle.REVIEWED
         ]
         for policy in reviewed_policies:
-            valid = reviewed_concepts if policy.source_kind == "DOMAIN_KNOWLEDGE" else reviewed_sources
+            valid = (
+                reviewed_concepts
+                if policy.source_kind == "DOMAIN_KNOWLEDGE"
+                else reviewed_sources
+            )
             if any(ref not in valid for ref in policy.source_refs):
                 raise KnowledgeLibraryV1_1ValidationError(
                     f"reviewed policy {policy.policy_id} depends on non-REVIEWED provenance"
