@@ -18,7 +18,6 @@ from jewelai_domain import (
     ReadyDecision,
     ReferenceBinding,
     RenderedQuestion,
-    SchemaV1_1MigrationEligibility,
     VisualizationVerificationResult,
 )
 from jewelai_domain.models import MessageSource
