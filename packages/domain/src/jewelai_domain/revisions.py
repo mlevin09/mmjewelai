@@ -149,16 +149,36 @@ def _transition(current, path, expected_revision_id, source, reason, created_at,
     data = current.design.model_dump(mode="json")
     cursor = data
     for part in key[:-1]:
+        while (
+            isinstance(cursor, dict)
+            and cursor.get("availability") == "value"
+            and isinstance(cursor.get("value"), (dict, list))
+        ):
+            cursor = cursor["value"]
         if isinstance(cursor, list):
-            cursor = next(group for group in cursor if group["group_id"] == part)
+            cursor = next(
+                item
+                for item in cursor
+                if any(
+                    item.get(id_key) == part
+                    for id_key in ("group_id", "component_id", "element_id")
+                )
+            )
         else:
             cursor = cursor[part]
+    while (
+        isinstance(cursor, dict)
+        and cursor.get("availability") == "value"
+        and isinstance(cursor.get("value"), (dict, list))
+    ):
+        cursor = cursor["value"]
     leaf = cursor[key[-1]]
     if action == "confirm":
         leaf["confirmed"] = True
     else:
         leaf["locked"] = action == "lock"
-    return _new_revision(current, Design.model_validate(data), source, reason, action, created_at)
+    design_type = DesignV1_1 if isinstance(current, DesignRevisionV1_1) else Design
+    return _new_revision(current, design_type.model_validate(data), source, reason, action, created_at)
 
 
 def confirm_field(
