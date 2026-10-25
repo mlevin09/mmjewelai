@@ -31,18 +31,43 @@ class RevisionConflict(ValueError):
     """The caller's revision is stale or an edit violates a state transition."""
 
 
+def _stable_item_id(item):
+    for name in ("group_id", "component_id", "element_id"):
+        value = getattr(item, name, None)
+        if value is not None:
+            return str(value)
+    return None
+
+
 def _fields(model, prefix=()):
     result = {}
     for name in type(model).model_fields:
         value = getattr(model, name)
         path = (*prefix, name)
-        if value is None or isinstance(value, FIELD_TYPES):
+        if value is None:
             result[path] = value
-        elif name == "side_stones":
-            for group in value:
-                result.update(_fields(group.stones, (*path, group.group_id, "stones")))
-                result[(*path, group.group_id, "quantity")] = group.quantity
-        elif isinstance(value, BaseModel):
+            continue
+        if isinstance(value, FIELD_TYPES):
+            result[path] = value
+            if isinstance(value, KnownValue):
+                nested = value.value
+                if isinstance(nested, BaseModel):
+                    result.update(_fields(nested, path))
+                elif isinstance(nested, tuple):
+                    for item in nested:
+                        if isinstance(item, BaseModel):
+                            stable_id = _stable_item_id(item)
+                            if stable_id is not None:
+                                result.update(_fields(item, (*path, stable_id)))
+            continue
+        if isinstance(value, tuple):
+            for item in value:
+                if isinstance(item, BaseModel):
+                    stable_id = _stable_item_id(item)
+                    if stable_id is not None:
+                        result.update(_fields(item, (*path, stable_id)))
+            continue
+        if isinstance(value, BaseModel):
             result.update(_fields(value, path))
     return result
 
