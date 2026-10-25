@@ -3,8 +3,6 @@
 import hashlib
 import json
 
-from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
-from jewelai_domain.state_paths import iter_prompt_state_fields
 from jewelai_domain.models import (
     Assumed,
     Derived,
@@ -13,6 +11,8 @@ from jewelai_domain.models import (
     NotApplicable,
     Unknown,
 )
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
+from jewelai_domain.state_paths import iter_prompt_state_fields
 
 from .models import (
     PROMPT_COMPILER_VERSION,
