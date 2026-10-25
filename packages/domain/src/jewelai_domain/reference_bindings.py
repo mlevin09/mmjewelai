@@ -66,7 +66,7 @@ class FeatureBinding(ImmutableModel):
     raw_user_language: str | None = None
     provenance: ReferenceProvenance
     confidence: Confidence | None = None
-    observability: ReferenceObservability | None = None
+    observability: ReferenceObservability | None = Field(\n        default=None, exclude_if=lambda value: value is None\n    )
 
 
 class PresentationBinding(ImmutableModel):
