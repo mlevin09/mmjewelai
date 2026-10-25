@@ -108,9 +108,7 @@ def revision_v1_1():
         "confirmed": False,
         "locked": False,
     }
-    return upgraded.model_copy(
-        update={"design": type(upgraded.design).model_validate(data)}
-    )
+    return upgraded.model_copy(update={"design": type(upgraded.design).model_validate(data)})
 
 
 def report(runtime):
