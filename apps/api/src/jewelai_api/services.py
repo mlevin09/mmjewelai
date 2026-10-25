@@ -495,16 +495,12 @@ class RuntimeService:
             ),
         )
         if proposal.has_changes:
-            revision = self.transition_revision(
+            revision = self._apply_parser_proposal_revision(
                 session_id,
                 organization_id,
-                EditRevisionRequest(
-                    action="edit",
-                    expected_revision_id=request.expected_revision_id,
-                    proposed_design=proposal.proposed_design,
-                    source=proposal.source,
-                    reason="Applied supported facts from natural-language intake",
-                ),
+                request.expected_revision_id,
+                proposal,
+                "Applied supported facts from natural-language intake",
             )
         else:
             revision = self.repository.get_current_revision(session_id, organization_id)
