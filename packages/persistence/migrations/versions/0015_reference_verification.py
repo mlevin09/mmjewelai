@@ -27,9 +27,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["organization_id"], ["organization.organization_id"], ondelete="RESTRICT"
         ),
-        sa.ForeignKeyConstraint(
-            ["session_id"], ["design_session.session_id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["session_id"], ["design_session.session_id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(["asset_id"], ["asset.asset_id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("binding_id"),
     )
@@ -40,9 +38,7 @@ def upgrade() -> None:
     )
     op.create_index("ix_reference_binding_session_id", "reference_binding", ["session_id"])
     op.create_index("ix_reference_binding_asset", "reference_binding", ["asset_id"])
-    op.create_index(
-        "ix_reference_binding_content_hash", "reference_binding", ["content_hash"]
-    )
+    op.create_index("ix_reference_binding_content_hash", "reference_binding", ["content_hash"])
     op.create_index(
         "ix_reference_binding_session_created",
         "reference_binding",
@@ -77,9 +73,7 @@ def upgrade() -> None:
             ["specification_revision.revision_id"],
             ondelete="RESTRICT",
         ),
-        sa.ForeignKeyConstraint(
-            ["previous_asset_id"], ["asset.asset_id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["previous_asset_id"], ["asset.asset_id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("verification_id"),
     )
     op.create_index(
