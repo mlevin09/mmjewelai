@@ -22,7 +22,7 @@ from jewelai_domain.knowledge_storage import (
 )
 from jewelai_domain.models import ImmutableModel, MessageSource
 from jewelai_domain.revisions import RevisionConflict, revise_design
-from jewelai_parser import FullMessageParseResult, ParserProposal, parse_full_message
+from jewelai_parser import AnyParserProposal, FullMessageParseResult, parse_full_message
 from jewelai_persistence import (
     ClarificationDecisionConflictError,
     ClarificationDecisionIntegrityError,
@@ -166,7 +166,7 @@ class PromptEnrichmentWorkflowState(ImmutableModel):
 
 class InitialEnrichmentRuntimeResult(ImmutableModel):
     parse_result: FullMessageParseResult
-    parser_proposal: ParserProposal
+    parser_proposal: AnyParserProposal
     enrichment: ParsedCandidateEnrichmentResult
     workflow: PromptEnrichmentWorkflowState
 

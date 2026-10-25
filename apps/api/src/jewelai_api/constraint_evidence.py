@@ -4,7 +4,8 @@ import hashlib
 import json
 from uuid import UUID
 
-from jewelai_domain.models import DesignRevision, MessageSource
+from jewelai_domain.models import MessageSource
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_parser import (
     CandidateCertainty,
     CandidateClassification,
@@ -41,7 +42,7 @@ def merge_constraint_evidence(
     session_id: UUID,
     organization_id: UUID,
     source: MessageSource,
-    authoritative_revision: DesignRevision,
+    authoritative_revision: AnyDesignRevision | object,
     enrichment_cycle_id: UUID,
     previous: tuple[FinalPromptConstraintEvidence, ...] = (),
 ) -> tuple[FinalPromptConstraintEvidence, ...]:
@@ -49,7 +50,7 @@ def merge_constraint_evidence(
 
     parsed = ParsedCandidateEnrichmentResult.model_validate(enrichment)
     source = MessageSource.model_validate(source)
-    revision = DesignRevision.model_validate(authoritative_revision)
+    revision = validate_design_revision(authoritative_revision)
     if source != parsed.parser_proposal.source:
         raise ValueError("constraint evidence source does not match parser provenance")
     retained = [FinalPromptConstraintEvidence.model_validate(item) for item in previous]

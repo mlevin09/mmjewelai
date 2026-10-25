@@ -19,13 +19,13 @@ from jewelai_domain.knowledge_policy import (
 from jewelai_domain.models import (
     Assumed,
     Derived,
-    DesignRevision,
     Explicit,
     ImmutableModel,
     MessageSource,
     NotApplicable,
     Text,
 )
+from jewelai_domain.models_v1_1 import AnyDesignRevision
 from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from pydantic import Field, JsonValue, StringConstraints, ValidationError, model_validator
 
@@ -152,7 +152,7 @@ class FinalPromptSnapshot(ImmutableModel):
     session_id: UUID
     organization_id: UUID
     locale: Literal["en", "ru"]
-    revision: DesignRevision
+    revision: AnyDesignRevision
     enrichment_cycle_id: UUID
     latest_enrichment_cycle_id: UUID
     enrichment_cycle_number: int = Field(ge=1)

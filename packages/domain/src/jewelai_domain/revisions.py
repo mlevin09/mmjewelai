@@ -11,10 +11,17 @@ from .models import (
     Design,
     DesignRevision,
     Explicit,
+    KnownValue,
     MessageSource,
     NotApplicable,
     RevisionEvent,
     Unknown,
+)
+from .models_v1_1 import (
+    AnyDesignRevision,
+    DesignRevisionV1_1,
+    DesignV1_1,
+    validate_design_revision,
 )
 
 FIELD_TYPES = (Unknown, NotApplicable, Explicit, Derived, Assumed)
@@ -24,24 +31,49 @@ class RevisionConflict(ValueError):
     """The caller's revision is stale or an edit violates a state transition."""
 
 
+def _stable_item_id(item):
+    for name in ("group_id", "component_id", "element_id"):
+        value = getattr(item, name, None)
+        if value is not None:
+            return str(value)
+    return None
+
+
 def _fields(model, prefix=()):
     result = {}
     for name in type(model).model_fields:
         value = getattr(model, name)
         path = (*prefix, name)
-        if value is None or isinstance(value, FIELD_TYPES):
+        if value is None:
             result[path] = value
-        elif name == "side_stones":
-            for group in value:
-                result.update(_fields(group.stones, (*path, group.group_id, "stones")))
-                result[(*path, group.group_id, "quantity")] = group.quantity
-        elif isinstance(value, BaseModel):
+            continue
+        if isinstance(value, FIELD_TYPES):
+            result[path] = value
+            if isinstance(value, KnownValue):
+                nested = value.value
+                if isinstance(nested, BaseModel):
+                    result.update(_fields(nested, path))
+                elif isinstance(nested, tuple):
+                    for item in nested:
+                        if isinstance(item, BaseModel):
+                            stable_id = _stable_item_id(item)
+                            if stable_id is not None:
+                                result.update(_fields(item, (*path, stable_id)))
+            continue
+        if isinstance(value, tuple):
+            for item in value:
+                if isinstance(item, BaseModel):
+                    stable_id = _stable_item_id(item)
+                    if stable_id is not None:
+                        result.update(_fields(item, (*path, stable_id)))
+            continue
+        if isinstance(value, BaseModel):
             result.update(_fields(value, path))
     return result
 
 
 def _check_current(current, expected_revision_id):
-    current = DesignRevision.model_validate(current)
+    current = validate_design_revision(current)
     if current.revision_id != expected_revision_id:
         raise RevisionConflict("Stale revision: reload current state before editing")
     return current
@@ -51,7 +83,10 @@ def _new_revision(current, design, source, reason, action, created_at):
     created_at = TypeAdapter(AwareDatetime).validate_python(created_at)
     if created_at < current.created_at:
         raise RevisionConflict("Revision timestamp cannot move backwards")
-    return DesignRevision(
+    revision_type = (
+        DesignRevisionV1_1 if isinstance(current, DesignRevisionV1_1) else DesignRevision
+    )
+    return revision_type(
         schema_version=current.schema_version,
         design_id=current.design_id,
         revision_id=uuid4(),
@@ -64,8 +99,8 @@ def _new_revision(current, design, source, reason, action, created_at):
 
 
 def revise_design(
-    current: DesignRevision,
-    proposed: Design,
+    current: AnyDesignRevision | object,
+    proposed: Design | DesignV1_1 | object,
     *,
     expected_revision_id: UUID,
     source: MessageSource,
@@ -74,7 +109,11 @@ def revise_design(
 ) -> DesignRevision:
     """Apply an unconfirmed proposal while retaining every locked leaf, including deletions."""
     current = _check_current(current, expected_revision_id)
-    proposed = Design.model_validate(proposed)
+    proposed = (
+        DesignV1_1.model_validate(proposed)
+        if isinstance(current, DesignRevisionV1_1)
+        else Design.model_validate(proposed)
+    )
     before, after = _fields(current.design), _fields(proposed)
     if current.design == proposed:
         raise RevisionConflict("No state change")
@@ -112,20 +151,47 @@ def _transition(current, path, expected_revision_id, source, reason, created_at,
     data = current.design.model_dump(mode="json")
     cursor = data
     for part in key[:-1]:
+        while (
+            isinstance(cursor, dict)
+            and cursor.get("availability") == "value"
+            and isinstance(cursor.get("value"), (dict, list))
+        ):
+            cursor = cursor["value"]
         if isinstance(cursor, list):
-            cursor = next(group for group in cursor if group["group_id"] == part)
+            cursor = next(
+                item
+                for item in cursor
+                if any(
+                    item.get(id_key) == part
+                    for id_key in ("group_id", "component_id", "element_id")
+                )
+            )
         else:
             cursor = cursor[part]
+    while (
+        isinstance(cursor, dict)
+        and cursor.get("availability") == "value"
+        and isinstance(cursor.get("value"), (dict, list))
+    ):
+        cursor = cursor["value"]
     leaf = cursor[key[-1]]
     if action == "confirm":
         leaf["confirmed"] = True
     else:
         leaf["locked"] = action == "lock"
-    return _new_revision(current, Design.model_validate(data), source, reason, action, created_at)
+    design_type = DesignV1_1 if isinstance(current, DesignRevisionV1_1) else Design
+    return _new_revision(
+        current,
+        design_type.model_validate(data),
+        source,
+        reason,
+        action,
+        created_at,
+    )
 
 
 def confirm_field(
-    current: DesignRevision,
+    current: AnyDesignRevision | object,
     path: str,
     *,
     expected_revision_id: UUID,
@@ -138,7 +204,7 @@ def confirm_field(
 
 
 def lock_field(
-    current: DesignRevision,
+    current: AnyDesignRevision | object,
     path: str,
     *,
     expected_revision_id: UUID,
@@ -151,7 +217,7 @@ def lock_field(
 
 
 def unlock_field(
-    current: DesignRevision,
+    current: AnyDesignRevision | object,
     path: str,
     *,
     expected_revision_id: UUID,

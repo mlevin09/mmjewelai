@@ -24,7 +24,8 @@ from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
     KnowledgeArtifactStore,
 )
-from jewelai_domain.models import DesignRevision, ImmutableModel, MessageSource, Text
+from jewelai_domain.models import ImmutableModel, MessageSource, Text
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_domain.revisions import RevisionConflict, revise_design
 from jewelai_parser import FullMessageParseResult, parse_full_message
 from jewelai_persistence import (
@@ -108,7 +109,7 @@ class CorrectionReenrichmentResult(ImmutableModel):
     source: MessageSource
     previous_revision_id: UUID
     new_revision_id: UUID | None = None
-    authoritative_revision: DesignRevision
+    authoritative_revision: AnyDesignRevision
     previous_enrichment_cycle_id: UUID
     previous_enrichment_cycle_number: int
     previous_enrichment_content_hash: Sha256
@@ -169,7 +170,7 @@ def process_user_correction(
     correction: UserCorrection,
     *,
     authoritative_session_id: UUID,
-    current_revision: DesignRevision,
+    current_revision: AnyDesignRevision | object,
     previous_cycle: EnrichmentCycleRecord,
     prior_answer_results: tuple[ClarificationAnswerResult, ...],
     dictionary: DictionaryRegistry,
@@ -184,7 +185,7 @@ def process_user_correction(
     """Apply one safe correction and prepare the next immutable enrichment-cycle payload."""
 
     request = UserCorrection.model_validate(correction)
-    revision = DesignRevision.model_validate(current_revision)
+    revision = validate_design_revision(current_revision)
     templates = PromptTemplateBundle.model_validate(templates)
     parametric_knowledge = ParametricKnowledgeBundle.model_validate(parametric_knowledge)
     answers = tuple(ClarificationAnswerResult.model_validate(item) for item in prior_answer_results)

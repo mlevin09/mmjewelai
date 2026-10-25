@@ -15,6 +15,7 @@ from jewelai_domain import (
     unlock_field,
 )
 from jewelai_domain.models import MessageSource
+from jewelai_domain.models_v1_1 import DesignV1_1, upgrade_design_revision_v1_to_v1_1
 
 FIXTURE = (
     Path(__file__).resolve().parents[3]
@@ -196,3 +197,46 @@ def test_reordering_groups_uses_stable_ids(current):
     assert reordered.design.side_stones[1].quantity.locked
     unlocked = unlock_field(reordered, "side_stones.accents.quantity", **args(reordered))
     assert not unlocked.design.side_stones[1].quantity.locked
+
+
+def test_v1_1_nested_state_obeys_confirm_lock_and_edit_invariants(current):
+    upgraded = upgrade_design_revision_v1_to_v1_1(current)
+    data = upgraded.design.model_dump(mode="json")
+    data["composition"] = explicit(
+        {
+            "symmetry_mode": explicit("asymmetrical"),
+        }
+    )
+    edited = revise_design(upgraded, DesignV1_1.model_validate(data), **args(upgraded))
+    confirmed = confirm_field(edited, "composition.symmetry_mode", **args(edited))
+    locked = lock_field(confirmed, "composition.symmetry_mode", **args(confirmed))
+
+    assert locked.schema_version == "1.1.0"
+    assert locked.design.composition.value.symmetry_mode.locked
+
+    changed_data = locked.design.model_dump(mode="json")
+    changed_data["composition"]["value"]["symmetry_mode"] = explicit("radial")
+    with pytest.raises(RevisionConflict, match="Locked field"):
+        revise_design(locked, DesignV1_1.model_validate(changed_data), **args(locked))
+
+
+def test_v1_1_nested_collection_uses_stable_component_id(current):
+    upgraded = upgrade_design_revision_v1_to_v1_1(current)
+    data = upgraded.design.model_dump(mode="json")
+    data["metal"]["components"] = explicit(
+        [
+            {
+                "component_id": "shank",
+                "material": explicit("gold"),
+            }
+        ]
+    )
+    edited = revise_design(upgraded, DesignV1_1.model_validate(data), **args(upgraded))
+    confirmed = confirm_field(edited, "metal.components.shank.material", **args(edited))
+    locked = lock_field(confirmed, "metal.components.shank.material", **args(confirmed))
+    assert locked.design.metal.components.value[0].material.locked
+
+    changed_data = locked.design.model_dump(mode="json")
+    changed_data["metal"]["components"]["value"][0]["material"] = explicit("platinum")
+    with pytest.raises(RevisionConflict, match="Locked field"):
+        revise_design(locked, DesignV1_1.model_validate(changed_data), **args(locked))

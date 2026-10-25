@@ -13,8 +13,10 @@ from jewelai_domain.knowledge_activation import (
 )
 from jewelai_domain.knowledge_policy import RuntimeProvenance, RuntimeSemanticState
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
-from jewelai_domain.models import DesignRevision, ImmutableModel, MessageSource
+from jewelai_domain.models import ImmutableModel, MessageSource
+from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_parser import (
+    AnyParserProposal,
     CandidateApplication,
     CandidateCertainty,
     CandidateClassification,
@@ -24,7 +26,6 @@ from jewelai_parser import (
     NormalizationSource,
     ParserCandidate,
     ParserIssueCode,
-    ParserProposal,
     ParserTarget,
     StructuredCandidate,
     StructuredTarget,
@@ -108,7 +109,7 @@ class CandidateDisposition(ImmutableModel):
 class ParsedCandidateEnrichmentResult(ImmutableModel):
     parse_result: FullMessageParseResult
     parse_knowledge_lineage: ParseKnowledgeLineage
-    parser_proposal: ParserProposal
+    parser_proposal: AnyParserProposal
     dispositions: tuple[CandidateDisposition, ...]
     enrichment_result: PromptEnrichmentResult
 
@@ -126,7 +127,7 @@ class ParsedCandidateEnrichmentResult(ImmutableModel):
 
 
 def enrich_parsed_candidates_with_active_release(
-    revision: DesignRevision,
+    revision: AnyDesignRevision | object,
     *,
     parse_result: FullMessageParseResult,
     source: MessageSource,
@@ -145,7 +146,7 @@ def enrich_parsed_candidates_with_active_release(
 ) -> ParsedCandidateEnrichmentResult:
     """Evaluate safe parsed candidates without mutating the authoritative revision."""
 
-    revision = DesignRevision.model_validate(revision)
+    revision = validate_design_revision(revision)
     parsed = FullMessageParseResult.model_validate(parse_result)
     source = MessageSource.model_validate(source)
     templates = PromptTemplateBundle.model_validate(templates)
