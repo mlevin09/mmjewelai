@@ -829,9 +829,7 @@ def create_app(
         result: VisualizationVerificationResult,
         organization_id: AuthorizedOrganization,
     ):
-        return service.create_visualization_verification(
-            session_id, organization_id, result
-        )
+        return service.create_visualization_verification(session_id, organization_id, result)
 
     @app.get(
         "/sessions/{session_id}/visualization-verifications",
@@ -841,9 +839,7 @@ def create_app(
         session_id: UUID,
         organization_id: AuthorizedOrganization,
     ):
-        return service.list_visualization_verifications(
-            session_id, organization_id
-        )
+        return service.list_visualization_verifications(session_id, organization_id)
 
     @app.get(
         "/sessions/{session_id}/visualization-verifications/{verification_id}",
@@ -854,9 +850,7 @@ def create_app(
         verification_id: str,
         organization_id: AuthorizedOrganization,
     ):
-        return service.get_visualization_verification(
-            session_id, verification_id, organization_id
-        )
+        return service.get_visualization_verification(session_id, verification_id, organization_id)
 
     @app.get("/sessions/{session_id}/assets", response_model=AssetListResponse)
     def list_assets(
