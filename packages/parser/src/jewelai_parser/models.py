@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from jewelai_domain import Design
+from jewelai_domain.models_v1_1 import DesignV1_1
 from jewelai_domain.dictionary import MatchCandidate, MatchKind
 from jewelai_domain.models import (
     Dimensions,
@@ -201,7 +202,7 @@ class ParserProposal(ImmutableModel):
     source: MessageSource
     locale: Literal["en", "ru"]
     dictionary_artifact_version: str
-    proposed_design: Design
+    proposed_design: Design | DesignV1_1
     accepted_updates: tuple[AcceptedUpdate, ...] = ()
     issues: tuple[ParserIssue, ...] = ()
     warnings: tuple[ParserWarning, ...] = ()
