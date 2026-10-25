@@ -6,9 +6,10 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from jewelai_domain import compile_knowledge_library, promote_knowledge_runtime
+from jewelai_domain import compile_knowledge_library, promote_knowledge_runtime, revise_design
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models import MessageSource
+from jewelai_domain.models_v1_1 import DesignV1_1, migrate_design_revision_v1_to_v1_1
 from jewelai_persistence import Base, create_database_engine, create_session_factory
 from jewelai_persistence.models import ClarificationPlanRow, EnrichmentCycleRow
 from sqlalchemy import event, func, select
@@ -1091,3 +1092,73 @@ def test_postgres_conflicting_corrections_commit_no_partial_constraint_history(t
     finally:
         Base.metadata.drop_all(pg_engine)
         pg_engine.dispose()
+
+
+
+def test_prompt_enrichment_preserves_additive_state_on_schema_v1_1(engine, tmp_path):
+    service = build_service(engine)
+    organization, _, session = create_persisted_session(service)
+    repository = service.repository
+    current = repository.get_current_revision(session.session_id, organization.organization_id)
+    migration_source = MessageSource(message_id="p0-20-migrate", recorded_at=NOW)
+    migrated = migrate_design_revision_v1_to_v1_1(
+        current,
+        revision_id=uuid4(),
+        created_at=NOW,
+        source=migration_source,
+        reason="P0-20 Prompt Enrichment compatibility test",
+    )
+    repository.upgrade_design_session_schema_v1_1(
+        session.session_id,
+        organization.organization_id,
+        current.revision_id,
+        migrated,
+    )
+
+    data = migrated.design.model_dump(mode="json")
+    data["style_descriptors"] = {
+        "availability": "value",
+        "origin": "explicit",
+        "value": ["minimalist"],
+        "source": migration_source.model_dump(mode="json"),
+        "confirmed": False,
+        "locked": False,
+    }
+    with_descriptor = revise_design(
+        migrated,
+        DesignV1_1.model_validate(data),
+        expected_revision_id=migrated.revision_id,
+        source=migration_source,
+        reason="Add explicit v1.1 design descriptor",
+        created_at=NOW,
+    )
+    repository.append_revision_cas(
+        session.session_id,
+        organization.organization_id,
+        migrated.revision_id,
+        with_descriptor,
+    )
+
+    message = service.create_message(
+        session.session_id,
+        organization.organization_id,
+        "Create an oval white-gold ring.",
+    )
+    runtime, *_ = _runtime(service, tmp_path)
+    result = runtime.start_initial_message(
+        InitialEnrichmentRequest(
+            session_id=session.session_id,
+            organization_id=organization.organization_id,
+            expected_revision_id=with_descriptor.revision_id,
+            message_id=message.message_id,
+        )
+    )
+    authoritative = repository.get_current_revision(
+        session.session_id, organization.organization_id
+    )
+
+    assert authoritative.schema_version == "1.1.0"
+    assert authoritative.design.style_descriptors.value == ("minimalist",)
+    assert result.workflow.authoritative_revision_id == authoritative.revision_id
+    assert result.parser_proposal.schema_version == "1.1.0"
+    assert result.workflow.final_output is not None
