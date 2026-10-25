@@ -26,6 +26,31 @@ from .knowledge_activation import (
     ProductionValidationStatus,
     promote_knowledge_runtime,
 )
+from .knowledge_activation_v1_1 import (
+    REQUIRED_PRODUCTION_VALIDATION_CHECKS_V1_1,
+    ActiveKnowledgeRuntimeV1_1,
+    KnowledgeActivationErrorV1_1,
+    ProductionValidationReportV1_1,
+    promote_knowledge_runtime_v1_1,
+    validate_for_production_v1_1,
+)
+from .knowledge_library_v1_1 import (
+    KNOWLEDGE_LIBRARY_CONTRACT_VERSION_V1_1,
+    KNOWLEDGE_LIBRARY_SCHEMA_VERSION_V1_1,
+    CompilationManifestV1_1,
+    CompiledKnowledgeLibraryV1_1,
+    KnowledgeLibraryBundleV1_1,
+    KnowledgeLibraryRegistryV1_1,
+    KnowledgeLibraryValidationErrorV1_1,
+    PolicyV1_1,
+    compile_knowledge_library_v1_1,
+    validate_knowledge_library_v1_1,
+)
+from .knowledge_policy_v1_1 import (
+    KnowledgePolicyEngineV1_1,
+    build_knowledge_runtime_state_v1_1,
+)
+from .knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
 from .knowledge_base import (
     KNOWLEDGE_BASE_SCHEMA_VERSION,
     CalibratedSizeWeightRecord,
@@ -261,5 +286,24 @@ __all__ = [
     "SchemaV1_1MigrationEligibility",
     "TargetConsumerCoverage",
     "assess_schema_v1_1_migration_eligibility",
-    "build_schema_v1_1_consumer_coverage",
+    "build_schema_v1_1_consumer_coverage",    "REQUIRED_PRODUCTION_VALIDATION_CHECKS_V1_1",
+    "ActiveKnowledgeRuntimeV1_1",
+    "KnowledgeActivationErrorV1_1",
+    "ProductionValidationReportV1_1",
+    "KNOWLEDGE_LIBRARY_CONTRACT_VERSION_V1_1",
+    "KNOWLEDGE_LIBRARY_SCHEMA_VERSION_V1_1",
+    "CompilationManifestV1_1",
+    "CompiledKnowledgeLibraryV1_1",
+    "KnowledgeLibraryBundleV1_1",
+    "KnowledgeLibraryRegistryV1_1",
+    "KnowledgeLibraryValidationErrorV1_1",
+    "PolicyV1_1",
+    "KnowledgePolicyEngineV1_1",
+    "KnowledgeArtifactStoreV1_1",
+    "build_knowledge_runtime_state_v1_1",
+    "compile_knowledge_library_v1_1",
+    "promote_knowledge_runtime_v1_1",
+    "validate_for_production_v1_1",
+    "validate_knowledge_library_v1_1",
+
 ]
