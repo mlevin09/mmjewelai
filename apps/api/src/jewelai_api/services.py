@@ -50,7 +50,7 @@ from jewelai_domain.models_v1_1 import DesignRevisionV1_1, migrate_design_revisi
 from jewelai_domain.revise_v1_1 import revise_parser_design_v1_1
 from jewelai_generation_queue import GenerationTaskPublisher, GenerationTaskPublishError
 from jewelai_model_gateway import GenerationRun, GenerationStatus
-from jewelai_parser import ParserProposal, build_parser_proposal
+from jewelai_parser import AnyParserProposal, build_parser_proposal
 from jewelai_persistence.models import (
     DesignSessionRow,
     MessageRow,
@@ -446,7 +446,7 @@ class RuntimeService:
         session_id: UUID,
         organization_id: UUID,
         request: ParserProposalRequest,
-    ) -> ParserProposal:
+    ) -> AnyParserProposal:
         session = self.repository.get_design_session(session_id, organization_id)
         self._assert_artifact_pins(session)
         if session.current_revision_id != request.expected_revision_id:
@@ -619,7 +619,7 @@ class RuntimeService:
         session_id: UUID,
         organization_id: UUID,
         expected_revision_id: UUID,
-        proposal: ParserProposal,
+        proposal: AnyParserProposal,
         reason: str,
     ):
         current = self.repository.get_current_revision(session_id, organization_id)
