@@ -257,6 +257,11 @@ def create_app(
         asset_ingestion_policy=AssetIngestionPolicy(max_bytes=settings.asset_upload_max_bytes),
         generation_task_publisher=generation_task_publisher,
         text_understanding_provider=text_understanding_provider,
+        schema_v1_1_migration_blocker=(
+            "PROMPT_ENRICHMENT_RUNTIME_V1_1_UNSUPPORTED"
+            if prompt_enrichment_service is not None
+            else None
+        ),
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
     if settings.web_allowed_origins:
