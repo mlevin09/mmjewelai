@@ -1,0 +1,177 @@
+{
+  "proposal_id": "jewelai.jewelry_design_schema.vnext.p0_15",
+  "proposal_version": "0.1.0",
+  "proposed_schema_version": "1.1.0",
+  "status": "DRAFT_NOT_NORMATIVE",
+  "compatibility": "ADDITIVE_MINOR_VERSION_PROPOSAL",
+  "principles": [
+    "All Jewelry Design Schema v1.0.0 fields and meanings remain unchanged.",
+    "New fields are optional/additive; no historical revision is silently migrated.",
+    "Reference feature bindings, AI presentation state, and verification results are separate contracts.",
+    "Creative-intent raw/normalized axes are interpretation metadata and do not become objective Product State facts.",
+    "Repeated product components require stable IDs; array position is never identity.",
+    "No quantitative value may be invented from qualitative wording or unscaled imagery."
+  ],
+  "current_v1_target_count": 30,
+  "candidate_product_state_vnext_target_count": 118,
+  "proposed_nested_models": [
+    {
+      "model": "StoneSemanticsExtension",
+      "covers": [
+        "variety_or_type",
+        "material_origin_status",
+        "geographic_origin",
+        "treatment_status",
+        "treatments",
+        "cut_style_class"
+      ]
+    },
+    {
+      "model": "SideStonePopulationExtension",
+      "covers": [
+        "role",
+        "arrangement",
+        "location",
+        "coverage",
+        "total_carat_weight",
+        "sieve_system",
+        "sieve_designation",
+        "diameter_range_mm"
+      ]
+    },
+    {
+      "model": "ProngConfiguration",
+      "covers": [
+        "prong_count",
+        "prong_style",
+        "prong_configuration"
+      ]
+    },
+    {
+      "model": "HaloState",
+      "covers": [
+        "enabled",
+        "type",
+        "location",
+        "row_count",
+        "outline_relation"
+      ]
+    },
+    {
+      "model": "PaveState",
+      "covers": [
+        "enabled",
+        "location",
+        "coverage",
+        "row_count"
+      ]
+    },
+    {
+      "model": "MetalSemanticsExtension",
+      "covers": [
+        "alloy_system",
+        "coating",
+        "surface_treatment",
+        "components"
+      ]
+    },
+    {
+      "model": "ProductConstructionExtension",
+      "covers": [
+        "ring",
+        "earring",
+        "pendant",
+        "necklace",
+        "bracelet",
+        "brooch",
+        "head",
+        "shoulders",
+        "bridge",
+        "sizing_area",
+        "shank_configuration",
+        "solidity"
+      ]
+    },
+    {
+      "model": "ProductDimensions",
+      "covers": [
+        "product.overall_dimensions",
+        "product.dimension_scope",
+        "product-specific dimensions"
+      ]
+    },
+    {
+      "model": "StyleDesignSemantics",
+      "covers": [
+        "style_period_or_movement",
+        "style_influences",
+        "style_descriptors",
+        "decorative_elements",
+        "composition"
+      ]
+    }
+  ],
+  "migration_rules": [
+    {
+      "from": "1.0.0",
+      "to": "1.1.0",
+      "rule": "Existing snapshots remain valid 1.0.0 artifacts; no in-place mutation."
+    },
+    {
+      "from": "style",
+      "to": "style + style/design semantic extensions",
+      "rule": "Do not infer historical period, decorative technique, motif, composition, or creative intent from an existing style ID."
+    },
+    {
+      "from": "references",
+      "to": "reference binding contract",
+      "rule": "Existing AssetReference objects remain unchanged; feature bindings link by asset_id and do not rewrite reference purpose/note."
+    },
+    {
+      "from": "visual_constraints",
+      "to": "AI Generation State / Verification",
+      "rule": "Do not reinterpret free-form visual constraints as passed verification checks."
+    },
+    {
+      "from": "side_stones",
+      "to": "extended side-stone semantics",
+      "rule": "Preserve stable group_id; extensions attach only to existing groups unless a separate user-authorized group creation occurs."
+    }
+  ],
+  "excluded_from_product_state": {
+    "interpretation_metadata": [
+      "creative_intent",
+      "proportions.scale_anchor",
+      "creative_intent_raw",
+      "creative_intent_descriptors",
+      "creative_intent_axes"
+    ],
+    "reference_binding": [
+      "references.feature_bindings"
+    ],
+    "ai_generation_state": [
+      "presentation.camera_view",
+      "presentation.lighting",
+      "presentation.scale"
+    ],
+    "output_profile": [
+      "presentation.framing",
+      "presentation.background",
+      "presentation.realism",
+      "presentation.additional_views"
+    ],
+    "verification_result": [
+      "verification.geometry_plausibility",
+      "verification.metal_realism",
+      "verification.stone_realism",
+      "verification.common_errors"
+    ],
+    "derived_runtime_metadata": [
+      "proportions.relative_ratios"
+    ]
+  },
+  "freeze_gate": {
+    "normative": false,
+    "reason": "Exact reconstructed target IDs must be reconciled with the original 56-target Matrix and P0-1..P0-9 source artifacts before schema freeze."
+  }
+}
