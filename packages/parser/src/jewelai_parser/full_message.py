@@ -234,7 +234,14 @@ _TOKEN = re.compile(r"[^\W_]+|\d+(?:[.,]\d+)?", re.UNICODE)
 
 _SPECIAL_CONSTRAINTS = (
     (
-        re.compile(r"\b(?:no|without)\s+(?:a\s+)?halo\b|\bбез\s+(?:гало|halo)\b", re.I),
+        re.compile(
+            r"\b(?:(?:no|without)\s+(?:a\s+)?|"
+            r"(?:please\s+)?(?:do\s+not|don['’]t|never)\s+(?:add|include|use)\s+(?:a\s+)?|"
+            r"(?:I\s+)?(?:do\s+not|don['’]t)\s+want\s+(?:a\s+)?|"
+            r"без\s+|не\s+(?:добавляй(?:те)?|добавлять|используй(?:те)?|использовать|хочу)\s+)"
+            r"(?:halo|гало)\b",
+            re.I,
+        ),
         CandidateClassification.PROHIBITION,
         CandidateSubject.SETTING,
         ("halo_setting", "halo_style"),
@@ -408,6 +415,10 @@ def parse_full_message(
         detail,
     ) in _SPECIAL_CONSTRAINTS:
         for match in pattern.finditer(text):
+            # Earlier, complete constraints own their spans: an embedded positive verb in
+            # "do not add a halo" is not another instruction. Separate clauses remain visible.
+            if _inside_any(match.start(), match.end(), protected_spans):
+                continue
             protected_spans.append(match.span())
             candidates.append(
                 _structured_candidate(

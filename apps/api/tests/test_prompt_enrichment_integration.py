@@ -10,8 +10,10 @@ from uuid import UUID, uuid4
 
 import pytest
 from conftest import NOW, create_hierarchy
+from jewelai_parser import parse_full_message
 from jewelai_persistence import Base, create_database_engine, create_session_factory
 from jewelai_persistence.models import ClarificationPlanRow, EnrichmentCycleRow
+from jewelai_prompts import FinalPromptConstraintEvidence, InternalFinalPrompt
 from sqlalchemy import func, select
 from test_persistence import build_service
 from test_prompt_enrichment_http import _client, _message
@@ -41,6 +43,285 @@ def _release_payload(runtime):
         "runtime_sha256": runtime.active_release.runtime_sha256,
         "validation_report_sha256": runtime.active_release.validation_report_sha256,
     }
+
+
+def _exercise_halo_constraint_sequence(engine, tmp_path, role_id, locale, sequence):
+    """Exercise real HTTP/CAS and durable restoration with synthetic, explicitly sourced facts."""
+    service = build_service(engine)
+    runtime, store, active, report = _runtime(service, tmp_path)
+    client, provider = _client(engine, runtime)
+    trace = []
+    with client:
+        org, _, session_response = create_hierarchy(client, role_id=role_id, locale=locale)
+        session = session_response.json()
+        sid = session["session_id"]
+        headers = {"X-Organization-ID": org}
+        current = service.repository.get_current_revision(UUID(sid), UUID(org))
+        # Existing test_rules dimensions fixture, never inferred from a qualitative request.
+        message = _message(client, sid, org, "Explicit synthetic fixture prerequisites")
+        source = {
+            "kind": "message",
+            "message_id": message["message_id"],
+            "recorded_at": NOW.isoformat(),
+        }
+        design = current.design.model_dump(mode="json")
+        for component, field, value in (
+            ("center_stone", "shape", "oval"),
+            ("center_stone", "setting", "prong_setting"),
+            (
+                "center_stone",
+                "dimensions",
+                {
+                    "length": {"value": 9.1, "unit": "mm"},
+                    "width": {"value": 7.2, "unit": "mm"},
+                    "depth": {"value": 4.8, "unit": "mm"},
+                },
+            ),
+            ("metal", "color", "white"),
+        ):
+            if field == "shape" and sequence[0][0].startswith("Design a platinum"):
+                # Test A must exercise an actual new oval revision, not a prefilled value.
+                continue
+            design[component][field] = {
+                "availability": "value",
+                "origin": "explicit",
+                "value": value,
+                "source": source,
+                "confirmed": False,
+                "locked": False,
+            }
+        setup = client.post(
+            f"/sessions/{sid}/revisions",
+            headers=headers,
+            json={
+                "action": "edit",
+                "expected_revision_id": str(current.revision_id),
+                "proposed_design": design,
+                "source": source,
+                "reason": "Explicit test prerequisites",
+            },
+        )
+        assert setup.status_code == 200, setup.json()
+        for action in ("confirm", "lock"):
+            current = service.repository.get_current_revision(UUID(sid), UUID(org))
+            response = client.post(
+                f"/sessions/{sid}/revisions",
+                headers=headers,
+                json={
+                    "action": action,
+                    "expected_revision_id": str(current.revision_id),
+                    "target": "center_stone.dimensions",
+                    "source": source,
+                    "reason": "Protect explicit fixture dimensions",
+                },
+            )
+            assert response.status_code == 200, response.json()
+
+        previous = ()
+        saved_plans = {}
+        for number, (text, expected_kind, expected_wording) in enumerate(sequence, 1):
+            before = service.repository.get_current_revision(UUID(sid), UUID(org))
+            message = _message(client, sid, org, text)
+            payload = {
+                "expected_revision_id": str(before.revision_id),
+                "message_id": message["message_id"],
+            }
+            route = "initial" if number == 1 else "corrections"
+            response = client.post(
+                f"/v1/sessions/{sid}/prompt-enrichment/{route}", headers=headers, json=payload
+            )
+            assert response.status_code == (201 if number == 1 else 200), response.json()
+            state = runtime.get_current_state(UUID(sid), UUID(org))
+            current = service.repository.get_current_revision(UUID(sid), UUID(org))
+            assert current.design.center_stone.model_dump(
+                exclude={"shape"}
+            ) == before.design.center_stone.model_dump(exclude={"shape"})
+            assert current.design.construction == before.design.construction
+            if number == 2 and sequence[0][0].startswith("Design a platinum"):
+                assert before.design.center_stone.shape is None
+                assert current.design.center_stone.shape.value == "oval"
+                assert current.parent_revision_id == before.revision_id
+                assert current.design.metal == before.design.metal
+                assert response.json()["outcome"] == "APPLIED"
+            elif number > 1:
+                assert current.design == before.design
+            assert state.enrichment_cycle_number == number
+            halo = tuple(
+                item
+                for item in state.clarification_plan.constraint_evidence
+                if item.semantic_subject == "feature.halo"
+            )
+            assert len(halo) == number
+            latest = [item for item in halo if item.status == "active"]
+            assert len(latest) == 1
+            latest = latest[0]
+            assert latest.kind == expected_kind
+            assert latest.original_wording == expected_wording
+            assert latest.source.message_id == message["message_id"]
+            assert latest.session_id == UUID(sid) and latest.organization_id == UUID(org)
+            assert latest.source_revision_id == current.revision_id
+            assert latest.source_enrichment_cycle_id == state.enrichment_cycle_id
+            assert text[latest.source_span_start : latest.source_span_end] == expected_wording
+            normalized = (
+                ("Do not include a halo." if expected_kind == "prohibition" else "Include a halo.")
+                if locale == "en"
+                else ("Не добавлять гало." if expected_kind == "prohibition" else "Добавить гало.")
+            )
+            assert latest.normalized_instruction == normalized
+            for item in halo:
+                assert (
+                    FinalPromptConstraintEvidence.model_validate_json(item.model_dump_json())
+                    == item
+                )
+            by_id = {item.evidence_id: item for item in halo}
+            for old in previous:
+                retained = by_id[old.evidence_id]
+                assert retained.source == old.source
+                assert retained.original_wording == old.original_wording
+                if old.status == "superseded":
+                    assert retained == old
+                else:
+                    assert retained.status == "superseded"
+                    assert retained.superseded_by_evidence_id == latest.evidence_id
+            prompt = state.final_output.internal_final_prompt
+            assert InternalFinalPrompt.model_validate_json(prompt.model_dump_json()) == prompt
+            authoritative_halo = [
+                item for item in prompt.constraints if item.target == "feature.halo"
+            ]
+            assert len(authoritative_halo) == 1 and authoritative_halo[0].kind == expected_kind
+            assert authoritative_halo[0].instruction == normalized
+            assert prompt.product_state_revision_id == current.revision_id
+            final = client.get(
+                f"/v1/sessions/{sid}/prompt-enrichment/final-output", headers=headers
+            )
+            # Preserve the existing HTTP contract: clarification statuses can expose a
+            # diagnostically BLOCKED prompt with 200. Do not mistake it for READY or fix
+            # general readiness/routing in this polarity regression.
+            assert final.status_code == (
+                409 if state.status.value == "final_output_blocked" else 200
+            )
+            if final.status_code == 200:
+                assert final.json()["internal_final_prompt"] == prompt.model_dump(mode="json")
+            if number == 1 and before.design.center_stone.shape is not None:
+                assert final.status_code == 200  # Real fixture requiredness, not forced readiness.
+            if number > 1:
+                # This HTTP wrapper rebuilds lineage from the latest cycle on replay. Its
+                # existing conflict response must fail closed, not append duplicate evidence.
+                retry = client.post(
+                    f"/v1/sessions/{sid}/prompt-enrichment/{route}", headers=headers, json=payload
+                )
+                assert retry.status_code == 409
+                assert retry.json()["error"] in {"correction_conflict", "stale_revision"}
+                assert runtime.get_current_state(UUID(sid), UUID(org)) == state
+            plans = service.repository.list_clarification_plans(UUID(sid), UUID(org))
+            current_plans = {item.clarification_plan_id: item for item in plans}
+            assert all(current_plans[key] == value for key, value in saved_plans.items())
+            saved_plans = current_plans
+            parsed = parse_full_message(
+                text,
+                locale=locale,
+                dictionary=service.artifacts.dictionary,
+                knowledge_runtime=active.compiled_runtime,
+            )
+            trace.append(
+                {
+                    "text": text,
+                    "message_id": message["message_id"],
+                    "response": response.json(),
+                    "parse_result": parsed.model_dump(mode="json"),
+                    "revision": current.model_dump(mode="json"),
+                    "workflow": state.model_dump(mode="json"),
+                    "final_output_http": final.status_code,
+                }
+            )
+            restored = _restart_runtime(build_service(engine), runtime, store, active, report)
+            assert restored.get_current_state(UUID(sid), UUID(org)) == state
+            previous = halo
+        locked_before = service.repository.get_current_revision(UUID(sid), UUID(org))
+        message = _message(
+            client, sid, org, "Center stone dimensions 10 x 8 x 5 mm. Do not add a halo."
+        )
+        response = client.post(
+            f"/v1/sessions/{sid}/prompt-enrichment/corrections",
+            headers=headers,
+            json={
+                "expected_revision_id": str(locked_before.revision_id),
+                "message_id": message["message_id"],
+            },
+        )
+        assert response.status_code == 200 and response.json()["outcome"] == "REJECTED"
+        assert service.repository.get_current_revision(UUID(sid), UUID(org)) == locked_before
+        assert provider.calls == []
+        foreign = service.create_organization("Other synthetic scope")
+        assert (
+            client.get(
+                f"/v1/sessions/{sid}/prompt-enrichment/state",
+                headers={"X-Organization-ID": str(foreign.organization_id)},
+            ).status_code
+            == 404
+        )
+        assert (
+            client.get(
+                f"/v1/sessions/{sid}/prompt-enrichment/state",
+                headers={**headers, "Authorization": ""},
+            ).status_code
+            == 401
+        )
+    return {
+        "role_id": role_id,
+        "locale": locale,
+        "session_id": sid,
+        "organization_id": org,
+        "turns": trace,
+    }
+
+
+HALO_SEQUENCES = [
+    (
+        "en",
+        (
+            ("Design a platinum engagement ring. No halo.", "prohibition", "No halo"),
+            ("Make the center stone oval. Do not add a halo.", "prohibition", "Do not add a halo"),
+            (
+                "Keep the platinum ring and don't include a halo.",
+                "prohibition",
+                "don't include a halo",
+            ),
+        ),
+    ),
+    (
+        "en",
+        (
+            ("No halo.", "prohibition", "No halo"),
+            ("Actually, add a halo.", "requirement", "add a halo"),
+            ("I changed my mind. Do not add a halo.", "prohibition", "Do not add a halo"),
+        ),
+    ),
+    (
+        "ru",
+        (
+            ("Без гало.", "prohibition", "Без гало"),
+            ("Не добавляйте гало.", "prohibition", "Не добавляйте гало"),
+            ("Не хочу гало.", "prohibition", "Не хочу гало"),
+        ),
+    ),
+    (
+        "ru",
+        (
+            ("Без halo.", "prohibition", "Без halo"),
+            ("Do not add гало.", "prohibition", "Do not add гало"),
+            ("Не добавлять halo.", "prohibition", "Не добавлять halo"),
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize("role_id", ["retail_client", "jewelry_designer"])
+@pytest.mark.parametrize(("locale", "sequence"), HALO_SEQUENCES)
+def test_halo_negation_and_polarity_changes_preserve_durable_lineage(
+    engine, tmp_path, role_id, locale, sequence
+):
+    _exercise_halo_constraint_sequence(engine, tmp_path, role_id, locale, sequence)
 
 
 def test_full_http_cycle_restores_retries_corrects_and_preserves_authority(engine, tmp_path):
