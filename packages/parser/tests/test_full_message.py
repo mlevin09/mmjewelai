@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 
 import pytest
-from jewelai_domain import DesignRevision, load_domain_dictionary
+from jewelai_domain import DesignRevision, compile_knowledge_library, load_domain_dictionary
 from jewelai_domain.knowledge_library import (
     CompiledDomainKnowledge,
     CompiledKnowledgeLibrary,
@@ -124,6 +124,213 @@ def test_negated_removal_is_not_a_halo_presence_prohibition(dictionary, text):
     parsed = parse_full_message(text, locale="en", dictionary=dictionary)
     assert not any(item.semantic_subject == "feature.halo" for item in parsed.candidates)
     assert any(item.certainty == CandidateCertainty.UNRESOLVED for item in parsed.candidates)
+
+
+@pytest.fixture(scope="module")
+def collision_runtime():
+    # Compile the repository catalog without promoting/activating a release.
+    payload = json.loads((ROOT / "data/knowledge/v1/jewelry-core-1.0.0.json").read_text())
+    runtime, _ = compile_knowledge_library(payload)
+    return runtime
+
+
+def _dictionary_evidence(result):
+    return tuple(
+        candidate.model_dump(mode="json", exclude={"candidate_id"})
+        for candidate in result.candidates
+        if candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+    )
+
+
+def test_dictionary_updates_survive_identical_knowledge_surfaces(dictionary, collision_runtime):
+    text = "Gold ring with an oval diamond"
+    baseline = parse_full_message(text, locale="en", dictionary=dictionary)
+    combined = parse_full_message(
+        text, locale="en", dictionary=dictionary, knowledge_runtime=collision_runtime
+    )
+
+    assert len([item for item in baseline.candidates if item.parser_update is not None]) == 4
+    assert _dictionary_evidence(combined) == _dictionary_evidence(baseline)
+    assert len([item for item in combined.candidates if item.parser_update is not None]) == 4
+    assert (
+        len(
+            {
+                item.parser_update.concrete_target
+                for item in combined.candidates
+                if item.parser_update
+            }
+        )
+        == 4
+    )
+    knowledge = [
+        item
+        for item in combined.candidates
+        if item.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+    ]
+    assert len(knowledge) == 4
+    assert all(
+        item.application == CandidateApplication.STRUCTURED_EVIDENCE_ONLY for item in knowledge
+    )
+    assert all(item.parser_update is None for item in knowledge)
+    assert all(item.certainty == CandidateCertainty.EXPLICIT for item in combined.candidates)
+
+
+@pytest.mark.parametrize(
+    ("locale", "text"),
+    [
+        ("en", "A white gold ring with an emerald-cut center diamond."),
+        ("ru", "Кольцо из золота с овальным алмазом."),
+        ("ru", "Кольцо with gold and an oval алмаз."),
+        ("en", "Gold or platinum ring."),
+        ("en", "Gold ring. No halo. Keep the center stone unchanged."),
+        ("ru", "Кольцо из золота. Без гало."),
+        ("en", "Gold prongs and platinum body."),
+        ("en", "Gold ring with gold band."),
+        ("en", "Gold ring with an oval sapphire and aurora facets."),
+    ],
+)
+def test_catalog_recognition_is_additive_and_deterministic(
+    dictionary, collision_runtime, locale, text
+):
+    baseline = parse_full_message(text, locale=locale, dictionary=dictionary)
+    combined = parse_full_message(
+        text, locale=locale, dictionary=dictionary, knowledge_runtime=collision_runtime
+    )
+    assert _dictionary_evidence(combined) == _dictionary_evidence(baseline)
+    assert combined == parse_full_message(
+        text, locale=locale, dictionary=dictionary, knowledge_runtime=collision_runtime
+    )
+    ids = [item.candidate_id for item in combined.candidates]
+    assert len(ids) == len(set(ids))
+    for candidate in combined.candidates:
+        span = candidate.evidence
+        assert text[span.start : span.end] == span.text
+        if candidate.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY:
+            assert candidate.parser_update is None
+        if candidate.classification in {
+            CandidateClassification.PROHIBITION,
+            CandidateClassification.PRESERVATION,
+        }:
+            assert candidate.parser_update is None
+    assert not any(
+        item.target == StructuredTarget.CENTER_STONE_DIMENSIONS for item in combined.candidates
+    )
+
+
+def _test_knowledge_terms(terms):
+    return CompiledKnowledgeLibrary(
+        package_id="jewelai.test.collision",
+        artifact_version="1.0.0",
+        sources=(),
+        claims=(),
+        domain_knowledge=tuple(
+            CompiledDomainKnowledge(
+                concept_id=concept_id,
+                kind=kind,
+                parent_id=None,
+                relationships=(),
+                claim_ids=(),
+                structural_schema=True,
+            )
+            for concept_id, kind, _ in terms
+        ),
+        language_mappings=tuple(
+            CompiledLanguageMapping(
+                mapping_id=f"LANG-COLLISION-{index}",
+                concept_id=concept_id,
+                locale="en",
+                canonical_term=term,
+                aliases=(),
+                mapping_mode=MappingMode.DIRECT,
+                mapping_quality=MappingQuality.EXACT,
+                context=None,
+            )
+            for index, (concept_id, _, term) in enumerate(terms)
+        ),
+        policies=(),
+    )
+
+
+def test_distinct_knowledge_ids_do_not_displace_dictionary_or_create_choices(dictionary):
+    runtime = _test_knowledge_terms(
+        (("metal.gold", "metal_material", "gold"), ("metal.platinum", "metal_material", "platinum"))
+    )
+    for text in ("Gold ring.", "Gold or platinum ring."):
+        baseline = parse_full_message(text, locale="en", dictionary=dictionary)
+        combined = parse_full_message(
+            text, locale="en", dictionary=dictionary, knowledge_runtime=runtime
+        )
+        assert _dictionary_evidence(combined) == _dictionary_evidence(baseline)
+        metals = [
+            item for item in combined.candidates if item.target == StructuredTarget.METAL_MATERIAL
+        ]
+        assert {item.normalization_source for item in metals} == {
+            NormalizationSource.DOMAIN_DICTIONARY,
+            NormalizationSource.KNOWLEDGE_LIBRARY,
+        }
+        assert {item.certainty for item in metals} == {
+            CandidateCertainty.AMBIGUOUS if " or " in text else CandidateCertainty.EXPLICIT
+        }
+        assert all(item.parser_update is None for item in metals if " or " in text)
+
+
+def test_compound_knowledge_surface_cannot_hide_dictionary_subspans(dictionary):
+    runtime = _test_knowledge_terms(
+        (("gold", "metal_material", "gold"), ("white_gold", "metal_material", "white gold"))
+    )
+    text = "White gold ring."
+    baseline = parse_full_message(text, locale="en", dictionary=dictionary)
+    combined = parse_full_message(
+        text, locale="en", dictionary=dictionary, knowledge_runtime=runtime
+    )
+    assert _dictionary_evidence(combined) == _dictionary_evidence(baseline)
+    knowledge = [
+        item
+        for item in combined.candidates
+        if item.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+    ]
+    assert len(knowledge) == 1
+    assert knowledge[0].evidence.text == "White gold"
+    assert knowledge[0].normalized_values == ("white_gold",)
+    assert knowledge[0].parser_update is None
+
+
+def test_component_and_unknown_evidence_remain_non_authoritative(dictionary, collision_runtime):
+    result = parse_full_message(
+        "Gold prongs and platinum body, with sapphire and aurora facets.",
+        locale="en",
+        dictionary=dictionary,
+        knowledge_runtime=collision_runtime,
+    )
+    metals = [item for item in result.candidates if item.target == StructuredTarget.METAL_MATERIAL]
+    assert {item.normalized_values for item in metals} == {("gold",), ("platinum",)}
+    assert all(item.parser_update is None for item in metals)
+    sapphire = _find(result, text="sapphire")
+    assert sapphire.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+    assert sapphire.parser_update is None
+    assert _find(result, text="aurora").certainty == CandidateCertainty.UNRESOLVED
+    assert _find(result, text="facets").certainty == CandidateCertainty.UNRESOLVED
+
+
+def test_emerald_cut_diamond_and_white_gold_remain_distinct_facts(dictionary, collision_runtime):
+    result = parse_full_message(
+        "A white gold ring with an emerald-cut center diamond.",
+        locale="en",
+        dictionary=dictionary,
+        knowledge_runtime=collision_runtime,
+    )
+    values = {
+        item.target: item.normalized_values
+        for item in result.candidates
+        if item.parser_update is not None
+    }
+    assert values == {
+        StructuredTarget.JEWELRY_TYPE: ("ring",),
+        StructuredTarget.METAL_MATERIAL: ("gold",),
+        StructuredTarget.METAL_COLOR: ("white",),
+        StructuredTarget.CENTER_STONE_SHAPE: ("emerald_cut",),
+        StructuredTarget.CENTER_STONE_MATERIAL: ("diamond",),
+    }
 
 
 @pytest.fixture(scope="module")

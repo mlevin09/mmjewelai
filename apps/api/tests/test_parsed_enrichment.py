@@ -3,7 +3,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from jewelai_domain import (
@@ -29,6 +29,11 @@ from jewelai_parser import (
 )
 from jewelai_prompts import (
     EnrichmentProposal,
+    FinalPromptArtifactVersions,
+    FinalPromptSnapshot,
+    InternalFinalPrompt,
+    KnowledgeReleaseReference,
+    assemble_internal_final_prompt,
     enrich_prompt_with_active_release,
     load_prompt_templates,
 )
@@ -154,6 +159,10 @@ def active_release(tmp_path):
             },
         ]
     )
+    return _publish_test_release(tmp_path, payload)
+
+
+def _publish_test_release(tmp_path, payload):
     store = KnowledgeArtifactStore(tmp_path)
     stored = store.publish(payload)
     runtime, _ = compile_knowledge_library(payload)
@@ -172,6 +181,166 @@ def active_release(tmp_path):
     )
     active = promote_knowledge_runtime(runtime, report)
     return store, stored, runtime, report, active
+
+
+@pytest.fixture
+def collision_release(tmp_path, dictionary):
+    # Synthetic, disposable validation release; never activate the real catalog.
+    payload = json.loads(KNOWLEDGE.read_text(encoding="utf-8"))
+    for domain_id, kind in (
+        ("gold", "metal_material"),
+        ("platinum", "metal_material"),
+        ("ring", "jewelry_type"),
+        ("oval", "stone_shape"),
+        ("diamond", "gemstone_material"),
+    ):
+        payload["domain_knowledge"].append(
+            {
+                "concept_id": domain_id,
+                "kind": kind,
+                "relationships": [],
+                "claim_ids": [],
+                "structural_schema": True,
+                "lifecycle_status": "REVIEWED",
+            }
+        )
+        entry = dictionary[domain_id]
+        for locale in ("en", "ru"):
+            payload["language_mappings"].append(
+                {
+                    "mapping_id": f"LANG-COLLISION-{domain_id.upper()}-{locale.upper()}",
+                    "concept_id": domain_id,
+                    "locale": locale,
+                    "canonical_term": getattr(entry.canonical_terms, locale),
+                    "aliases": list(getattr(entry.synonyms, locale)),
+                    "mapping_mode": "DIRECT",
+                    "mapping_quality": "EXACT",
+                    "lifecycle_status": "REVIEWED",
+                }
+            )
+    return _publish_test_release(tmp_path, payload)
+
+
+@pytest.mark.parametrize(
+    ("locale", "text"),
+    [
+        ("en", "Gold ring with an oval diamond"),
+        ("ru", "Кольцо из золота с овальным алмазом."),
+        ("ru", "Кольцо with gold and an oval алмаз."),
+    ],
+)
+def test_overlap_preserves_actual_parser_and_matrix_updates(
+    locale, text, ring, dictionary, templates, collision_release
+):
+    payload = ring.model_dump(mode="json")
+    payload["design"] = {}
+    revision = DesignRevision.model_validate(payload)
+    before = revision.model_dump_json()
+    results = [
+        _enrich(
+            text,
+            locale=locale,
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )[1]
+        for enabled in (False, True)
+    ]
+    baseline, combined = results
+    assert combined.parser_proposal.accepted_updates == baseline.parser_proposal.accepted_updates
+    assert len(combined.parser_proposal.accepted_updates) == 4
+    # Added evidence legitimately renumbers candidates; semantic state and its
+    # provenance must match, while each new source ID must bind its own evidence.
+    assert tuple(
+        cell.model_dump(exclude={"source_ids"}) for cell in combined.enrichment_result.final_matrix
+    ) == tuple(
+        cell.model_dump(exclude={"source_ids"}) for cell in baseline.enrichment_result.final_matrix
+    )
+    assert not combined.parser_proposal.issues
+    assert (
+        tuple(item.candidate for item in combined.dispositions) == combined.parse_result.candidates
+    )
+    assert all(
+        item.reason != CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES
+        for item in combined.dispositions
+    )
+    for disposition in combined.dispositions:
+        if disposition.candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY:
+            assert disposition.outcome == CandidateDispositionOutcome.APPLIED
+            assert (
+                disposition.enrichment_proposal.provenance == RuntimeProvenance.NORMALIZED_FROM_USER
+            )
+            assert disposition.enrichment_proposal.source_id == disposition.candidate.candidate_id
+        elif disposition.candidate.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY:
+            assert disposition.reason == CandidateDispositionReason.TARGET_NOT_SUPPORTED_BY_PARSER
+            assert disposition.enrichment_proposal is None
+    assert revision.model_dump_json() == before
+    assert (
+        combined
+        == _enrich(
+            text,
+            locale=locale,
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+        )[1]
+    )
+
+
+@pytest.mark.parametrize("text", ("Gold and platinum ring.", "Gold gold ring."))
+def test_overlap_does_not_resolve_existing_multi_target_conflicts(
+    text, ring, dictionary, templates, collision_release
+):
+    for enabled in (False, True):
+        _, result = _enrich(
+            text,
+            locale="en",
+            revision=ring,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )
+        metal = [
+            item
+            for item in result.dispositions
+            if item.candidate.target == StructuredTarget.METAL_MATERIAL
+            and item.candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+        ]
+        assert len(metal) == 2
+        assert all(
+            item.reason == CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES for item in metal
+        )
+        assert all(item.enrichment_proposal is None for item in metal)
+
+
+def test_overlap_preserves_locked_field_conflicts(ring, dictionary, templates, collision_release):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["metal"]["material"]["locked"] = True
+    revision = DesignRevision.model_validate(payload)
+    for enabled in (False, True):
+        _, result = _enrich(
+            "Platinum ring.",
+            locale="en",
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )
+        metal = next(
+            item
+            for item in result.dispositions
+            if item.candidate.target == StructuredTarget.METAL_MATERIAL
+            and item.candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+        )
+        assert metal.outcome == CandidateDispositionOutcome.BLOCKED
+        assert metal.parser_issue_codes == (ParserIssueCode.LOCKED_FIELD_CONFLICT,)
+        assert revision.design.metal.material.value == "gold"
+        assert revision.design.metal.material.locked
 
 
 def _enrich(text, *, locale, revision, dictionary, templates, active_release, runtime=True):
@@ -208,6 +377,254 @@ def _find(result, *, target=None, classification=None, subject=None, text=None):
     ]
     assert matches, (target, classification, subject, text, result.dispositions)
     return matches[0]
+
+
+@pytest.mark.parametrize(
+    ("locale", "text", "halo_kind", "halo_wording", "update_count", "knowledge_count"),
+    [
+        ("en", "Gold ring with an oval diamond.", None, None, 4, 4),
+        (
+            "en",
+            "Gold ring with an oval diamond. Do not add a halo.",
+            "prohibition",
+            "Do not add a halo",
+            4,
+            4,
+        ),
+        (
+            "ru",
+            "Кольцо из золота с овальным алмазом. Не добавляйте гало.",
+            "prohibition",
+            "Не добавляйте гало",
+            4,
+            3,  # This synthetic Knowledge fixture lacks the inflected gold surface.
+        ),
+        (
+            "ru",
+            "Хочу gold ring with an oval diamond. Do not add гало.",
+            "prohibition",
+            "Do not add гало",
+            0,
+            4,
+        ),
+        (
+            "en",
+            "Gold ring with an oval diamond. Actually, add a halo.",
+            "requirement",
+            "add a halo",
+            4,
+            4,
+        ),
+    ],
+)
+def test_combined_collision_and_halo_preserve_matrix_and_final_constraints(
+    locale,
+    text,
+    halo_kind,
+    halo_wording,
+    update_count,
+    knowledge_count,
+    ring,
+    dictionary,
+    templates,
+    collision_release,
+    runtime_artifacts,
+):
+    revision = ring.model_copy(update={"design": type(ring.design)()})
+    before = revision.model_dump_json()
+    session_id, organization_id, cycle_id = uuid4(), uuid4(), uuid4()
+    matrices, instructions, dictionary_evidence = [], [], []
+    for enabled in (False, True):
+        parsed, result = _enrich(
+            text,
+            locale=locale,
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )
+        assert (
+            parsed
+            == _enrich(
+                text,
+                locale=locale,
+                revision=revision,
+                dictionary=dictionary,
+                templates=templates,
+                active_release=collision_release,
+                runtime=enabled,
+            )[0]
+        )
+        dictionary_candidates = [
+            item
+            for item in parsed.candidates
+            if item.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+        ]
+        knowledge_candidates = [
+            item
+            for item in parsed.candidates
+            if item.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+        ]
+        assert len(dictionary_candidates) == 4
+        assert len(knowledge_candidates) == (knowledge_count if enabled else 0)
+        dictionary_evidence.append(
+            [item.model_dump(exclude={"candidate_id"}) for item in dictionary_candidates]
+        )
+        assert len(result.parser_proposal.accepted_updates) == update_count
+        assert all(item.parser_update is None for item in knowledge_candidates)
+        for disposition in result.dispositions:
+            if disposition.candidate in knowledge_candidates:
+                assert disposition.enrichment_proposal is None
+            if disposition.enrichment_proposal is not None:
+                assert disposition.candidate in dictionary_candidates
+                assert (
+                    disposition.enrichment_proposal.source_id == disposition.candidate.candidate_id
+                )
+                assert (
+                    disposition.enrichment_proposal.provenance
+                    == RuntimeProvenance.NORMALIZED_FROM_USER
+                )
+        if update_count == 0:
+            # "Хочу" marks preferences, not accepted requirements; adding Knowledge
+            # must not grant those preferences authority or invent a missing binding.
+            assert all(
+                item.classification == CandidateClassification.PREFERENCE
+                for item in dictionary_candidates
+            )
+        for candidate in parsed.candidates:
+            assert (
+                text[candidate.evidence.start : candidate.evidence.end] == candidate.evidence.text
+            )
+        halo = [item for item in parsed.candidates if item.semantic_subject == "feature.halo"]
+        assert len(halo) == (1 if halo_kind else 0)
+        if halo:
+            assert halo[0].classification.value == halo_kind
+            assert halo[0].evidence.text == halo_wording
+            assert halo[0].parser_update is None
+        matrices.append(
+            [
+                cell.model_dump(exclude={"source_ids"})
+                for cell in result.enrichment_result.final_matrix
+            ]
+        )
+        evidence = merge_constraint_evidence(
+            result,
+            session_id=session_id,
+            organization_id=organization_id,
+            source=result.parser_proposal.source,
+            authoritative_revision=revision,
+            enrichment_cycle_id=cycle_id,
+        )
+        snapshot = FinalPromptSnapshot(
+            session_id=session_id,
+            organization_id=organization_id,
+            locale=locale,
+            revision=revision,
+            enrichment_cycle_id=cycle_id,
+            latest_enrichment_cycle_id=cycle_id,
+            enrichment_cycle_number=1,
+            enrichment_result=result.enrichment_result,
+            knowledge_release=KnowledgeReleaseReference(
+                package_id=collision_release[4].package_id,
+                artifact_version=collision_release[4].artifact_version,
+                runtime_sha256=collision_release[4].runtime_sha256,
+                validation_report_sha256=collision_release[4].validation_report_sha256,
+            ),
+            artifact_versions=FinalPromptArtifactVersions(
+                design_schema_version=revision.schema_version,
+                dictionary_artifact_version=dictionary.artifact_version,
+                question_artifact_version=runtime_artifacts.questions.artifact_version,
+                rules_artifact_version=runtime_artifacts.rules.artifact_version,
+                prompt_template_artifact_version=templates.artifact_version,
+                enrichment_version=result.enrichment_result.enrichment_version,
+            ),
+            rule_decision=runtime_artifacts.rules.evaluate(revision, "retail_client"),
+            constraint_evidence=evidence,
+        )
+        final = assemble_internal_final_prompt(
+            snapshot, dictionary=dictionary, templates=templates
+        ).internal_final_prompt
+        assert InternalFinalPrompt.model_validate_json(final.model_dump_json()) == final
+        final_halo = [item for item in final.constraints if item.target == "feature.halo"]
+        assert len(final_halo) == (1 if halo_kind else 0)
+        if final_halo:
+            assert final_halo[0].kind == halo_kind
+        instructions.append([item.model_dump() for item in final_halo])
+    assert dictionary_evidence[0] == dictionary_evidence[1]
+    assert matrices[0] == matrices[1]
+    # Source IDs legitimately differ with added evidence; compare semantic instructions.
+    assert [(item["kind"], item["instruction"]) for item in instructions[0]] == [
+        (item["kind"], item["instruction"]) for item in instructions[1]
+    ]
+    assert revision.model_dump_json() == before
+
+
+@pytest.mark.parametrize("role_id", ("retail_client", "jewelry_designer"))
+def test_combined_four_turn_halo_history_uses_collision_release(
+    engine, tmp_path, monkeypatch, role_id, collision_release
+):
+    from conftest import NOW as API_NOW
+    from test_prompt_enrichment_integration import _exercise_halo_constraint_sequence
+
+    from jewelai_api.prompt_enrichment_runtime import PromptEnrichmentRuntimeService
+
+    store, stored, _, report, active = collision_release
+
+    def runtime_factory(service, _tmp_path):
+        runtime = PromptEnrichmentRuntimeService(
+            service.repository,
+            service.artifacts,
+            store,
+            knowledge_package_id=stored.package_id,
+            knowledge_artifact_version=stored.artifact_version,
+            active_release=active,
+            validation_report=report,
+            clock=lambda: API_NOW,
+            uuid_factory=uuid4,
+        )
+        return runtime, store, active, report
+
+    monkeypatch.setattr("test_prompt_enrichment_integration._runtime", runtime_factory)
+    trace = _exercise_halo_constraint_sequence(
+        engine,
+        tmp_path,
+        role_id,
+        "en",
+        (
+            (
+                "Gold engagement ring with an oval diamond. No halo.",
+                "prohibition",
+                "No halo",
+            ),
+            (
+                "Keep the oval center stone. Do not add a halo.",
+                "prohibition",
+                "Do not add a halo",
+            ),
+            ("Actually, add a halo.", "requirement", "add a halo"),
+            ("I changed my mind. Don't include a halo.", "prohibition", "Don't include a halo"),
+        ),
+        initial_center_fields=("shape", "material"),
+    )
+    for turn in trace["turns"]:
+        revision = DesignRevision.model_validate(turn["revision"])
+        assert revision.design.metal.material.value == "gold"
+        assert revision.design.center_stone.shape.value == "oval"
+        assert revision.design.center_stone.material.value == "diamond"
+        assert revision.design.center_stone.dimensions.locked
+    initial = FullMessageParseResult.model_validate(trace["turns"][0]["parse_result"])
+    assert (
+        len(
+            [
+                item
+                for item in initial.candidates
+                if item.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+            ]
+        )
+        >= 4
+    )
+    assert UUID(trace["session_id"])
 
 
 @pytest.mark.parametrize(

@@ -45,7 +45,9 @@ def _release_payload(runtime):
     }
 
 
-def _exercise_halo_constraint_sequence(engine, tmp_path, role_id, locale, sequence):
+def _exercise_halo_constraint_sequence(
+    engine, tmp_path, role_id, locale, sequence, *, initial_center_fields=("shape",)
+):
     """Exercise real HTTP/CAS and durable restoration with synthetic, explicitly sourced facts."""
     service = build_service(engine)
     runtime, store, active, report = _runtime(service, tmp_path)
@@ -133,9 +135,12 @@ def _exercise_halo_constraint_sequence(engine, tmp_path, role_id, locale, sequen
             assert response.status_code == (201 if number == 1 else 200), response.json()
             state = runtime.get_current_state(UUID(sid), UUID(org))
             current = service.repository.get_current_revision(UUID(sid), UUID(org))
+            # The combined collision case also explicitly supplies the initially
+            # unknown material. Later turns must preserve it along with all other facts.
+            allowed = set(initial_center_fields) if number == 1 else {"shape"}
             assert current.design.center_stone.model_dump(
-                exclude={"shape"}
-            ) == before.design.center_stone.model_dump(exclude={"shape"})
+                exclude=allowed
+            ) == before.design.center_stone.model_dump(exclude=allowed)
             assert current.design.construction == before.design.construction
             if number == 2 and sequence[0][0].startswith("Design a platinum"):
                 assert before.design.center_stone.shape is None
