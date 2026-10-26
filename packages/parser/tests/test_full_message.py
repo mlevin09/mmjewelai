@@ -32,6 +32,100 @@ def dictionary():
     return load_domain_dictionary(ROOT / "data" / "dictionary" / "v1.0.0.json")
 
 
+@pytest.mark.parametrize(
+    ("locale", "phrase"),
+    [
+        ("en", "Do not add a halo"),
+        ("en", "Don't add a halo"),
+        ("en", "Do not include a halo"),
+        ("en", "Please do not use a halo"),
+        ("en", "I don't want a halo"),
+        ("en", "No halo"),
+        ("en", "Without a halo"),
+        ("en", "Never add a halo"),
+        ("en", "Don't include a halo"),
+        ("en", "Don’t add a halo"),
+        ("ru", "Не добавляй гало"),
+        ("ru", "Не добавлять гало"),
+        ("ru", "Не добавляйте гало"),
+        ("ru", "Не используйте гало"),
+        ("ru", "Не хочу гало"),
+        ("ru", "Без гало"),
+        ("ru", "Do not add гало"),
+        ("ru", "Не добавляй halo"),
+        ("ru", "Не добавлять halo"),
+    ],
+)
+def test_halo_negation_preserves_complete_source_and_polarity(dictionary, locale, phrase):
+    text = f"A ring. {phrase}."
+    parsed = parse_full_message(text, locale=locale, dictionary=dictionary)
+    assert parsed == parse_full_message(text, locale=locale, dictionary=dictionary)
+    halo = [item for item in parsed.candidates if item.semantic_subject == "feature.halo"]
+    assert len(halo) == 1
+    assert halo[0].classification == CandidateClassification.PROHIBITION
+    assert halo[0].certainty == CandidateCertainty.EXPLICIT
+    assert halo[0].evidence.text == phrase
+    assert halo[0].evidence.start == text.index(phrase)
+    assert text[halo[0].evidence.start : halo[0].evidence.end] == phrase
+    assert halo[0].parser_update is None
+    # No Dictionary/Knowledge match may reintroduce the protected inner positive phrase.
+    assert not any(
+        item.classification == CandidateClassification.REQUIREMENT
+        and item.evidence.start >= halo[0].evidence.start
+        and item.evidence.end <= halo[0].evidence.end
+        for item in parsed.candidates
+    )
+
+
+@pytest.mark.parametrize(
+    "text", ["Actually, add a halo.", "Include a halo.", "Use a halo.", "A ring with a halo."]
+)
+def test_positive_halo_requests_remain_explicit_requirements(dictionary, text):
+    parsed = parse_full_message(text, locale="en", dictionary=dictionary)
+    halo = [item for item in parsed.candidates if item.semantic_subject == "feature.halo"]
+    assert len(halo) == 1
+    assert halo[0].classification == CandidateClassification.REQUIREMENT
+    assert halo[0].certainty == CandidateCertainty.EXPLICIT
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Do not add a halo, but add side stones.",
+        "Do not add a halo. Add a halo to another design.",
+        "Add a halo, but do not include engraving.",
+    ],
+)
+def test_halo_negation_scope_does_not_consume_independent_clauses(dictionary, text):
+    parsed = parse_full_message(text, locale="en", dictionary=dictionary)
+    positive = [
+        item
+        for item in parsed.candidates
+        if item.semantic_subject == "feature.halo"
+        and item.classification == CandidateClassification.REQUIREMENT
+    ]
+    if text.startswith("Do not add a halo,"):
+        assert positive == []
+        assert any(item.evidence.start >= text.index("side") for item in parsed.candidates)
+    else:
+        assert len(positive) == 1
+        assert positive[0].evidence.text.casefold() == "add a halo"
+    # The parser retains separate instructions; it does not resolve contradictory intentions.
+    if "another design" in text:
+        assert any(
+            item.semantic_subject == "feature.halo"
+            and item.classification == CandidateClassification.PROHIBITION
+            for item in parsed.candidates
+        )
+
+
+@pytest.mark.parametrize("text", ["Do not remove the halo.", "Не убирайте гало."])
+def test_negated_removal_is_not_a_halo_presence_prohibition(dictionary, text):
+    parsed = parse_full_message(text, locale="en", dictionary=dictionary)
+    assert not any(item.semantic_subject == "feature.halo" for item in parsed.candidates)
+    assert any(item.certainty == CandidateCertainty.UNRESOLVED for item in parsed.candidates)
+
+
 @pytest.fixture(scope="module")
 def terminology():
     concepts = (

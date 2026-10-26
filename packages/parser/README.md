@@ -14,6 +14,13 @@ metal, negative constraints, and preservation intent remain structured evidence 
 integration can bind them safely. The function never changes Product State, creates side-stone
 groups, accepts recommendations, invokes a provider, or requires an ACTIVE production catalog.
 
+Halo constraints recognize bounded EN/RU and mixed-language prohibitions, including
+"do not add/include/use", "don't want", "never add", "не добавлять" and "без гало".
+The complete negative span protects against an embedded positive match; a separate positive
+halo instruction remains evidence. Negated removal ("do not remove the halo") is not treated
+as a prohibition of halo presence. Contradictory same-message instructions are not resolved by
+inventing precedence; existing final-snapshot conflict validation remains authoritative.
+
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for
 `center_stone.dimensions`. It applies the factor only to an existing known dimensions value;
 missing values produce a typed issue and locked values retain the existing lock-conflict behavior.
