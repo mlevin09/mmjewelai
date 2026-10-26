@@ -3,7 +3,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from jewelai_domain import (
@@ -29,6 +29,11 @@ from jewelai_parser import (
 )
 from jewelai_prompts import (
     EnrichmentProposal,
+    FinalPromptArtifactVersions,
+    FinalPromptSnapshot,
+    InternalFinalPrompt,
+    KnowledgeReleaseReference,
+    assemble_internal_final_prompt,
     enrich_prompt_with_active_release,
     load_prompt_templates,
 )
@@ -372,6 +377,254 @@ def _find(result, *, target=None, classification=None, subject=None, text=None):
     ]
     assert matches, (target, classification, subject, text, result.dispositions)
     return matches[0]
+
+
+@pytest.mark.parametrize(
+    ("locale", "text", "halo_kind", "halo_wording", "update_count", "knowledge_count"),
+    [
+        ("en", "Gold ring with an oval diamond.", None, None, 4, 4),
+        (
+            "en",
+            "Gold ring with an oval diamond. Do not add a halo.",
+            "prohibition",
+            "Do not add a halo",
+            4,
+            4,
+        ),
+        (
+            "ru",
+            "Кольцо из золота с овальным алмазом. Не добавляйте гало.",
+            "prohibition",
+            "Не добавляйте гало",
+            4,
+            3,  # This synthetic Knowledge fixture lacks the inflected gold surface.
+        ),
+        (
+            "ru",
+            "Хочу gold ring with an oval diamond. Do not add гало.",
+            "prohibition",
+            "Do not add гало",
+            0,
+            4,
+        ),
+        (
+            "en",
+            "Gold ring with an oval diamond. Actually, add a halo.",
+            "requirement",
+            "add a halo",
+            4,
+            4,
+        ),
+    ],
+)
+def test_combined_collision_and_halo_preserve_matrix_and_final_constraints(
+    locale,
+    text,
+    halo_kind,
+    halo_wording,
+    update_count,
+    knowledge_count,
+    ring,
+    dictionary,
+    templates,
+    collision_release,
+    runtime_artifacts,
+):
+    revision = ring.model_copy(update={"design": type(ring.design)()})
+    before = revision.model_dump_json()
+    session_id, organization_id, cycle_id = uuid4(), uuid4(), uuid4()
+    matrices, instructions, dictionary_evidence = [], [], []
+    for enabled in (False, True):
+        parsed, result = _enrich(
+            text,
+            locale=locale,
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )
+        assert (
+            parsed
+            == _enrich(
+                text,
+                locale=locale,
+                revision=revision,
+                dictionary=dictionary,
+                templates=templates,
+                active_release=collision_release,
+                runtime=enabled,
+            )[0]
+        )
+        dictionary_candidates = [
+            item
+            for item in parsed.candidates
+            if item.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+        ]
+        knowledge_candidates = [
+            item
+            for item in parsed.candidates
+            if item.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+        ]
+        assert len(dictionary_candidates) == 4
+        assert len(knowledge_candidates) == (knowledge_count if enabled else 0)
+        dictionary_evidence.append(
+            [item.model_dump(exclude={"candidate_id"}) for item in dictionary_candidates]
+        )
+        assert len(result.parser_proposal.accepted_updates) == update_count
+        assert all(item.parser_update is None for item in knowledge_candidates)
+        for disposition in result.dispositions:
+            if disposition.candidate in knowledge_candidates:
+                assert disposition.enrichment_proposal is None
+            if disposition.enrichment_proposal is not None:
+                assert disposition.candidate in dictionary_candidates
+                assert (
+                    disposition.enrichment_proposal.source_id == disposition.candidate.candidate_id
+                )
+                assert (
+                    disposition.enrichment_proposal.provenance
+                    == RuntimeProvenance.NORMALIZED_FROM_USER
+                )
+        if update_count == 0:
+            # "Хочу" marks preferences, not accepted requirements; adding Knowledge
+            # must not grant those preferences authority or invent a missing binding.
+            assert all(
+                item.classification == CandidateClassification.PREFERENCE
+                for item in dictionary_candidates
+            )
+        for candidate in parsed.candidates:
+            assert (
+                text[candidate.evidence.start : candidate.evidence.end] == candidate.evidence.text
+            )
+        halo = [item for item in parsed.candidates if item.semantic_subject == "feature.halo"]
+        assert len(halo) == (1 if halo_kind else 0)
+        if halo:
+            assert halo[0].classification.value == halo_kind
+            assert halo[0].evidence.text == halo_wording
+            assert halo[0].parser_update is None
+        matrices.append(
+            [
+                cell.model_dump(exclude={"source_ids"})
+                for cell in result.enrichment_result.final_matrix
+            ]
+        )
+        evidence = merge_constraint_evidence(
+            result,
+            session_id=session_id,
+            organization_id=organization_id,
+            source=result.parser_proposal.source,
+            authoritative_revision=revision,
+            enrichment_cycle_id=cycle_id,
+        )
+        snapshot = FinalPromptSnapshot(
+            session_id=session_id,
+            organization_id=organization_id,
+            locale=locale,
+            revision=revision,
+            enrichment_cycle_id=cycle_id,
+            latest_enrichment_cycle_id=cycle_id,
+            enrichment_cycle_number=1,
+            enrichment_result=result.enrichment_result,
+            knowledge_release=KnowledgeReleaseReference(
+                package_id=collision_release[4].package_id,
+                artifact_version=collision_release[4].artifact_version,
+                runtime_sha256=collision_release[4].runtime_sha256,
+                validation_report_sha256=collision_release[4].validation_report_sha256,
+            ),
+            artifact_versions=FinalPromptArtifactVersions(
+                design_schema_version=revision.schema_version,
+                dictionary_artifact_version=dictionary.artifact_version,
+                question_artifact_version=runtime_artifacts.questions.artifact_version,
+                rules_artifact_version=runtime_artifacts.rules.artifact_version,
+                prompt_template_artifact_version=templates.artifact_version,
+                enrichment_version=result.enrichment_result.enrichment_version,
+            ),
+            rule_decision=runtime_artifacts.rules.evaluate(revision, "retail_client"),
+            constraint_evidence=evidence,
+        )
+        final = assemble_internal_final_prompt(
+            snapshot, dictionary=dictionary, templates=templates
+        ).internal_final_prompt
+        assert InternalFinalPrompt.model_validate_json(final.model_dump_json()) == final
+        final_halo = [item for item in final.constraints if item.target == "feature.halo"]
+        assert len(final_halo) == (1 if halo_kind else 0)
+        if final_halo:
+            assert final_halo[0].kind == halo_kind
+        instructions.append([item.model_dump() for item in final_halo])
+    assert dictionary_evidence[0] == dictionary_evidence[1]
+    assert matrices[0] == matrices[1]
+    # Source IDs legitimately differ with added evidence; compare semantic instructions.
+    assert [(item["kind"], item["instruction"]) for item in instructions[0]] == [
+        (item["kind"], item["instruction"]) for item in instructions[1]
+    ]
+    assert revision.model_dump_json() == before
+
+
+@pytest.mark.parametrize("role_id", ("retail_client", "jewelry_designer"))
+def test_combined_four_turn_halo_history_uses_collision_release(
+    engine, tmp_path, monkeypatch, role_id, collision_release
+):
+    from conftest import NOW as API_NOW
+    from test_prompt_enrichment_integration import _exercise_halo_constraint_sequence
+
+    from jewelai_api.prompt_enrichment_runtime import PromptEnrichmentRuntimeService
+
+    store, stored, _, report, active = collision_release
+
+    def runtime_factory(service, _tmp_path):
+        runtime = PromptEnrichmentRuntimeService(
+            service.repository,
+            service.artifacts,
+            store,
+            knowledge_package_id=stored.package_id,
+            knowledge_artifact_version=stored.artifact_version,
+            active_release=active,
+            validation_report=report,
+            clock=lambda: API_NOW,
+            uuid_factory=uuid4,
+        )
+        return runtime, store, active, report
+
+    monkeypatch.setattr("test_prompt_enrichment_integration._runtime", runtime_factory)
+    trace = _exercise_halo_constraint_sequence(
+        engine,
+        tmp_path,
+        role_id,
+        "en",
+        (
+            (
+                "Gold engagement ring with an oval diamond. No halo.",
+                "prohibition",
+                "No halo",
+            ),
+            (
+                "Keep the oval center stone. Do not add a halo.",
+                "prohibition",
+                "Do not add a halo",
+            ),
+            ("Actually, add a halo.", "requirement", "add a halo"),
+            ("I changed my mind. Don't include a halo.", "prohibition", "Don't include a halo"),
+        ),
+        initial_center_fields=("shape", "material"),
+    )
+    for turn in trace["turns"]:
+        revision = DesignRevision.model_validate(turn["revision"])
+        assert revision.design.metal.material.value == "gold"
+        assert revision.design.center_stone.shape.value == "oval"
+        assert revision.design.center_stone.material.value == "diamond"
+        assert revision.design.center_stone.dimensions.locked
+    initial = FullMessageParseResult.model_validate(trace["turns"][0]["parse_result"])
+    assert (
+        len(
+            [
+                item
+                for item in initial.candidates
+                if item.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+            ]
+        )
+        >= 4
+    )
+    assert UUID(trace["session_id"])
 
 
 @pytest.mark.parametrize(
