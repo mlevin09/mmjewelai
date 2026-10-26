@@ -447,6 +447,8 @@ def parse_full_message(
             item["evidence"]["end"],
             item["target"].value if isinstance(item.get("target"), StrEnum) else "",
             item["subject"].value,
+            item["normalization_source"].value,
+            item["normalized_values"],
         )
     )
     immutable = tuple(
@@ -563,35 +565,55 @@ def _find_surfaces(text: str, surfaces: list[_Surface]) -> list[_Found]:
                     found.append(_Found(tokens[start].start, tokens[end - 1].end, surface))
 
     unique = {
-        (item.start, item.end, item.surface.category, item.surface.normalized_id): item
+        (
+            item.start,
+            item.end,
+            item.surface.source,
+            item.surface.category,
+            item.surface.normalized_id,
+        ): item
         for item in found
     }
     ordered = sorted(unique.values(), key=lambda item: (item.start, -(item.end - item.start)))
     kept: list[_Found] = []
     for item in ordered:
-        if any(existing.start <= item.start and existing.end >= item.end for existing in kept):
+        # Longest-span selection is local to each authority source. Knowledge
+        # recognition must neither replace nor suppress supported Dictionary facts.
+        if any(
+            existing.surface.source == item.surface.source
+            and existing.start <= item.start
+            and existing.end >= item.end
+            for existing in kept
+        ):
             continue
         kept.append(item)
     return kept
 
 
 def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
-    alternatives: dict[tuple[int, int, DictionaryCategory, str], set[str]] = {}
+    alternatives: dict[tuple[int, int, NormalizationSource, DictionaryCategory, str], set[str]] = {}
     for index, left in enumerate(found):
         for right in found[index + 1 :]:
-            if left.surface.category != right.surface.category or right.start - left.end > 30:
+            if (
+                left.surface.source != right.surface.source
+                or left.surface.category != right.surface.category
+                or left.surface.normalized_id == right.surface.normalized_id
+                or right.start - left.end > 30
+            ):
                 continue
             between = text[left.end : right.start]
             if _AMBIGUITY.search(between):
                 left_key = (
                     left.start,
                     left.end,
+                    left.surface.source,
                     left.surface.category,
                     left.surface.normalized_id,
                 )
                 right_key = (
                     right.start,
                     right.end,
+                    right.surface.source,
                     right.surface.category,
                     right.surface.normalized_id,
                 )
@@ -600,7 +622,13 @@ def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
                 alternatives.setdefault(right_key, set()).update(pair)
     result = []
     for item in found:
-        key = (item.start, item.end, item.surface.category, item.surface.normalized_id)
+        key = (
+            item.start,
+            item.end,
+            item.surface.source,
+            item.surface.category,
+            item.surface.normalized_id,
+        )
         values = alternatives.get(key)
         result.append(
             replace(
@@ -1036,14 +1064,11 @@ def _deduplicate(candidates: list[dict]) -> list[dict]:
             item.get("target"),
             item["subject"],
             item["classification"],
+            item["normalization_source"],
+            item["normalized_values"],
             update.target if update is not None else None,
         )
-        existing = unique.get(key)
-        if existing is None or (
-            existing["normalization_source"] == NormalizationSource.KNOWLEDGE_LIBRARY
-            and item["normalization_source"] == NormalizationSource.DOMAIN_DICTIONARY
-        ):
-            unique[key] = item
+        unique.setdefault(key, item)
     return list(unique.values())
 
 

@@ -154,6 +154,10 @@ def active_release(tmp_path):
             },
         ]
     )
+    return _publish_test_release(tmp_path, payload)
+
+
+def _publish_test_release(tmp_path, payload):
     store = KnowledgeArtifactStore(tmp_path)
     stored = store.publish(payload)
     runtime, _ = compile_knowledge_library(payload)
@@ -172,6 +176,166 @@ def active_release(tmp_path):
     )
     active = promote_knowledge_runtime(runtime, report)
     return store, stored, runtime, report, active
+
+
+@pytest.fixture
+def collision_release(tmp_path, dictionary):
+    # Synthetic, disposable validation release; never activate the real catalog.
+    payload = json.loads(KNOWLEDGE.read_text(encoding="utf-8"))
+    for domain_id, kind in (
+        ("gold", "metal_material"),
+        ("platinum", "metal_material"),
+        ("ring", "jewelry_type"),
+        ("oval", "stone_shape"),
+        ("diamond", "gemstone_material"),
+    ):
+        payload["domain_knowledge"].append(
+            {
+                "concept_id": domain_id,
+                "kind": kind,
+                "relationships": [],
+                "claim_ids": [],
+                "structural_schema": True,
+                "lifecycle_status": "REVIEWED",
+            }
+        )
+        entry = dictionary[domain_id]
+        for locale in ("en", "ru"):
+            payload["language_mappings"].append(
+                {
+                    "mapping_id": f"LANG-COLLISION-{domain_id.upper()}-{locale.upper()}",
+                    "concept_id": domain_id,
+                    "locale": locale,
+                    "canonical_term": getattr(entry.canonical_terms, locale),
+                    "aliases": list(getattr(entry.synonyms, locale)),
+                    "mapping_mode": "DIRECT",
+                    "mapping_quality": "EXACT",
+                    "lifecycle_status": "REVIEWED",
+                }
+            )
+    return _publish_test_release(tmp_path, payload)
+
+
+@pytest.mark.parametrize(
+    ("locale", "text"),
+    [
+        ("en", "Gold ring with an oval diamond"),
+        ("ru", "Кольцо из золота с овальным алмазом."),
+        ("ru", "Кольцо with gold and an oval алмаз."),
+    ],
+)
+def test_overlap_preserves_actual_parser_and_matrix_updates(
+    locale, text, ring, dictionary, templates, collision_release
+):
+    payload = ring.model_dump(mode="json")
+    payload["design"] = {}
+    revision = DesignRevision.model_validate(payload)
+    before = revision.model_dump_json()
+    results = [
+        _enrich(
+            text,
+            locale=locale,
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )[1]
+        for enabled in (False, True)
+    ]
+    baseline, combined = results
+    assert combined.parser_proposal.accepted_updates == baseline.parser_proposal.accepted_updates
+    assert len(combined.parser_proposal.accepted_updates) == 4
+    # Added evidence legitimately renumbers candidates; semantic state and its
+    # provenance must match, while each new source ID must bind its own evidence.
+    assert tuple(
+        cell.model_dump(exclude={"source_ids"}) for cell in combined.enrichment_result.final_matrix
+    ) == tuple(
+        cell.model_dump(exclude={"source_ids"}) for cell in baseline.enrichment_result.final_matrix
+    )
+    assert not combined.parser_proposal.issues
+    assert (
+        tuple(item.candidate for item in combined.dispositions) == combined.parse_result.candidates
+    )
+    assert all(
+        item.reason != CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES
+        for item in combined.dispositions
+    )
+    for disposition in combined.dispositions:
+        if disposition.candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY:
+            assert disposition.outcome == CandidateDispositionOutcome.APPLIED
+            assert (
+                disposition.enrichment_proposal.provenance == RuntimeProvenance.NORMALIZED_FROM_USER
+            )
+            assert disposition.enrichment_proposal.source_id == disposition.candidate.candidate_id
+        elif disposition.candidate.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY:
+            assert disposition.reason == CandidateDispositionReason.TARGET_NOT_SUPPORTED_BY_PARSER
+            assert disposition.enrichment_proposal is None
+    assert revision.model_dump_json() == before
+    assert (
+        combined
+        == _enrich(
+            text,
+            locale=locale,
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+        )[1]
+    )
+
+
+@pytest.mark.parametrize("text", ("Gold and platinum ring.", "Gold gold ring."))
+def test_overlap_does_not_resolve_existing_multi_target_conflicts(
+    text, ring, dictionary, templates, collision_release
+):
+    for enabled in (False, True):
+        _, result = _enrich(
+            text,
+            locale="en",
+            revision=ring,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )
+        metal = [
+            item
+            for item in result.dispositions
+            if item.candidate.target == StructuredTarget.METAL_MATERIAL
+            and item.candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+        ]
+        assert len(metal) == 2
+        assert all(
+            item.reason == CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES for item in metal
+        )
+        assert all(item.enrichment_proposal is None for item in metal)
+
+
+def test_overlap_preserves_locked_field_conflicts(ring, dictionary, templates, collision_release):
+    payload = ring.model_dump(mode="json")
+    payload["design"]["metal"]["material"]["locked"] = True
+    revision = DesignRevision.model_validate(payload)
+    for enabled in (False, True):
+        _, result = _enrich(
+            "Platinum ring.",
+            locale="en",
+            revision=revision,
+            dictionary=dictionary,
+            templates=templates,
+            active_release=collision_release,
+            runtime=enabled,
+        )
+        metal = next(
+            item
+            for item in result.dispositions
+            if item.candidate.target == StructuredTarget.METAL_MATERIAL
+            and item.candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+        )
+        assert metal.outcome == CandidateDispositionOutcome.BLOCKED
+        assert metal.parser_issue_codes == (ParserIssueCode.LOCKED_FIELD_CONFLICT,)
+        assert revision.design.metal.material.value == "gold"
+        assert revision.design.metal.material.locked
 
 
 def _enrich(text, *, locale, revision, dictionary, templates, active_release, runtime=True):
