@@ -30,6 +30,7 @@ from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models_v1_1 import (
     AnyDesignRevision,
     DesignRevisionV1_1,
+    migrate_design_revision_v1_to_v1_1,
     validate_design_revision,
 )
 from jewelai_domain.reference_bindings import ReferenceBinding
@@ -728,6 +729,20 @@ class PersistenceRepository:
                 ):
                     raise DuplicateRevisionError(
                         "Schema migration must continue the stored v1.0 design as v1.1"
+                    )
+                # Derive from the locked, persisted snapshot, never a caller's copy.
+                # Only new revision metadata may vary; the complete nested design
+                # and the canonical migration's edit event must remain equivalent.
+                expected = migrate_design_revision_v1_to_v1_1(
+                    self._domain_revision(parent),
+                    revision_id=revision.revision_id,
+                    created_at=revision.created_at,
+                    source=revision.event.source,
+                    reason=revision.event.reason,
+                )
+                if revision != expected:
+                    raise DuplicateRevisionError(
+                        "Schema migration must equal the canonical stored-parent migration"
                     )
                 db.add(self._revision_row(session_id, revision))
                 session.current_revision_id = revision.revision_id
