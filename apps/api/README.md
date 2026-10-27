@@ -154,6 +154,10 @@ schema-supported facts. Preferences, constraints, ambiguous or unresolved facts,
 that Product State v1 cannot represent, and side-stone facts without exactly one stable group remain
 traceable deferred evidence. The boundary never mutates Product State or accepts a recommendation.
 
+Parser tuples (including Dictionary-normalized style terms) are converted to JSON arrays before
+enrichment-proposal validation. This representation conversion does not expand style vocabulary or
+change preference acceptance, provenance, locks, or clarification policy.
+
 The internal `plan_clarifications()` boundary deterministically composes that first-enrichment
 evidence with the existing Rules Engine and Question Catalog. It emits immutable English or Russian
 questions with stable IDs, exact candidate evidence, Product State revision lineage and verified
