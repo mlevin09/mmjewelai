@@ -56,6 +56,7 @@ from .artifacts import RuntimeArtifacts
 from .clarification import (
     ClarificationImportance,
     ClarificationPlan,
+    UnaskedReason,
     continue_clarification_plan,
     plan_clarifications,
 )
@@ -71,6 +72,8 @@ from .constraint_evidence import merge_constraint_evidence
 from .correction_enrichment import (
     CorrectionErrorCode,
     CorrectionInputError,
+    CorrectionOutcome,
+    CorrectionReason,
     CorrectionReenrichmentResult,
     UserCorrection,
     process_user_correction,
@@ -83,6 +86,8 @@ from .durable_enrichment import (
 )
 from .parametric_enrichment import select_parametric_references
 from .parsed_enrichment import (
+    CandidateDispositionOutcome,
+    CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
     enrich_parsed_candidates_with_active_release,
 )
@@ -1151,7 +1156,6 @@ def build_final_prompt_snapshot(
     corrections = list_user_correction_results(
         repository, session_id=session_id, organization_id=organization_id
     )
-    lineage = _decision_lineage(session_id, revision.revision_id, answers, corrections)
     try:
         plan_record = repository.get_clarification_plan_for_cycle(
             session_id, latest.enrichment_cycle_id, organization_id
@@ -1185,6 +1189,19 @@ def build_final_prompt_snapshot(
                 PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
                 "Constraint evidence references invalid session history",
             ) from exc
+    correction_blocks = _effective_correction_blocks(
+        repository,
+        session_id=session_id,
+        organization_id=organization_id,
+        cycles=cycles,
+        corrections=corrections,
+        answers=answers,
+        current_plan=plan,
+        artifacts=artifacts,
+    )
+    lineage = _decision_lineage(
+        session_id, revision.revision_id, answers, corrections, correction_blocks
+    )
     return FinalPromptSnapshot(
         session_id=session_id,
         organization_id=organization_id,
@@ -1214,7 +1231,210 @@ def build_final_prompt_snapshot(
     )
 
 
-def _decision_lineage(session_id, current_revision_id, answers, corrections):
+def _effective_correction_blocks(
+    repository,
+    *,
+    session_id,
+    organization_id,
+    cycles,
+    corrections,
+    answers,
+    current_plan,
+    artifacts,
+):
+    """Project open correction obligations; never rewrite their immutable outcomes.
+
+    A question can discharge only its own source candidates along answer-only plan
+    continuations. A correction starts fresh parsing, so matching candidate IDs or
+    targets across that boundary is deliberately insufficient proof of resolution.
+    """
+    if not any(item.outcome == CorrectionOutcome.DEFERRED for item in corrections):
+        return {item.content_hash: False for item in corrections}
+    by_cycle = {cycle.enrichment_cycle_id: cycle for cycle in cycles}
+    plans = {}
+    try:
+        records = repository.list_clarification_plans(session_id, organization_id)
+        for record in records:
+            cycle = by_cycle[record.enrichment_cycle_id]
+            restored = ClarificationPlan.model_validate(record.plan_payload)
+            if (
+                record.content_hash != restored.content_hash
+                or record.specification_revision_id != cycle.specification_revision_id
+                or restored.design_revision_id != str(cycle.specification_revision_id)
+                or restored.knowledge_package_id != cycle.release_pin.package_id
+                or restored.knowledge_artifact_version != cycle.release_pin.artifact_version
+                or restored.knowledge_runtime_sha256 != cycle.release_pin.runtime_sha256
+                or restored.knowledge_validation_report_sha256
+                != cycle.release_pin.validation_report_sha256
+                or restored.question_artifact_version != current_plan.question_artifact_version
+                or restored.rules_artifact_version != current_plan.rules_artifact_version
+                or restored.role_id != current_plan.role_id
+                or restored.locale != current_plan.locale
+            ):
+                raise ValueError("historical clarification plan lineage mismatch")
+            plans[record.clarification_plan_id] = (cycle, restored)
+        answer_plans = {
+            record.content_hash: plans[record.clarification_plan_id]
+            for record in repository.list_clarification_answers(session_id, organization_id)
+            if record.clarification_plan_id is not None
+        }
+    except (KeyError, ValueError, ClarificationPlanIntegrityError) as exc:
+        raise PromptEnrichmentRuntimeError(
+            PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+            "Effective readiness requires valid durable clarification lineage",
+        ) from exc
+    correction_cycles = {item.next_enrichment_cycle_number for item in corrections}
+    by_number = {cycle.cycle_number: cycle for cycle in cycles}
+    plans_by_number = {cycle.cycle_number: plan for cycle, plan in plans.values()}
+    answer_steps = set()
+    for answer in answers:
+        bound = answer_plans.get(answer.content_hash)
+        if bound is None:
+            continue
+        source_cycle, source_plan = bound
+        successor = by_number.get(source_cycle.cycle_number + 1)
+        successor_plan = plans_by_number.get(source_cycle.cycle_number + 1)
+        if successor is None or successor.specification_revision_id != (
+            answer.new_revision_id or answer.previous_revision_id
+        ):
+            continue
+        next_revision = repository.get_revision(
+            session_id, successor.specification_revision_id, organization_id
+        )
+        expected_plan = continue_clarification_plan(
+            source_plan,
+            next_revision,
+            answered_clarification_ids=(answer.clarification_id,),
+            questions=artifacts.questions,
+            rules=artifacts.rules,
+        )
+        if expected_plan == successor_plan:
+            # Exact existing continuation semantics also prove nonmutating
+            # SKIP/UNKNOWN/REJECT steps; a coincidentally newer revision cannot.
+            answer_steps.add(source_cycle.cycle_number)
+    flags = {}
+    for correction in corrections:
+        blocks = correction.outcome == CorrectionOutcome.DEFERRED
+        if blocks and correction.reason != CorrectionReason.REVISION_TRANSITION_DEFERRED:
+            origin = next(
+                (
+                    item
+                    for item in plans.values()
+                    if item[0].cycle_number == correction.next_enrichment_cycle_number
+                ),
+                None,
+            )
+            if origin is not None:
+                cycle, original_plan = origin
+                resolved = {
+                    evidence.source_candidate_id
+                    for evidence in current_plan.constraint_evidence
+                    if evidence.source == correction.source
+                    and evidence.source_enrichment_cycle_id == cycle.enrichment_cycle_id
+                    and evidence.source_revision_id == cycle.specification_revision_id
+                    and evidence.status in {"active", "superseded"}
+                    and any(
+                        candidate.candidate_id == evidence.source_candidate_id
+                        and candidate.semantic_subject == evidence.semantic_subject
+                        and candidate.classification.value == evidence.kind
+                        and candidate.evidence.start == evidence.source_span_start
+                        and candidate.evidence.end == evidence.source_span_end
+                        for candidate in correction.parsed_correction.candidates
+                    )
+                }
+                for question in original_plan.questions:
+                    if any(
+                        _answer_discharges_question(
+                            answer,
+                            question,
+                            origin=cycle.cycle_number,
+                            answer_plan=answer_plans.get(answer.content_hash),
+                            correction_cycles=correction_cycles,
+                            answer_steps=answer_steps,
+                        )
+                        for answer in answers
+                    ):
+                        resolved.update(question.source_candidate_ids)
+                dispositions = correction.correction_evaluation.dispositions
+                noncritical = {
+                    item.candidate_id
+                    for item in original_plan.unasked_evidence
+                    if item.reason == UnaskedReason.NONCRITICAL_UNKNOWN
+                }
+                pending = {
+                    item.candidate.candidate_id
+                    for item in dispositions
+                    if item.outcome == CandidateDispositionOutcome.DEFERRED
+                }
+                # Ignore only source-overlap mirrors of a separately discharged or
+                # already-current Dictionary fact, not arbitrary Knowledge-only terms.
+                for item in dispositions:
+                    candidate = item.candidate
+                    if candidate.normalization_source.value != "knowledge_library":
+                        continue
+                    if any(
+                        other.candidate.normalization_source.value == "domain_dictionary"
+                        and other.candidate.evidence == candidate.evidence
+                        and other.candidate.target == candidate.target
+                        and other.candidate.subject == candidate.subject
+                        and other.candidate.normalized_values == candidate.normalized_values
+                        and (
+                            other.candidate.candidate_id in resolved
+                            or other.reason == CandidateDispositionReason.ALREADY_CURRENT
+                        )
+                        for other in dispositions
+                    ):
+                        resolved.add(candidate.candidate_id)
+                has_nonmutating_fact = any(
+                    item.reason
+                    in {
+                        CandidateDispositionReason.ALREADY_CURRENT,
+                        CandidateDispositionReason.PRESERVATION_RETAINED,
+                    }
+                    for item in dispositions
+                )
+                blocks = bool(pending - resolved - noncritical) or not (
+                    resolved or has_nonmutating_fact
+                )
+        flags[correction.content_hash] = blocks
+    return flags
+
+
+def _answer_discharges_question(
+    answer, question, *, origin, answer_plan, correction_cycles, answer_steps
+):
+    if answer_plan is None:
+        return False  # Legacy unbound answers cannot prove causal resolution.
+    cycle, plan = answer_plan
+    if cycle.cycle_number < origin or any(
+        origin < number <= cycle.cycle_number for number in correction_cycles
+    ):
+        return False
+    if any(number not in answer_steps for number in range(origin, cycle.cycle_number)):
+        return False  # A newer revision alone is not proof of answer continuation.
+    linked = next(
+        (item for item in plan.questions if item.clarification_id == answer.clarification_id), None
+    )
+    if linked is None or answer.plan_content_hash != plan.content_hash:
+        return False
+    excluded = {"clarification_id", "design_revision_id"}
+    if (
+        linked.model_dump(exclude=excluded) != question.model_dump(exclude=excluded)
+        or answer.target != question.target.value
+        or answer.subject != (question.subject.value if question.subject is not None else None)
+        or answer.source_candidate_ids != question.source_candidate_ids
+        or answer.source_proposal_ids != question.source_proposal_ids
+        or answer.evidence != question.evidence
+    ):
+        return False
+    return answer.question_resolved or (
+        question.importance != ClarificationImportance.BLOCKING
+        and not answer.blocks_progression
+        and answer.decision in {ClarificationDecision.SKIP, ClarificationDecision.UNKNOWN}
+    )
+
+
+def _decision_lineage(session_id, current_revision_id, answers, corrections, correction_blocks):
     items = []
     for answer in answers:
         option = answer.selected_option.value if answer.selected_option is not None else None
@@ -1255,7 +1475,7 @@ def _decision_lineage(session_id, current_revision_id, answers, corrections):
                 knowledge_artifact_version=correction.knowledge_artifact_version,
                 knowledge_runtime_sha256=correction.knowledge_runtime_sha256,
                 knowledge_validation_report_sha256=(correction.knowledge_validation_report_sha256),
-                blocks_progression=correction.outcome.value == "DEFERRED",
+                blocks_progression=correction_blocks[correction.content_hash],
                 content_hash=correction.content_hash,
             )
         )
@@ -1263,15 +1483,18 @@ def _decision_lineage(session_id, current_revision_id, answers, corrections):
 
 
 def _workflow_status(assembly, clarification_plan):
+    readiness = assembly.internal_final_prompt.readiness
     if clarification_plan is not None:
         if any(
             item.importance == ClarificationImportance.BLOCKING
             for item in clarification_plan.questions
         ):
             return PromptEnrichmentWorkflowStatus.BLOCKING_CLARIFICATION_UNRESOLVED
+    if readiness == FinalPromptReadiness.BLOCKED:
+        return PromptEnrichmentWorkflowStatus.FINAL_OUTPUT_BLOCKED
+    if clarification_plan is not None:
         if clarification_plan.questions:
             return PromptEnrichmentWorkflowStatus.CLARIFICATION_AVAILABLE
-    readiness = assembly.internal_final_prompt.readiness
     if readiness == FinalPromptReadiness.READY:
         return PromptEnrichmentWorkflowStatus.FINAL_OUTPUT_READY
     if readiness == FinalPromptReadiness.READY_WITH_UNRESOLVED:
