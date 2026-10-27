@@ -1,6 +1,15 @@
 """Deterministic provider-neutral Prompt Compiler v1."""
 
 from .compiler import PromptValidationError, compile_prompt, validate_compiled_prompt
+from .downstream_preparation import (
+    CanonicalInternalFinalPrompt,
+    CanonicalInternalFinalPromptHandoff,
+    GenerationPreparation,
+    GenerationPreparationError,
+    PreparationErrorCode,
+    PreparationGateEvidence,
+    build_generation_preparation,
+)
 from .enrichment import (
     PROMPT_ENRICHMENT_VERSION,
     EnrichmentDecision,
@@ -51,8 +60,18 @@ from .models import (
     PromptTemplateBundle,
     SpecificationEntry,
 )
+from .revision_projection import RevisionProjection, project_revision
 
 __all__ = [
+    "CanonicalInternalFinalPrompt",
+    "CanonicalInternalFinalPromptHandoff",
+    "GenerationPreparation",
+    "GenerationPreparationError",
+    "PreparationErrorCode",
+    "PreparationGateEvidence",
+    "RevisionProjection",
+    "build_generation_preparation",
+    "project_revision",
     "PROMPT_COMPILER_VERSION",
     "PROMPT_ENRICHMENT_VERSION",
     "PROMPT_SCHEMA_VERSION",
