@@ -1197,6 +1197,7 @@ def build_final_prompt_snapshot(
         corrections=corrections,
         answers=answers,
         current_plan=plan,
+        artifacts=artifacts,
     )
     lineage = _decision_lineage(
         session_id, revision.revision_id, answers, corrections, correction_blocks
@@ -1231,7 +1232,15 @@ def build_final_prompt_snapshot(
 
 
 def _effective_correction_blocks(
-    repository, *, session_id, organization_id, cycles, corrections, answers, current_plan
+    repository,
+    *,
+    session_id,
+    organization_id,
+    cycles,
+    corrections,
+    answers,
+    current_plan,
+    artifacts,
 ):
     """Project open correction obligations; never rewrite their immutable outcomes.
 
@@ -1276,15 +1285,33 @@ def _effective_correction_blocks(
         ) from exc
     correction_cycles = {item.next_enrichment_cycle_number for item in corrections}
     by_number = {cycle.cycle_number: cycle for cycle in cycles}
-    answer_steps = {
-        answer_plans[answer.content_hash][0].cycle_number
-        for answer in answers
-        if answer.content_hash in answer_plans
-        and answer.new_revision_id is not None
-        and (next_cycle := by_number.get(answer_plans[answer.content_hash][0].cycle_number + 1))
-        is not None
-        and next_cycle.specification_revision_id == answer.new_revision_id
-    }
+    plans_by_number = {cycle.cycle_number: plan for cycle, plan in plans.values()}
+    answer_steps = set()
+    for answer in answers:
+        bound = answer_plans.get(answer.content_hash)
+        if bound is None:
+            continue
+        source_cycle, source_plan = bound
+        successor = by_number.get(source_cycle.cycle_number + 1)
+        successor_plan = plans_by_number.get(source_cycle.cycle_number + 1)
+        if successor is None or successor.specification_revision_id != (
+            answer.new_revision_id or answer.previous_revision_id
+        ):
+            continue
+        next_revision = repository.get_revision(
+            session_id, successor.specification_revision_id, organization_id
+        )
+        expected_plan = continue_clarification_plan(
+            source_plan,
+            next_revision,
+            answered_clarification_ids=(answer.clarification_id,),
+            questions=artifacts.questions,
+            rules=artifacts.rules,
+        )
+        if expected_plan == successor_plan:
+            # Exact existing continuation semantics also prove nonmutating
+            # SKIP/UNKNOWN/REJECT steps; a coincidentally newer revision cannot.
+            answer_steps.add(source_cycle.cycle_number)
     flags = {}
     for correction in corrections:
         blocks = correction.outcome == CorrectionOutcome.DEFERRED
@@ -1394,6 +1421,7 @@ def _answer_discharges_question(
     if (
         linked.model_dump(exclude=excluded) != question.model_dump(exclude=excluded)
         or answer.target != question.target.value
+        or answer.subject != (question.subject.value if question.subject is not None else None)
         or answer.source_candidate_ids != question.source_candidate_ids
         or answer.source_proposal_ids != question.source_proposal_ids
         or answer.evidence != question.evidence

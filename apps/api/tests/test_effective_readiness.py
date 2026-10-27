@@ -324,6 +324,21 @@ def test_unrelated_later_answer_and_new_revision_do_not_clear_an_old_issue(ready
     assert final.status_code == 409
 
 
+@pytest.mark.parametrize("decision", ("SKIP", "UNKNOWN", "REJECT"))
+def test_nonmutating_answer_continuation_preserves_another_questions_resolution(
+    ready_session, decision
+):
+    ctx = ready_session()
+    _correct(ctx, "I prefer yellow with an emerald-cut center stone.")
+    _, pending = _answer(ctx, "metal.color", decision=decision)
+    assert pending.final_output.internal_final_prompt.readiness == FinalPromptReadiness.BLOCKED
+    _, resolved = _answer(ctx, "center_stone.shape")
+    _assert_current_ready(ctx, resolved)
+    current = ctx.service.repository.get_current_revision(UUID(ctx.sid), UUID(ctx.org))
+    assert current.design.metal.color.value == "white"
+    assert current.design.center_stone.shape.value == "emerald_cut"
+
+
 @pytest.mark.parametrize("text", ("Keep the center stone unchanged.", "Gold ring.", "No halo."))
 def test_supported_nonmutating_corrections_remain_nonblocking(ready_session, text):
     ctx = ready_session()

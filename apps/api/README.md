@@ -246,7 +246,8 @@ candidate is accounted for by verified retained/superseded constraint evidence, 
 source-bound clarification decision, or the existing noncritical/unchanged-fact policy.
 
 Clarification resolution follows the originating correction cycle and exact question target,
-candidate/proposal IDs and evidence. Applied answer revisions prove intervening continuations;
+candidate/proposal IDs and evidence. Exact reconstruction of the next durable plan and its
+authoritative revision proves intervening answer continuations, including nonmutating decisions;
 array order, matching wording, or a newer unrelated revision cannot prove resolution. A fresh
 correction is a conservative causal boundary. Unbound legacy answers and unsupported obligations
 remain blocking when resolution cannot be demonstrated. Optional SKIP/UNKNOWN decisions retain
