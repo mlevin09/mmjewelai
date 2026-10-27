@@ -1,5 +1,54 @@
 # JewelAI Prompt Compiler
 
+## B1: pure canonical generation preparation (not wired to application runtime)
+
+Implementation record: [ADR 0032 (pending B1 review)](../../docs/adr/0032-canonical-generation-preparation-b1.md).
+
+`project_revision()` extracts the legacy compiler's existing structured projection. It preserves
+canonical targets/stable IDs, applicability, origin, confirmation, locks and disclosures without
+compiling text. The legacy compiler reuses these helpers; historical schemas and serialized hashes
+are unchanged.
+
+`build_generation_preparation(source_handoff, gate_evidence, preparation_id=..., created_at=...)`
+validates the staged `CanonicalInternalFinalPrompt`/handoff **2.0.0** and caller-supplied
+`PreparationGateEvidence`. It returns a `GenerationPreparation` **1.0.0** owning immutable canonical
+UTF-8 bytes. Its `.payload` / `.model_dump()` views are fresh defensive copies. IDs and timestamps
+are explicit inputs, never generated. The wire schema is available from
+`GenerationPreparationPayload.model_json_schema()` in `downstream_preparation`.
+
+The successor source retains every original field plus typed parametric references/disclosures and
+the bound user-readable description. The latter lets validation check the existing internal-text
+formatter exactly, rejecting added untyped instructions without parsing prose. It is retained
+internally, not sent to a provider or promoted to independent Product State authority. These types
+are staged contracts only: `enrich_prompt()` and all current assembly/storage writers stay unchanged.
+
+The semantic renderer uses typed facts/constraints only: requirements, active prohibitions, KEEP,
+LOCKED, current accepted values, advisory reference context/uncertainty, disclosures and nonblocking
+unresolved classifications. Recommendations and rejected/superseded instructions are retained in
+source history, not promoted into requirements. Canonical facts must match the supplied revision;
+missing mandatory meaning, inconsistent mappings and unrecognized executable instructions fail
+closed with `unsupported_source_semantics`. Stable repeated-entity IDs become local sorted aliases
+only in execution text; source and provenance remain unchanged. No internal envelope is forwarded.
+
+Sorted compact JSON preserves exact Unicode/numbers, rejects duplicate keys/nonfinite values/
+surrogates, and requires canonical byte round trips. New hashes are domain-separated for rendering,
+gate, decision frontier and full artifact; existing source hashes retain their original algorithm.
+Validation re-renders exact execution bytes/lengths/coverage instead of trusting hashes alone.
+
+The **provisional**, non-production-qualified #118 bounds are 1 MiB source+gate, 2 MiB full artifact,
+20,000 rendered Unicode code points / 80,000 UTF-8 bytes. No truncation, legacy fallback, or expansion
+of legacy `Text`/`LongText` occurs. Image-bearing `references` fail explicitly: B1 has no reference
+image transport/cutover policy. Some otherwise valid professional sources therefore cannot be
+prepared yet; this is not full Schema v1.1 qualification.
+
+Gate evidence validates supplied coherence/readiness, not membership, authenticity or a real ACTIVE
+lookup. B2 must obtain the authoritative transaction-scoped revision/cycle/plan/decision frontier and
+verified release bytes. B3/B4 must wire/qualify the sole canonical downstream path. This module does
+not access a database, network, clock, provider, API or catalog activation. The persisted HTTP→worker
+`no halo` P1 remains open; pure B1 test success is **not** downstream or preproduction verification.
+
+## Existing compiler and enrichment
+
 This package compiles one validated immutable `DesignRevision` and one explicit versioned prompt
 template artifact into a deterministic provider-neutral `CompiledPrompt`. It depends only on
 Pydantic and `packages/domain`; it has no API, persistence, parser, provider SDK, Model Gateway,
