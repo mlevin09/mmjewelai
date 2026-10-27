@@ -237,6 +237,25 @@ issuance but cannot revoke a capability already issued before its expiration. Up
 a signed URL; clients request temporary read access separately. General reference retention remains
 unimplemented.
 
+## Current enrichment readiness and immutable correction history
+
+The durable final-prompt snapshot projects current correction obligations separately from
+historical correction outcomes. A stored `DEFERRED` result, its reason and hashes are never
+rewritten. Its derived `decision_lineage.blocks_progression` is cleared only when every deferred
+candidate is accounted for by verified retained/superseded constraint evidence, an exact
+source-bound clarification decision, or the existing noncritical/unchanged-fact policy.
+
+Clarification resolution follows the originating correction cycle and exact question target,
+candidate/proposal IDs and evidence. Applied answer revisions prove intervening continuations;
+array order, matching wording, or a newer unrelated revision cannot prove resolution. A fresh
+correction is a conservative causal boundary. Unbound legacy answers and unsupported obligations
+remain blocking when resolution cannot be demonstrated. Optional SKIP/UNKNOWN decisions retain
+their unresolved disclosures and never become accepted facts. Rules and required clarifications
+remain authoritative; successfully retained non-schema constraints do not force READY.
+
+This is a current read-only projection, not a migration or a rewrite of stored final artifacts.
+The existing Internal Final Prompt and handoff contracts and legacy downstream route are unchanged.
+
 ## Verification
 
 ```sh
