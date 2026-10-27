@@ -33,10 +33,10 @@ from jewelai_parser import (
 )
 from jewelai_parser.models import QuantityCandidate, StyleTermsCandidate, TermCandidate
 from jewelai_prompts import (
+    AnyPromptEnrichmentResult,
     EnrichmentDecision,
     EnrichmentProposal,
     ParametricEnrichmentReference,
-    PromptEnrichmentResult,
     PromptTemplateBundle,
     enrich_prompt_with_active_release,
 )
@@ -111,7 +111,7 @@ class ParsedCandidateEnrichmentResult(ImmutableModel):
     parse_knowledge_lineage: ParseKnowledgeLineage
     parser_proposal: AnyParserProposal
     dispositions: tuple[CandidateDisposition, ...]
-    enrichment_result: PromptEnrichmentResult
+    enrichment_result: AnyPromptEnrichmentResult
 
     @model_validator(mode="after")
     def validate_complete_lineage(self):

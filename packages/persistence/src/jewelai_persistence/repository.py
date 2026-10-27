@@ -44,7 +44,11 @@ from jewelai_model_gateway import (
     GenerationStatus,
     validate_generation_result,
 )
-from jewelai_prompts import CompiledPrompt, PromptEnrichmentResult
+from jewelai_prompts import (
+    AnyPromptEnrichmentResult,
+    CompiledPrompt,
+    decode_prompt_enrichment_result,
+)
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -255,7 +259,7 @@ class EnrichmentCycleRecord:
     cycle_number: int
     specification_revision_id: UUID
     release_pin: KnowledgeReleasePinRecord
-    result: PromptEnrichmentResult
+    result: AnyPromptEnrichmentResult
     created_at: datetime
 
 
@@ -870,13 +874,13 @@ class PersistenceRepository:
         organization_id: UUID,
         expected_revision_id: UUID,
         expected_previous_cycle_number: int,
-        result: PromptEnrichmentResult,
+        result: AnyPromptEnrichmentResult,
         created_at: datetime,
     ) -> EnrichmentCycleRecord:
         """Atomically pin one verified release and append one immutable enrichment cycle."""
 
         try:
-            enrichment = PromptEnrichmentResult.model_validate(result)
+            enrichment = decode_prompt_enrichment_result(result)
         except ValidationError as exc:
             raise EnrichmentIntegrityError("enrichment result is invalid") from exc
         if enrichment.knowledge_validation_report_sha256 is None:
@@ -992,7 +996,7 @@ class PersistenceRepository:
         organization_id: UUID,
         expected_revision_id: UUID,
         resulting_revision: AnyDesignRevision | object | None,
-        result: PromptEnrichmentResult,
+        result: AnyPromptEnrichmentResult,
         created_at: datetime,
         clarification_plan_id: UUID | None = None,
         clarification_plan_payload: dict | None = None,
@@ -1000,7 +1004,7 @@ class PersistenceRepository:
         """Atomically commit the optional first edit, release pin, and first cycle."""
 
         try:
-            enrichment = PromptEnrichmentResult.model_validate(result)
+            enrichment = decode_prompt_enrichment_result(result)
             revision = (
                 validate_design_revision(resulting_revision)
                 if resulting_revision is not None
@@ -1255,7 +1259,7 @@ class PersistenceRepository:
         result_payload: dict,
         created_at: datetime,
         next_enrichment_cycle_id: UUID | None = None,
-        next_enrichment_result: PromptEnrichmentResult | None = None,
+        next_enrichment_result: AnyPromptEnrichmentResult | None = None,
         next_clarification_plan_id: UUID | None = None,
         next_clarification_plan_payload: dict | None = None,
     ) -> ClarificationAnswerRecord:
@@ -1303,7 +1307,7 @@ class PersistenceRepository:
         next_enrichment = None
         if next_enrichment_result is not None:
             try:
-                next_enrichment = PromptEnrichmentResult.model_validate(next_enrichment_result)
+                next_enrichment = decode_prompt_enrichment_result(next_enrichment_result)
             except ValidationError as exc:
                 raise ClarificationDecisionIntegrityError(
                     "clarification re-enrichment result is invalid"
@@ -1551,9 +1555,7 @@ class PersistenceRepository:
                 UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
             )
             authoritative_revision = validate_design_revision(payload["authoritative_revision"])
-            next_enrichment = PromptEnrichmentResult.model_validate(
-                payload["next_enrichment_result"]
-            )
+            next_enrichment = decode_prompt_enrichment_result(payload["next_enrichment_result"])
             source = payload["source"]
             previous_cycle_id = UUID(payload["previous_enrichment_cycle_id"])
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
@@ -3006,7 +3008,7 @@ class PersistenceRepository:
         session_pin: KnowledgeReleasePinRecord,
     ) -> EnrichmentCycleRecord:
         try:
-            result = PromptEnrichmentResult.model_validate(row.result_payload)
+            result = decode_prompt_enrichment_result(row.result_payload)
         except ValidationError as exc:
             raise EnrichmentIntegrityError("stored enrichment result is invalid") from exc
         row_identity = (
@@ -3364,9 +3366,7 @@ class PersistenceRepository:
             source = payload["source"]
             previous_cycle = db.get(EnrichmentCycleRow, row.previous_enrichment_cycle_id)
             next_cycle = db.get(EnrichmentCycleRow, row.next_enrichment_cycle_id)
-            next_enrichment = PromptEnrichmentResult.model_validate(
-                payload["next_enrichment_result"]
-            )
+            next_enrichment = decode_prompt_enrichment_result(payload["next_enrichment_result"])
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise UserCorrectionIntegrityError("stored correction result is invalid") from exc
         try:

@@ -25,8 +25,10 @@ from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import AnyParserProposal, ParserCandidate
 from jewelai_prompts import (
+    CanonicalInternalFinalPrompt as InternalFinalPrompt,
+)
+from jewelai_prompts import (
     CompiledPrompt,
-    InternalFinalPrompt,
     KnowledgeReleaseReference,
     UserReadableJewelryDescription,
 )
@@ -34,6 +36,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .clarification_answers import ClarificationDecision
 from .generation import ProfileId
+from .preparation_contracts import GenerationPreparationRequest
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
@@ -247,6 +250,8 @@ class PromptEnrichmentStateResponse(ApiModel):
     description: UserReadableJewelryDescription | None = None
     internal_final_prompt_content_hash: str | None = None
     internal_final_prompt_readiness: str | None = None
+    preparation_expectations: GenerationPreparationRequest | None = None
+    can_prepare: bool = False
 
 
 class PromptEnrichmentAnswerResponse(ApiModel):

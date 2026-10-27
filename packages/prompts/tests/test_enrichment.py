@@ -75,7 +75,7 @@ def test_enrichment_matrix_is_deterministic_and_pinned(ring, templates, runtime)
     payload = first.model_dump(mode="json", exclude={"content_hash"})
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     assert first.content_hash == hashlib.sha256(canonical.encode()).hexdigest()
-    assert first.enrichment_version == "1.2.0"
+    assert first.enrichment_version == "1.3.0"
 
 
 def test_lower_precedence_enrichment_cannot_overwrite_user_shape(ring, templates, runtime):
@@ -118,8 +118,12 @@ def test_enrichment_does_not_mutate_canonical_revision_or_prompt(ring, templates
     )
     assert enriched.decisions[0].outcome == "APPLIED"
     assert enriched.decisions[0].result.value == "prong_setting"
-    assert enriched.compiled_prompt == baseline.compiled_prompt
-    assert "center_stone.setting" not in enriched.compiled_prompt.prompt_text
+    from jewelai_prompts import enrichment_projection
+
+    assert enrichment_projection(enriched) == enrichment_projection(baseline)
+    assert "center_stone.setting" not in {
+        item.concrete_target for item in enriched.specification_entries
+    }
 
 
 def test_keep_and_locked_semantics_are_preserved(ring, templates, runtime):

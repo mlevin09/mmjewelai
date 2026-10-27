@@ -257,7 +257,7 @@ def test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_c
             headers={"X-Organization-ID": organization_id},
         )
         assert final.status_code == 200, final.json()
-        assert final.json()["internal_final_prompt"]["schema_version"] == "1.1.0"
+        assert final.json()["internal_final_prompt"]["schema_version"] == "2.0.0"
         assert restarted_legacy_provider.calls == []
         assert restarted_app.state.prompt_enrichment_service is not runtime
 

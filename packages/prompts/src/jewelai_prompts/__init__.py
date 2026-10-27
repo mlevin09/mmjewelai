@@ -2,6 +2,7 @@
 
 from .compiler import PromptValidationError, compile_prompt, validate_compiled_prompt
 from .downstream_preparation import (
+    CanonicalFinalPromptAssembly,
     CanonicalInternalFinalPrompt,
     CanonicalInternalFinalPromptHandoff,
     GenerationPreparation,
@@ -12,14 +13,19 @@ from .downstream_preparation import (
 )
 from .enrichment import (
     PROMPT_ENRICHMENT_VERSION,
+    AnyPromptEnrichmentResult,
     EnrichmentDecision,
     EnrichmentMatrixCell,
     EnrichmentProposal,
     ParametricEnrichmentReference,
     ParametricReferenceDimensions,
     PromptEnrichmentResult,
+    StructuredPromptEnrichmentResult,
+    decode_prompt_enrichment_result,
     enrich_prompt,
     enrich_prompt_with_active_release,
+    enrichment_projection,
+    enrichment_template_version,
     parametric_reference_context_is_eligible,
 )
 from .final_prompt import (
@@ -63,6 +69,12 @@ from .models import (
 from .revision_projection import RevisionProjection, project_revision
 
 __all__ = [
+    "AnyPromptEnrichmentResult",
+    "StructuredPromptEnrichmentResult",
+    "decode_prompt_enrichment_result",
+    "enrichment_projection",
+    "enrichment_template_version",
+    "CanonicalFinalPromptAssembly",
     "CanonicalInternalFinalPrompt",
     "CanonicalInternalFinalPromptHandoff",
     "GenerationPreparation",

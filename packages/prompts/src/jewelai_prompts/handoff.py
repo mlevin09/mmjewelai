@@ -7,19 +7,24 @@ provider translation, persistence, network access, or generation work.
 import hashlib
 import json
 from enum import StrEnum
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 from uuid import UUID
 
 from jewelai_domain.models import ImmutableModel
 from pydantic import StrictBool, ValidationError, model_validator
 
 from .final_prompt import (
-    FinalPromptAssembly,
     FinalPromptReadiness,
     InternalFinalPrompt,
     KnowledgeReleaseReference,
 )
 from .models import Sha256
+
+if TYPE_CHECKING:
+    from .downstream_preparation import (
+        CanonicalFinalPromptAssembly,
+        CanonicalInternalFinalPromptHandoff,
+    )
 
 INTERNAL_FINAL_PROMPT_HANDOFF_SCHEMA_VERSION = "1.0.0"
 
@@ -83,15 +88,20 @@ class InternalFinalPromptHandoff(ImmutableModel):
 
 
 def build_internal_final_prompt_handoff(
-    final_output: FinalPromptAssembly | object,
-) -> InternalFinalPromptHandoff:
+    final_output: "CanonicalFinalPromptAssembly | object",
+) -> "CanonicalInternalFinalPromptHandoff":
     """Validate an existing authoritative output and bind it into a deterministic handoff."""
 
     try:
         # Round-trip through JSON-compatible data so unchecked ``model_copy`` data is revalidated.
         if hasattr(final_output, "model_dump"):
             final_output = final_output.model_dump(mode="json")
-        assembly = FinalPromptAssembly.model_validate(final_output)
+        from .downstream_preparation import (
+            CanonicalFinalPromptAssembly,
+            CanonicalInternalFinalPromptHandoff,
+        )
+
+        assembly = CanonicalFinalPromptAssembly.model_validate(final_output)
     except (ValidationError, TypeError, ValueError) as exc:
         raise InternalFinalPromptHandoffError(
             InternalFinalPromptHandoffErrorCode.INVALID_FINAL_OUTPUT,
@@ -100,7 +110,7 @@ def build_internal_final_prompt_handoff(
 
     prompt = assembly.internal_final_prompt
     payload = {
-        "schema_version": INTERNAL_FINAL_PROMPT_HANDOFF_SCHEMA_VERSION,
+        "schema_version": "2.0.0",
         "organization_id": prompt.organization_id,
         "session_id": prompt.session_id,
         "product_state_revision_id": prompt.product_state_revision_id,
@@ -113,7 +123,7 @@ def build_internal_final_prompt_handoff(
         in {FinalPromptReadiness.READY, FinalPromptReadiness.READY_WITH_UNRESOLVED},
         "internal_final_prompt": prompt,
     }
-    return InternalFinalPromptHandoff(**payload, content_hash=_hash(payload))
+    return CanonicalInternalFinalPromptHandoff(**payload, content_hash=_hash(payload))
 
 
 def _hash(payload: object) -> str:

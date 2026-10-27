@@ -14,6 +14,9 @@ from jewelai_domain.rules import BlockDecision, ReadyDecision, ReasonCode
 from pydantic import ValidationError
 
 from jewelai_prompts import (
+    CanonicalInternalFinalPromptHandoff as InternalFinalPromptHandoff,
+)
+from jewelai_prompts import (
     CompiledPrompt,
     EnrichmentProposal,
     FinalPromptArtifactVersions,
@@ -23,7 +26,6 @@ from jewelai_prompts import (
     FinalPromptInputErrorCode,
     FinalPromptReadiness,
     FinalPromptSnapshot,
-    InternalFinalPromptHandoff,
     InternalFinalPromptHandoffError,
     InternalFinalPromptHandoffErrorCode,
     KnowledgeReleaseReference,
@@ -32,6 +34,7 @@ from jewelai_prompts import (
     PromptEnrichmentResult,
     assemble_internal_final_prompt,
     build_internal_final_prompt_handoff,
+    compile_prompt,
     enrich_prompt,
     load_prompt_templates,
 )
@@ -96,8 +99,18 @@ def _hash(payload):
 
 
 def _verified_enrichment(revision, templates, runtime, *, proposals=(), **kwargs):
+    """Frozen 1.2 fixture factory; current 1.3 writer has separate integration coverage."""
     result = enrich_prompt(revision, templates, runtime, proposals=proposals, **kwargs)
     payload = result.model_dump(mode="json", exclude={"content_hash"})
+    for name in (
+        "specification_entries",
+        "locked_constraints",
+        "disclosures",
+        "prompt_template_artifact_version",
+    ):
+        payload.pop(name)
+    payload["enrichment_version"] = "1.2.0"
+    payload["compiled_prompt"] = compile_prompt(revision, templates).model_dump(mode="json")
     payload["knowledge_validation_report_sha256"] = REPORT_HASH
     return PromptEnrichmentResult(**payload, content_hash=_hash(payload))
 
@@ -113,6 +126,28 @@ def _ready():
         tie_order=1,
         trace=(),
     )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("prompt_text", "Altered historical text"),
+        ("design_id", "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+        ("specification_revision_id", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+    ],
+)
+def test_historical_nested_source_integrity_without_recompilation(
+    ring, templates, runtime, dictionary, field, value
+):
+    result = _verified_enrichment(ring, templates, runtime)
+    payload = result.model_dump(mode="json", exclude={"content_hash"})
+    payload["compiled_prompt"][field] = value
+    changed = PromptEnrichmentResult(**payload, content_hash=_hash(payload))
+    with pytest.raises(FinalPromptInputError) as error:
+        assemble_internal_final_prompt(
+            _snapshot(ring, changed), dictionary=dictionary, templates=templates
+        )
+    assert error.value.code == FinalPromptInputErrorCode.INVALID_ENRICHMENT_STATE
 
 
 def _blocked():
@@ -221,7 +256,7 @@ def test_builds_deterministic_provider_neutral_outputs(ring, templates, runtime,
 
     assert first == second
     prompt = first.internal_final_prompt
-    assert prompt.schema_version == "1.1.0"
+    assert prompt.schema_version == "2.0.0"
     assert prompt.product_state_revision_id == ring.revision_id
     assert prompt.knowledge_release.runtime_sha256 == runtime.sha256
     assert prompt.description_content_hash == first.description.content_hash
@@ -905,13 +940,13 @@ def test_handoff_is_deterministic_and_binds_the_exact_authoritative_output(
     second = build_internal_final_prompt_handoff(assembly)
 
     assert first == second
-    assert first.schema_version == "1.0.0"
+    assert first.schema_version == "2.0.0"
     assert first.organization_id == ORGANIZATION_ID
     assert first.session_id == SESSION_ID
     assert first.product_state_revision_id == ring.revision_id
     assert first.enrichment_cycle_id == CYCLE_ID
     assert first.knowledge_release == assembly.internal_final_prompt.knowledge_release
-    assert first.internal_final_prompt_schema_version == "1.1.0"
+    assert first.internal_final_prompt_schema_version == "2.0.0"
     assert first.internal_final_prompt_content_hash == assembly.internal_final_prompt.content_hash
     assert first.internal_final_prompt == assembly.internal_final_prompt
     assert first.ready_for_downstream_preparation
@@ -1006,7 +1041,7 @@ def test_blocked_handoff_is_valid_but_not_ready_for_downstream_preparation(
 @pytest.mark.parametrize(
     ("field", "value", "error"),
     (
-        ("schema_version", "2.0.0", "Input should be '1.0.0'"),
+        ("schema_version", "3.0.0", "Input should be '2.0.0'"),
         ("session_id", "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "lineage mismatch"),
         ("internal_final_prompt_content_hash", "0" * 64, "integrity mismatch"),
         ("readiness", "blocked", "readiness mismatch"),
@@ -1060,8 +1095,8 @@ def test_handoff_rejects_release_schema_and_constraint_evidence_tampering(
         InternalFinalPromptHandoff.model_validate(release)
 
     schema = handoff.model_dump(mode="json")
-    schema["internal_final_prompt"]["schema_version"] = "2.0.0"
-    with pytest.raises(ValidationError, match="Input should be '1.1.0'"):
+    schema["internal_final_prompt"]["schema_version"] = "3.0.0"
+    with pytest.raises(ValidationError, match="Input should be '2.0.0'"):
         InternalFinalPromptHandoff.model_validate(schema)
 
     constraint = handoff.model_dump(mode="json")

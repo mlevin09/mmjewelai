@@ -44,3 +44,15 @@ full capacity qualification (#118) remain later work. Unit tests cover prohibiti
 coverage/tamper, history/authority, Unicode, stable IDs, candidate caps and golden legacy parity.
 
 This records the approved R1 implementation slice, not a replacement enrichment architecture.
+
+## B2 implementation extension (draft; no deployment or dispatch)
+
+B2 follows the same approved R1 architecture: current enrichment 1.3 is a structured revision
+projection rather than legacy compiled text; original 1.2 readers/hashes remain frozen. Current
+IFP/handoff writers use the staged 2.0 types. A single organization/session-locked transaction
+constructs authoritative gate evidence, verifies ACTIVE runtime/report bytes and expected
+revision/cycle/plan/frontier bindings, then retains preparation and scoped idempotent response
+atomically. Additive 0016 introduces append-only preparation/command storage without rewriting
+historical records. Run/iteration input discriminators and worker/Web cutover remain coordinated B3
+work; no preparation-backed generation is enabled. See the
+[B2 boundary and complete legacy route inventory](../architecture/CANONICAL_PREPARATION_B2.md).

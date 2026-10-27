@@ -7,7 +7,7 @@ Product State, re-enrich, select a Knowledge release, or invoke a provider.
 import hashlib
 import json
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
 from jewelai_domain.dictionary import DictionaryLocale, DictionaryRegistry
@@ -29,9 +29,18 @@ from jewelai_domain.models_v1_1 import AnyDesignRevision
 from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from pydantic import Field, JsonValue, StringConstraints, ValidationError, model_validator
 
-from .compiler import PromptValidationError, validate_compiled_prompt
-from .enrichment import ParametricEnrichmentReference, PromptEnrichmentResult
+from .enrichment import (
+    AnyPromptEnrichmentResult,
+    ParametricEnrichmentReference,
+    PromptEnrichmentResult,
+    enrichment_projection,
+    enrichment_template_version,
+)
 from .models import PromptTemplateBundle, Sha256
+from .revision_projection import project_revision
+
+if TYPE_CHECKING:
+    from .downstream_preparation import CanonicalFinalPromptAssembly
 
 FINAL_PROMPT_SCHEMA_VERSION = "1.1.0"
 DESCRIPTION_SCHEMA_VERSION = "1.0.0"
@@ -156,7 +165,7 @@ class FinalPromptSnapshot(ImmutableModel):
     enrichment_cycle_id: UUID
     latest_enrichment_cycle_id: UUID
     enrichment_cycle_number: int = Field(ge=1)
-    enrichment_result: PromptEnrichmentResult
+    enrichment_result: AnyPromptEnrichmentResult
     knowledge_release: KnowledgeReleaseReference
     artifact_versions: FinalPromptArtifactVersions
     rule_decision: RuleDecision
@@ -304,7 +313,7 @@ def assemble_internal_final_prompt(
     *,
     dictionary: DictionaryRegistry,
     templates: PromptTemplateBundle,
-) -> FinalPromptAssembly:
+) -> "CanonicalFinalPromptAssembly":
     """Build both Step #12 outputs from one immutable, fail-closed snapshot."""
 
     try:
@@ -331,8 +340,9 @@ def assemble_internal_final_prompt(
         readiness,
         snapshot.enrichment_result.parametric_references,
     )
+    _check_current_text_capacity(prompt_text)
     payload = {
-        "schema_version": FINAL_PROMPT_SCHEMA_VERSION,
+        "schema_version": "2.0.0",
         "session_id": snapshot.session_id,
         "organization_id": snapshot.organization_id,
         "design_id": snapshot.revision.design_id,
@@ -343,7 +353,10 @@ def assemble_internal_final_prompt(
         "readiness": readiness,
         "readiness_reason": readiness_reason,
         "description_content_hash": description.content_hash,
-        "prompt_text": prompt_text,
+        "prompt_text": "JEWELAI INTERNAL FINAL PROMPT 2.0.0\n" + prompt_text.split("\n", 1)[1],
+        "description": description,
+        "parametric_references": snapshot.enrichment_result.parametric_references,
+        "disclosures": enrichment_projection(snapshot.enrichment_result).disclosures,
         "design_facts": facts,
         "constraints": constraints,
         "unresolved_details": unresolved,
@@ -354,23 +367,41 @@ def assemble_internal_final_prompt(
         "artifact_versions": snapshot.artifact_versions,
         "enrichment_result_content_hash": snapshot.enrichment_result.content_hash,
     }
-    internal = InternalFinalPrompt(**payload, content_hash=_hash(_json(payload)))
-    return FinalPromptAssembly(description=description, internal_final_prompt=internal)
+    # Import lazily to retain the frozen v1 models without a module import cycle.
+    from .downstream_preparation import CanonicalFinalPromptAssembly, CanonicalInternalFinalPrompt
+
+    internal = CanonicalInternalFinalPrompt(**payload, content_hash=_hash(_json(payload)))
+    return CanonicalFinalPromptAssembly(description=description, internal_final_prompt=internal)
 
 
 def _validate_snapshot(snapshot, *, dictionary, templates):
     revision = snapshot.revision
     enrichment = snapshot.enrichment_result
-    compiled = enrichment.compiled_prompt
-    if (
-        enrichment.design_revision_id != str(revision.revision_id)
-        or compiled.specification_revision_id != revision.revision_id
-        or compiled.design_id != revision.design_id
-    ):
+    projection = enrichment_projection(enrichment)
+    if enrichment.design_revision_id != str(revision.revision_id):
         raise FinalPromptInputError(
             FinalPromptInputErrorCode.STALE_REVISION,
             "Product State and enrichment cycle revisions do not match",
         )
+    if isinstance(enrichment, PromptEnrichmentResult):
+        # Historical input integrity only; do not execute the legacy text compiler.
+        historical = enrichment.compiled_prompt
+        template = next(
+            (t for t in templates.templates if t.template_id == historical.template_id), None
+        )
+        if (
+            historical.specification_revision_id != revision.revision_id
+            or historical.design_id != revision.design_id
+            or historical.design_schema_version != revision.schema_version
+            or historical.content_hash
+            != hashlib.sha256(historical.prompt_text.encode()).hexdigest()
+            or template is None
+            or historical.template_version != template.template_version
+        ):
+            raise FinalPromptInputError(
+                FinalPromptInputErrorCode.INVALID_ENRICHMENT_STATE,
+                "historical compiled source failed scope/hash validation",
+            )
     if snapshot.enrichment_cycle_id != snapshot.latest_enrichment_cycle_id:
         raise FinalPromptInputError(
             FinalPromptInputErrorCode.ENRICHMENT_CYCLE_MISMATCH,
@@ -393,20 +424,18 @@ def _validate_snapshot(snapshot, *, dictionary, templates):
         or versions.dictionary_artifact_version != dictionary.artifact_version
         or versions.rules_artifact_version != snapshot.rule_decision.rules_artifact_version
         or versions.prompt_template_artifact_version != templates.artifact_version
-        or versions.prompt_template_artifact_version != compiled.template_artifact_version
+        or versions.prompt_template_artifact_version != enrichment_template_version(enrichment)
         or versions.enrichment_version != enrichment.enrichment_version
     ):
         raise FinalPromptInputError(
             FinalPromptInputErrorCode.ARTIFACT_MISMATCH,
             "final-prompt artifact versions do not match the supplied snapshot",
         )
-    try:
-        validate_compiled_prompt(compiled, revision, templates)
-    except PromptValidationError as exc:
+    if projection != project_revision(revision):
         raise FinalPromptInputError(
             FinalPromptInputErrorCode.INVALID_ENRICHMENT_STATE,
-            "enrichment CompiledPrompt does not match the authoritative revision",
-        ) from exc
+            "enrichment structured projection does not match the authoritative revision",
+        )
     for item in snapshot.decision_lineage:
         if item.session_id != snapshot.session_id:
             raise FinalPromptInputError(
@@ -441,7 +470,7 @@ def _validate_snapshot(snapshot, *, dictionary, templates):
 def _design_facts(snapshot) -> tuple[FinalPromptDesignFact, ...]:
     matrix = {item.target: item for item in snapshot.enrichment_result.final_matrix}
     facts = []
-    for entry in snapshot.enrichment_result.compiled_prompt.specification_entries:
+    for entry in enrichment_projection(snapshot.enrichment_result).specification_entries:
         cell = matrix.get(entry.concrete_target)
         expected_value = None if entry.applicability == "not_applicable" else entry.value
         if cell is None:
@@ -559,7 +588,7 @@ def _constraints(snapshot, facts) -> tuple[FinalPromptConstraint, ...]:
     by_target = {item.target: item for item in facts}
     disclosures = {
         item.concrete_target: item
-        for item in snapshot.enrichment_result.compiled_prompt.disclosures
+        for item in enrichment_projection(snapshot.enrichment_result).disclosures
     }
     for fact in facts:
         if fact.applicability == "not_applicable":
@@ -804,6 +833,7 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
             + "."
         )
     text = " ".join(sentences)
+    _check_current_text_capacity(text)
     payload = {
         "schema_version": DESCRIPTION_SCHEMA_VERSION,
         "locale": snapshot.locale,
@@ -812,6 +842,19 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
         "unresolved_summary": unresolved_summary,
     }
     return UserReadableJewelryDescription(**payload, content_hash=_hash(_json(payload)))
+
+
+def _check_current_text_capacity(text):
+    # Keep B1's provisional bounds; never let Pydantic errors echo professional source text.
+    from .downstream_preparation import (
+        RENDER_MAX_BYTES,
+        RENDER_MAX_CHARACTERS,
+        GenerationPreparationError,
+        PreparationErrorCode,
+    )
+
+    if len(text) > RENDER_MAX_CHARACTERS or len(text.encode("utf-8")) > RENDER_MAX_BYTES:
+        raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
 
 
 def _component_sentence(prefix, facts, dictionary, locale, language, group_number=None):
