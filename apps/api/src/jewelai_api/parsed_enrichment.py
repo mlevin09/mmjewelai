@@ -440,5 +440,5 @@ def _json_value(value):
     if isinstance(value, BaseModel):
         return value.model_dump(mode="json")
     if isinstance(value, tuple):
-        return tuple(_json_value(item) for item in value)
+        return [_json_value(item) for item in value]
     return value
