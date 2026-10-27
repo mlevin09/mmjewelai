@@ -38,7 +38,7 @@ def engine(monkeypatch, capfd):
     with control.begin() as db:
         db.execute(text(f'CREATE SCHEMA "{schema}"'))
     scoped_url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
-    scoped = create_database_engine(scoped_url)
+    scoped = create_database_engine(scoped_url.render_as_string(hide_password=False))
     monkeypatch.setenv("DATABASE_URL", scoped_url.render_as_string(hide_password=False))
     cfg = Config(str(ROOT / "packages/persistence/alembic.ini"))
     try:
