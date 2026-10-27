@@ -37,9 +37,9 @@ def engine(monkeypatch, capfd):
     schema = "b2_" + uuid4().hex
     with control.begin() as db:
         db.execute(text(f'CREATE SCHEMA "{schema}"'))
-    scoped_url = make_url(url).update_query_dict({"options": f"-csearch_path={schema}"})
-    scoped = create_database_engine(scoped_url.render_as_string(hide_password=False))
-    monkeypatch.setenv("DATABASE_URL", scoped_url.render_as_string(hide_password=False))
+    scoped_url = _schema_url(url, schema)
+    scoped = create_database_engine(scoped_url)
+    monkeypatch.setenv("DATABASE_URL", scoped_url)
     cfg = Config(str(ROOT / "packages/persistence/alembic.ini"))
     try:
         command.upgrade(cfg, "0015_reference_verification")
@@ -84,6 +84,22 @@ def engine(monkeypatch, capfd):
         with control.begin() as db:
             db.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         control.dispose()
+
+
+def _schema_url(url, schema):
+    # Only our generated ASCII identifier is used. Leave '=' unescaped to preserve the URL
+    # through existing Alembic ConfigParser interpolation without altering shared env.py.
+    assert schema.startswith("b2_") and len(schema) == 35
+    assert all(c in "0123456789abcdef" for c in schema[3:])
+    return url + "?options=-csearch_path=" + schema
+
+
+def test_scoped_url_preserves_driver_options_and_alembic_interpolation():
+    url = _schema_url("postgresql+psycopg://localhost/jewelai_test", "b2_" + "a" * 32)
+    assert make_url(url).query["options"] == "-csearch_path=b2_" + "a" * 32
+    cfg = Config()
+    cfg.set_main_option("sqlalchemy.url", url)
+    assert cfg.get_main_option("sqlalchemy.url") == url
 
 
 def test_same_revision_c3_to_c4_no_halo_race(ready_session, engine, capfd):
