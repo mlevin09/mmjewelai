@@ -1,5 +1,6 @@
 """LCK-001..016 canonical authority and complete locked-wrapper regressions."""
 
+import json
 from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
@@ -437,3 +438,134 @@ def test_canonical_v1_keeps_flat_leaf_contract_including_untyped_proposal_values
     state = build_knowledge_runtime_state(runtime, revision)
     change = proposal("metal.finish", None)
     assert engine.evaluate(state, change) == evaluate(engine, revision, change)
+
+
+@pytest.mark.parametrize("kind", ["component", "decorative"])
+@pytest.mark.parametrize("iterator_kind", ["generator", "list_iterator", "legacy_sequence"])
+def test_r1_one_shot_replacement_is_rejected_without_consumption(engine, kind, iterator_kind):
+    """R1-001/002/005/006: never check a generator then return its exhausted value."""
+    revision = current(kind)
+    target, full = aggregate(revision.design.model_dump(mode="json"), kind)
+    complete = full["value"]
+    one_shot = (item for item in complete) if iterator_kind == "generator" else iter(complete)
+    if iterator_kind == "legacy_sequence":
+
+        class OneShotSequence:
+            def __init__(self):
+                self.items = iter(complete)
+
+            def __getitem__(self, index):
+                try:
+                    return next(self.items)
+                except StopIteration:
+                    raise IndexError from None
+
+        one_shot = OneShotSequence()
+    change = proposal(target, one_shot)
+    for _ in range(2):
+        with pytest.raises(ValueError, match="repeatable replacement snapshot"):
+            evaluate(engine, revision, change)
+    assert list(one_shot) == complete
+
+
+@pytest.mark.parametrize("container", ["dict", "tuple", "model"])
+def test_r1_nested_iterator_is_rejected_before_validation(engine, container):
+    """R1-003/006: preflight must inspect nested State/provenance containers."""
+    from jewelai_domain.models_v1_1 import MetalComponentV1_1
+
+    revision = current("component")
+    full = revision.design.model_dump(mode="json")["metal"]["components"]["value"]
+    sources = [
+        dict(kind="knowledge", record_id="synthetic", version="1.0.0", recorded_at=NOW.isoformat())
+    ]
+    one_shot = (item for item in sources)
+    full[0]["material"] = dict(
+        availability="value",
+        origin="derived",
+        value="platinum",
+        sources=one_shot,
+        uncertainty="Synthetic evidence only",
+        confirmed=True,
+        locked=True,
+    )
+    value = full
+    if container == "tuple":
+        value = tuple(full)
+    elif container == "model":
+        # Deliberately bypass construction validation: canonical evaluation must
+        # still reject unsafe content before Pydantic can consume it.
+        value = (MetalComponentV1_1.model_construct(**full[0]),)
+    change = proposal("metal.components", value)
+    for _ in range(2):
+        with pytest.raises(ValueError, match="repeatable replacement snapshot"):
+            evaluate(engine, revision, change)
+    assert list(one_shot) == sources
+
+
+@pytest.mark.parametrize("kind", ["component", "decorative"])
+@pytest.mark.parametrize("form", ["list", "tuple", "typed"])
+@pytest.mark.parametrize("locked", [True, False], ids=["preserve-locked", "unlocked-positive"])
+def test_r1_validated_snapshot_is_the_serialized_returned_value(engine, kind, form, locked):
+    """R1-004..007/009: coercion, serialization, revision parity and immutability."""
+    revision_data = current(kind).model_dump(mode="json")
+    target, wrapper = aggregate(revision_data["design"], kind)
+    child = "material" if kind == "component" else "motif"
+    wrapper["value"][0][child]["locked"] = locked
+    wrapper["value"][0][child]["confirmed"] = locked
+    revision = DesignRevisionV1_1.model_validate(revision_data)
+    before_revision = revision.model_dump_json()
+    full = deepcopy(wrapper["value"])
+    # Existing datetime parsing accepts equivalent UTC representations. The
+    # checked serialization must be returned, not the raw input spelling.
+    full[0][child]["source"]["recorded_at"] = NOW.isoformat()
+    full[0]["finish" if kind == "component" else "location"] = explicit("synthetic")
+    if not locked:
+        full[0][child]["value"] = "changed"
+    design_data = revision.design.model_dump(mode="json")
+    _, expected_wrapper = aggregate(design_data, kind)
+    expected_wrapper["value"] = deepcopy(full)
+    checked_design = DesignV1_1.model_validate(design_data)
+    _, checked_wrapper = aggregate(checked_design.model_dump(mode="json"), kind)
+    expected = checked_wrapper["value"]
+    value = full if form == "list" else tuple(full)
+    if form == "typed":
+        value = (
+            checked_design.metal.components.value
+            if kind == "component"
+            else checked_design.decorative_elements.value
+        )
+    change = proposal(target, value)
+    before_input = change.model_dump_json()
+    first = evaluate(engine, revision, change)
+    second = evaluate(engine, revision, change)
+    assert first.outcome == second.outcome == "APPLIED"
+    serialized = json.loads(first.model_dump_json())
+    assert serialized["result"]["value"] == serialized["proposed"]["value"] == expected
+    assert first.model_dump_json() == second.model_dump_json()
+    assert change.model_dump_json() == before_input
+    assert revision.model_dump_json() == before_revision
+    # Check the actual serialized APPLIED value through the authoritative edit,
+    # not merely an independently constructed value that passed the guard.
+    expected_wrapper["value"] = serialized["result"]["value"]
+    updated = revise_design(revision, DesignV1_1.model_validate(design_data), **edit_args(revision))
+    _, updated_wrapper = aggregate(updated.design.model_dump(mode="json"), kind)
+    assert updated_wrapper["value"] == expected
+    # A supported mutable input cannot remain aliased into the returned result.
+    if form != "typed":
+        full[0][child]["value"] = "caller-change-after-evaluation"
+        assert json.loads(first.model_dump_json()) == serialized
+
+
+@pytest.mark.parametrize("kind", ["component", "decorative"])
+def test_r1_serialized_blocked_replacement_retains_locked_descendants(engine, kind):
+    """R1-009: removal rejected by revisions cannot return applicable policy output."""
+    revision = current(kind)
+    data = revision.design.model_dump(mode="json")
+    target, wrapper = aggregate(data, kind)
+    original = deepcopy(wrapper["value"])
+    wrapper["value"] = []
+    result = evaluate(engine, revision, proposal(target, []))
+    assert (result.outcome, result.reason) == ("BLOCKED", "locked")
+    assert json.loads(result.model_dump_json())["result"]["value"] == original
+    with pytest.raises(RevisionConflict, match="Locked field"):
+        revise_design(revision, DesignV1_1.model_validate(data), **edit_args(revision))

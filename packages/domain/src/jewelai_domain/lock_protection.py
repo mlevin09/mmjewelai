@@ -4,6 +4,8 @@ No database currency, authorization, Knowledge policy or special-transition auth
 is inferred here. Paths contain typed field segments and existing stable item IDs.
 """
 
+from collections.abc import Iterable
+
 from pydantic import BaseModel, TypeAdapter
 
 from .models import Assumed, Derived, Explicit, KnownValue, NotApplicable, Unknown
@@ -89,6 +91,30 @@ def _require_complete(value):
     elif isinstance(value, tuple):
         for item in value:
             _require_complete(item)
+
+
+def require_repeatable_replacement(value):
+    """Reject non-snapshot iterables without iterating/consuming caller inputs.
+
+    Only explicit dict/list/tuple containers and model fields are traversed;
+    arbitrary iterables (including nested generators) are not replacement data.
+    """
+    if isinstance(value, BaseModel):
+        for name in type(value).model_fields:
+            require_repeatable_replacement(getattr(value, name))
+    elif type(value) is dict:
+        for key, item in value.items():
+            require_repeatable_replacement(key)
+            require_repeatable_replacement(item)
+    elif type(value) in (list, tuple):
+        for item in value:
+            require_repeatable_replacement(item)
+    elif not isinstance(value, (str, bytes)) and (
+        isinstance(value, Iterable) or hasattr(type(value), "__getitem__")
+    ):
+        # Python can also iterate legacy __getitem__ sequences that are not
+        # registered with Iterable. Do not ask iter(value) to discover these.
+        raise ValueError("Canonical policy requires a repeatable replacement snapshot")
 
 
 def _validate_replacement_snapshot(design, target, checked):

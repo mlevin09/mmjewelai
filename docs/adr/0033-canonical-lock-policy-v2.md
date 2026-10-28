@@ -61,6 +61,14 @@ explicit schema-valid empty collection can remove unlocked items; any removed/re
 locked descendant still blocks. Invalid/incomplete replacements raise bounded ValueError before
 APPLIED, without adding a public outcome/reason. Non-value proposals cannot erase locked descendants.
 
+The validated replacement is retained as a detached, serializable snapshot in both the proposed
+and APPLIED result values; the LOCK guard never checks one value and returns unchecked input.
+Schema1.1 canonical evaluation rejects arbitrary iterables (including one-shot generators nested
+inside dict/list/tuple/model fields) before target validation, without consuming them. Supported
+replacement containers are explicit dict/list/tuple snapshots and existing typed models. Repeated
+evaluation is deterministic and does not mutate caller collections. Historical Schema1.0 behavior
+is unchanged. This repairs independent-review R1 in the same issue/PR, not a new contract version.
+
 These replacement checks apply to Schema1.1 canonical evaluation. Historical Schema1.0 flat leaf
 proposal/value behavior is retained, including validation deferred to the canonical transition;
 canonical v2 still obtains direct LOCK authority from its required v1 revision.

@@ -12,6 +12,7 @@ from .knowledge_targets_v1_1 import target_family_from_concrete
 from .lock_protection import (
     first_locked_change,
     locked_ancestor,
+    require_repeatable_replacement,
     state_fields,
     validate_replacement_value,
     value_state_fields,
@@ -447,6 +448,10 @@ class KnowledgePolicyEngine:
         if revision.revision_id != expected_revision_id:
             raise ValueError("Canonical policy revision identity mismatch")
         proposal = RuntimeStateProposal.model_validate(proposal)
+        if revision.schema_version == "1.1.0":
+            # Do this before any validation can consume an iterable, even if a
+            # lock/unknown target would otherwise short-circuit the evaluation.
+            require_repeatable_replacement(proposal.value)
         canonical = build_knowledge_runtime_state(self.runtime, revision)
         state = (
             canonical
@@ -478,6 +483,9 @@ class KnowledgePolicyEngine:
                 replacement = validate_replacement_value(
                     revision.design, target, proposal.value, source=revision.event.source
                 )
+                # The exact validated content checked below must also supply
+                # proposed/result. Never retain the unchecked caller value.
+                proposal = proposal.model_copy(update={"value": _runtime_value(replacement)})
             before = value_state_fields(old.value, target) if isinstance(old, KnownValue) else {}
             after = value_state_fields(replacement, target)
             protected = first_locked_change(before, after) is not None
