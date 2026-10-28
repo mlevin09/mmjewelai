@@ -119,6 +119,11 @@ $$
 def downgrade() -> None:
     bind = op.get_bind()
     # Never destroy retained professional input or successful command history during rollback.
+    # PostgreSQL holds both locks through Alembic's transactional DDL. Match insertion order:
+    # a writer which already inserted a preparation must finish before we check either table.
+    bind.execute(
+        sa.text("LOCK TABLE generation_preparation, generation_command IN ACCESS EXCLUSIVE MODE")
+    )
     if any(
         bind.scalar(sa.text(f"SELECT count(*) FROM {table}"))
         for table in (

@@ -57,7 +57,10 @@ Migration **0016_generation_preparations**, after **0015_reference_verification*
 - PostgreSQL append-only UPDATE/DELETE rejection triggers for those two new tables.
 
 There is no historical data rewrite/backfill. Empty new tables can be downgraded; populated retained
-preparation history refuses downgrade rather than deleting data. The existing run/iteration tables
+preparation history refuses downgrade rather than deleting data. Downgrade takes transaction-held
+ACCESS EXCLUSIVE locks on preparation then command before checking either table and holds them
+through DDL; concurrent successful history cannot appear between the checks and DROP.
+The existing run/iteration tables
 are untouched: nullable preparation references, discriminators/XOR and their complete reader/worker
 updates are deferred together to B3 because **B2 creates no preparation-backed runs**. There is no
 partially enabled mixed-input execution contract.
@@ -104,3 +107,29 @@ Review transaction scope, nested history, immutable retention and PostgreSQL pro
 B3 must coordinate the only NEW-generation cutover and the still outstanding image-edit product
 policy. B4 must prove persisted HTTP→worker semantic delivery. Capacity limits remain B1's
 provisional bounds; real Knowledge v1.1 release qualification/activation is not evaluated here.
+
+## Independent-review remediation (B2-R1–R4; draft only)
+
+Preparation/GET use PostgreSQL organization `FOR NO KEY UPDATE` (SQLAlchemy
+`with_for_update(key_share=True)`). This still conflicts with membership revocation's `FOR UPDATE`,
+but is compatible with FK `KEY SHARE` from session-first correction/answer writers. Session locking,
+transaction-time membership checks and exact revision/cycle/frontier conflicts remain unchanged;
+there is no automatic retry against changed state.
+
+Retained handoff, embedded IFP and gate must match all four Knowledge release components of the
+verified historical cycle/persisted immutable pin. Template/enrichment versions bind to that cycle;
+dictionary/question/rules versions bind to its historical plan. Historical read/replay does not
+require equality with the latest mutable revision, cycle or decision frontier.
+
+For enrichment 1.2 only, an isolated read-only verifier reuses the frozen renderer plus canonical
+revision projection to compare the complete original compiled source, including exact text and
+template metadata. Recomputing inner/outer hashes cannot authorize a different rendering. It never
+calls `compile_prompt`, rewrites bytes or produces a current generation input. Current structured
+1.3 bypasses this historical branch and remains compiler-free. Frozen compiler/template/catalog
+artifacts and schemas remain unchanged.
+
+Barrier/event-controlled disposable PostgreSQL regressions exercise both downgrade/writer orders,
+correction and answer overlap with creation/GET, and actual revocation lock contention. Local
+PostgreSQL skips are not evidence of success; final exact-head CI must execute every critical case.
+No persistent migration, B3 dispatch, Web/provider change, merge, release activation or deployment
+is authorized by this remediation.

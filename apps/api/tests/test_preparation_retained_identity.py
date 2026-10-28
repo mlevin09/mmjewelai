@@ -26,6 +26,10 @@ def _rehash(payload):
         ("artifact_version", "99.0.0"),
         ("runtime_sha256", "b" * 64),
         ("validation_report_sha256", "c" * 64),
+        ("versions.dictionary_artifact_version", "99.0.0"),
+        ("versions.question_artifact_version", "99.0.0"),
+        ("versions.prompt_template_artifact_version", "99.0.0"),
+        ("versions.enrichment_version", "99.0.0"),
     ],
 )
 def test_coherently_forged_retained_knowledge_rejected_by_get_and_replay(
@@ -42,15 +46,19 @@ def test_coherently_forged_retained_knowledge_rejected_by_get_and_replay(
     retained = GenerationPreparation(original["artifact_bytes"]).payload
     source = retained.source_handoff.model_dump(mode="json")
     gate = retained.gate_evidence.model_dump(mode="json")
-    source["knowledge_release"][field] = value
     prompt = source["internal_final_prompt"]
-    prompt["knowledge_release"][field] = value
-    for item in prompt["decision_lineage"]:
-        item["knowledge_" + ("package_id" if field == "package_id" else field)] = value
+    if field.startswith("versions."):
+        version_field = field.split(".", 1)[1]
+        prompt["artifact_versions"][version_field] = value
+    else:
+        source["knowledge_release"][field] = value
+        prompt["knowledge_release"][field] = value
+        for item in prompt["decision_lineage"]:
+            item["knowledge_" + field] = value
+        gate["knowledge_release"][field] = value
     _rehash(prompt)
     source["internal_final_prompt_content_hash"] = prompt["content_hash"]
     _rehash(source)
-    gate["knowledge_release"][field] = value
     gate["source_handoff_hash"] = source["content_hash"]
     forged = build_generation_preparation(
         source, gate, preparation_id=forged_id, created_at=retained.created_at

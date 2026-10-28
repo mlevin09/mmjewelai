@@ -2,12 +2,15 @@
 
 import hashlib
 import json
+from copy import deepcopy
 from uuid import UUID
 
 import pytest
+from jewelai_domain.models_v1_1 import validate_design_revision
 from jewelai_persistence.models import (
     ClarificationAnswerRow,
     EnrichmentCycleRow,
+    SpecificationRevisionRow,
     UserCorrectionRow,
 )
 from jewelai_prompts import (
@@ -16,6 +19,7 @@ from jewelai_prompts import (
     compile_prompt,
     decode_prompt_enrichment_result,
 )
+from jewelai_prompts.historical_validation import validate_historical_compiled_source
 from sqlalchemy import select
 from test_effective_readiness import _answer, _correct
 from test_effective_readiness import ready_session as ready_session
@@ -63,6 +67,12 @@ def test_nested_historical_answers_corrections_and_cycles_remain_original(
             model.__tablename__: tuple(db.scalars(select(model.result_payload)))
             for model in (EnrichmentCycleRow, ClarificationAnswerRow, UserCorrectionRow)
         }
+        revisions = {
+            str(row.revision_id): validate_design_revision(row.snapshot)
+            for row in db.execute(
+                select(SpecificationRevisionRow.revision_id, SpecificationRevisionRow.snapshot)
+            )
+        }
     assert all(p["enrichment_version"] == "1.2.0" for p in before["enrichment_cycle"])
     correction = next(c for c in before["user_correction"] if c["prior_answer_results"])
     assert correction["next_enrichment_result"]["enrichment_version"] == "1.2.0"
@@ -88,6 +98,38 @@ def test_nested_historical_answers_corrections_and_cycles_remain_original(
             for model in (EnrichmentCycleRow, ClarificationAnswerRow, UserCorrectionRow)
         }
     assert after == before
+
+    # Validate original compiled sources wherever embedded in nested answers/corrections.
+    # Use each source's actual historical revision, not today's current Product State.
+    def historical_sources(value):
+        if isinstance(value, dict):
+            if value.get("enrichment_version") == "1.2.0":
+                yield value
+            for child in value.values():
+                yield from historical_sources(child)
+        elif isinstance(value, (list, tuple)):
+            for child in value:
+                yield from historical_sources(child)
+
+    nested_count = 0
+    for table in ("clarification_answer", "user_correction"):
+        for nested in historical_sources(before[table]):
+            historical = decode_prompt_enrichment_result(nested)
+            revision = revisions[historical.design_revision_id]
+            templates = ctx.service.artifacts.prompts
+            validate_historical_compiled_source(historical.compiled_prompt, revision, templates)
+            changed = deepcopy(nested)
+            compiled = changed["compiled_prompt"]
+            compiled["prompt_text"] = "Rehashed but not the historical canonical rendering."
+            compiled["content_hash"] = hashlib.sha256(compiled["prompt_text"].encode()).hexdigest()
+            changed["content_hash"] = ctx.service.repository._canonical_hash(
+                {k: v for k, v in changed.items() if k != "content_hash"}
+            )
+            forged = decode_prompt_enrichment_result(changed)
+            with pytest.raises(ValueError, match="historical compiled source"):
+                validate_historical_compiled_source(forged.compiled_prompt, revision, templates)
+            nested_count += 1
+    assert nested_count > 0
     for payload in before["enrichment_cycle"]:
         assert decode_prompt_enrichment_result(payload).model_dump(mode="json") == payload
         forged = {**payload, "content_hash": "0" * 64}

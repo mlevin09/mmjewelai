@@ -56,11 +56,12 @@ def locked_reader(db):
 
 
 def _authorize_and_lock(repository, db, organization_id, session_id, principal_id):
-    # Match membership mutation's organization-first serialization, then session writers.
+    # NO KEY UPDATE still serializes with membership mutation's FOR UPDATE, but allows the
+    # FK KEY SHARE taken by session-first correction/answer writers. UPDATE would deadlock.
     organization = db.scalar(
         select(OrganizationRow)
         .where(OrganizationRow.organization_id == organization_id)
-        .with_for_update()
+        .with_for_update(key_share=True)
     )
     membership = db.get(OrganizationMembershipRow, (organization_id, principal_id))
     if organization is None or membership is None:

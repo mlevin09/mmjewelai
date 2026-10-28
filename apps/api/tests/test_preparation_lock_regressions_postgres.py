@@ -147,13 +147,13 @@ def test_downgrade_first_excludes_writer_before_empty_check_and_drop(ready_sessi
         )
 
 
-@pytest.mark.parametrize("operation", ["correction", "answer"])
+@pytest.mark.parametrize("operation", ["correction", "answer", "skip"])
 @pytest.mark.parametrize("reader", ["create", "get"])
 def test_session_first_writer_and_org_first_preparation_do_not_deadlock(
     ready_session, engine, capfd, operation, reader
 ):
     ctx = ready_session()
-    if operation == "answer":
+    if operation in ("answer", "skip"):
         _correct(ctx, "I prefer yellow.")
     request, key = expected(ctx), uuid4()
     original = post(ctx, request, key)
@@ -183,7 +183,12 @@ def test_session_first_writer_and_org_first_preparation_do_not_deadlock(
             writer = (
                 pool.submit(_correct, ctx, "Do not add a halo.")
                 if operation == "correction"
-                else pool.submit(_answer, ctx, "metal.color", decision="SKIP")
+                else pool.submit(
+                    _answer,
+                    ctx,
+                    "metal.color",
+                    decision="SKIP" if operation == "skip" else "ACCEPT",
+                )
             )
             assert session_locked.wait(10)
             retained = (
@@ -205,7 +210,11 @@ def test_session_first_writer_and_org_first_preparation_do_not_deadlock(
     assert deadlocks == []
     if reader == "create":
         assert response.status_code == 409
-        assert response.json()["error"] in ("enrichment_cycle_mismatch", "stale_clarification_plan")
+        assert response.json()["error"] in (
+            "stale_revision",
+            "enrichment_cycle_mismatch",
+            "stale_clarification_plan",
+        )
     else:
         assert response.status_code == 200 and response.json() == original.json()
     assert counts(engine) == (1, 1, 0, 0)  # old preparation only; writer commits as one unit
