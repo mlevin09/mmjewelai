@@ -54,9 +54,11 @@ def engine(monkeypatch, capfd):
         command.upgrade(cfg, "head")
         command.check(cfg)
         command.current(cfg)
-        # Empty B2 tables may roll back; historical session/revision rows remain untouched.
-        command.downgrade(cfg, "0015_reference_verification")
-        command.upgrade(cfg, "head")
+        # Unsupported online downgrade refuses even with empty retained tables.
+        retained = retention_snapshot(scoped)
+        with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+            command.downgrade(cfg, "0015_reference_verification")
+        assert retention_snapshot(scoped) == retained
         command.check(cfg)
         with scoped.connect() as db:
             assert (
@@ -92,6 +94,44 @@ def _schema_url(url, schema):
     assert schema.startswith("b2_") and len(schema) == 35
     assert all(c in "0123456789abcdef" for c in schema[3:])
     return url + "?options=-csearch_path=" + schema
+
+
+def retention_snapshot(engine):
+    """Exact retained bytes/hashes and schema objects; never print synthetic source payloads."""
+    with engine.connect() as db:
+        objects = tuple(
+            db.execute(
+                text("""
+            SELECT 'relation', c.relname, c.relkind::text FROM pg_class c
+              JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema()
+            UNION ALL
+            SELECT 'constraint', c.conname, pg_get_constraintdef(c.oid) FROM pg_constraint c
+              JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname=current_schema()
+            UNION ALL
+            SELECT 'trigger', t.tgname, pg_get_triggerdef(t.oid) FROM pg_trigger t
+              JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+              WHERE n.nspname=current_schema() AND NOT t.tgisinternal
+            UNION ALL
+            SELECT 'function', p.proname, pg_get_functiondef(p.oid) FROM pg_proc p
+              JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=current_schema()
+            ORDER BY 1,2,3
+        """)
+            )
+        )
+        rows = {
+            model.__tablename__: tuple(
+                dict(row)
+                for row in db.execute(
+                    select(model).order_by(*model.__table__.primary_key.columns)
+                ).mappings()
+            )
+            for model in (GenerationPreparationRow, GenerationCommandRow)
+        }
+        return {
+            "version": db.scalar(text("SELECT version_num FROM alembic_version")),
+            "objects": objects,
+            "rows": rows,
+        }
 
 
 def test_scoped_url_preserves_driver_options_and_alembic_interpolation():
@@ -204,11 +244,13 @@ def test_postgres_immutability_and_scope_foreign_keys(ready_session, engine):
             with engine.begin() as db:
                 db.execute(GenerationPreparationRow.__table__.insert().values(**invalid))
     assert counts(engine) == (1, 1, 0, 0)
-    with pytest.raises(RuntimeError, match="Populated preparation history"):
+    before = retention_snapshot(engine)
+    with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
         command.downgrade(
             Config(str(ROOT / "packages/persistence/alembic.ini")), "0015_reference_verification"
         )
     assert counts(engine) == (1, 1, 0, 0)
+    assert retention_snapshot(engine) == before
 
 
 def test_postgres_command_failure_rolls_back_both_rows(ready_session, engine):

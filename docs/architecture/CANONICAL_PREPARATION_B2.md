@@ -56,10 +56,13 @@ Migration **0016_generation_preparations**, after **0015_reference_verification*
 - `generation_command`: scoped command/key, request hash, exact success response and its hash.
 - PostgreSQL append-only UPDATE/DELETE rejection triggers for those two new tables.
 
-There is no historical data rewrite/backfill. Empty new tables can be downgraded; populated retained
-preparation history refuses downgrade rather than deleting data. Downgrade takes transaction-held
-ACCESS EXCLUSIVE locks on preparation then command before checking either table and holds them
-through DDL; concurrent successful history cannot appear between the checks and DROP.
+There is no historical data rewrite/backfill. Migration 0016 **always refuses online downgrade**,
+whether retained tables are empty or populated. It raises a deterministic operational error before
+any migration database operation, lock or DDL. The earlier child-table locking protocol prevented
+data loss but could deadlock with command lookups or FK parent locks; it is superseded by this
+fail-closed policy (B2-R1a). Safe operational rollback must retain schema 0016 and reader-compatible
+application code. Any schema rollback requires a separately planned maintenance operation, not
+table deletion, cleanup of retained history or a production escape hatch.
 The existing run/iteration tables
 are untouched: nullable preparation references, discriminators/XOR and their complete reader/worker
 updates are deferred together to B3 because **B2 creates no preparation-backed runs**. There is no
@@ -128,8 +131,12 @@ calls `compile_prompt`, rewrites bytes or produces a current generation input. C
 1.3 bypasses this historical branch and remains compiler-free. Frozen compiler/template/catalog
 artifacts and schemas remain unchanged.
 
-Barrier/event-controlled disposable PostgreSQL regressions exercise both downgrade/writer orders,
-correction and answer overlap with creation/GET, and actual revocation lock contention. Local
+Barrier/event-controlled disposable PostgreSQL regressions exercise early command lookup and
+FK-parent overlap with a refused downgrade, correction and answer overlap with creation/GET, and
+actual revocation lock contention. Downgrade tests require normal concurrent POST success, retained
+schema/rows/hashes, and zero driver SQLSTATE 40P01 or server deadlock messages; arbitrary HTTP 503 is
+not accepted. Empty and populated downgrade attempts both refuse without database operations.
+Test cleanup uses only the verified owned-schema teardown, never a downgrade workaround. Local
 PostgreSQL skips are not evidence of success; final exact-head CI must execute every critical case.
 No persistent migration, B3 dispatch, Web/provider change, merge, release activation or deployment
 is authorized by this remediation.

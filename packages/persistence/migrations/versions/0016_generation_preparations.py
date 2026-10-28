@@ -6,7 +6,6 @@ Revises: 0015_reference_verification
 Additive only. No historical inputs are rewritten. Run/iteration input cutover belongs to B3.
 """
 
-import sqlalchemy as sa
 from alembic import op
 
 revision = "0016_generation_preparations"
@@ -117,28 +116,9 @@ $$
 
 
 def downgrade() -> None:
-    bind = op.get_bind()
-    # Never destroy retained professional input or successful command history during rollback.
-    # PostgreSQL holds both locks through Alembic's transactional DDL. Match insertion order:
-    # a writer which already inserted a preparation must finish before we check either table.
-    bind.execute(
-        sa.text("LOCK TABLE generation_preparation, generation_command IN ACCESS EXCLUSIVE MODE")
+    # Refuse before any database operation: child-only table locking can deadlock with
+    # command lookups and FK parent locks held by normal preparation transactions.
+    raise RuntimeError(
+        "0016 online downgrade is unsupported; retain schema 0016 and reader-compatible "
+        "application code. Use a separately planned maintenance rollback."
     )
-    if any(
-        bind.scalar(sa.text(f"SELECT count(*) FROM {table}"))
-        for table in (
-            "generation_command",
-            "generation_preparation",
-        )
-    ):
-        raise RuntimeError("Populated preparation history cannot be downgraded")
-    op.drop_table("generation_command")
-    op.drop_table("generation_preparation")
-    op.execute("DROP FUNCTION jewelai_reject_generation_input_mutation()")
-    for table, name in (
-        ("enrichment_cycle", "uq_cycle_preparation_binding"),
-        ("specification_revision", "uq_revision_session_design"),
-        ("design_session", "uq_design_session_project"),
-        ("project", "uq_project_organization"),
-    ):
-        op.drop_constraint(name, table, type_="unique")
