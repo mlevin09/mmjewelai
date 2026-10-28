@@ -384,24 +384,16 @@ def _validate_snapshot(snapshot, *, dictionary, templates):
             "Product State and enrichment cycle revisions do not match",
         )
     if isinstance(enrichment, PromptEnrichmentResult):
-        # Historical input integrity only; do not execute the legacy text compiler.
-        historical = enrichment.compiled_prompt
-        template = next(
-            (t for t in templates.templates if t.template_id == historical.template_id), None
-        )
-        if (
-            historical.specification_revision_id != revision.revision_id
-            or historical.design_id != revision.design_id
-            or historical.design_schema_version != revision.schema_version
-            or historical.content_hash
-            != hashlib.sha256(historical.prompt_text.encode()).hexdigest()
-            or template is None
-            or historical.template_version != template.template_version
-        ):
+        # Historical-only consistency verification. Current 1.3 never enters this branch.
+        from .historical_validation import validate_historical_compiled_source
+
+        try:
+            validate_historical_compiled_source(enrichment.compiled_prompt, revision, templates)
+        except (ValueError, KeyError) as exc:
             raise FinalPromptInputError(
                 FinalPromptInputErrorCode.INVALID_ENRICHMENT_STATE,
-                "historical compiled source failed scope/hash validation",
-            )
+                "historical compiled source failed canonical rendering validation",
+            ) from exc
     if snapshot.enrichment_cycle_id != snapshot.latest_enrichment_cycle_id:
         raise FinalPromptInputError(
             FinalPromptInputErrorCode.ENRICHMENT_CYCLE_MISMATCH,

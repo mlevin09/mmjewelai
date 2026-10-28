@@ -6,6 +6,7 @@ from contextlib import nullcontext
 from jewelai_auth import MembershipNotFoundError
 from jewelai_prompts import GenerationPreparation
 from jewelai_prompts.downstream_preparation import canonical_bytes
+from jewelai_prompts.enrichment import enrichment_template_version
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -138,6 +139,23 @@ def _validate_row(repository, db, session, row):
         )
         if verified_cycle.result.content_hash != p.enrichment_result_hash:
             raise ValueError("cycle hash mismatch")
+        pin = verified_cycle.release_pin
+        expected_release = {
+            "package_id": pin.package_id,
+            "artifact_version": pin.artifact_version,
+            "runtime_sha256": pin.runtime_sha256,
+            "validation_report_sha256": pin.validation_report_sha256,
+        }
+        prompt = p.source_handoff.internal_final_prompt
+        if any(
+            release.model_dump(mode="json") != expected_release
+            for release in (
+                p.source_handoff.knowledge_release,
+                prompt.knowledge_release,
+                p.gate_evidence.knowledge_release,
+            )
+        ):
+            raise ValueError("historical Knowledge identity mismatch")
         plan = db.get(ClarificationPlanRow, p.gate_evidence.clarification_plan_id)
         if (
             plan is None
@@ -146,6 +164,17 @@ def _validate_row(repository, db, session, row):
         ):
             raise ValueError("plan scope mismatch")
         verified_plan = repository._clarification_plan_record(db, plan, session)
+        # Bind retained versions to this historical cycle/plan, not the latest mutable cycle.
+        versions = prompt.artifact_versions
+        if (
+            versions.enrichment_version != verified_cycle.result.enrichment_version
+            or versions.prompt_template_artifact_version
+            != enrichment_template_version(verified_cycle.result)
+            or versions.dictionary_artifact_version != plan.dictionary_artifact_version
+            or versions.question_artifact_version != plan.question_artifact_version
+            or versions.rules_artifact_version != plan.rules_artifact_version
+        ):
+            raise ValueError("historical artifact versions mismatch")
         if verified_plan.content_hash != p.gate_evidence.clarification_plan_hash or canonical_bytes(
             verified_plan.plan_payload["constraint_evidence"]
         ) != canonical_bytes(
