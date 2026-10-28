@@ -153,11 +153,12 @@ def test_session_first_writer_and_org_first_preparation_do_not_deadlock(
     ready_session, engine, capfd, operation, reader
 ):
     ctx = ready_session()
+    original_request, key = expected(ctx), uuid4()
+    original = post(ctx, original_request, key)
+    assert original.status_code == 201
     if operation in ("answer", "skip"):
         _correct(ctx, "I prefer yellow.")
-    request, key = expected(ctx), uuid4()
-    original = post(ctx, request, key)
-    assert original.status_code == 201
+    request = expected(ctx)
     path = f"/sessions/{ctx.sid}/generation-preparations/{original.json()['preparation_id']}"
     session_locked, org_locked, release_writer = Event(), Event(), Event()
     reader_pid, deadlocks = [], []
@@ -218,7 +219,7 @@ def test_session_first_writer_and_org_first_preparation_do_not_deadlock(
     else:
         assert response.status_code == 200 and response.json() == original.json()
     assert counts(engine) == (1, 1, 0, 0)  # old preparation only; writer commits as one unit
-    assert post(ctx, request, key).json() == original.json()
+    assert post(ctx, original_request, key).json() == original.json()
     with capfd.disabled():
         print(
             f"B2_R2_OVERLAP: {operation}/{reader}; no 40P01; "
