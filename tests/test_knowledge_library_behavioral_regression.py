@@ -460,6 +460,8 @@ def test_enrichment_is_derived_state_and_cannot_silently_rewrite_prompt():
 
     final = {item.target: item for item in enriched.final_matrix}
     assert final["center_stone.setting"].value == "prong_setting"
-    assert enriched.compiled_prompt == baseline.compiled_prompt
+    from jewelai_prompts import enrichment_projection
+
+    assert enrichment_projection(enriched) == enrichment_projection(baseline)
     assert enriched.design_revision_id == str(ring.revision_id)
     assert enriched.knowledge_runtime_sha256 == runtime.sha256

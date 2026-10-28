@@ -9,8 +9,10 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
     Uuid,
@@ -66,6 +68,9 @@ class OrganizationMembershipRow(Base):
 
 class ProjectRow(Base):
     __tablename__ = "project"
+    __table_args__ = (
+        UniqueConstraint("project_id", "organization_id", name="uq_project_organization"),
+    )
 
     project_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
     organization_id: Mapped[UUID] = mapped_column(
@@ -78,6 +83,7 @@ class ProjectRow(Base):
 class DesignSessionRow(Base):
     __tablename__ = "design_session"
     __table_args__ = (
+        UniqueConstraint("session_id", "project_id", name="uq_design_session_project"),
         CheckConstraint(
             "(knowledge_package_id IS NULL AND knowledge_artifact_version IS NULL "
             "AND knowledge_runtime_sha256 IS NULL "
@@ -115,6 +121,9 @@ class DesignSessionRow(Base):
 class SpecificationRevisionRow(Base):
     __tablename__ = "specification_revision"
     __table_args__ = (
+        UniqueConstraint(
+            "session_id", "revision_id", "design_id", name="uq_revision_session_design"
+        ),
         UniqueConstraint("session_id", "revision_number", name="uq_revision_session_number"),
         UniqueConstraint("session_id", "parent_revision_id", name="uq_revision_session_parent"),
         Index("ix_revision_session_created", "session_id", "created_at"),
@@ -196,6 +205,13 @@ class PromptRevisionRow(Base):
 class EnrichmentCycleRow(Base):
     __tablename__ = "enrichment_cycle"
     __table_args__ = (
+        UniqueConstraint(
+            "session_id",
+            "enrichment_cycle_id",
+            "cycle_number",
+            "specification_revision_id",
+            name="uq_cycle_preparation_binding",
+        ),
         CheckConstraint("cycle_number >= 1", name="ck_enrichment_cycle_number_positive"),
         UniqueConstraint("session_id", "cycle_number", name="uq_enrichment_cycle_session_number"),
         Index("ix_enrichment_cycle_session_created", "session_id", "created_at"),
@@ -216,6 +232,116 @@ class EnrichmentCycleRow(Base):
     enrichment_version: Mapped[str] = mapped_column(String(32))
     result_payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class GenerationPreparationRow(Base):
+    __tablename__ = "generation_preparation"
+    __table_args__ = (
+        *(
+            CheckConstraint(f"{field} ~ '^[0-9a-f]{{64}}$'", name=f"ck_preparation_{field}").ddl_if(
+                dialect="postgresql"
+            )
+            for field in (
+                "enrichment_result_hash",
+                "source_handoff_hash",
+                "source_bytes_sha256",
+                "gate_evidence_hash",
+                "rendering_hash",
+                "artifact_hash",
+            )
+        ),
+        UniqueConstraint(
+            "preparation_id", "organization_id", "session_id", name="uq_preparation_scope"
+        ),
+        ForeignKeyConstraint(
+            ["project_id", "organization_id"],
+            ["project.project_id", "project.organization_id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "project_id"],
+            ["design_session.session_id", "design_session.project_id"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "product_state_revision_id", "design_id"],
+            [
+                "specification_revision.session_id",
+                "specification_revision.revision_id",
+                "specification_revision.design_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            [
+                "session_id",
+                "enrichment_cycle_id",
+                "enrichment_cycle_number",
+                "product_state_revision_id",
+            ],
+            [
+                "enrichment_cycle.session_id",
+                "enrichment_cycle.enrichment_cycle_id",
+                "enrichment_cycle.cycle_number",
+                "enrichment_cycle.specification_revision_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("schema_version = '1.0.0'", name="ck_preparation_version"),
+        CheckConstraint("length(artifact_bytes) <= 2097152", name="ck_preparation_artifact_size"),
+        Index("ix_preparation_session_created", "session_id", "created_at"),
+    )
+    preparation_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT")
+    )
+    project_id: Mapped[UUID] = mapped_column(Uuid)
+    session_id: Mapped[UUID] = mapped_column(Uuid)
+    design_id: Mapped[UUID] = mapped_column(Uuid)
+    product_state_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    enrichment_cycle_id: Mapped[UUID] = mapped_column(Uuid)
+    enrichment_cycle_number: Mapped[int] = mapped_column(Integer)
+    enrichment_result_hash: Mapped[str] = mapped_column(String(64))
+    schema_version: Mapped[str] = mapped_column(String(32))
+    source_handoff_hash: Mapped[str] = mapped_column(String(64))
+    source_bytes_sha256: Mapped[str] = mapped_column(String(64))
+    gate_evidence_hash: Mapped[str] = mapped_column(String(64))
+    rendering_hash: Mapped[str] = mapped_column(String(64))
+    artifact_hash: Mapped[str] = mapped_column(String(64))
+    source_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    artifact_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    artifact_payload: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class GenerationCommandRow(Base):
+    __tablename__ = "generation_command"
+    __table_args__ = (
+        *(
+            CheckConstraint(
+                f"{field} ~ '^[0-9a-f]{{64}}$'", name=f"ck_generation_command_{field}"
+            ).ddl_if(dialect="postgresql")
+            for field in ("request_hash", "response_hash")
+        ),
+        ForeignKeyConstraint(
+            ["preparation_id", "organization_id", "session_id"],
+            [
+                "generation_preparation.preparation_id",
+                "generation_preparation.organization_id",
+                "generation_preparation.session_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+    )
+    organization_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    session_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    command: Mapped[str] = mapped_column(String(80), primary_key=True)
+    idempotency_key: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    preparation_id: Mapped[UUID] = mapped_column(Uuid)
+    response_bytes: Mapped[bytes] = mapped_column(LargeBinary)
+    response_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

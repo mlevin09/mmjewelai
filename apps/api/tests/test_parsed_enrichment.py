@@ -28,10 +28,12 @@ from jewelai_parser import (
     parse_full_message,
 )
 from jewelai_prompts import (
+    CanonicalInternalFinalPrompt as InternalFinalPrompt,
+)
+from jewelai_prompts import (
     EnrichmentProposal,
     FinalPromptArtifactVersions,
     FinalPromptSnapshot,
-    InternalFinalPrompt,
     KnowledgeReleaseReference,
     assemble_internal_final_prompt,
     enrich_prompt_with_active_release,

@@ -32,7 +32,12 @@ from jewelai_persistence import (
     EnrichmentCycleRecord,
     KnowledgeReleasePinConflictError,
 )
-from jewelai_prompts import PromptEnrichmentResult, PromptTemplateBundle
+from jewelai_prompts import (
+    AnyPromptEnrichmentResult,
+    PromptTemplateBundle,
+    decode_prompt_enrichment_result,
+    enrichment_template_version,
+)
 from pydantic import Field, model_validator
 
 from .clarification_answers import ClarificationAnswerResult
@@ -124,7 +129,7 @@ class CorrectionReenrichmentResult(ImmutableModel):
     parsed_correction: FullMessageParseResult
     correction_evaluation: ParsedCandidateEnrichmentResult
     post_transition_evaluation: ParsedCandidateEnrichmentResult
-    next_enrichment_result: PromptEnrichmentResult
+    next_enrichment_result: AnyPromptEnrichmentResult
     outcome: CorrectionOutcome
     reason: CorrectionReason
     semantic_hash: Sha256
@@ -358,13 +363,13 @@ def _validate_previous_cycle(request, cycle):
             "correction does not match the previous append-only enrichment cycle",
         )
     try:
-        result = PromptEnrichmentResult.model_validate(cycle.result)
+        result = decode_prompt_enrichment_result(cycle.result)
     except ValueError as exc:
         raise CorrectionInputError(
             CorrectionErrorCode.PREVIOUS_CYCLE_MISMATCH,
             "previous enrichment cycle failed integrity validation",
         ) from exc
-    if result.compiled_prompt.template_artifact_version != request.prompt_template_artifact_version:
+    if enrichment_template_version(result) != request.prompt_template_artifact_version:
         raise CorrectionInputError(
             CorrectionErrorCode.ARTIFACT_MISMATCH,
             "previous enrichment cycle used a different Prompt Template artifact",
@@ -372,7 +377,7 @@ def _validate_previous_cycle(request, cycle):
 
 
 def _validate_parametric_lineage(result, catalog):
-    result = PromptEnrichmentResult.model_validate(result)
+    result = decode_prompt_enrichment_result(result)
     expected = (catalog.catalog_id, str(catalog.artifact_version), catalog.sha256)
     actual = (
         result.parametric_catalog_id,

@@ -9,7 +9,15 @@ from conftest import NOW, create_hierarchy
 from jewelai_domain.rules import ReadyDecision
 from jewelai_persistence import UserCorrectionIntegrityError
 from jewelai_persistence.models import UserCorrectionRow
-from jewelai_prompts import FinalPromptReadiness, InternalFinalPrompt, InternalFinalPromptHandoff
+from jewelai_prompts import (
+    CanonicalInternalFinalPrompt as InternalFinalPrompt,
+)
+from jewelai_prompts import (
+    CanonicalInternalFinalPromptHandoff as InternalFinalPromptHandoff,
+)
+from jewelai_prompts import (
+    FinalPromptReadiness,
+)
 from sqlalchemy import select
 from test_persistence import build_service
 from test_prompt_enrichment_http import _client, _message

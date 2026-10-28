@@ -13,7 +13,8 @@ from conftest import NOW, create_hierarchy
 from jewelai_parser import parse_full_message
 from jewelai_persistence import Base, create_database_engine, create_session_factory
 from jewelai_persistence.models import ClarificationPlanRow, EnrichmentCycleRow
-from jewelai_prompts import FinalPromptConstraintEvidence, InternalFinalPrompt
+from jewelai_prompts import CanonicalInternalFinalPrompt as InternalFinalPrompt
+from jewelai_prompts import FinalPromptConstraintEvidence
 from sqlalchemy import func, select
 from test_persistence import build_service
 from test_prompt_enrichment_http import _client, _message
@@ -469,7 +470,7 @@ def test_full_http_cycle_restores_retries_corrects_and_preserves_authority(engin
         assert final.status_code == 200, final.json()
         output = final.json()
         prompt = output["internal_final_prompt"]
-        assert prompt["schema_version"] == "1.1.0"
+        assert prompt["schema_version"] == "2.0.0"
         assert prompt["product_state_revision_id"] == corrected["authoritative_revision_id"]
         assert prompt["knowledge_release"] == _release_payload(runtime)
         assert prompt["description_content_hash"] == output["description"]["content_hash"]

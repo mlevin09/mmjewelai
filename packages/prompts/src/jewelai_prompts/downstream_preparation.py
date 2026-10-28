@@ -33,6 +33,7 @@ from pydantic import (
 
 from .enrichment import ParametricEnrichmentReference, parametric_reference_context_is_eligible
 from .final_prompt import (
+    FinalPromptAssembly,
     InternalFinalPrompt,
     KnowledgeReleaseReference,
     UserReadableJewelryDescription,
@@ -154,6 +155,10 @@ def render_canonical_source_text(prompt: CanonicalInternalFinalPrompt) -> str:
     )
     _, body = text.split("\n", 1)
     return "JEWELAI INTERNAL FINAL PROMPT 2.0.0\n" + body
+
+
+class CanonicalFinalPromptAssembly(FinalPromptAssembly):
+    internal_final_prompt: CanonicalInternalFinalPrompt
 
 
 class CanonicalInternalFinalPromptHandoff(InternalFinalPromptHandoff):

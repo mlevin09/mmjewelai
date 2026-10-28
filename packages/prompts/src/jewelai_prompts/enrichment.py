@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from typing import Literal
+from typing import Annotated, Literal
 
 from jewelai_domain.knowledge_activation import (
     ActiveKnowledgeRuntime,
@@ -30,14 +30,21 @@ from jewelai_domain.models import (
     KnownValue,
     NotApplicable,
     Text,
+    Version,
 )
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
-from pydantic import Field, JsonValue, field_validator, model_validator
+from pydantic import Field, JsonValue, TypeAdapter, field_validator, model_validator
 
-from .compiler import compile_prompt
-from .models import CompiledPrompt, PromptTemplateBundle
+from .models import (
+    CompiledPrompt,
+    PromptConstraint,
+    PromptDisclosure,
+    PromptTemplateBundle,
+    SpecificationEntry,
+)
+from .revision_projection import RevisionProjection, project_revision
 
-PROMPT_ENRICHMENT_VERSION = "1.2.0"
+PROMPT_ENRICHMENT_VERSION = "1.3.0"
 
 
 class ParametricReferenceDimensions(ImmutableModel):
@@ -130,7 +137,9 @@ class EnrichmentDecision(ImmutableModel):
 
 
 class PromptEnrichmentResult(ImmutableModel):
-    enrichment_version: Literal["1.2.0"] = PROMPT_ENRICHMENT_VERSION
+    """Frozen historical 1.2 decoder; current writers emit StructuredPromptEnrichmentResult."""
+
+    enrichment_version: Literal["1.2.0"] = "1.2.0"
     design_revision_id: str
     knowledge_package_id: str
     knowledge_artifact_version: str
@@ -182,6 +191,69 @@ class PromptEnrichmentResult(ImmutableModel):
         if self.content_hash != expected:
             raise ValueError("prompt enrichment content hash mismatch")
         return self
+
+
+class StructuredPromptEnrichmentResult(ImmutableModel):
+    """Current structured source, with no legacy text compiler dependency."""
+
+    enrichment_version: Literal["1.3.0"] = PROMPT_ENRICHMENT_VERSION
+    design_revision_id: str
+    knowledge_package_id: str
+    knowledge_artifact_version: str
+    knowledge_runtime_sha256: str
+    knowledge_validation_report_sha256: Sha256 | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
+    parametric_catalog_id: str | None = None
+    parametric_artifact_version: str | None = None
+    parametric_catalog_sha256: Sha256 | None = None
+    parametric_references: tuple[ParametricEnrichmentReference, ...] = ()
+    initial_matrix: tuple[EnrichmentMatrixCell, ...]
+    decisions: tuple[EnrichmentDecision, ...]
+    final_matrix: tuple[EnrichmentMatrixCell, ...]
+    specification_entries: tuple[SpecificationEntry, ...]
+    locked_constraints: tuple[PromptConstraint, ...]
+    disclosures: tuple[PromptDisclosure, ...]
+    prompt_template_artifact_version: Version
+    content_hash: str
+
+    @model_validator(mode="after")
+    def validate_hash(self):
+        # The canonical JSON hash and parametric metadata rules are deliberately shared.
+        return PromptEnrichmentResult.validate_hash(self)
+
+
+AnyPromptEnrichmentResult = Annotated[
+    PromptEnrichmentResult | StructuredPromptEnrichmentResult,
+    Field(discriminator="enrichment_version"),
+]
+_ENRICHMENT_DECODER = TypeAdapter(AnyPromptEnrichmentResult)
+
+
+def decode_prompt_enrichment_result(value: object) -> AnyPromptEnrichmentResult:
+    """Verify the ORIGINAL version/hash, including nested historical payloads; never rewrite."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    return _ENRICHMENT_DECODER.validate_python(value)
+
+
+def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjection:
+    result = decode_prompt_enrichment_result(value)
+    source = result.compiled_prompt if isinstance(result, PromptEnrichmentResult) else result
+    return RevisionProjection(
+        specification_entries=source.specification_entries,
+        locked_constraints=source.locked_constraints,
+        disclosures=source.disclosures,
+    )
+
+
+def enrichment_template_version(value: AnyPromptEnrichmentResult) -> str:
+    result = decode_prompt_enrichment_result(value)
+    return (
+        result.compiled_prompt.template_artifact_version
+        if isinstance(result, PromptEnrichmentResult)
+        else result.prompt_template_artifact_version
+    )
 
 
 def _cell(
@@ -255,11 +327,11 @@ def enrich_prompt(
     parametric_catalog_sha256: Sha256 | None = None,
     parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
-) -> PromptEnrichmentResult:
-    """Evaluate deterministic enrichment proposals before compiling the canonical prompt.
+) -> StructuredPromptEnrichmentResult:
+    """Evaluate proposals and project the canonical revision without compiling legacy text.
 
     Step 12 deliberately does not mutate DesignRevision. Matrix/policy results are structured
-    derived output, while Prompt Compiler remains anchored to the immutable canonical revision.
+    derived output; the revision projection remains anchored to immutable canonical Product State.
     """
     revision = validate_design_revision(revision)
     templates = PromptTemplateBundle.model_validate(templates)
@@ -322,7 +394,10 @@ def enrich_prompt(
         parameters=tuple(sorted(current.values(), key=lambda item: item.target)),
     )
     final_matrix = _matrix(final_state, engine)
-    compiled = compile_prompt(revision, templates, template_id=template_id)
+    # Preserve the existing template identity check, but do not compile text.
+    if template_id not in {item.template_id for item in templates.templates}:
+        raise KeyError("Unknown prompt template ID")
+    projection = project_revision(revision)
     payload = {
         "enrichment_version": PROMPT_ENRICHMENT_VERSION,
         "design_revision_id": str(revision.revision_id),
@@ -336,10 +411,11 @@ def enrich_prompt(
         "initial_matrix": [item.model_dump(mode="json") for item in initial_matrix],
         "decisions": [item.model_dump(mode="json") for item in decisions],
         "final_matrix": [item.model_dump(mode="json") for item in final_matrix],
-        "compiled_prompt": compiled.model_dump(mode="json"),
+        **projection.model_dump(mode="json"),
+        "prompt_template_artifact_version": templates.artifact_version,
     }
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return PromptEnrichmentResult(
+    return StructuredPromptEnrichmentResult(
         **payload,
         content_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
     )
@@ -360,7 +436,7 @@ def enrich_prompt_with_active_release(
     parametric_catalog_sha256: Sha256 | None = None,
     parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
-) -> PromptEnrichmentResult:
+) -> StructuredPromptEnrichmentResult:
     """Enrich one cycle with an explicitly selected, durably verified ACTIVE release."""
 
     verified = artifact_store.load_active_runtime(
@@ -383,7 +459,7 @@ def enrich_prompt_with_active_release(
     payload = base.model_dump(mode="json", exclude={"content_hash"})
     payload["knowledge_validation_report_sha256"] = verified.validation_report_sha256
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return PromptEnrichmentResult(
+    return StructuredPromptEnrichmentResult(
         **payload,
         content_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
     )

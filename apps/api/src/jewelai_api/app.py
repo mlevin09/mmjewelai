@@ -8,6 +8,7 @@ from uuid import UUID
 
 from fastapi import Depends, FastAPI, File, Header, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jewelai_assets import (
     AssetAccessContractError,
@@ -57,7 +58,13 @@ from jewelai_persistence import (
     create_database_engine,
     create_session_factory,
 )
+from jewelai_persistence.preparations import (
+    PreparationConflictError,
+    PreparationIntegrityError,
+    PreparationStorageError,
+)
 from jewelai_persistence.repository import PersistenceRepository
+from jewelai_prompts import GenerationPreparationError
 from jewelai_text_understanding_google import (
     GoogleTextUnderstandingAdapter,
     TextUnderstandingInvalidResponseError,
@@ -74,11 +81,13 @@ from .generation import (
     NoVisualizationProfilesError,
     UnknownGenerationProfileError,
 )
+from .generation_preparations import GenerationPreparationService
 from .middleware import (
     RequestBodyLimitMiddleware,
     RequestObservabilityMiddleware,
     configure_json_logger,
 )
+from .preparation_contracts import GenerationPreparationRequest, GenerationPreparationSummary
 from .prompt_enrichment_composition import compose_prompt_enrichment_runtime
 from .prompt_enrichment_runtime import (
     InitialEnrichmentRequest,
@@ -259,13 +268,52 @@ def create_app(
         text_understanding_provider=text_understanding_provider,
     )
     app = FastAPI(title="JewelAI V2 API", version="1.0.0")
+    preparation_service = GenerationPreparationService(repository, prompt_enrichment_service)
+
+    @app.exception_handler(PreparationConflictError)
+    async def preparation_conflict_handler(_, exc):
+        return JSONResponse(
+            status_code=409, content={"error": exc.code, "detail": "Preparation state conflict"}
+        )
+
+    @app.exception_handler(PreparationIntegrityError)
+    async def preparation_integrity_handler(_, exc):
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "invalid_durable_history",
+                "detail": "Stored preparation failed validation",
+            },
+        )
+
+    @app.exception_handler(PreparationStorageError)
+    async def preparation_storage_handler(_, exc):
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error": "generation_preparation_unavailable",
+                "detail": "Preparation storage is unavailable",
+            },
+        )
+
+    @app.exception_handler(GenerationPreparationError)
+    async def preparation_input_handler(_, exc):
+        status = 409 if exc.code.value == "final_output_not_ready" else 422
+        return JSONResponse(
+            status_code=status,
+            content={
+                "error": exc.code.value,
+                "detail": "Authoritative generation preparation failed validation",
+            },
+        )
+
     if settings.web_allowed_origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=list(settings.web_allowed_origins),
             allow_credentials=False,
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "X-Organization-ID"],
+            allow_headers=["Authorization", "Content-Type", "X-Organization-ID", "Idempotency-Key"],
         )
     api_logger = configure_json_logger("jewelai.api")
     app.add_middleware(RequestBodyLimitMiddleware, max_bytes=settings.http_max_request_bytes)
@@ -518,6 +566,46 @@ def create_app(
     @app.post("/organizations", response_model=OrganizationResponse, status_code=201)
     def create_organization(request: CreateOrganizationRequest, principal: Authenticated):
         return service.create_organization(request.name, principal.principal_id)
+
+    @app.post(
+        "/sessions/{session_id}/generation-preparations",
+        response_model=GenerationPreparationSummary,
+    )
+    def create_generation_preparation(
+        session_id: UUID,
+        request: GenerationPreparationRequest,
+        principal: Authenticated,
+        organization_id: AuthorizedOrganization,
+        response: Response,
+        idempotency_key: Annotated[UUID, Header(alias="Idempotency-Key")],
+    ):
+        if prompt_enrichment_service is None:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": "generation_preparation_unavailable",
+                    "detail": "Authoritative enrichment runtime is unavailable",
+                },
+            )
+        result, replayed = preparation_service.create(
+            session_id, organization_id, principal.principal_id, idempotency_key, request
+        )
+        response.status_code = 200 if replayed else 201
+        return result
+
+    @app.get(
+        "/sessions/{session_id}/generation-preparations/{preparation_id}",
+        response_model=GenerationPreparationSummary,
+    )
+    def get_generation_preparation(
+        session_id: UUID,
+        preparation_id: UUID,
+        principal: Authenticated,
+        organization_id: AuthorizedOrganization,
+    ):
+        return preparation_service.get(
+            session_id, organization_id, principal.principal_id, preparation_id
+        )
 
     @app.get("/organizations/{organization_id}/memberships", response_model=MembershipListResponse)
     def list_memberships(organization_id: UUID, principal: Authenticated):
@@ -1121,6 +1209,8 @@ def _prompt_enrichment_state(
         internal_final_prompt_readiness=(
             final.internal_final_prompt.readiness.value if final is not None else None
         ),
+        preparation_expectations=state.preparation_expectations,
+        can_prepare=state.can_prepare,
     )
 
 

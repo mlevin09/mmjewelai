@@ -13,7 +13,7 @@ from jewelai_persistence import (
     PersistenceRepository,
     UserCorrectionRecord,
 )
-from jewelai_prompts import PromptEnrichmentResult
+from jewelai_prompts import AnyPromptEnrichmentResult
 
 from .clarification import ClarificationPlan
 from .clarification_answers import ClarificationAnswerResult
@@ -30,7 +30,7 @@ def commit_clarification_answer_result(
     result: ClarificationAnswerResult,
     created_at: datetime,
     next_enrichment_cycle_id: UUID | None = None,
-    next_enrichment_result: PromptEnrichmentResult | None = None,
+    next_enrichment_result: AnyPromptEnrichmentResult | None = None,
     next_clarification_plan_id: UUID | None = None,
     next_clarification_plan: ClarificationPlan | None = None,
 ) -> ClarificationAnswerResult:

@@ -64,11 +64,14 @@ into a structured manifest and rendered under the template's locked-constraint l
 equality, detecting altered text, hashes, entries, disclosures, metadata, or lock manifests.
 
 `enrich_prompt` is the deterministic provider-neutral orchestration entry point for the current
-Knowledge Library enrichment slice. `PromptEnrichmentResult` v1.1.0 retains the exact validated
+Knowledge Library enrichment slice. `StructuredPromptEnrichmentResult` v1.3.0 retains the validated
 proposal on every `EnrichmentDecision`, including kept and blocked proposals, so later persistence
 can retain attempted value, source, provenance and preservation intent. The result remains derived
 evidence: it does not mutate `DesignRevision`, accept recommendations automatically, create repeated
-groups, interpret policy prose, or alter the backward-compatible `CompiledPrompt`.
+groups, interpret policy prose, or invoke the historical `CompiledPrompt` compiler. Structured
+revision entries, locks and disclosures come from `project_revision()`. The frozen
+`PromptEnrichmentResult` v1.2.0 reader and its original hashes remain available through
+`decode_prompt_enrichment_result()`, including nested correction/answer history.
 
 Proposal semantic state and provenance must use the authority combinations defined by the domain
 runtime. Knowledge-derived proposals must cite an identifier present in the exact selected compiled
@@ -89,15 +92,16 @@ of scope for this boundary.
 single-revision `FinalPromptSnapshot`: the immutable Product State, latest applicable enrichment
 result, exact verified ACTIVE Knowledge release pin, artifact versions, existing Rules Engine
 decision, and normalized clarification/correction lineage. It fails closed for stale revisions,
-cross-session evidence, release/artifact mismatches, altered enrichment hashes, or a `CompiledPrompt`
-that no longer matches the same revision. It does not select a release or re-enrich.
+cross-session evidence, release/artifact mismatches, altered enrichment hashes, or a structured
+projection that no longer matches the same revision. Historical compiled entries may be read but
+are never recompiled or promoted into new authority. It does not select a release or re-enrich.
 
 The builder returns two versioned derived artifacts from the same snapshot:
 
 - `UserReadableJewelryDescription` v1.0.0 renders deterministic EN/RU prose without schema paths,
   stable group IDs, UUIDs, hashes, or release metadata. Unknown or deferred facts remain explicit;
   values are never invented.
-- `InternalFinalPrompt` v1.1.0 is the structured provider-neutral module handoff. It retains
+- Current `CanonicalInternalFinalPrompt` v2.0.0 is the provider-neutral module handoff. It retains
   authoritative design facts, requirements, prohibitions, locks/preservation, accepted versus
   unaccepted enrichment evidence, unresolved details, decision lineage, release/artifact
   provenance, readiness, and a canonical SHA-256. Its deterministic text rendering is derived from
@@ -106,14 +110,15 @@ The builder returns two versioned derived artifacts from the same snapshot:
   active/superseded/unresolved status, and its own canonical hash. Only verified active evidence is
   rendered as authority; ambiguous evidence is never promoted into a requirement.
 
-This new contract is intentionally distinct from `CompiledPrompt`; the existing compiler and live
-API/generation path are unchanged. Step #13 will provide reviewed runtime integration. The builder
+This contract is intentionally distinct from `CompiledPrompt`; old generation write routes remain
+B3 cutover dependencies, not a canonical fallback. B2 preparation never dispatches work. The builder
 uses no network, provider, persistence, clock, random ID, or catalog fallback.
 
-## Internal Final Prompt handoff v1.0.0
+## Historical handoff and current preparation
 
-Step #14C adds `InternalFinalPromptHandoff` as a small downstream-facing envelope around the exact
-validated `InternalFinalPrompt` v1.1.0. It binds the embedded prompt to organization/session,
+The frozen `InternalFinalPromptHandoff` v1.0.0 reads historical `InternalFinalPrompt` v1.1.0.
+Current builders emit B1's `CanonicalInternalFinalPromptHandoff` v2.0.0, retaining the typed
+references, disclosures and bound description. The envelope binds the prompt to organization/session,
 authoritative Product State revision, latest enrichment cycle, exact Knowledge release and both
 release hashes, prompt schema/hash, readiness, and its own canonical hash. Accepted decision
 lineage, active constraints, supersession history, unresolved evidence, and unaccepted
@@ -126,11 +131,17 @@ handoff only by restoring current organization-scoped durable state; repeated/re
 deterministic and do not persist another record. No route or current caller sends this handoff to a
 provider, and legacy `CompiledPrompt` generation is unchanged.
 
+B2 adds authorized transaction-scoped preparation retention, not worker integration. See
+[the bounded B2 contract and route inventory](../../docs/architecture/CANONICAL_PREPARATION_B2.md).
+Frozen schema files remain unchanged; `canonical-preparation-schema.json` separately describes
+the current contracts and original enrichment reader.
+
 ```sh
 python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/prompts[test]'
 python -m jewelai_prompts.schema specs/prompts/schema.json
 python -m jewelai_prompts.final_schema specs/prompts/internal-final-prompt-schema.json
 python -m jewelai_prompts.handoff_schema specs/prompts/internal-final-prompt-handoff-schema.json
+python -m jewelai_prompts.canonical_schema specs/prompts/canonical-preparation-schema.json
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 ```

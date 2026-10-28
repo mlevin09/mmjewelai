@@ -38,18 +38,30 @@ from jewelai_persistence import (
     UserCorrectionIntegrityError,
 )
 from jewelai_prompts import (
+    CanonicalFinalPromptAssembly as FinalPromptAssembly,
+)
+from jewelai_prompts import (
+    CanonicalInternalFinalPromptHandoff as InternalFinalPromptHandoff,
+)
+from jewelai_prompts import (
     FinalPromptArtifactVersions,
-    FinalPromptAssembly,
     FinalPromptDecisionLineage,
     FinalPromptInputError,
     FinalPromptReadiness,
     FinalPromptSnapshot,
-    InternalFinalPromptHandoff,
     InternalFinalPromptHandoffError,
     KnowledgeReleaseReference,
     assemble_internal_final_prompt,
     build_internal_final_prompt_handoff,
     enrich_prompt_with_active_release,
+)
+from jewelai_prompts.downstream_preparation import (
+    DecisionFrontier,
+    DecisionReference,
+    GenerationPreparationError,
+    PreparationGateEvidence,
+    preparation_hash,
+    render_semantic_source,
 )
 
 from .artifacts import RuntimeArtifacts
@@ -91,6 +103,7 @@ from .parsed_enrichment import (
     ParsedCandidateEnrichmentResult,
     enrich_parsed_candidates_with_active_release,
 )
+from .preparation_contracts import GenerationPreparationRequest
 
 
 class PromptEnrichmentRuntimeErrorCode(StrEnum):
@@ -167,6 +180,8 @@ class PromptEnrichmentWorkflowState(ImmutableModel):
     clarification_plan_id: UUID | None = None
     clarification_plan: ClarificationPlan | None = None
     final_output: FinalPromptAssembly | None = None
+    preparation_expectations: GenerationPreparationRequest | None = None
+    can_prepare: bool = False
 
 
 class InitialEnrichmentRuntimeResult(ImmutableModel):
@@ -325,6 +340,82 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.INVALID_CLARIFICATION_PLAN,
                 "Clarification plan failed durable validation",
             ) from exc
+
+    def build_preparation_source(self, repository, session_id, organization_id):
+        """Restore the sole current source using the caller's already locked transaction reader."""
+        snapshot = build_final_prompt_snapshot(
+            repository,
+            session_id=session_id,
+            organization_id=organization_id,
+            artifacts=self.artifacts,
+            artifact_store=self.artifact_store,
+            active_release=self.active_release,
+            validation_report=self.validation_report,
+        )
+        record = repository.get_clarification_plan_for_cycle(
+            session_id, snapshot.enrichment_cycle_id, organization_id
+        )
+        plan = ClarificationPlan.model_validate(record.plan_payload)
+        assembly = assemble_internal_final_prompt(
+            snapshot, dictionary=self.artifacts.dictionary, templates=self.artifacts.prompts
+        )
+        return self._preparation_context(repository, snapshot, assembly, record, plan)
+
+    def _preparation_context(self, repository, snapshot, assembly, record, plan):
+        session_id, organization_id = snapshot.session_id, snapshot.organization_id
+        handoff = build_internal_final_prompt_handoff(assembly)
+        frontier = DecisionFrontier(
+            answers=tuple(
+                sorted(
+                    (
+                        DecisionReference(
+                            record_id=r.answer_record_id,
+                            content_hash=r.result_payload["content_hash"],
+                        )
+                        for r in repository.list_clarification_answers(session_id, organization_id)
+                    ),
+                    key=lambda r: str(r.record_id),
+                )
+            ),
+            corrections=tuple(
+                sorted(
+                    (
+                        DecisionReference(
+                            record_id=r.correction_record_id,
+                            content_hash=r.result_payload["content_hash"],
+                        )
+                        for r in repository.list_user_corrections(session_id, organization_id)
+                    ),
+                    key=lambda r: str(r.record_id),
+                )
+            ),
+        )
+        gate = PreparationGateEvidence(
+            organization_id=organization_id,
+            session_id=session_id,
+            revision=snapshot.revision,
+            enrichment_cycle_id=snapshot.enrichment_cycle_id,
+            enrichment_cycle_number=snapshot.enrichment_cycle_number,
+            enrichment_result_hash=snapshot.enrichment_result.content_hash,
+            source_handoff_hash=handoff.content_hash,
+            knowledge_release=snapshot.knowledge_release,
+            rule_decision=snapshot.rule_decision,
+            workflow_status=_workflow_status(assembly, plan).value,
+            clarification_plan_id=record.clarification_plan_id,
+            clarification_plan_hash=record.content_hash,
+            blocking_clarification_ids=tuple(
+                sorted(
+                    q.clarification_id
+                    for q in plan.questions
+                    if q.importance == ClarificationImportance.BLOCKING
+                )
+            ),
+            decision_frontier=frontier,
+            decision_frontier_hash=preparation_hash("jewelai.preparation.frontier/1.0.0", frontier),
+            release_verified=True,
+        )
+        # The snapshot builder reloads and verifies actual runtime/report bytes against the pin.
+        return handoff, gate
 
     def get_current_state(
         self, session_id: UUID, organization_id: UUID
@@ -1059,6 +1150,27 @@ class PromptEnrichmentRuntimeService:
                 "Durable state cannot form a consistent final-prompt snapshot",
             ) from exc
         status = _workflow_status(assembly, clarification_plan)
+        record = self.repository.get_clarification_plan_for_cycle(
+            session_id, snapshot.enrichment_cycle_id, organization_id
+        )
+        if (
+            record.clarification_plan_id != clarification_plan_id
+            or cycle.enrichment_cycle_id != snapshot.enrichment_cycle_id
+        ):
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.CONCURRENT_CONFLICT,
+                "Enrichment state changed during restoration",
+            )
+        source, gate = self._preparation_context(
+            self.repository, snapshot, assembly, record, clarification_plan
+        )
+        from .generation_preparations import preparation_expectations
+
+        try:
+            render_semantic_source(source, gate)
+            can_prepare = True
+        except GenerationPreparationError:
+            can_prepare = False
         return PromptEnrichmentWorkflowState(
             session_id=session_id,
             organization_id=organization_id,
@@ -1070,6 +1182,8 @@ class PromptEnrichmentRuntimeService:
             clarification_plan_id=clarification_plan_id,
             clarification_plan=clarification_plan,
             final_output=assembly,
+            preparation_expectations=preparation_expectations(source, gate),
+            can_prepare=can_prepare,
         )
 
 

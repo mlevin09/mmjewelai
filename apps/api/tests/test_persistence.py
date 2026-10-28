@@ -929,11 +929,13 @@ def test_repository_rejects_nonsequential_revision(engine):
     )
 
 
-def test_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch):
+def test_historical_sqlite_alembic_upgrade_and_downgrade_from_empty_database(tmp_path, monkeypatch):
     database = tmp_path / "migration.db"
     monkeypatch.setenv("DATABASE_URL", f"sqlite+pysqlite:///{database}")
     config = Config(str(ROOT / "packages" / "persistence" / "alembic.ini"))
-    command.upgrade(config, "head")
+    # B2's PostgreSQL-only 0016 is tested on independently verified disposable PostgreSQL,
+    # not emulated by SQLite constraint/table-copy operations.
+    command.upgrade(config, "0015_reference_verification")
     engine = create_database_engine(f"sqlite+pysqlite:///{database}")
     assert set(inspect(engine).get_table_names()) == {
         "asset",
