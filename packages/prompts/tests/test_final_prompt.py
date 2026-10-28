@@ -150,6 +150,79 @@ def test_historical_nested_source_integrity_without_recompilation(
     assert error.value.code == FinalPromptInputErrorCode.INVALID_ENRICHMENT_STATE
 
 
+@pytest.mark.parametrize(
+    "change",
+    [
+        "text",
+        "instructions",
+        "labels",
+        "entries",
+        "constraints",
+        "disclosures",
+        "template_id",
+        "template_version",
+        "template_artifact_version",
+    ],
+)
+def test_historical_canonical_rendering_rejects_consistent_rehash(
+    ring, templates, runtime, dictionary, change
+):
+    result = _verified_enrichment(ring, templates, runtime)
+    original_bytes = result.model_dump_json()
+    payload = result.model_dump(mode="json", exclude={"content_hash"})
+    compiled = payload["compiled_prompt"]
+    supplied_templates = templates
+    if change in ("instructions", "labels"):
+        altered = templates.model_dump(mode="json")
+        if change == "instructions":
+            altered["templates"][0]["instructions"] = ["Different template instruction."]
+        else:
+            altered["templates"][0]["labels"]["specification"] = "Different label"
+        supplied_templates = type(templates).model_validate(altered)
+    elif change == "text":
+        compiled["prompt_text"] = "This text was never produced by the pinned template."
+    elif change in ("entries", "constraints", "disclosures"):
+        field = {
+            "entries": "specification_entries",
+            "constraints": "locked_constraints",
+            "disclosures": "disclosures",
+        }[change]
+        # Keep stored text untouched while its structured source is changed.
+        if field == "specification_entries":
+            compiled[field][0]["confirmed"] = not compiled[field][0]["confirmed"]
+        elif field == "locked_constraints":
+            compiled[field] = (
+                []
+                if compiled[field]
+                else [
+                    {"concrete_target": "metal.color", "applicability": "value", "value": "yellow"}
+                ]
+            )
+        else:
+            compiled[field] = (
+                []
+                if compiled[field]
+                else [
+                    {
+                        "concrete_target": "metal.color",
+                        "origin": "not_applicable",
+                        "reason": "Synthetic inconsistent disclosure",
+                        "sources": [],
+                    }
+                ]
+            )
+    else:
+        compiled[change] = "other_template" if change == "template_id" else "99.0.0"
+    compiled["content_hash"] = hashlib.sha256(compiled["prompt_text"].encode()).hexdigest()
+    payload["compiled_prompt"] = CompiledPrompt.model_validate(compiled).model_dump(mode="json")
+    forged = PromptEnrichmentResult(**payload, content_hash=_hash(payload))
+    with pytest.raises(FinalPromptInputError):
+        assemble_internal_final_prompt(
+            _snapshot(ring, forged), dictionary=dictionary, templates=supplied_templates
+        )
+    assert result.model_dump_json() == original_bytes
+
+
 def _blocked():
     return BlockDecision(
         rule_id="blocked_missing_required",
