@@ -447,6 +447,10 @@ def parse_full_message(
     candidates.extend(_quantity_candidates(text))
     candidates.extend(_aesthetic_candidates(text, protected_spans))
 
+    from .p010_symmetry import symmetry_evidence
+
+    candidates.extend(symmetry_evidence(text, runtime))
+
     recognized = [(item["evidence"]["start"], item["evidence"]["end"]) for item in candidates]
     candidates.extend(_unresolved_candidates(text, recognized))
 

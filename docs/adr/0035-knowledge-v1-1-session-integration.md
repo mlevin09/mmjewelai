@@ -92,3 +92,50 @@ runtime must not reinterpret a v1.1 session as v1.0.
 
 Only actual passing runs count as evidence. PostgreSQL tests use the existing independently verified
 CI container/schema gate; absence of verified disposable PostgreSQL is a SKIP, not a local PASS.
+
+## Owner-approved C2 T10-10 raw-text slice
+
+Issue #125 [Owner decision 6502450359](https://github.com/mlevin09/mmjewelai/issues/125#issuecomment-6502450359)
+authorizes only the first P0-10 symmetry slice. The source-backed fragment and
+per-record register live in `data/knowledge/v1_1/p010-symmetry-0.1.0.json` and
+`p010-symmetry-provenance-0.1.0.json`. Original source SHA-256 is
+`43cda0eddf6e33dc15a120ad8c0025ed047824f4a98d377726edee70587b6b64`.
+Scoped REVIEWED internal decisions do not imply external factual approval or
+approval of all original P0-10 proposals. Private source archives remain outside Git.
+
+`parse_full_message` reuses the v1.1 matcher for exact contextual RU/EN language
+surfaces, then emits existing untrusted structured evidence. The consumer re-derives
+that evidence from original text and the verified pinned runtime. It binds only
+the approved explicit `composition.symmetry_mode=asymmetrical` to an existing
+`EnrichmentProposal`. No legacy ParserTarget, public DTO or durable schema changes.
+No symmetry is inferred from Art Deco/organic/geometric cues. Ambiguous/rejected
+language remains deferred or prohibited; unsupported evidence retains original text.
+
+For a missing/Unknown/NotApplicable composition aggregate, existing canonical
+projection has no addressable child. The existing complete-aggregate proposal
+carries exactly the explicit symmetry child, with other fields absent. Canonical
+Policy v2 evaluates the real parent and its precedence, LOCK and applicability.
+Existing known aggregates use a leaf proposal. There is no preseed revision,
+parallel policy engine or factual inference. STYLE-10-02/06/07 remain descriptive
+policy records, observable on the actual symmetry Matrix cell after EDIT.
+Only APPLIED decisions join the existing parser's proposed design before normal
+revision validation and transactional CAS. Confirmed/LOCKED/N/A values are protected.
+
+The literal preservation instruction uses existing constraint evidence and IFP 2.1
+preservation constraints. It creates no confirmation/LOCK and becomes an active
+instruction only when the canonical symmetry is actually asymmetrical. Corrections
+and clarification retain original message provenance and immutable release binding.
+Schema 1.0 sessions are not silently upgraded; the HTTP test uses the existing explicit
+schema 1.1 upgrade endpoint on an empty session before submitting the original text.
+
+The HTTP lifecycle fixture has a clearly synthetic test identity/report/ACTIVE;
+its P0-10 fragment is authentic. It is not professional qualification evidence.
+The real recovered-core extension is DRAFT 0.2.0, with no ACTIVE envelope/report;
+the prior 0.1.0 qualification cannot be reused for its different runtime hash.
+Full production qualification and promotion remain separate gates. No live release
+selection, migration, provider, worker, UI or deployment is changed here.
+
+Full T10-12 three-signal preservation, structured hierarchy/rhythm, multi-value
+organization, inscription text/color, creative metadata, geometric ambiguity,
+unrelated concept/source collisions and prior professional deferrals remain out
+of scope. The bounded T10-12 regression makes no full-acceptance claim.

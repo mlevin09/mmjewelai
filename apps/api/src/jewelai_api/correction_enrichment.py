@@ -47,6 +47,7 @@ from .parsed_enrichment import (
     CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
     enrich_parsed_candidates_with_active_release,
+    proposed_design_for_transition,
 )
 
 CORRECTION_REENRICHMENT_VERSION = "1.0.0"
@@ -237,11 +238,12 @@ def process_user_correction(
     )
     authoritative = revision
     new_revision = None
-    if evaluation.parser_proposal.has_changes:
+    proposed_design = proposed_design_for_transition(revision, evaluation)
+    if proposed_design != revision.design:
         try:
             authoritative = revise_design(
                 revision,
-                evaluation.parser_proposal.proposed_design,
+                proposed_design,
                 expected_revision_id=revision.revision_id,
                 source=request.source,
                 reason="Applied an explicitly sourced user correction",

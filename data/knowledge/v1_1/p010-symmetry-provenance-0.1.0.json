@@ -1,0 +1,149 @@
+{
+  "artifact_kind": "C2_T10_10_PROVENANCE_REGISTER_NOT_A_RELEASE_APPROVAL",
+  "original_artifact_id": "JewelAI_Style_Design_Language_P10_v1",
+  "original_sha256": "43cda0eddf6e33dc15a120ad8c0025ed047824f4a98d377726edee70587b6b64",
+  "owner_approval": "https://github.com/mlevin09/mmjewelai/issues/125#issuecomment-6502450359",
+  "target": "composition.symmetry_mode",
+  "canonical_value": "asymmetrical",
+  "original_excerpts": {
+    "/matrix_additions/7": {
+      "field": "composition.symmetry_mode",
+      "type": "enum",
+      "why": "Explicitly preserves symmetrical/asymmetrical intent."
+    },
+    "/composition_primitives/1": {
+      "concept_id": "asymmetry",
+      "definition": "Intentional unequal distribution of elements without treating imbalance as an error."
+    },
+    "/style_cue_policy/1": {
+      "rule_id": "STYLE-10-02",
+      "rule": "Explicit user Product State always overrides style stereotypes."
+    },
+    "/style_cue_policy/5": {
+      "rule_id": "STYLE-10-06",
+      "rule": "Do not infer symmetry from geometric or Art Deco language unless explicitly visible/requested."
+    },
+    "/style_cue_policy/6": {
+      "rule_id": "STYLE-10-07",
+      "rule": "Do not infer asymmetry from organic or Art Nouveau language unless explicitly visible/requested."
+    },
+    "/mini_tests/9": {
+      "id": "T10-10",
+      "input": "Асимметричное кольцо — не выравнивай его.",
+      "expected": "composition.symmetry_mode=asymmetrical and preservation intent; do not auto-correct."
+    }
+  },
+  "records": [
+    {
+      "type": "sources",
+      "record_id": "SRC-P010-C2-ORIGINAL",
+      "original_pointer": "/mini_tests/9",
+      "recovery_class": "FAITHFUL_PARAPHRASE",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Deterministic P010 + C2 + original semantic role/locale; no random or external-source identity",
+      "record_sha256": "c61de3d1689a99f8b5ac702547b40dcaf71a8f6c386ab2f80bbeb3b14085bea8"
+    },
+    {
+      "type": "sources",
+      "record_id": "DEC-P010-C2-SYMMETRY",
+      "original_pointer": "owner_approval",
+      "recovery_class": "FAITHFUL_PARAPHRASE",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Deterministic P010 + C2 + original semantic role/locale; no random or external-source identity",
+      "record_sha256": "40730eabf26ab88ac89bbf0bf124134cb3e434a1d68675b2c1afcf14384b44b3"
+    },
+    {
+      "type": "claims",
+      "record_id": "CLM-P010-C2-ASYMMETRY",
+      "original_pointer": "/composition_primitives/1",
+      "recovery_class": "VERBATIM_RECOVERED",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Deterministic P010 + C2 + original semantic role/locale; no random or external-source identity",
+      "record_sha256": "c7665447d056b1d584487908edaa899a05b4b9b30494a62cb3017f11cefeaacd"
+    },
+    {
+      "type": "claims",
+      "record_id": "CLM-P010-C2-T10-10",
+      "original_pointer": "/mini_tests/9",
+      "recovery_class": "VERBATIM_RECOVERED",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Deterministic P010 + C2 + original semantic role/locale; no random or external-source identity",
+      "record_sha256": "8b9d78ae55f5771eb37b8909d3a70c2cb468a751090b576bc023aca66b944422"
+    },
+    {
+      "type": "domain_knowledge",
+      "record_id": "asymmetry",
+      "original_pointer": "/composition_primitives/1",
+      "recovery_class": "VERBATIM_RECOVERED",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Preserve original rule/concept ID",
+      "record_sha256": "738a47f6a5a246f972d1aff60ad7ac9fc4927df4e2bd29c52666aee561b7cec6"
+    },
+    {
+      "type": "language_mappings",
+      "record_id": "LANG-P010-C2-RU-ASYMMETRY",
+      "original_pointer": "/mini_tests/9",
+      "recovery_class": "FAITHFUL_PARAPHRASE",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Deterministic P010 + C2 + original semantic role/locale; no random or external-source identity",
+      "record_sha256": "2258d96265e44cd10f7b3cc40e0711b145649f80ae362449457c5361c1e58c04"
+    },
+    {
+      "type": "language_mappings",
+      "record_id": "LANG-P010-C2-EN-ASYMMETRY",
+      "original_pointer": "owner_approval",
+      "recovery_class": "FAITHFUL_PARAPHRASE",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Deterministic P010 + C2 + original semantic role/locale; no random or external-source identity",
+      "record_sha256": "283f23e2c852f4e789760d16b3a1029013ef9d483d516712619d72f777f87db8"
+    },
+    {
+      "type": "policies",
+      "record_id": "STYLE-10-02",
+      "original_pointer": "/style_cue_policy/1",
+      "recovery_class": "VERBATIM_RECOVERED",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Preserve original rule/concept ID",
+      "record_sha256": "e50bb8b5d6e5a49345211fa47b32fa09f002303ad49fbef47299171fc03e3696"
+    },
+    {
+      "type": "policies",
+      "record_id": "STYLE-10-06",
+      "original_pointer": "/style_cue_policy/5",
+      "recovery_class": "VERBATIM_RECOVERED",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Preserve original rule/concept ID",
+      "record_sha256": "5f8670627802d1ed248283b9bb7ee9185a3aee7c1637d55bc52bae89049804e3"
+    },
+    {
+      "type": "policies",
+      "record_id": "STYLE-10-07",
+      "original_pointer": "/style_cue_policy/6",
+      "recovery_class": "VERBATIM_RECOVERED",
+      "lifecycle": "REVIEWED",
+      "review_basis": "Owner approval 6502450359, T10-10 internal decision only; not inferred from CONTENT_COMPLETE",
+      "id_rule": "Preserve original rule/concept ID",
+      "record_sha256": "96e076e0392b3e78a6ff49eddd641b7bb735a29a2c2663d0de6b71b3e3b72a55"
+    }
+  ],
+  "identity_collisions": "geometric, eight overlapping concepts and same-URI GIA IDs are not imported or merged",
+  "qualification": "No real ACTIVE or all-PASS report; other P0-10 mappings remain unapproved",
+  "deferred": [
+    "structured focal hierarchy/rhythm",
+    "multi-value organization",
+    "inscription text",
+    "decorative color",
+    "creative intent",
+    "unrelated P0-10 identities",
+    "five accepted professional deferrals"
+  ]
+}

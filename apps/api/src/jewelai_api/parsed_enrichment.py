@@ -13,8 +13,13 @@ from jewelai_domain.knowledge_runtime import (
     AnyKnowledgeStore,
     AnyValidationReport,
 )
-from jewelai_domain.models import ImmutableModel, MessageSource
-from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
+from jewelai_domain.models import Explicit, ImmutableModel, KnownValue, MessageSource
+from jewelai_domain.models_v1_1 import (
+    AnyDesignRevision,
+    CompositionV1_1,
+    DesignV1_1,
+    validate_design_revision,
+)
 from jewelai_parser import (
     AnyParserProposal,
     CandidateApplication,
@@ -32,6 +37,9 @@ from jewelai_parser import (
     build_parser_proposal,
 )
 from jewelai_parser.models import QuantityCandidate, StyleTermsCandidate, TermCandidate
+from jewelai_parser.p010_symmetry import TARGET as SYMMETRY_TARGET
+from jewelai_parser.p010_symmetry import VALUE as SYMMETRY_VALUE
+from jewelai_parser.p010_symmetry import verified_symmetry_candidate
 from jewelai_prompts import (
     AnyPromptEnrichmentResult,
     EnrichmentDecision,
@@ -168,6 +176,7 @@ def enrich_parsed_candidates_with_active_release(
     parse_lineage = _verify_parse_release(parsed, verified)
 
     prepared: dict[str, CandidateUpdate] = {}
+    symmetry_candidates: list[StructuredCandidate] = []
     dispositions: dict[str, CandidateDisposition] = {}
     group_ids = tuple(sorted(group.group_id for group in revision.design.side_stones))
 
@@ -179,7 +188,17 @@ def enrich_parsed_candidates_with_active_release(
             locale=parsed.requested_locale,
         )
         if deferred is not None:
-            dispositions[candidate.candidate_id] = deferred
+            if (
+                revision.schema_version == "1.1.0"
+                and parse_lineage == ParseKnowledgeLineage.MATCHED_VERIFIED_RELEASE
+                and deferred.reason == CandidateDispositionReason.TARGET_NOT_SUPPORTED_BY_PARSER
+                and candidate.semantic_subject == SYMMETRY_TARGET
+                and candidate.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+                and verified_symmetry_candidate(candidate, parsed, verified.compiled_runtime)
+            ):
+                symmetry_candidates.append(candidate)
+            else:
+                dispositions[candidate.candidate_id] = deferred
         elif update is not None:
             prepared[candidate.candidate_id] = update
 
@@ -229,6 +248,38 @@ def enrich_parsed_candidates_with_active_release(
     }
 
     proposals = []
+    # Existing evidence and EnrichmentProposal contracts already admit this
+    # approved binding. Do not forge a legacy ParserTarget/AcceptedUpdate.
+    if len(symmetry_candidates) == 1:
+        candidate = symmetry_candidates[0]
+        target = SYMMETRY_TARGET
+        value = SYMMETRY_VALUE
+        if not isinstance(revision.design.composition, KnownValue):
+            # A missing aggregate has no addressable child yet. Use the existing
+            # complete aggregate operation, containing ONLY the user-stated leaf.
+            # Canonical v2 checks the real parent (including N/A/LOCK/precedence).
+            # Do not preseed a fabricated revision to make a child guard succeed.
+            target = "composition"
+            value = CompositionV1_1(
+                symmetry_mode=Explicit[str](value=SYMMETRY_VALUE, source=source)
+            ).model_dump(mode="json")
+        proposals.append(
+            EnrichmentProposal(
+                target=target,
+                semantic_state=RuntimeSemanticState.NORMALIZED,
+                provenance=RuntimeProvenance.NORMALIZED_FROM_USER,
+                value=value,
+                source_id=candidate.candidate_id,
+            )
+        )
+    else:
+        for candidate in symmetry_candidates:
+            dispositions[candidate.candidate_id] = CandidateDisposition(
+                candidate=candidate,
+                outcome=CandidateDispositionOutcome.DEFERRED,
+                reason=CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES,
+                concrete_target=SYMMETRY_TARGET,
+            )
     for target, candidate in candidate_for_target.items():
         issues = tuple(sorted(issues_by_target.get(target, ()), key=lambda item: item.value))
         if issues:
@@ -324,6 +375,54 @@ def _verify_parse_release(
             "parsed evidence does not match the explicitly selected verified Knowledge release"
         )
     return ParseKnowledgeLineage.MATCHED_VERIFIED_RELEASE
+
+
+def proposed_design_for_transition(revision, evaluation):
+    """Combine legacy parser edits and the bounded, Matrix-approved C2 delta.
+
+    This is an internal consumer of existing proposals, not a new durable DTO.
+    The caller still owns revise_design, source authorization and database CAS.
+    """
+    revision = validate_design_revision(revision)
+    if str(revision.revision_id) != evaluation.enrichment_result.design_revision_id:
+        raise ParsedEnrichmentInputError("enrichment transition revision mismatch")
+    design = evaluation.parser_proposal.proposed_design
+    if revision.schema_version != "1.1.0":
+        return design
+    for disposition in evaluation.dispositions:
+        decision = disposition.enrichment_decision
+        if not (
+            decision is not None
+            and decision.target in {SYMMETRY_TARGET, "composition"}
+            and decision.outcome == "APPLIED"
+            and disposition.candidate.semantic_subject == SYMMETRY_TARGET
+            and disposition.candidate.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
+        ):
+            continue
+        if decision.target == "composition":
+            proposed = CompositionV1_1.model_validate(decision.result.value)
+            if (
+                not isinstance(proposed.symmetry_mode, KnownValue)
+                or proposed.symmetry_mode.value != SYMMETRY_VALUE
+            ):
+                raise ParsedEnrichmentInputError("invalid approved symmetry aggregate")
+        elif decision.result.value != SYMMETRY_VALUE:
+            raise ParsedEnrichmentInputError("invalid approved symmetry value")
+        current = revision.design.composition
+        child = current.value.symmetry_mode if isinstance(current, KnownValue) else None
+        if isinstance(child, KnownValue) and child.value == SYMMETRY_VALUE:
+            continue
+        payload = design.model_dump(mode="json")
+        value = Explicit[str](value=SYMMETRY_VALUE, source=evaluation.parser_proposal.source)
+        if isinstance(current, KnownValue):
+            payload["composition"]["value"]["symmetry_mode"] = value.model_dump(mode="json")
+        else:
+            payload["composition"] = Explicit[dict](
+                value={"symmetry_mode": value.model_dump(mode="json")},
+                source=evaluation.parser_proposal.source,
+            ).model_dump(mode="json")
+        design = DesignV1_1.model_validate(payload)
+    return design
 
 
 def _prepare_candidate(

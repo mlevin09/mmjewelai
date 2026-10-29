@@ -104,6 +104,7 @@ from .parsed_enrichment import (
     CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
     enrich_parsed_candidates_with_active_release,
+    proposed_design_for_transition,
 )
 from .preparation_contracts import GenerationPreparationRequest
 
@@ -269,10 +270,11 @@ class PromptEnrichmentRuntimeService:
             first = self._evaluate(revision, parsed, source)
             resulting_revision = None
             authoritative = revision
-            if first.parser_proposal.has_changes:
+            proposed_design = proposed_design_for_transition(revision, first)
+            if proposed_design != revision.design:
                 authoritative = revise_design(
                     revision,
-                    first.parser_proposal.proposed_design,
+                    proposed_design,
                     expected_revision_id=revision.revision_id,
                     source=source,
                     reason="Applied explicitly sourced internal full-message parsing",

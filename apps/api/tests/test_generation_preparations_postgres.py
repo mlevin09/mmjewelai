@@ -26,6 +26,12 @@ from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
 
 
+def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):
+    from test_p010_symmetry_runtime import exercise_p010_http
+
+    exercise_p010_http(engine, tmp_path, monkeypatch)
+
+
 @pytest.fixture
 def engine(monkeypatch, capfd):
     if os.getenv("GITHUB_ACTIONS") != "true":

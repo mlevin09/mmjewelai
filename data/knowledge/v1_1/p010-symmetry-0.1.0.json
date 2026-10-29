@@ -1,0 +1,119 @@
+{
+  "contract_version": "1.1.0",
+  "package_id": "jewelai.draft.p010_symmetry",
+  "artifact_version": "0.1.0",
+  "sources": [
+    {
+      "source_id": "SRC-P010-C2-ORIGINAL",
+      "title": "P0-10 T10-10 only; SHA256 43cda0eddf6e33dc15a120ad8c0025ed047824f4a98d377726edee70587b6b64; /matrix_additions/7; /composition_primitives/1; /mini_tests/9; /style_cue_policy/1; /style_cue_policy/5; /style_cue_policy/6",
+      "source_type": "INTERNAL_DECISION",
+      "uri": "urn:jewelai:p010:sha256:43cda0eddf6e33dc15a120ad8c0025ed047824f4a98d377726edee70587b6b64",
+      "language": "mixed",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "source_id": "DEC-P010-C2-SYMMETRY",
+      "title": "Owner-approved C2 T10-10 symmetry slice only — Issue 125 comment 6502450359",
+      "source_type": "INTERNAL_DECISION",
+      "uri": "https://github.com/mlevin09/mmjewelai/issues/125#issuecomment-6502450359",
+      "language": "mixed",
+      "evidence_tier": "INTERNAL",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CLM-P010-C2-ASYMMETRY",
+      "statement": "Intentional unequal distribution of elements without treating imbalance as an error.",
+      "source_id": "SRC-P010-C2-ORIGINAL",
+      "supporting_source_ids": [
+        "DEC-P010-C2-SYMMETRY"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Owner-approved internal T10-10 decision only; /composition_primitives/1; SHA256 43cda0eddf6e33dc15a120ad8c0025ed047824f4a98d377726edee70587b6b64; not an external factual claim or full P0-10 approval",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "claim_id": "CLM-P010-C2-T10-10",
+      "statement": "composition.symmetry_mode=asymmetrical and preservation intent; do not auto-correct.",
+      "source_id": "SRC-P010-C2-ORIGINAL",
+      "supporting_source_ids": [
+        "DEC-P010-C2-SYMMETRY"
+      ],
+      "evidence_strength": "HIGH",
+      "scope": "Owner-approved internal T10-10 decision only; /mini_tests/9; SHA256 43cda0eddf6e33dc15a120ad8c0025ed047824f4a98d377726edee70587b6b64; not an external factual claim or full P0-10 approval",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "domain_knowledge": [
+    {
+      "concept_id": "asymmetry",
+      "kind": "composition_symmetry",
+      "claim_ids": [
+        "CLM-P010-C2-ASYMMETRY",
+        "CLM-P010-C2-T10-10"
+      ],
+      "structural_schema": false,
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "language_mappings": [
+    {
+      "mapping_id": "LANG-P010-C2-RU-ASYMMETRY",
+      "concept_id": "asymmetry",
+      "locale": "ru",
+      "canonical_term": "асимметричное",
+      "aliases": [],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "jewelry_composition",
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "mapping_id": "LANG-P010-C2-EN-ASYMMETRY",
+      "concept_id": "asymmetry",
+      "locale": "en",
+      "canonical_term": "asymmetrical",
+      "aliases": [
+        "asymmetric"
+      ],
+      "mapping_mode": "CONTEXTUAL",
+      "mapping_quality": "CONTEXT_DEPENDENT",
+      "context": "jewelry_composition",
+      "lifecycle_status": "REVIEWED"
+    }
+  ],
+  "policies": [
+    {
+      "policy_id": "STYLE-10-02",
+      "target": "composition.symmetry_mode",
+      "effect": "Explicit user Product State always overrides style stereotypes.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-P010-C2-SYMMETRY"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "STYLE-10-06",
+      "target": "composition.symmetry_mode",
+      "effect": "Do not infer symmetry from geometric or Art Deco language unless explicitly visible/requested.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-P010-C2-SYMMETRY"
+      ],
+      "lifecycle_status": "REVIEWED"
+    },
+    {
+      "policy_id": "STYLE-10-07",
+      "target": "composition.symmetry_mode",
+      "effect": "Do not infer asymmetry from organic or Art Nouveau language unless explicitly visible/requested.",
+      "source_kind": "INTERNAL_PRODUCT_DECISION",
+      "source_refs": [
+        "DEC-P010-C2-SYMMETRY"
+      ],
+      "lifecycle_status": "REVIEWED"
+    }
+  ]
+}

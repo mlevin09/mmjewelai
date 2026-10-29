@@ -24,6 +24,7 @@ from pydantic import Field, model_validator
 from .parsed_enrichment import (
     CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
+    proposed_design_for_transition,
 )
 
 CLARIFICATION_PLAN_VERSION = "1.1.0"
@@ -497,7 +498,7 @@ def _unasked(disposition, reason):
 
 def _effective_revision(revision, enrichment):
     payload = revision.model_dump(mode="json")
-    payload["design"] = enrichment.parser_proposal.proposed_design.model_dump(mode="json")
+    payload["design"] = proposed_design_for_transition(revision, enrichment).model_dump(mode="json")
     return validate_design_revision(payload)
 
 

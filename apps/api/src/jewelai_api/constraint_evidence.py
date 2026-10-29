@@ -29,6 +29,12 @@ _INSTRUCTIONS = {
     ),
     ("component.band", "preservation", "en"): "Keep the existing band unchanged.",
     ("component.band", "preservation", "ru"): "Сохранить существующую шинку без изменений.",
+    ("composition.symmetry_mode", "preservation", "ru"): (
+        "Сохранить явно заданную асимметричную композицию; не выравнивать её."
+    ),
+    ("composition.symmetry_mode", "preservation", "en"): (
+        "Preserve the explicitly requested asymmetrical composition; do not make it symmetrical."
+    ),
     ("design.proportions", "preservation", "en"): "Keep the existing proportions unchanged.",
     ("design.proportions", "preservation", "ru"): (
         "Сохранить существующие пропорции без изменений."
@@ -77,6 +83,12 @@ def merge_constraint_evidence(
             candidate.certainty == CandidateCertainty.EXPLICIT
             and candidate.semantic_subject is not None
         )
+        if candidate.semantic_subject == "composition.symmetry_mode":
+            # A rejected/locked conflicting request cannot become an active
+            # preservation instruction contradicting the canonical design.
+            composition = getattr(revision.design, "composition", None)
+            symmetry = getattr(getattr(composition, "value", None), "symmetry_mode", None)
+            explicit = explicit and getattr(symmetry, "value", None) == "asymmetrical"
         kind = candidate.classification.value
         identity = {
             "session_id": str(session_id),
