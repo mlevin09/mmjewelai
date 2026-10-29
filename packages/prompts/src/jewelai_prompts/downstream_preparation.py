@@ -7,6 +7,7 @@ The preparation owns canonical bytes; mutable JSON views are always defensive co
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -216,11 +217,22 @@ _IFP_DECODER = TypeAdapter(AnyCanonicalInternalFinalPrompt)
 _HANDOFF_DECODER = TypeAdapter(AnyCanonicalInternalFinalPromptHandoff)
 
 
+def _explicit_canonical_version(value: object) -> str:
+    """Check wire input before Pydantic can fill frozen-model version defaults."""
+    if not isinstance(value, Mapping):
+        raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
+    version = value.get("schema_version")
+    if not isinstance(version, str) or version not in ("2.0.0", "2.1.0"):
+        raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
+    return version
+
+
 def decode_canonical_internal_final_prompt(value: object) -> AnyCanonicalInternalFinalPrompt:
     if isinstance(value, (bytes, str)):
         value = _strict_json(value)
     elif hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
+    _explicit_canonical_version(value)
     return _IFP_DECODER.validate_python(value)
 
 
@@ -229,6 +241,12 @@ def decode_canonical_handoff(value: object) -> AnyCanonicalInternalFinalPromptHa
         value = _strict_json(value)
     elif hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
+    version = _explicit_canonical_version(value)
+    if (
+        value.get("internal_final_prompt_schema_version") != version
+        or _explicit_canonical_version(value.get("internal_final_prompt")) != version
+    ):
+        raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
     return _HANDOFF_DECODER.validate_python(value)
 
 

@@ -30,6 +30,14 @@ discriminator. Missing, unsupported or mixed versions and tampered payload/hash 
 selection, relabeling or validation-fallback probing exists. The builder dispatches assemblies by
 their embedded IFP version. Hash algorithms and canonical JSON rules are unchanged.
 
+R1 hardening checks the original parsed mapping before TypeAdapter validation: raw handoffs
+must explicitly supply matching outer, nested-reference and nested-IFP schema versions; standalone
+raw IFPs must supply their version. Only 2.0.0 and 2.1.0 are accepted. Dict, JSON string and UTF-8
+bytes follow the same rule; model defaults cannot repair incomplete wire input. Already validated
+typed objects are dumped with their resolved fields before this check, preserving historical
+in-memory construction with default versions. Frozen model definitions/schemas and hashes remain
+unchanged. Semantic rendering and preparation construction share these guarded readers.
+
 Historical CompiledPrompt 1.0, enrichment 1.2, current structured enrichment 1.3, description 1.0,
 release pins and Product State are unchanged. Description retains its independent **20,000 /
 80,000** limits. The preparation renderer also retains **20,000 / 80,000**, source+gate retains
