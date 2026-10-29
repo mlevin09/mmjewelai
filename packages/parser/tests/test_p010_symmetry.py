@@ -19,6 +19,51 @@ REVIEW_NEGATIVES = (
     "An asymmetric design for the website.",
     "An asymmetric composition for the photograph.",
 )
+F00_NEGATIVE_LISTS = (
+    "An asymmetric ring, no halo, engraving or asymmetry.",
+    "An asymmetric ring, no halo, engraving and asymmetry.",
+    "An asymmetric ring, no halo,\nengraving,\nasymmetry.",
+    "An asymmetric ring, no halo,engraving,asymmetry.",
+    "An asymmetric ring, without engraving, halo or asymmetry.",
+    "Асимметричное кольцо, без гало, гравировки или асимметрии.",
+    "An asymmetric ring. No halo, engraving or asymmetry.",
+    "An asymmetric ring, no halo, engraving or asymmetry — do not make it symmetrical.",
+    "An asymmetric ring, no halo, yellow gold or oval diamond.",
+)
+
+
+@pytest.mark.parametrize("text", F00_NEGATIVE_LISTS)
+def test_f00_shared_negative_scope_has_no_positive_symmetry(text):
+    parsed = parse(text)
+    assert parsed.original_text == text
+    assert not any(
+        c.semantic_subject == TARGET
+        and c.classification == "requirement"
+        and c.certainty == "explicit"
+        for c in parsed.candidates
+    )
+    assert not any(
+        c.semantic_subject == TARGET and c.classification == "preservation"
+        for c in parsed.candidates
+    )
+
+
+def test_f00_shared_scope_does_not_apply_other_negative_list_objects():
+    parsed = parse("An asymmetric ring, no halo, yellow gold or oval diamond.")
+    assert not any(c.parser_update for c in parsed.candidates if c.target != "jewelry_type")
+
+
+@pytest.mark.parametrize("text", ["An asymmetric ring road.", "An asymmetric jewelry diagram."])
+def test_f00_unknown_product_compound_is_not_a_jewelry_assertion(text):
+    parsed = parse(text)
+    assert not any(
+        c.semantic_subject == TARGET
+        and c.certainty == "explicit"
+        and c.classification == "requirement"
+        for c in parsed.candidates
+    )
+
+
 SCOPE_REVIEW_CASES = (
     ("Асимметричное кольцо\nне нужно.", False, False, False),
     ("An asymmetric ring\nis not what I want.", False, False, False),
@@ -55,7 +100,22 @@ SCOPE_CONTROLS = (
 )
 
 
-@pytest.mark.parametrize("text,symmetry,keep,halo", SCOPE_REVIEW_CASES + SCOPE_CONTROLS)
+F00_INDEPENDENT = (
+    ("An asymmetric ring, no halo, without engraving.", True, False, True),
+    (
+        "An asymmetric ring, no halo, and without engraving — do not make it symmetrical.",
+        True,
+        True,
+        True,
+    ),
+    ("An asymmetric ring without engraving.", True, False, False),
+    ("An asymmetric ring, no halo, keep the band.", True, False, True),
+)
+
+
+@pytest.mark.parametrize(
+    "text,symmetry,keep,halo", SCOPE_REVIEW_CASES + SCOPE_CONTROLS + F00_INDEPENDENT
+)
 def test_review_semantic_scope(text, symmetry, keep, halo):
     parsed = parse(text)
     assert parsed.original_text == text

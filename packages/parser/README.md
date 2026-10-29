@@ -36,15 +36,29 @@ Website/photograph context remains deferred even if a jewelry word also appears.
 The scoped recognizer checks both sides of the phrase using explicit `.?!;`
 statement boundaries. Line breaks remain formatting inside a continued statement;
 the original string and source offsets are never normalized or rewritten.
-The existing special-constraint emitter is reused to identify independent negative
-objects (for example, halo). A verified object-bound prohibition after the symmetry
-assertion does not negate symmetry or valid KEEP. Earlier/shared negative object
-lists are not erased when their remaining scope is unbound. Only a complete approved
-preservation instruction with positive governing context is exempted from rejection.
+The existing special-constraint emitter is reused to identify negative objects.
+Before excluding a property prohibition from symmetry analysis, the entire remaining
+operator scope must close: only complete existing instructions with their own
+operator and supported clause separators may follow it. Comma/newline-separated
+bare objects, alternatives and unknown list members do not prove closure. The
+operator is retained and symmetry deferred; matched terms in the unclosed tail
+remain evidence without positive parser updates. This includes other dictionary
+fields, so rejected list members cannot silently become Product State facts.
+An independent closed `no halo`/`without engraving` still permits positive symmetry
+and valid KEEP. Unknown noun compounds after a product word are deferred instead
+of expanding a non-jewelry noun blacklist. Only a complete approved preservation
+instruction with positive governing context is exempted from rejection.
 Independent punctuated sentences retain separate scope; unclear mixed scope is not
 applied. For example, `No halo\nAn asymmetric ring.` without punctuation and
 `An asymmetric ring, no halo or side stones.` remain non-applied rather than guessing
 the boundaries of an unsupported negative list.
+
+F00 acceptance tests exercise representative positive, rejected, uncertain,
+coordinated, multiline/non-jewelry and KEEP inputs through actual HTTP, three
+cycles, correction, clarification, revision/CAS, immutable binding and restart to
+IFP 2.1. Trace output reports actual candidates/dispositions, initial Matrix
+decisions, canonical symmetry and final IFP facts/KEEP. The release is explicitly
+test-only; this is not professional catalog qualification or preproduction evidence.
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for
