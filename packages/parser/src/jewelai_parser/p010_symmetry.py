@@ -33,10 +33,12 @@ _UNCERTAIN = re.compile(
 _PRESERVE = re.compile(r"\bне\s+выравнивай\s+его\b|\bdo not make it symmetrical\b", re.I)
 _SYMMETRIC = re.compile(r"\b(?:symmetrical|symmetric|симметрич\w*)\b", re.I)
 _REJECT = re.compile(
-    r"\b(?:not|no|without|never|reject\w*|avoid|unwanted|не|без|ненуж\w*)\b|"
+    r"\b(?:not|no|without|never|reject\w*|avoid|unwanted|unnecessary|undesired|"
+    r"не|без|ненуж\w*|нежелательн\w*)\b|"
     r"\b(?:don|doesn|isn|wasn|wouldn|shouldn|can)['’]t\b",
     re.I,
 )
+_NON_JEWELRY_CONTEXT = re.compile(r"\b(?:website|photograph\w*|сайт\w*|фотограф\w*)\b", re.I)
 _SENTENCE_BOUNDARIES = ".!?;\n"
 _INSTRUCTION_BOUNDARIES = _SENTENCE_BOUNDARIES + ",—–"
 
@@ -145,7 +147,12 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
         scope = scoped_text[left:right]
         if _REJECT.search(scope):
             classification = CandidateClassification.PROHIBITION
-        uncertain = competing or _UNCERTAIN.search(scope) or scoped_text[right : right + 1] == "?"
+        uncertain = (
+            competing
+            or _UNCERTAIN.search(scope)
+            or _NON_JEWELRY_CONTEXT.search(scope)
+            or scoped_text[right : right + 1] == "?"
+        )
         evidence.append(
             _structured_candidate(
                 text,

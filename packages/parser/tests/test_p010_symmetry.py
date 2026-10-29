@@ -118,6 +118,10 @@ def test_p010_explicit_user_evidence_uses_real_knowledge(text):
         "Асимметричное композиция для фотографии.",
         "An asymmetric website design with a ring.",
         "An asymmetric design. Do not make it symmetrical.",
+        "An asymmetric ring is unnecessary.",
+        "Асимметричное кольцо нежелательно.",
+        "An asymmetric jewelry website design.",
+        "An asymmetric ring photograph.",
     ],
 )
 def test_p010_does_not_turn_negation_uncertainty_or_style_into_a_fact(text):

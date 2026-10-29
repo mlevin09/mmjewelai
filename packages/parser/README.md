@@ -32,6 +32,7 @@ become a positive canonical fact. Style labels alone provide no symmetry inferen
 The exact T10-10 preservation phrase is evidence, never implicit confirmation or LOCK.
 The referent must be jewelry-specific (for example, ring or jewelry design);
 generic design/composition and their Russian equivalents are insufficient.
+Website/photograph context remains deferred even if a jewelry word also appears.
 The scoped recognizer checks rejection/doubt on both sides of the phrase within
 its sentence, retaining scope across commas. Only a complete approved preservation
 instruction clause is exempted from rejection. Unclear mixed scope is not applied;

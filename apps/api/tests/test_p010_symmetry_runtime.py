@@ -130,6 +130,8 @@ def test_review_false_positives_do_not_persist_across_restart(engine, tmp_path, 
     [
         "An asymmetric ring is not what I want — do not make it symmetrical.",
         "An asymmetric composition for the photograph — do not make it symmetrical.",
+        "An asymmetric jewelry website design — do not make it symmetrical.",
+        "An asymmetric ring photograph — do not make it symmetrical.",
     ],
 )
 def test_rejected_symmetry_cannot_activate_preservation(engine, tmp_path, monkeypatch, text):
