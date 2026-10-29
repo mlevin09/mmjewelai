@@ -12,7 +12,7 @@ from typing import Literal
 from uuid import UUID
 
 from jewelai_domain.dictionary import DictionaryCategory, DictionaryRegistry, EntryLifecycle
-from jewelai_domain.knowledge_activation import ActiveKnowledgeRuntime
+from jewelai_domain.knowledge_runtime import AnyActiveKnowledge, validate_active_knowledge
 from jewelai_domain.models import ImmutableModel, MessageSource
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_domain.questions import DictionaryAnswerContract, QuestionCatalog, QuestionId
@@ -178,7 +178,7 @@ def process_clarification_answer(
     *,
     authoritative_session_id: UUID,
     current_revision: AnyDesignRevision | object,
-    active_release: ActiveKnowledgeRuntime,
+    active_release: AnyActiveKnowledge,
     dictionary: DictionaryRegistry,
     questions: QuestionCatalog,
     rules: RuleRegistry,
@@ -196,7 +196,7 @@ def process_clarification_answer(
         ) from exc
     answer = ClarificationAnswer.model_validate(answer)
     current_revision = validate_design_revision(current_revision)
-    release = ActiveKnowledgeRuntime.model_validate(active_release)
+    release = validate_active_knowledge(active_release)
 
     if answer.session_id != authoritative_session_id:
         raise ClarificationAnswerError(

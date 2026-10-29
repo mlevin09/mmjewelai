@@ -12,7 +12,8 @@ from jewelai_domain.dictionary import (
     DictionaryRegistry,
     ResolvedMatch,
 )
-from jewelai_domain.knowledge_library import CompiledKnowledgeLibrary, MappingMode
+from jewelai_domain.knowledge_library import MappingMode
+from jewelai_domain.knowledge_runtime import AnyCompiledKnowledge, validate_compiled_knowledge
 from jewelai_domain.models import ImmutableModel, Text
 from pydantic import Field, JsonValue, model_validator
 
@@ -385,7 +386,7 @@ def parse_full_message(
     *,
     locale: Literal["en", "ru"],
     dictionary: DictionaryRegistry,
-    knowledge_runtime: CompiledKnowledgeLibrary | None = None,
+    knowledge_runtime: AnyCompiledKnowledge | None = None,
 ) -> FullMessageParseResult:
     """Extract conservative structured evidence without changing canonical Product State."""
 
@@ -395,9 +396,7 @@ def parse_full_message(
         raise ValueError("full-message input exceeds the domain text limit")
 
     runtime = (
-        CompiledKnowledgeLibrary.model_validate(knowledge_runtime)
-        if knowledge_runtime is not None
-        else None
+        validate_compiled_knowledge(knowledge_runtime) if knowledge_runtime is not None else None
     )
     surfaces = _dictionary_surfaces(dictionary)
     if runtime is not None:
@@ -521,7 +520,7 @@ def _dictionary_surfaces(dictionary: DictionaryRegistry) -> list[_Surface]:
     return surfaces
 
 
-def _knowledge_surfaces(runtime: CompiledKnowledgeLibrary) -> list[_Surface]:
+def _knowledge_surfaces(runtime: AnyCompiledKnowledge) -> list[_Surface]:
     kinds = {item.concept_id: item.kind for item in runtime.domain_knowledge}
     surfaces = []
     for mapping in runtime.language_mappings:
@@ -657,7 +656,7 @@ def _candidate_from_surface(
     text: str,
     item: _Found,
     dictionary: DictionaryRegistry,
-    runtime: CompiledKnowledgeLibrary | None,
+    runtime: AnyCompiledKnowledge | None,
 ) -> dict:
     evidence = text[item.start : item.end]
     subject = _subject_for(text, item.start, item.end, item.surface.category)

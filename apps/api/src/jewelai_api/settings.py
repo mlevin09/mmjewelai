@@ -45,8 +45,11 @@ class PromptEnrichmentRuntimeConfig:
     active_release_path: Path
     validation_report_path: Path
     qualification_contract_version: str
+    knowledge_contract_version: str
 
     def __post_init__(self) -> None:
+        if self.knowledge_contract_version not in {"1.0.0", "1.1.0"}:
+            raise ValueError("Unsupported Knowledge contract version")
         if not isinstance(self.candidate, KnowledgeReleaseCandidateSelection):
             raise ValueError("Prompt Enrichment candidate selection must be typed and complete")
         if not all(
@@ -276,6 +279,7 @@ def _parse_prompt_enrichment_config() -> PromptEnrichmentRuntimeConfig | None:
         "PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT",
         "PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID",
         "PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION",
+        "PROMPT_ENRICHMENT_KNOWLEDGE_CONTRACT_VERSION",
         "PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH",
         "PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH",
         "PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION",
@@ -303,6 +307,7 @@ def _parse_prompt_enrichment_config() -> PromptEnrichmentRuntimeConfig | None:
         active_release_path=Path(values["PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH"]),
         validation_report_path=Path(values["PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH"]),
         qualification_contract_version=values["PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION"],
+        knowledge_contract_version=values["PROMPT_ENRICHMENT_KNOWLEDGE_CONTRACT_VERSION"],
     )
 
 

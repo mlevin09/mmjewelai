@@ -16,6 +16,7 @@ from jewelai_domain.knowledge_activation import (
     ActiveKnowledgeRuntime,
     ProductionValidationReport,
 )
+from jewelai_domain.knowledge_runtime import bind_verified_release, knowledge_store_version
 from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
     KnowledgeArtifactStore,
@@ -242,6 +243,18 @@ class PromptEnrichmentRuntimeService:
                 request.session_id, request.message_id, request.organization_id
             )
             verified = self._load_release()
+            if knowledge_store_version(self.artifact_store) != "1.1.0":
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE,
+                    "New controlled enrichment sessions require Knowledge Contract 1.1.0",
+                )
+            release_binding = bind_verified_release(
+                self.artifact_store,
+                self.knowledge_package_id,
+                self.knowledge_artifact_version,
+                active_release=self.active_release,
+                validation_report=self.validation_report,
+            )
             source = MessageSource(
                 message_id=str(message.message_id),
                 recorded_at=_aware(message.created_at),
@@ -299,6 +312,7 @@ class PromptEnrichmentRuntimeService:
                 created_at=self._clock(),
                 clarification_plan_id=clarification_plan_id,
                 clarification_plan_payload=clarification.model_dump(mode="json"),
+                release_binding=release_binding,
             )
             workflow = self._state_from_cycle(
                 session_id=request.session_id,

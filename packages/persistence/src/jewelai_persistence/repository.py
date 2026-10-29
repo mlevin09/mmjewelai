@@ -26,6 +26,11 @@ from jewelai_domain.knowledge_activation import (
     ActiveKnowledgeRuntime,
     ProductionValidationReport,
 )
+from jewelai_domain.knowledge_runtime import (
+    KnowledgeReleaseBinding,
+    bind_verified_release,
+    knowledge_store_version,
+)
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models_v1_1 import (
     AnyDesignRevision,
@@ -64,6 +69,7 @@ from .models import (
     GenerationDispatchOutboxRow,
     GenerationRunRow,
     IterativeEditRow,
+    KnowledgeReleaseBindingRow,
     MessageRow,
     OrganizationMembershipRow,
     OrganizationRow,
@@ -228,6 +234,7 @@ class KnowledgeReleasePinRecord:
     artifact_version: str
     runtime_sha256: str
     validation_report_sha256: str
+    binding: KnowledgeReleaseBinding | None = None
 
     def restore_verified_runtime(
         self,
@@ -236,6 +243,19 @@ class KnowledgeReleasePinRecord:
         active_release: ActiveKnowledgeRuntime | object,
         validation_report: ProductionValidationReport | object,
     ) -> ActiveKnowledgeRuntime:
+        expected_version = self.binding.knowledge_contract_version if self.binding else "1.0.0"
+        if knowledge_store_version(artifact_store) != expected_version:
+            raise KnowledgeReleasePinConflictError("Knowledge contract does not match session pin")
+        if self.binding is not None:
+            actual = bind_verified_release(
+                artifact_store,
+                self.package_id,
+                self.artifact_version,
+                active_release=active_release,
+                validation_report=validation_report,
+            )
+            if actual != self.binding:
+                raise KnowledgeReleasePinConflictError("Knowledge binding evidence mismatch")
         verified = artifact_store.load_active_runtime(
             self.package_id,
             self.artifact_version,
@@ -1000,6 +1020,7 @@ class PersistenceRepository:
         created_at: datetime,
         clarification_plan_id: UUID | None = None,
         clarification_plan_payload: dict | None = None,
+        release_binding: KnowledgeReleaseBinding | None = None,
     ) -> EnrichmentCycleRecord:
         """Atomically commit the optional first edit, release pin, and first cycle."""
 
@@ -1033,6 +1054,15 @@ class PersistenceRepository:
             enrichment.knowledge_runtime_sha256,
             enrichment.knowledge_validation_report_sha256,
         )
+        if release_binding is not None:
+            release_binding = KnowledgeReleaseBinding.model_validate(
+                release_binding.model_dump(mode="json")
+            )
+            if (
+                release_binding.knowledge_contract_version != "1.1.0"
+                or release_binding.release_identity != pin_identity
+            ):
+                raise KnowledgeReleasePinConflictError("Initial Knowledge binding mismatch")
         plan_payload = self._prepare_clarification_plan(
             clarification_plan_id=clarification_plan_id,
             clarification_plan_payload=clarification_plan_payload,
@@ -1101,6 +1131,20 @@ class PersistenceRepository:
                 )
                 db.add(row)
                 db.flush()
+                if release_binding is not None:
+                    row.knowledge_contract_version = release_binding.knowledge_contract_version
+                    db.add(
+                        KnowledgeReleaseBindingRow(
+                            session_id=session_id,
+                            enrichment_cycle_id=enrichment_cycle_id,
+                            cycle_number=1,
+                            specification_revision_id=authoritative_revision_id,
+                            organization_id=organization_id,
+                            payload=release_binding.model_dump(mode="json"),
+                            content_hash=release_binding.content_hash,
+                        )
+                    )
+                    db.flush()
                 if plan_payload is not None:
                     self._add_clarification_plan(
                         db,
@@ -1127,6 +1171,7 @@ class PersistenceRepository:
                 artifact_version=pin_identity[1],
                 runtime_sha256=pin_identity[2],
                 validation_report_sha256=pin_identity[3],
+                binding=release_binding,
             ),
             result=enrichment,
             created_at=created_at,
@@ -2984,8 +3029,7 @@ class PersistenceRepository:
             )
         return result
 
-    @staticmethod
-    def _knowledge_release_pin(session: DesignSessionRow) -> KnowledgeReleasePinRecord:
+    def _knowledge_release_pin(self, session: DesignSessionRow) -> KnowledgeReleasePinRecord:
         values = (
             session.knowledge_package_id,
             session.knowledge_artifact_version,
@@ -2994,12 +3038,38 @@ class PersistenceRepository:
         )
         if any(value is None for value in values):
             raise NotFoundError("Session has no verified Knowledge release pin")
+        binding = None
+        with self._session_factory() as db:
+            first_cycle = db.scalar(
+                select(EnrichmentCycleRow).where(
+                    EnrichmentCycleRow.session_id == session.session_id,
+                    EnrichmentCycleRow.cycle_number == 1,
+                )
+            )
+            version = first_cycle.knowledge_contract_version if first_cycle else None
+            row = db.get(KnowledgeReleaseBindingRow, session.session_id)
+            if row is not None:
+                try:
+                    binding = KnowledgeReleaseBinding.model_validate(row.payload)
+                except ValueError as exc:
+                    raise EnrichmentIntegrityError("Invalid stored Knowledge binding") from exc
+                project = db.get(ProjectRow, session.project_id)
+                if (
+                    binding.content_hash != row.content_hash
+                    or binding.release_identity != values
+                    or binding.knowledge_contract_version != version
+                    or project.organization_id != row.organization_id
+                ):
+                    raise EnrichmentIntegrityError("Stored Knowledge binding identity mismatch")
+            elif version is not None:
+                raise EnrichmentIntegrityError("Session Knowledge binding is missing")
         return KnowledgeReleasePinRecord(
             session_id=session.session_id,
             package_id=values[0],
             artifact_version=values[1],
             runtime_sha256=values[2],
             validation_report_sha256=values[3],
+            binding=binding,
         )
 
     @staticmethod
@@ -3347,21 +3417,20 @@ class PersistenceRepository:
             created_at=cls._utc(row.created_at),
         )
 
-    @classmethod
     def _user_correction_record(
-        cls,
+        self,
         db: Session,
         row: UserCorrectionRow,
         session: DesignSessionRow,
     ) -> UserCorrectionRecord:
-        payload = cls._verified_payload_hash(
+        payload = self._verified_payload_hash(
             row.result_payload,
             hash_field="content_hash",
             error_type=UserCorrectionIntegrityError,
         )
-        cls._validate_release_identity(session, payload)
+        self._validate_release_identity(session, payload)
         try:
-            previous = cls._locked_revision(db, row.session_id, row.previous_revision_id)
+            previous = self._locked_revision(db, row.session_id, row.previous_revision_id)
             authoritative = validate_design_revision(payload["authoritative_revision"])
             source = payload["source"]
             previous_cycle = db.get(EnrichmentCycleRow, row.previous_enrichment_cycle_id)
@@ -3370,7 +3439,7 @@ class PersistenceRepository:
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise UserCorrectionIntegrityError("stored correction result is invalid") from exc
         try:
-            source_hash = cls._canonical_hash(
+            source_hash = self._canonical_hash(
                 {"kind": source["kind"], "message_id": source["message_id"]}
             )
             mirrors = (
@@ -3407,8 +3476,8 @@ class PersistenceRepository:
             or next_cycle.content_hash != next_enrichment.content_hash
         ):
             raise UserCorrectionIntegrityError("stored correction cycle lineage is inconsistent")
-        cls._enrichment_cycle_record(next_cycle, cls._knowledge_release_pin(session))
-        cls._validate_prior_answer_lineage(
+        self._enrichment_cycle_record(next_cycle, self._knowledge_release_pin(session))
+        self._validate_prior_answer_lineage(
             db,
             session,
             previous_cycle,
@@ -3416,9 +3485,9 @@ class PersistenceRepository:
             row.previous_revision_id,
         )
         if row.new_revision_id is not None:
-            cls._validate_next_revision(previous, authoritative)
+            self._validate_next_revision(previous, authoritative)
             persisted = db.get(SpecificationRevisionRow, row.new_revision_id)
-            if persisted is None or cls._domain_revision(persisted) != authoritative:
+            if persisted is None or self._domain_revision(persisted) != authoritative:
                 raise UserCorrectionIntegrityError(
                     "stored corrected Product State revision is missing or inconsistent"
                 )
@@ -3426,7 +3495,7 @@ class PersistenceRepository:
             raise UserCorrectionIntegrityError(
                 "non-mutating correction does not preserve the previous revision"
             )
-        if not cls._revision_reaches_current(db, session, authoritative.revision_id):
+        if not self._revision_reaches_current(db, session, authoritative.revision_id):
             raise UserCorrectionIntegrityError(
                 "stored correction is not in the current Product State lineage"
             )
@@ -3442,7 +3511,7 @@ class PersistenceRepository:
             semantic_hash=row.semantic_hash,
             result_payload=payload,
             content_hash=row.content_hash,
-            created_at=cls._utc(row.created_at),
+            created_at=self._utc(row.created_at),
         )
 
     @staticmethod

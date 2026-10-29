@@ -8,11 +8,16 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from jewelai_domain import (
-    ActiveKnowledgeRuntime,
-    KnowledgeArtifactStore,
     KnowledgeReleaseQualificationStatus,
     ProductionValidationReport,
     qualify_knowledge_release,
+)
+from jewelai_domain.knowledge_activation_v1_1 import ProductionValidationReportV1_1
+from jewelai_domain.knowledge_qualification_v1_1 import qualify_knowledge_release_v1_1
+from jewelai_domain.knowledge_runtime import (
+    knowledge_contract_version,
+    knowledge_store,
+    validate_active_knowledge,
 )
 from jewelai_persistence.repository import PersistenceRepository
 from pydantic import ValidationError
@@ -65,8 +70,13 @@ def compose_prompt_enrichment_runtime(
 
     active_payload = _load_evidence(config.active_release_path)
     report_payload = _load_evidence(config.validation_report_path)
-    store = KnowledgeArtifactStore(config.artifact_root)
-    qualification = qualify_knowledge_release(
+    store = knowledge_store(config.knowledge_contract_version, config.artifact_root)
+    qualify = (
+        qualify_knowledge_release_v1_1
+        if config.knowledge_contract_version == "1.1.0"
+        else qualify_knowledge_release
+    )
+    qualification = qualify(
         store,
         config.candidate,
         active_release=active_payload,
@@ -84,9 +94,19 @@ def compose_prompt_enrichment_runtime(
             "Configured Prompt Enrichment qualification contract does not match",
         )
     try:
-        active = ActiveKnowledgeRuntime.model_validate(active_payload)
-        report = ProductionValidationReport.model_validate(report_payload)
-    except ValidationError as exc:  # Defensive: successful qualification already validates both.
+        if (
+            knowledge_contract_version(active_payload) != config.knowledge_contract_version
+            or knowledge_contract_version(report_payload) != config.knowledge_contract_version
+        ):
+            raise ValueError("Configured Knowledge evidence version mismatch")
+        active = validate_active_knowledge(active_payload)
+        report_model = (
+            ProductionValidationReportV1_1
+            if config.knowledge_contract_version == "1.1.0"
+            else ProductionValidationReport
+        )
+        report = report_model.model_validate(report_payload)
+    except (ValidationError, ValueError) as exc:
         raise PromptEnrichmentCompositionError(
             PromptEnrichmentCompositionErrorCode.EVIDENCE_INVALID,
             "Configured Prompt Enrichment release evidence is invalid",

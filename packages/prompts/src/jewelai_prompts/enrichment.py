@@ -4,12 +4,7 @@ import hashlib
 import json
 from typing import Annotated, Literal
 
-from jewelai_domain.knowledge_activation import (
-    ActiveKnowledgeRuntime,
-    ProductionValidationReport,
-    Sha256,
-)
-from jewelai_domain.knowledge_library import CompiledKnowledgeLibrary
+from jewelai_domain.knowledge_activation import Sha256
 from jewelai_domain.knowledge_policy import (
     KnowledgePolicyEngine,
     KnowledgeRuntimeState,
@@ -21,7 +16,13 @@ from jewelai_domain.knowledge_policy import (
     build_knowledge_runtime_state,
     validate_proposal_authority,
 )
-from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
+from jewelai_domain.knowledge_runtime import (
+    AnyActiveKnowledge,
+    AnyCompiledKnowledge,
+    AnyKnowledgeStore,
+    AnyValidationReport,
+    validate_compiled_knowledge,
+)
 from jewelai_domain.models import (
     Assumed,
     Derived,
@@ -319,7 +320,7 @@ def parametric_reference_context_is_eligible(revision: AnyDesignRevision | objec
 def enrich_prompt(
     revision: AnyDesignRevision | object,
     templates: PromptTemplateBundle,
-    knowledge_runtime: CompiledKnowledgeLibrary,
+    knowledge_runtime: AnyCompiledKnowledge,
     *,
     proposals: tuple[EnrichmentProposal, ...] = (),
     parametric_catalog_id: str | None = None,
@@ -335,7 +336,7 @@ def enrich_prompt(
     """
     revision = validate_design_revision(revision)
     templates = PromptTemplateBundle.model_validate(templates)
-    runtime = CompiledKnowledgeLibrary.model_validate(knowledge_runtime)
+    runtime = validate_compiled_knowledge(knowledge_runtime)
     engine = KnowledgePolicyEngine(runtime)
     state = build_knowledge_runtime_state(runtime, revision)
     parametric_references = tuple(
@@ -426,12 +427,12 @@ def enrich_prompt(
 def enrich_prompt_with_active_release(
     revision: AnyDesignRevision | object,
     templates: PromptTemplateBundle,
-    artifact_store: KnowledgeArtifactStore,
+    artifact_store: AnyKnowledgeStore,
     *,
     knowledge_package_id: str,
     knowledge_artifact_version: str,
-    active_release: ActiveKnowledgeRuntime | object,
-    validation_report: ProductionValidationReport | object,
+    active_release: AnyActiveKnowledge | object,
+    validation_report: AnyValidationReport | object,
     proposals: tuple[EnrichmentProposal, ...] = (),
     parametric_catalog_id: str | None = None,
     parametric_artifact_version: str | None = None,

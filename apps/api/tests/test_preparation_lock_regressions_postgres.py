@@ -133,7 +133,7 @@ def _observe_postgres(engine, capfd, schedule):
 
 
 def _assert_preserved(before, after):
-    assert before["version"] == after["version"] == "0016_generation_preparations"
+    assert before["version"] == after["version"] == "0017_knowledge_release_bindings"
     assert before["objects"] == after["objects"]  # includes constraints, triggers and functions
     for table, rows in before["rows"].items():
         assert all(row in after["rows"][table] for row in rows)
@@ -148,7 +148,7 @@ def test_empty_and_populated_downgrade_refuse_without_schema_or_data_change(
         assert post(ctx).status_code == 201
     before = retention_snapshot(engine)
     with _observe_postgres(engine, capfd, "populated" if populated else "empty"):
-        with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+        with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
             _downgrade()
         assert retention_snapshot(engine) == before
     command.check(Config(str(ROOT / "packages/persistence/alembic.ini")))
@@ -190,7 +190,7 @@ def test_early_command_lookup_writer_survives_unsupported_downgrade(ready_sessio
                 finally:
                     release_writer.set()
                 assert writer.result(timeout=25).status_code == 201
-                with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+                with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
                     downgrade.result(timeout=25)
         finally:
             release_writer.set()
@@ -246,7 +246,7 @@ def test_fk_parent_writer_survives_downgrade_first_child_access(ready_session, e
                 finally:
                     release_writer.set()
                     release_drop.set()
-                with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+                with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
                     downgrade.result(timeout=25)
                 assert writer.result(timeout=25).status_code == 201
         finally:

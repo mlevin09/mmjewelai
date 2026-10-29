@@ -18,10 +18,15 @@ from jewelai_domain import (
     KNOWLEDGE_RELEASE_QUALIFICATION_VERSION,
     KnowledgeReleaseCandidateKind,
     KnowledgeReleaseCandidateSelection,
-    compile_knowledge_library,
-    promote_knowledge_runtime,
 )
-from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
+from jewelai_domain.knowledge_activation_v1_1 import (
+    ProductionValidationReportV1_1,
+    promote_knowledge_runtime_v1_1,
+)
+from jewelai_domain.knowledge_library_v1_1 import compile_knowledge_library_v1_1
+from jewelai_domain.knowledge_storage_v1_1 import (
+    KnowledgeArtifactStoreV1_1 as KnowledgeArtifactStore,
+)
 from test_enrichment_persistence import _report
 from test_prompt_enrichment_http import _message
 
@@ -45,12 +50,18 @@ CONTROLLED_PATHS = (
 def _release(tmp_path: Path, version: str = "1.0.0"):
     payload = json.loads(KNOWLEDGE.read_text(encoding="utf-8"))
     payload["artifact_version"] = version
+    payload["contract_version"] = "1.1.0"
     artifact_root = tmp_path / f"knowledge-{version}"
     store = KnowledgeArtifactStore(artifact_root)
     stored = store.publish(payload)
-    compiled, _ = compile_knowledge_library(payload)
-    report = _report(compiled)
-    active = promote_knowledge_runtime(compiled, report)
+    compiled, _ = compile_knowledge_library_v1_1(payload)
+    report = ProductionValidationReportV1_1(
+        package_id=compiled.package_id,
+        artifact_version=compiled.artifact_version,
+        runtime_sha256=compiled.sha256,
+        checks=_report(compiled).checks,
+    )
+    active = promote_knowledge_runtime_v1_1(compiled, report)
     evidence_root = tmp_path / f"evidence-{version}"
     evidence_root.mkdir()
     active_path = evidence_root / "active.json"
@@ -67,6 +78,7 @@ def _release(tmp_path: Path, version: str = "1.0.0"):
         active_release_path=active_path,
         validation_report_path=report_path,
         qualification_contract_version=KNOWLEDGE_RELEASE_QUALIFICATION_VERSION,
+        knowledge_contract_version="1.1.0",
     )
     return config, active, report
 
@@ -142,6 +154,7 @@ def test_enabled_environment_loads_exact_typed_release_configuration(monkeypatch
         "PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT": str(config.artifact_root),
         "PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID": config.candidate.package_id,
         "PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION": str(config.candidate.artifact_version),
+        "PROMPT_ENRICHMENT_KNOWLEDGE_CONTRACT_VERSION": "1.1.0",
         "PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH": str(config.active_release_path),
         "PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH": str(config.validation_report_path),
         "PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION": (config.qualification_contract_version),
@@ -168,20 +181,59 @@ def test_production_rejects_synthetic_candidate(tmp_path):
         )
 
 
+@pytest.mark.parametrize(
+    "session_locale,initial_text",
+    [
+        (
+            "en-US",
+            "A white or yellow-gold three-stone ring "
+            "with an oval sapphire center stone and no halo.",
+        ),
+        (
+            "ru-RU",
+            "Кольцо с тремя камнями из белого или желтого золота с овальным сапфиром, без гало.",
+        ),
+        (
+            "en-US",
+            "Кольцо с тремя камнями. "
+            "A white or yellow-gold ring with an oval sapphire and no halo.",
+        ),
+    ],
+)
 def test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_cycle(
-    engine, tmp_path
+    engine, tmp_path, monkeypatch, session_locale, initial_text
 ):
+    from jewelai_domain.knowledge_runtime import KnowledgeReleaseBinding
+    from jewelai_parser.full_message import parse_full_message
+    from jewelai_persistence.models import KnowledgeReleaseBindingRow
+    from sqlalchemy import select
+
+    parsed = []
+
+    def observe(*args, **kwargs):
+        result = parse_full_message(*args, **kwargs)
+        parsed.append(result)
+        return result
+
+    monkeypatch.setattr("jewelai_api.prompt_enrichment_runtime.parse_full_message", observe)
     config, active, report = _release(tmp_path)
     first, first_app, first_legacy_provider = _client(engine, config)
 
     with first:
-        organization_id, _, session_response = create_hierarchy(first)
+        organization_id, project_id, session_response = create_hierarchy(first)
+        if session_locale == "ru-RU":
+            session_response = first.post(
+                f"/projects/{project_id}/sessions",
+                headers={"X-Organization-ID": organization_id},
+                json={"role_id": "retail_client", "locale": session_locale},
+            )
+            assert session_response.status_code == 201
         session = session_response.json()
         message = _message(
             first,
             session["session_id"],
             organization_id,
-            "A white or yellow-gold ring with an oval sapphire center stone and no halo.",
+            initial_text,
         )
         initial = first.post(
             f"/v1/sessions/{session['session_id']}/prompt-enrichment/initial",
@@ -192,6 +244,9 @@ def test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_c
             },
         )
         assert initial.status_code == 201, initial.json()
+        assert {
+            c.normalization_source.value for c in parsed[0].candidates if c.normalization_source
+        } >= {"domain_dictionary", "knowledge_library"}
         assert all(path in first.get("/openapi.json").json()["paths"] for path in CONTROLLED_PATHS)
         assert first_legacy_provider.calls == []
 
@@ -201,6 +256,11 @@ def test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_c
     assert runtime.knowledge_artifact_version == str(config.candidate.artifact_version)
     assert runtime.active_release.runtime_sha256 == active.runtime_sha256
     assert runtime.validation_report.sha256 == report.sha256
+    with engine.connect() as db:
+        binding_payload = db.scalar(select(KnowledgeReleaseBindingRow.payload))
+    binding = KnowledgeReleaseBinding.model_validate(binding_payload)
+    assert binding.knowledge_contract_version == "1.1.0"
+    assert binding.runtime_sha256 == active.runtime_sha256
 
     restarted, restarted_app, restarted_legacy_provider = _client(engine, config)
     with restarted:
@@ -258,6 +318,12 @@ def test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_c
         )
         assert final.status_code == 200, final.json()
         assert final.json()["internal_final_prompt"]["schema_version"] == "2.1.0"
+        assert (
+            final.json()["internal_final_prompt"]["knowledge_release"]["runtime_sha256"]
+            == binding.runtime_sha256
+        )
+        with engine.connect() as db:
+            assert db.scalar(select(KnowledgeReleaseBindingRow.payload)) == binding_payload
         assert restarted_legacy_provider.calls == []
         assert restarted_app.state.prompt_enrichment_service is not runtime
 
@@ -372,4 +438,5 @@ def test_unsupported_qualification_contract_is_rejected(tmp_path):
             active_release_path=config.active_release_path,
             validation_report_path=config.validation_report_path,
             qualification_contract_version="2.0.0",
+            knowledge_contract_version="1.1.0",
         )

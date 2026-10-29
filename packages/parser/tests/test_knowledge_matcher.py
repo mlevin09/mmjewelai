@@ -111,6 +111,26 @@ def test_exact_direct_match_resolves():
     assert result.candidate.match_method == KnowledgeMatchMethod.EXACT
 
 
+def test_v1_1_matcher_uses_same_en_ru_semantics_without_coercion():
+    from jewelai_domain.knowledge_library_v1_1 import CompiledKnowledgeLibraryV1_1
+
+    legacy = runtime()
+    before = legacy.canonical_json()
+    payload = legacy.model_dump(mode="json")
+    payload.update(contract_version="1.1.0", schema_version="1.1.0")
+    current = CompiledKnowledgeLibraryV1_1.model_validate(payload)
+    matcher = KnowledgeLibraryMatcher(current)
+    assert type(matcher.runtime) is CompiledKnowledgeLibraryV1_1
+    assert matcher.runtime == current
+    assert matcher.runtime_sha256 == current.sha256 != legacy.sha256
+    for text, locale, expected in (
+        ("oval", "en", "stone.shape.oval"),
+        ("крапановой закрепки", "ru", "setting.prong"),
+    ):
+        assert matcher.match(text, locale=locale).candidate.concept_id == expected
+    assert legacy.canonical_json() == before
+
+
 def test_ru_inflection_resolves_without_fuzzy_matching():
     result = KnowledgeLibraryMatcher(runtime()).match(
         "крапановой закрепки",

@@ -56,14 +56,14 @@ def engine(monkeypatch, capfd):
         command.current(cfg)
         # Unsupported online downgrade refuses even with empty retained tables.
         retained = retention_snapshot(scoped)
-        with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+        with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
             command.downgrade(cfg, "0015_reference_verification")
         assert retention_snapshot(scoped) == retained
         command.check(cfg)
         with scoped.connect() as db:
             assert (
                 db.scalar(text("SELECT version_num FROM alembic_version"))
-                == "0016_generation_preparations"
+                == "0017_knowledge_release_bindings"
             )
             assert (
                 db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
@@ -245,7 +245,7 @@ def test_postgres_immutability_and_scope_foreign_keys(ready_session, engine):
                 db.execute(GenerationPreparationRow.__table__.insert().values(**invalid))
     assert counts(engine) == (1, 1, 0, 0)
     before = retention_snapshot(engine)
-    with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+    with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
         command.downgrade(
             Config(str(ROOT / "packages/persistence/alembic.ini")), "0015_reference_verification"
         )
