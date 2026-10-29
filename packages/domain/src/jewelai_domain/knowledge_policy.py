@@ -2,22 +2,49 @@
 
 from enum import StrEnum
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, StrictBool, model_validator
 
 from .knowledge_library import CompiledKnowledgeLibrary, CompiledPolicy, PolicyTarget
 from .knowledge_library_v1_1 import CompiledKnowledgeLibraryV1_1, CompiledPolicyV1_1
+from .knowledge_targets_v1_1 import target_family_from_concrete
+from .lock_protection import (
+    first_locked_change,
+    locked_ancestor,
+    require_repeatable_replacement,
+    state_fields,
+    validate_replacement_value,
+    value_state_fields,
+)
 from .models import (
     Assumed,
     Derived,
     Explicit,
     ImmutableModel,
+    KnownValue,
     NotApplicable,
     Text,
     Unknown,
 )
 from .models_v1_1 import AnyDesignRevision, validate_design_revision
 from .state_paths import iter_knowledge_state_fields
+
+CANONICAL_POLICY_EVALUATION_VERSION = "2.0.0"
+
+
+def _expanded_target(target):
+    # Reuse the frozen grammar, not a second list of legacy scalar/group leaves.
+    from .knowledge_library import _ALLOWED_POLICY_TARGETS
+
+    parts = target.split(".")
+    if parts[0] in {"composition", "decorative_elements"} or parts[:2] == [
+        "metal",
+        "components",
+    ]:
+        return True
+    family = target_family_from_concrete(target)
+    return family is not None and family not in _ALLOWED_POLICY_TARGETS
 
 
 class RuntimeSemanticState(StrEnum):
@@ -393,6 +420,104 @@ class KnowledgePolicyEngine:
         state: KnowledgeRuntimeState,
         proposal: RuntimeStateProposal,
     ) -> PolicyEvaluation:
+        """Frozen flat v1 leaf policy; expanded operations require canonical v2."""
+        state = KnowledgeRuntimeState.model_validate(state)
+        proposal = RuntimeStateProposal.model_validate(proposal)
+        if (
+            isinstance(self.runtime, CompiledKnowledgeLibraryV1_1)
+            or _expanded_target(proposal.target)
+            or any(_expanded_target(item.target) for item in state.parameters)
+        ):
+            raise ValueError("Expanded policy evaluation requires the canonical v2 interface")
+        return self._evaluate(state, proposal)
+
+    def evaluate_canonical(
+        self,
+        revision: AnyDesignRevision | object,
+        proposal: RuntimeStateProposal,
+        *,
+        expected_revision_id: UUID,
+        effective_state: KnowledgeRuntimeState | None = None,
+    ) -> PolicyEvaluation:
+        """Canonical policy v2; the caller, not this pure function, owns DB currency/CAS.
+
+        Sequential effective state supplies precedence only. LOCK authority always
+        comes from the complete original canonical revision, never a flat summary.
+        """
+        revision = validate_design_revision(revision)
+        if revision.revision_id != expected_revision_id:
+            raise ValueError("Canonical policy revision identity mismatch")
+        proposal = RuntimeStateProposal.model_validate(proposal)
+        if revision.schema_version == "1.1.0":
+            # Do this before any validation can consume an iterable, even if a
+            # lock/unknown target would otherwise short-circuit the evaluation.
+            require_repeatable_replacement(proposal.value)
+        canonical = build_knowledge_runtime_state(self.runtime, revision)
+        state = (
+            canonical
+            if effective_state is None
+            else KnowledgeRuntimeState.model_validate(effective_state)
+        )
+        if (
+            (state.package_id, state.artifact_version, state.runtime_sha256)
+            != (canonical.package_id, canonical.artifact_version, canonical.runtime_sha256)
+            or state.existing_group_ids != canonical.existing_group_ids
+            or tuple(item.target for item in state.parameters)
+            != tuple(item.target for item in canonical.parameters)
+        ):
+            raise ValueError("Effective policy state does not match canonical runtime context")
+        if canonical.get(proposal.target) is None:
+            return self._evaluate(canonical, proposal)
+        fields = state_fields(revision.design)
+        target = tuple(proposal.target.split("."))
+        protected = locked_ancestor(fields, target) is not None
+        old = fields.get(target)
+        # For a non-value proposal, every old descendant would be removed. For a
+        # value proposal, type-check the complete replacement before any APPLIED.
+        if not protected and revision.schema_version == "1.1.0":
+            replacement = None
+            if proposal.semantic_state not in {
+                RuntimeSemanticState.AMBIGUOUS,
+                RuntimeSemanticState.NOT_APPLICABLE,
+            }:
+                replacement = validate_replacement_value(
+                    revision.design, target, proposal.value, source=revision.event.source
+                )
+                # The exact validated content checked below must also supply
+                # proposed/result. Never retain the unchecked caller value.
+                proposal = proposal.model_copy(update={"value": _runtime_value(replacement)})
+            before = value_state_fields(old.value, target) if isinstance(old, KnownValue) else {}
+            after = value_state_fields(replacement, target)
+            protected = first_locked_change(before, after) is not None
+        if protected:
+            self._validate_source(proposal)
+            current = canonical.get(proposal.target)
+            return PolicyEvaluation(
+                outcome="BLOCKED",
+                reason="locked",
+                target=proposal.target,
+                current=current,
+                proposed=proposal,
+                result=current,
+                applicable_policy_ids=tuple(
+                    policy.policy_id
+                    for policy in self.policies_for(
+                        proposal.target, existing_group_ids=canonical.existing_group_ids
+                    )
+                ),
+            )
+        return self._evaluate(state, proposal)
+
+    def _validate_source(self, proposal):
+        if (
+            proposal.provenance in _KNOWLEDGE_LINEAGE_PROVENANCE
+            and proposal.source_id not in self._runtime_evidence_ids
+        ):
+            raise ValueError("knowledge proposal source_id does not belong to the selected runtime")
+
+    def _evaluate(
+        self, state: KnowledgeRuntimeState, proposal: RuntimeStateProposal
+    ) -> PolicyEvaluation:
         state = KnowledgeRuntimeState.model_validate(state)
         proposal = RuntimeStateProposal.model_validate(proposal)
         if (
@@ -401,11 +526,7 @@ class KnowledgePolicyEngine:
             or state.runtime_sha256 != self.runtime.sha256
         ):
             raise ValueError("runtime state does not match the policy engine runtime")
-        if (
-            proposal.provenance in _KNOWLEDGE_LINEAGE_PROVENANCE
-            and proposal.source_id not in self._runtime_evidence_ids
-        ):
-            raise ValueError("knowledge proposal source_id does not belong to the selected runtime")
+        self._validate_source(proposal)
 
         current = state.get(proposal.target)
         if current is None:

@@ -353,14 +353,8 @@ def enrich_prompt(
         (EnrichmentProposal.model_validate(item) for item in proposals),
         key=lambda item: (item.target, item.source_id),
     ):
-        evaluation = engine.evaluate(
-            KnowledgeRuntimeState(
-                package_id=state.package_id,
-                artifact_version=state.artifact_version,
-                runtime_sha256=state.runtime_sha256,
-                existing_group_ids=state.existing_group_ids,
-                parameters=tuple(sorted(current.values(), key=lambda item: item.target)),
-            ),
+        evaluation = engine.evaluate_canonical(
+            revision,
             RuntimeStateProposal(
                 target=proposal.target,
                 semantic_state=proposal.semantic_state,
@@ -368,6 +362,14 @@ def enrich_prompt(
                 value=proposal.value,
                 source_id=proposal.source_id,
                 preservation=proposal.preservation,
+            ),
+            expected_revision_id=revision.revision_id,
+            effective_state=KnowledgeRuntimeState(
+                package_id=state.package_id,
+                artifact_version=state.artifact_version,
+                runtime_sha256=state.runtime_sha256,
+                existing_group_ids=state.existing_group_ids,
+                parameters=tuple(sorted(current.values(), key=lambda item: item.target)),
             ),
         )
         if evaluation.outcome == "APPLIED":

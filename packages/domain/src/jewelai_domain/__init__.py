@@ -67,6 +67,7 @@ from .knowledge_library_v1_1 import (
     validate_knowledge_library_v1_1,
 )
 from .knowledge_policy import (
+    CANONICAL_POLICY_EVALUATION_VERSION,
     KnowledgePolicyEngine,
     KnowledgeRuntimeState,
     PolicyEvaluation,
@@ -166,6 +167,7 @@ from .visualization_verification import (
 )
 
 __all__ = [
+    "CANONICAL_POLICY_EVALUATION_VERSION",
     "DICTIONARY_SCHEMA_VERSION",
     "REQUIRED_PRODUCTION_VALIDATION_CHECKS",
     "KNOWLEDGE_BASE_SCHEMA_VERSION",
