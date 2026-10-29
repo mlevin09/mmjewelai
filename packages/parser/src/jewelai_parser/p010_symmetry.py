@@ -30,7 +30,7 @@ _UNCERTAIN = re.compile(
     r"doubt\w*|unsure|uncertain|not\s+sure)\b",
     re.I,
 )
-_PRESERVE = re.compile(r"\bне\s+выравнивай\s+его\b|\bdo not make it symmetrical\b", re.I)
+_PRESERVE = re.compile(r"\bне\s+выравнивай\s+его\b|\bdo\s+not\s+make\s+it\s+symmetrical\b", re.I)
 _SYMMETRIC = re.compile(r"\b(?:symmetrical|symmetric|симметрич\w*)\b", re.I)
 _REJECT = re.compile(
     r"\b(?:not|no|without|never|reject\w*|avoid|unwanted|unnecessary|undesired|"
@@ -39,8 +39,9 @@ _REJECT = re.compile(
     re.I,
 )
 _NON_JEWELRY_CONTEXT = re.compile(r"\b(?:website|photograph\w*|сайт\w*|фотограф\w*)\b", re.I)
-_SENTENCE_BOUNDARIES = ".!?;\n"
+_SENTENCE_BOUNDARIES = ".!?;"
 _INSTRUCTION_BOUNDARIES = _SENTENCE_BOUNDARIES + ",—–"
+_OBJECT_COORDINATION = re.compile(r"\s+(?:and|or|nor|и|или|ни)\b", re.I)
 
 
 def _bounds(text: str, start: int, end: int, separators: str) -> tuple[int, int]:
@@ -49,7 +50,36 @@ def _bounds(text: str, start: int, end: int, separators: str) -> tuple[int, int]
     return left, right
 
 
-def _preservation_instructions(text: str):
+def _mask_spans(text: str, spans) -> str:
+    """A same-length analysis view only; original text and offsets are untouched."""
+    characters = list(text)
+    for start, end in spans:
+        characters[start:end] = " " * (end - start)
+    return "".join(characters)
+
+
+def _property_scoped_text(text: str, anchor_end: int, constraints: list[dict]) -> str:
+    # Only existing, explicit object-bound prohibitions AFTER the symmetry
+    # assertion are independent modifiers. A preceding operator may govern a
+    # coordinated list ("no halo or an asymmetric ring"); do not erase it.
+    return _mask_spans(
+        text,
+        (
+            (item["evidence"]["start"], item["evidence"]["end"])
+            for item in constraints
+            if item["classification"] == "prohibition"
+            and item["certainty"] == "explicit"
+            and item["semantic_subject"] is not None
+            and item["semantic_subject"] != TARGET
+            and item["evidence"]["start"] >= anchor_end
+            # A recognized first object does not prove where a shared negative
+            # list ends. Retain the operator if the remaining objects are unbound.
+            and not _OBJECT_COORDINATION.match(text[item["evidence"]["end"] :])
+        ),
+    )
+
+
+def _preservation_instructions(text: str, property_view: str):
     """Only complete approved instruction clauses are exempt from rejection.
 
     Embedded/negated mentions of the same words do not receive the exemption.
@@ -61,7 +91,10 @@ def _preservation_instructions(text: str):
             sentence_left, sentence_right = _bounds(
                 text, match.start(), match.end(), _SENTENCE_BOUNDARIES
             )
-            surrounding = text[sentence_left : match.start()] + text[match.end() : sentence_right]
+            surrounding = (
+                property_view[sentence_left : match.start()]
+                + property_view[match.end() : sentence_right]
+            )
             if (
                 not _REJECT.search(surrounding)
                 and not _UNCERTAIN.search(surrounding)
@@ -113,6 +146,7 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
         CandidateSubject,
         NormalizationSource,
         _classification_for,
+        _special_constraint_candidates,
         _structured_candidate,
         _tokens,
     )
@@ -121,18 +155,9 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
         return []
     matcher = KnowledgeLibraryMatcher(runtime)
     evidence = []
-    preservation = tuple(_preservation_instructions(text))
-    scoped_text = text
-    for instruction in preservation:
-        scoped_text = (
-            scoped_text[: instruction.start()]
-            + " " * (instruction.end() - instruction.start())
-            + scoped_text[instruction.end() :]
-        )
-    competing = any(
-        _classification_for(scoped_text, m.start(), m.end()) == CandidateClassification.REQUIREMENT
-        for m in _SYMMETRIC.finditer(scoped_text)
-    )
+    # Re-derive from raw text, never trust caller-supplied spans to hide negation.
+    constraints, _ = _special_constraint_candidates(text)
+    preservation_by_anchor = {}
     for token in _tokens(text):
         if not (_AFTER.search(text[token.end :]) or _BEFORE.search(text[: token.start])):
             continue
@@ -149,12 +174,21 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
             continue
         if match.candidate.mapping_id != f"LANG-P010-C2-{locale.upper()}-ASYMMETRY":
             continue
-        classification = _classification_for(scoped_text, token.start, token.end)
+        property_view = _property_scoped_text(text, token.end, constraints)
+        preservation = tuple(_preservation_instructions(text, property_view))
+        preservation_by_anchor[token.start] = preservation
+        scoped_text = _mask_spans(property_view, (item.span() for item in preservation))
+        competing = any(
+            _classification_for(scoped_text, m.start(), m.end())
+            == CandidateClassification.REQUIREMENT
+            for m in _SYMMETRIC.finditer(scoped_text)
+        )
         # Commas do not terminate a governing rejection/doubt ("Не хочу, чтобы...").
         # Inspect both sides within this sentence, rather than a token prefix or
         # the entire message. Independent sentences keep their own scope.
         left, right = _bounds(scoped_text, token.start, token.end, _SENTENCE_BOUNDARIES)
         scope = scoped_text[left:right]
+        classification = _classification_for(scope, token.start - left, token.end - left)
         if _REJECT.search(scope):
             classification = CandidateClassification.PROHIBITION
         uncertain = (
@@ -197,7 +231,7 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
     ]
     # A preservation phrase alone has no invented referent. It never creates LOCK.
     if len(positive) == 1:
-        for match in preservation:
+        for match in preservation_by_anchor[positive[0]["evidence"]["start"]]:
             evidence.append(
                 _structured_candidate(
                     text,

@@ -33,10 +33,18 @@ The exact T10-10 preservation phrase is evidence, never implicit confirmation or
 The referent must be jewelry-specific (for example, ring or jewelry design);
 generic design/composition and their Russian equivalents are insufficient.
 Website/photograph context remains deferred even if a jewelry word also appears.
-The scoped recognizer checks rejection/doubt on both sides of the phrase within
-its sentence, retaining scope across commas. Only a complete approved preservation
-instruction clause is exempted from rejection. Unclear mixed scope is not applied;
-independent sentences retain separate negation scope and original evidence offsets.
+The scoped recognizer checks both sides of the phrase using explicit `.?!;`
+statement boundaries. Line breaks remain formatting inside a continued statement;
+the original string and source offsets are never normalized or rewritten.
+The existing special-constraint emitter is reused to identify independent negative
+objects (for example, halo). A verified object-bound prohibition after the symmetry
+assertion does not negate symmetry or valid KEEP. Earlier/shared negative object
+lists are not erased when their remaining scope is unbound. Only a complete approved
+preservation instruction with positive governing context is exempted from rejection.
+Independent punctuated sentences retain separate scope; unclear mixed scope is not
+applied. For example, `No halo\nAn asymmetric ring.` without punctuation and
+`An asymmetric ring, no halo or side stones.` remain non-applied rather than guessing
+the boundaries of an unsupported negative list.
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for

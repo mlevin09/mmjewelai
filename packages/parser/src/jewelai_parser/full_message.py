@@ -381,27 +381,8 @@ _UNRESOLVED_STOPWORDS = frozenset(
 )
 
 
-def parse_full_message(
-    text: str,
-    *,
-    locale: Literal["en", "ru"],
-    dictionary: DictionaryRegistry,
-    knowledge_runtime: AnyCompiledKnowledge | None = None,
-) -> FullMessageParseResult:
-    """Extract conservative structured evidence without changing canonical Product State."""
-
-    if not isinstance(text, str) or not text or not text.strip():
-        raise ValueError("full-message input must contain non-whitespace text")
-    if len(text) > 2000:
-        raise ValueError("full-message input exceeds the domain text limit")
-
-    runtime = (
-        validate_compiled_knowledge(knowledge_runtime) if knowledge_runtime is not None else None
-    )
-    surfaces = _dictionary_surfaces(dictionary)
-    if runtime is not None:
-        surfaces.extend(_knowledge_surfaces(runtime))
-
+def _special_constraint_candidates(text: str) -> tuple[list[dict], list[tuple[int, int]]]:
+    """Existing property-bound evidence, shared with the scoped symmetry consumer."""
     candidates: list[dict] = []
     protected_spans: list[tuple[int, int]] = []
     for (
@@ -435,6 +416,30 @@ def parse_full_message(
                     detail=detail,
                 )
             )
+    return candidates, protected_spans
+
+
+def parse_full_message(
+    text: str,
+    *,
+    locale: Literal["en", "ru"],
+    dictionary: DictionaryRegistry,
+    knowledge_runtime: AnyCompiledKnowledge | None = None,
+) -> FullMessageParseResult:
+    """Extract conservative structured evidence without changing canonical Product State."""
+
+    if not isinstance(text, str) or not text or not text.strip():
+        raise ValueError("full-message input must contain non-whitespace text")
+    if len(text) > 2000:
+        raise ValueError("full-message input exceeds the domain text limit")
+
+    runtime = (
+        validate_compiled_knowledge(knowledge_runtime) if knowledge_runtime is not None else None
+    )
+    surfaces = _dictionary_surfaces(dictionary)
+    if runtime is not None:
+        surfaces.extend(_knowledge_surfaces(runtime))
+    candidates, protected_spans = _special_constraint_candidates(text)
 
     found = _find_surfaces(text, surfaces)
     found = _mark_choice_ambiguity(text, found)

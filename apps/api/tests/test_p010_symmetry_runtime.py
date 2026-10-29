@@ -16,9 +16,45 @@ REVIEW_NEGATIVES = (
     "An asymmetric design for the website.",
     "An asymmetric composition for the photograph.",
 )
+SCOPE_REVIEW_CASES = (
+    ("Асимметричное кольцо\nне нужно.", False, False, False),
+    ("An asymmetric ring\nis not what I want.", False, False, False),
+    ("An asymmetric ring\nphotograph.", False, False, False),
+    ("An asymmetric jewelry\nwebsite design.", False, False, False),
+    ("An asymmetric ring. Maybe,\ndo not make it symmetrical.", True, False, False),
+    ("An asymmetric ring. I don't mean,\ndo not make it symmetrical.", True, False, False),
+    ("An asymmetric ring, no halo.", True, False, True),
+    ("An asymmetric ring without a halo.", True, False, True),
+    ("Асимметричное кольцо без гало.", True, False, True),
+)
 
 
-def exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text):
+SCOPE_CONTROLS = (
+    ("Асимметричное кольцо — не выравнивай его.", True, True, False),
+    ("An asymmetric ring, no halo. Do not make it symmetrical.", True, True, True),
+    ("An asymmetric ring.\nNo halo.", True, False, True),
+    ("No halo. An asymmetric ring.", True, False, True),
+    ("An asymmetrical jewelry design.", True, False, False),
+    ("Не хочу,\nчтобы было асимметричное кольцо.", False, False, False),
+    ("An asymmetric ring\nis unnecessary.", False, False, False),
+    ("An asymmetric ring.\nMaybe, do not make it symmetrical.", True, False, False),
+    ("Асимметричное кольцо\nбез гало — не выравнивай его.", True, True, True),
+    ("An asymmetric ring, no halo — do not\nmake it symmetrical.", True, True, True),
+    ("No asymmetric ring without a halo.", False, False, True),
+    ("No halo or an asymmetric ring.", False, False, True),
+    ("An asymmetric ring, do not add a halo — do not make it symmetrical.", True, True, True),
+    ("An asymmetric ring, without engraving.", True, False, False),
+    ("No halo;\nAn asymmetric ring.", True, False, True),
+    # With no explicit statement boundary, a shared negative list is ambiguous.
+    ("No halo\nAn asymmetric ring.", False, False, True),
+    ("An asymmetric ring, no halo or asymmetry.", False, False, True),
+    ("An asymmetric ring, no halo or side stones.", False, False, True),
+)
+
+
+def exercise_p010_rejected_http(
+    engine, tmp_path, monkeypatch, text, *, symmetry=False, keep=False, halo=False
+):
     config, active, report = _release(tmp_path, bundle=p010_bundle())
     client, app, provider = _client(engine, config)
     observed = []
@@ -30,6 +66,16 @@ def exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text):
         return result
 
     monkeypatch.setattr("jewelai_api.prompt_enrichment_runtime.parse_full_message", observe)
+    service = app.state.prompt_enrichment_service
+    evaluate = service._evaluate
+    evaluations = []
+
+    def observe_evaluation(*args, **kwargs):
+        result = evaluate(*args, **kwargs)
+        evaluations.append(result)
+        return result
+
+    monkeypatch.setattr(service, "_evaluate", observe_evaluation)
     with client:
         org, project, _ = create_hierarchy(client)
         response = client.post(
@@ -58,30 +104,54 @@ def exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text):
         assert result.status_code == 201, result.json()
         repo = app.state.prompt_enrichment_service.repository
         revision = repo.get_current_revision(UUID(sid), UUID(org))
-        assert revision.design.composition is None
+        if symmetry:
+            value = revision.design.composition.value.symmetry_mode
+            assert value.value == "asymmetrical" and not value.confirmed and not value.locked
+            assert value.source.message_id == message["message_id"]
+        else:
+            assert revision.design.composition is None
         # Existing parser may retain the explicitly mentioned product category;
         # no composition or unrelated design facts may be invented.
         assert {
             key: value
             for key, value in revision.design.model_dump(mode="json").items()
-            if key != "jewelry_type"
+            if key not in ({"jewelry_type", "composition"} if symmetry else {"jewelry_type"})
         } == {
-            key: value for key, value in upgrade.json()["design"].items() if key != "jewelry_type"
+            key: value
+            for key, value in upgrade.json()["design"].items()
+            if key not in ({"jewelry_type", "composition"} if symmetry else {"jewelry_type"})
         }
         assert observed[0].original_text == text
         assert observed[0].knowledge_runtime_sha256 == active.runtime_sha256
-        assert not any(
-            c.semantic_subject == "composition.symmetry_mode"
-            and c.classification == "requirement"
-            and c.certainty == "explicit"
-            for c in observed[0].candidates
+        assert (
+            any(
+                c.semantic_subject == "composition.symmetry_mode"
+                and c.classification == "requirement"
+                and c.certainty == "explicit"
+                for c in observed[0].candidates
+            )
+            is symmetry
         )
         cycles = repo.list_enrichment_cycles(UUID(sid), UUID(org))
         assert len(cycles) == 1
-        assert not any(
-            d.outcome == "APPLIED" and d.target in {"composition", "composition.symmetry_mode"}
-            for d in cycles[0].result.decisions
+        assert (
+            any(
+                d.outcome == "APPLIED" and d.target in {"composition", "composition.symmetry_mode"}
+                for d in evaluations[0].enrichment_result.decisions
+            )
+            is symmetry
         )
+        if not symmetry:
+            assert not any(
+                d.outcome == "APPLIED" and d.target in {"composition", "composition.symmetry_mode"}
+                for d in cycles[0].result.decisions
+            )
+        else:
+            cell = next(
+                c for c in cycles[0].result.final_matrix if c.target == "composition.symmetry_mode"
+            )
+            assert cell.value == "asymmetrical"
+            assert set(cell.applicable_policy_ids) == {"STYLE-10-02", "STYLE-10-06", "STYLE-10-07"}
         binding = repo.get_knowledge_release_pin(UUID(sid), UUID(org))
         assert binding.binding.runtime_sha256 == active.runtime_sha256
         assert binding.binding.validation_report_sha256 == report.sha256
@@ -91,12 +161,29 @@ def exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text):
         plan = app.state.prompt_enrichment_service.restore_clarification_plan(
             UUID(sid), UUID(org), UUID(state.json()["clarification_plan_id"]), require_current=True
         )
-        assert not any(
-            e.semantic_subject == "composition.symmetry_mode"
-            and e.kind == "preservation"
-            and e.status == "active"
-            for e in plan.constraint_evidence
+        assert (
+            any(
+                e.semantic_subject == "composition.symmetry_mode"
+                and e.kind == "preservation"
+                and e.status == "active"
+                for e in plan.constraint_evidence
+            )
+            is keep
         )
+        if halo:
+            assert any(
+                c.semantic_subject == "feature.halo" and c.classification == "prohibition"
+                for c in observed[0].candidates
+            )
+            assert any(
+                e.semantic_subject == "feature.halo"
+                and e.kind == "prohibition"
+                and e.status == "active"
+                for e in plan.constraint_evidence
+            )
+        for candidate in observed[0].candidates:
+            span = candidate.evidence
+            assert text[span.start : span.end] == span.text
         assert provider.calls == []
         revision_url = f"/sessions/{sid}/revisions/{revision.revision_id}"
         persisted = client.get(revision_url, headers=headers)
@@ -118,6 +205,13 @@ def exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text):
         restored_revision = restarted.get(revision_url, headers=headers)
         assert restored_revision.status_code == 200 and restored_revision.json() == persisted.json()
         assert restored_provider.calls == []
+
+
+@pytest.mark.parametrize("text,symmetry,keep,halo", SCOPE_REVIEW_CASES + SCOPE_CONTROLS)
+def test_review_semantic_scope_http(engine, tmp_path, monkeypatch, text, symmetry, keep, halo):
+    exercise_p010_rejected_http(
+        engine, tmp_path, monkeypatch, text, symmetry=symmetry, keep=keep, halo=halo
+    )
 
 
 @pytest.mark.parametrize("text", REVIEW_NEGATIVES)

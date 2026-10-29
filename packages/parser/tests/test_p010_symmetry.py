@@ -19,6 +19,70 @@ REVIEW_NEGATIVES = (
     "An asymmetric design for the website.",
     "An asymmetric composition for the photograph.",
 )
+SCOPE_REVIEW_CASES = (
+    ("Асимметричное кольцо\nне нужно.", False, False, False),
+    ("An asymmetric ring\nis not what I want.", False, False, False),
+    ("An asymmetric ring\nphotograph.", False, False, False),
+    ("An asymmetric jewelry\nwebsite design.", False, False, False),
+    ("An asymmetric ring. Maybe,\ndo not make it symmetrical.", True, False, False),
+    ("An asymmetric ring. I don't mean,\ndo not make it symmetrical.", True, False, False),
+    ("An asymmetric ring, no halo.", True, False, True),
+    ("An asymmetric ring without a halo.", True, False, True),
+    ("Асимметричное кольцо без гало.", True, False, True),
+)
+
+
+SCOPE_CONTROLS = (
+    ("Асимметричное кольцо — не выравнивай его.", True, True, False),
+    ("An asymmetric ring, no halo. Do not make it symmetrical.", True, True, True),
+    ("An asymmetric ring.\nNo halo.", True, False, True),
+    ("No halo. An asymmetric ring.", True, False, True),
+    ("An asymmetrical jewelry design.", True, False, False),
+    ("Не хочу,\nчтобы было асимметричное кольцо.", False, False, False),
+    ("An asymmetric ring\nis unnecessary.", False, False, False),
+    ("An asymmetric ring.\nMaybe, do not make it symmetrical.", True, False, False),
+    ("Асимметричное кольцо\nбез гало — не выравнивай его.", True, True, True),
+    ("An asymmetric ring, no halo — do not\nmake it symmetrical.", True, True, True),
+    ("No asymmetric ring without a halo.", False, False, True),
+    ("No halo or an asymmetric ring.", False, False, True),
+    ("An asymmetric ring, do not add a halo — do not make it symmetrical.", True, True, True),
+    ("An asymmetric ring, without engraving.", True, False, False),
+    ("No halo;\nAn asymmetric ring.", True, False, True),
+    # With no explicit statement boundary, a shared negative list is ambiguous.
+    ("No halo\nAn asymmetric ring.", False, False, True),
+    ("An asymmetric ring, no halo or asymmetry.", False, False, True),
+    ("An asymmetric ring, no halo or side stones.", False, False, True),
+)
+
+
+@pytest.mark.parametrize("text,symmetry,keep,halo", SCOPE_REVIEW_CASES + SCOPE_CONTROLS)
+def test_review_semantic_scope(text, symmetry, keep, halo):
+    parsed = parse(text)
+    assert parsed.original_text == text
+    assert (
+        any(
+            c.semantic_subject == TARGET
+            and c.classification == "requirement"
+            and c.certainty == "explicit"
+            for c in parsed.candidates
+        )
+        is symmetry
+    )
+    assert (
+        any(
+            c.semantic_subject == TARGET and c.classification == "preservation"
+            for c in parsed.candidates
+        )
+        is keep
+    )
+    if halo:
+        assert any(
+            c.semantic_subject == "feature.halo" and c.classification == "prohibition"
+            for c in parsed.candidates
+        )
+    for candidate in parsed.candidates:
+        span = candidate.evidence
+        assert text[span.start : span.end] == span.text
 
 
 @pytest.mark.parametrize("text", REVIEW_NEGATIVES)

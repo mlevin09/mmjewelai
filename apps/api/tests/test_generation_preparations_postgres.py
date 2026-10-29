@@ -22,7 +22,12 @@ from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
 )
-from test_p010_symmetry_runtime import REVIEW_NEGATIVES, exercise_p010_rejected_http
+from test_p010_symmetry_runtime import (
+    REVIEW_NEGATIVES,
+    SCOPE_CONTROLS,
+    SCOPE_REVIEW_CASES,
+    exercise_p010_rejected_http,
+)
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
 
@@ -36,6 +41,16 @@ def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypa
 @pytest.mark.parametrize("text", REVIEW_NEGATIVES)
 def test_p010_rejected_raw_message_postgres(engine, tmp_path, monkeypatch, text):
     exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text)
+
+
+@pytest.mark.parametrize(
+    "text,symmetry,keep,halo",
+    SCOPE_REVIEW_CASES + tuple(case for case in SCOPE_CONTROLS if all(case[1:])),
+)
+def test_p010_semantic_scope_postgres(engine, tmp_path, monkeypatch, text, symmetry, keep, halo):
+    exercise_p010_rejected_http(
+        engine, tmp_path, monkeypatch, text, symmetry=symmetry, keep=keep, halo=halo
+    )
 
 
 @pytest.fixture
