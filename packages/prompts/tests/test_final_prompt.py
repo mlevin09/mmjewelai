@@ -14,7 +14,7 @@ from jewelai_domain.rules import BlockDecision, ReadyDecision, ReasonCode
 from pydantic import ValidationError
 
 from jewelai_prompts import (
-    CanonicalInternalFinalPromptHandoff as InternalFinalPromptHandoff,
+    CanonicalInternalFinalPromptHandoffV2_1 as InternalFinalPromptHandoff,
 )
 from jewelai_prompts import (
     CompiledPrompt,
@@ -329,7 +329,7 @@ def test_builds_deterministic_provider_neutral_outputs(ring, templates, runtime,
 
     assert first == second
     prompt = first.internal_final_prompt
-    assert prompt.schema_version == "2.0.0"
+    assert prompt.schema_version == "2.1.0"
     assert prompt.product_state_revision_id == ring.revision_id
     assert prompt.knowledge_release.runtime_sha256 == runtime.sha256
     assert prompt.description_content_hash == first.description.content_hash
@@ -1013,13 +1013,13 @@ def test_handoff_is_deterministic_and_binds_the_exact_authoritative_output(
     second = build_internal_final_prompt_handoff(assembly)
 
     assert first == second
-    assert first.schema_version == "2.0.0"
+    assert first.schema_version == "2.1.0"
     assert first.organization_id == ORGANIZATION_ID
     assert first.session_id == SESSION_ID
     assert first.product_state_revision_id == ring.revision_id
     assert first.enrichment_cycle_id == CYCLE_ID
     assert first.knowledge_release == assembly.internal_final_prompt.knowledge_release
-    assert first.internal_final_prompt_schema_version == "2.0.0"
+    assert first.internal_final_prompt_schema_version == "2.1.0"
     assert first.internal_final_prompt_content_hash == assembly.internal_final_prompt.content_hash
     assert first.internal_final_prompt == assembly.internal_final_prompt
     assert first.ready_for_downstream_preparation
@@ -1114,7 +1114,7 @@ def test_blocked_handoff_is_valid_but_not_ready_for_downstream_preparation(
 @pytest.mark.parametrize(
     ("field", "value", "error"),
     (
-        ("schema_version", "3.0.0", "Input should be '2.0.0'"),
+        ("schema_version", "3.0.0", "Input should be '2.1.0'"),
         ("session_id", "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "lineage mismatch"),
         ("internal_final_prompt_content_hash", "0" * 64, "integrity mismatch"),
         ("readiness", "blocked", "readiness mismatch"),
@@ -1169,7 +1169,7 @@ def test_handoff_rejects_release_schema_and_constraint_evidence_tampering(
 
     schema = handoff.model_dump(mode="json")
     schema["internal_final_prompt"]["schema_version"] = "3.0.0"
-    with pytest.raises(ValidationError, match="Input should be '2.0.0'"):
+    with pytest.raises(ValidationError, match="expected tags: '2.1.0'"):
         InternalFinalPromptHandoff.model_validate(schema)
 
     constraint = handoff.model_dump(mode="json")

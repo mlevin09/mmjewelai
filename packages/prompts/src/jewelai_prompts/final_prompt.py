@@ -40,7 +40,7 @@ from .models import PromptTemplateBundle, Sha256
 from .revision_projection import project_revision
 
 if TYPE_CHECKING:
-    from .downstream_preparation import CanonicalFinalPromptAssembly
+    from .downstream_preparation import CanonicalFinalPromptAssemblyV2_1
 
 FINAL_PROMPT_SCHEMA_VERSION = "1.1.0"
 DESCRIPTION_SCHEMA_VERSION = "1.0.0"
@@ -313,7 +313,7 @@ def assemble_internal_final_prompt(
     *,
     dictionary: DictionaryRegistry,
     templates: PromptTemplateBundle,
-) -> "CanonicalFinalPromptAssembly":
+) -> "CanonicalFinalPromptAssemblyV2_1":
     """Build both Step #12 outputs from one immutable, fail-closed snapshot."""
 
     try:
@@ -340,9 +340,11 @@ def assemble_internal_final_prompt(
         readiness,
         snapshot.enrichment_result.parametric_references,
     )
-    _check_current_text_capacity(prompt_text)
+    from .downstream_preparation import check_ifp_v2_1_capacity
+
+    check_ifp_v2_1_capacity(prompt_text)
     payload = {
-        "schema_version": "2.0.0",
+        "schema_version": "2.1.0",
         "session_id": snapshot.session_id,
         "organization_id": snapshot.organization_id,
         "design_id": snapshot.revision.design_id,
@@ -353,7 +355,7 @@ def assemble_internal_final_prompt(
         "readiness": readiness,
         "readiness_reason": readiness_reason,
         "description_content_hash": description.content_hash,
-        "prompt_text": "JEWELAI INTERNAL FINAL PROMPT 2.0.0\n" + prompt_text.split("\n", 1)[1],
+        "prompt_text": "JEWELAI INTERNAL FINAL PROMPT 2.1.0\n" + prompt_text.split("\n", 1)[1],
         "description": description,
         "parametric_references": snapshot.enrichment_result.parametric_references,
         "disclosures": enrichment_projection(snapshot.enrichment_result).disclosures,
@@ -368,10 +370,13 @@ def assemble_internal_final_prompt(
         "enrichment_result_content_hash": snapshot.enrichment_result.content_hash,
     }
     # Import lazily to retain the frozen v1 models without a module import cycle.
-    from .downstream_preparation import CanonicalFinalPromptAssembly, CanonicalInternalFinalPrompt
+    from .downstream_preparation import (
+        CanonicalFinalPromptAssemblyV2_1,
+        CanonicalInternalFinalPromptV2_1,
+    )
 
-    internal = CanonicalInternalFinalPrompt(**payload, content_hash=_hash(_json(payload)))
-    return CanonicalFinalPromptAssembly(description=description, internal_final_prompt=internal)
+    internal = CanonicalInternalFinalPromptV2_1(**payload, content_hash=_hash(_json(payload)))
+    return CanonicalFinalPromptAssemblyV2_1(description=description, internal_final_prompt=internal)
 
 
 def _validate_snapshot(snapshot, *, dictionary, templates):

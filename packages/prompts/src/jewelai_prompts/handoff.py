@@ -22,8 +22,9 @@ from .models import Sha256
 
 if TYPE_CHECKING:
     from .downstream_preparation import (
+        AnyCanonicalInternalFinalPromptHandoff,
         CanonicalFinalPromptAssembly,
-        CanonicalInternalFinalPromptHandoff,
+        CanonicalFinalPromptAssemblyV2_1,
     )
 
 INTERNAL_FINAL_PROMPT_HANDOFF_SCHEMA_VERSION = "1.0.0"
@@ -88,8 +89,8 @@ class InternalFinalPromptHandoff(ImmutableModel):
 
 
 def build_internal_final_prompt_handoff(
-    final_output: "CanonicalFinalPromptAssembly | object",
-) -> "CanonicalInternalFinalPromptHandoff":
+    final_output: "CanonicalFinalPromptAssembly | CanonicalFinalPromptAssemblyV2_1 | object",
+) -> "AnyCanonicalInternalFinalPromptHandoff":
     """Validate an existing authoritative output and bind it into a deterministic handoff."""
 
     try:
@@ -98,11 +99,19 @@ def build_internal_final_prompt_handoff(
             final_output = final_output.model_dump(mode="json")
         from .downstream_preparation import (
             CanonicalFinalPromptAssembly,
+            CanonicalFinalPromptAssemblyV2_1,
             CanonicalInternalFinalPromptHandoff,
+            CanonicalInternalFinalPromptHandoffV2_1,
         )
 
-        assembly = CanonicalFinalPromptAssembly.model_validate(final_output)
-    except (ValidationError, TypeError, ValueError) as exc:
+        # Exact version dispatch; no latest/default or validation-fallback probing.
+        version = final_output.get("internal_final_prompt", {}).get("schema_version")
+        assembly_type, handoff_type = {
+            "2.0.0": (CanonicalFinalPromptAssembly, CanonicalInternalFinalPromptHandoff),
+            "2.1.0": (CanonicalFinalPromptAssemblyV2_1, CanonicalInternalFinalPromptHandoffV2_1),
+        }[version]
+        assembly = assembly_type.model_validate(final_output)
+    except (ValidationError, TypeError, ValueError, KeyError, AttributeError) as exc:
         raise InternalFinalPromptHandoffError(
             InternalFinalPromptHandoffErrorCode.INVALID_FINAL_OUTPUT,
             "authoritative final output failed handoff validation",
@@ -110,7 +119,7 @@ def build_internal_final_prompt_handoff(
 
     prompt = assembly.internal_final_prompt
     payload = {
-        "schema_version": "2.0.0",
+        "schema_version": prompt.schema_version,
         "organization_id": prompt.organization_id,
         "session_id": prompt.session_id,
         "product_state_revision_id": prompt.product_state_revision_id,
@@ -123,7 +132,7 @@ def build_internal_final_prompt_handoff(
         in {FinalPromptReadiness.READY, FinalPromptReadiness.READY_WITH_UNRESOLVED},
         "internal_final_prompt": prompt,
     }
-    return CanonicalInternalFinalPromptHandoff(**payload, content_hash=_hash(payload))
+    return handoff_type(**payload, content_hash=_hash(payload))
 
 
 def _hash(payload: object) -> str:

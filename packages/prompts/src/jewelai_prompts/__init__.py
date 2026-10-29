@@ -2,14 +2,21 @@
 
 from .compiler import PromptValidationError, compile_prompt, validate_compiled_prompt
 from .downstream_preparation import (
+    AnyCanonicalInternalFinalPrompt,
+    AnyCanonicalInternalFinalPromptHandoff,
     CanonicalFinalPromptAssembly,
+    CanonicalFinalPromptAssemblyV2_1,
     CanonicalInternalFinalPrompt,
     CanonicalInternalFinalPromptHandoff,
+    CanonicalInternalFinalPromptHandoffV2_1,
+    CanonicalInternalFinalPromptV2_1,
     GenerationPreparation,
     GenerationPreparationError,
     PreparationErrorCode,
     PreparationGateEvidence,
     build_generation_preparation,
+    decode_canonical_handoff,
+    decode_canonical_internal_final_prompt,
 )
 from .enrichment import (
     PROMPT_ENRICHMENT_VERSION,
@@ -69,6 +76,13 @@ from .models import (
 from .revision_projection import RevisionProjection, project_revision
 
 __all__ = [
+    "AnyCanonicalInternalFinalPrompt",
+    "AnyCanonicalInternalFinalPromptHandoff",
+    "CanonicalFinalPromptAssemblyV2_1",
+    "CanonicalInternalFinalPromptV2_1",
+    "CanonicalInternalFinalPromptHandoffV2_1",
+    "decode_canonical_handoff",
+    "decode_canonical_internal_final_prompt",
     "AnyPromptEnrichmentResult",
     "StructuredPromptEnrichmentResult",
     "decode_prompt_enrichment_result",

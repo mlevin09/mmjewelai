@@ -10,10 +10,10 @@ from jewelai_domain.rules import ReadyDecision
 from jewelai_persistence import UserCorrectionIntegrityError
 from jewelai_persistence.models import UserCorrectionRow
 from jewelai_prompts import (
-    CanonicalInternalFinalPrompt as InternalFinalPrompt,
+    CanonicalInternalFinalPromptHandoffV2_1 as InternalFinalPromptHandoff,
 )
 from jewelai_prompts import (
-    CanonicalInternalFinalPromptHandoff as InternalFinalPromptHandoff,
+    CanonicalInternalFinalPromptV2_1 as InternalFinalPrompt,
 )
 from jewelai_prompts import (
     FinalPromptReadiness,

@@ -1,6 +1,6 @@
 """Authoritative preparation, not generation; all identities/releases are synthetic."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from conftest import create_hierarchy
@@ -253,6 +253,75 @@ def test_renderer_failure_is_typed_redacted_and_atomic(ready_session, engine, mo
     response = post(ctx, request)
     assert response.status_code == 422 and response.json()["error"] == code
     assert counts(engine) == (0, 0, 0, 0)
+
+
+def test_ifp_capacity_failure_rolls_back_only_the_preparation_operation(
+    ready_session, engine, monkeypatch
+):
+    import jewelai_prompts.downstream_preparation as module
+
+    ctx = ready_session()
+    request = expected(ctx)
+    cycles = ctx.service.repository.list_enrichment_cycles(UUID(ctx.sid), UUID(ctx.org))
+    monkeypatch.setattr(module, "IFP_V2_1_MAX_BYTES", 1)
+    response = post(ctx, request)
+    assert response.status_code == 422
+    assert response.json()["error"] == "preparation_capacity_exceeded"
+    assert counts(engine) == (0, 0, 0, 0)
+    assert ctx.service.repository.list_enrichment_cycles(UUID(ctx.sid), UUID(ctx.org)) == cycles
+
+
+def test_retained_v2_source_replays_without_reassembly_on_v2_1_runtime(
+    ready_session, engine, monkeypatch
+):
+    from jewelai_prompts import CanonicalInternalFinalPromptHandoff
+    from jewelai_prompts.downstream_preparation import source_content_hash
+
+    ctx = ready_session()
+    original = ctx.runtime.build_preparation_source
+
+    def old_writer(*args):
+        # Simulate the previous writer, retaining its exact old version/hash.
+        source, gate = original(*args)
+        payload = source.model_dump(mode="json", exclude={"content_hash"})
+        prompt = payload["internal_final_prompt"]
+        prompt.pop("content_hash")
+        prompt["schema_version"] = "2.0.0"
+        prompt["prompt_text"] = prompt["prompt_text"].replace("2.1.0", "2.0.0", 1)
+        prompt["content_hash"] = source_content_hash(prompt)
+        payload.update(
+            schema_version="2.0.0",
+            internal_final_prompt_schema_version="2.0.0",
+            internal_final_prompt_content_hash=prompt["content_hash"],
+        )
+        payload["content_hash"] = source_content_hash(payload)
+        frozen = CanonicalInternalFinalPromptHandoff.model_validate(payload)
+        return frozen, gate.model_copy(update={"source_handoff_hash": frozen.content_hash})
+
+    source, _ = old_writer(ctx.service.repository, UUID(ctx.sid), UUID(ctx.org))
+    request = {**expected(ctx), "expected_handoff_hash": source.content_hash}
+    monkeypatch.setattr(ctx.runtime, "build_preparation_source", old_writer)
+    key = uuid4()
+    created = post(ctx, request, key)
+    assert created.status_code == 201
+    with engine.connect() as db:
+        before = db.scalar(select(GenerationPreparationRow.artifact_bytes))
+    assert GenerationPreparation(before).payload.source_handoff.schema_version == "2.0.0"
+
+    def forbidden(*args):
+        pytest.fail("Historical read/replay attempted current reassembly")
+
+    monkeypatch.setattr(ctx.runtime, "build_preparation_source", forbidden)
+    read = ctx.client.get(
+        f"/sessions/{ctx.sid}/generation-preparations/{created.json()['preparation_id']}",
+        headers=ctx.headers,
+    )
+    assert read.status_code == 200
+    replay = post(ctx, request, key)
+    assert replay.status_code == 200 and replay.json() == created.json()
+    with engine.connect() as db:
+        assert db.scalar(select(GenerationPreparationRow.artifact_bytes)) == before
+    assert counts(engine) == (1, 1, 0, 0)
 
 
 def test_missing_bearer_and_member_revocation_prevent_replay(ready_session, engine):

@@ -90,7 +90,7 @@ def test_nested_historical_answers_corrections_and_cycles_remain_original(
 
     monkeypatch.setattr("jewelai_prompts.compiler.compile_prompt", forbidden)
     state = ctx.runtime.get_current_state(UUID(ctx.sid), UUID(ctx.org))
-    assert state.final_output.internal_final_prompt.schema_version == "2.0.0"
+    assert state.final_output.internal_final_prompt.schema_version == "2.1.0"
     assert post(ctx).status_code == 201
     with engine.connect() as db:
         after = {

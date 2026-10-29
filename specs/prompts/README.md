@@ -59,3 +59,17 @@ semantic payload, and binds it to exact organization/session, Product State revi
 cycle, Knowledge release hashes, readiness, and a canonical handoff SHA-256. Its internal runtime
 builder reconstructs this state from durable organization-scoped history. It is not a provider
 request, production-generation authorization, or replacement for legacy `CompiledPrompt`.
+
+## Current canonical IFP/handoff 2.1.0
+
+Current writers emit structured enrichment **1.3.0**, without calling the legacy compiler, followed
+by canonical IFP/handoff **2.1.0**. IFP text alone permits **32,000 Unicode characters / 128,000 UTF-8
+bytes**. Description 1.0 and downstream execution rendering retain **20,000 / 80,000**. All bounds
+fail closed; facts/locks/provenance are never truncated to fit. CompiledPrompt 1.0 and canonical
+IFP/handoff 2.0 readers retain their original limits and hashes.
+
+Use `decode_canonical_internal_final_prompt` / `decode_canonical_handoff` for exact 2.0/2.1 dispatch;
+unsupported/mixed versions fail. The additive current schema is
+[canonical-preparation-schema.json](canonical-preparation-schema.json); the older schema files
+above remain frozen. No historical record is rewritten. See
+[ADR 0034](../../docs/adr/0034-versioned-ifp-capacity-v2-1.md) for operation boundaries and PCAP tests.

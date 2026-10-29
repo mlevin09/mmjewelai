@@ -38,10 +38,10 @@ from jewelai_persistence import (
     UserCorrectionIntegrityError,
 )
 from jewelai_prompts import (
-    CanonicalFinalPromptAssembly as FinalPromptAssembly,
+    CanonicalFinalPromptAssemblyV2_1 as FinalPromptAssembly,
 )
 from jewelai_prompts import (
-    CanonicalInternalFinalPromptHandoff as InternalFinalPromptHandoff,
+    CanonicalInternalFinalPromptHandoffV2_1 as InternalFinalPromptHandoff,
 )
 from jewelai_prompts import (
     FinalPromptArtifactVersions,

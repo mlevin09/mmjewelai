@@ -2131,6 +2131,262 @@
       "title": "CanonicalInternalFinalPromptHandoff",
       "type": "object"
     },
+    "CanonicalInternalFinalPromptHandoffV2_1": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "2.1.0",
+          "default": "2.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "product_state_revision_id": {
+          "format": "uuid",
+          "title": "Product State Revision Id",
+          "type": "string"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "knowledge_release": {
+          "$ref": "#/$defs/KnowledgeReleaseReference"
+        },
+        "internal_final_prompt_schema_version": {
+          "const": "2.1.0",
+          "default": "2.1.0",
+          "title": "Internal Final Prompt Schema Version",
+          "type": "string"
+        },
+        "internal_final_prompt_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Internal Final Prompt Content Hash",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/FinalPromptReadiness"
+        },
+        "ready_for_downstream_preparation": {
+          "title": "Ready For Downstream Preparation",
+          "type": "boolean"
+        },
+        "internal_final_prompt": {
+          "discriminator": {
+            "mapping": {
+              "2.1.0": "#/$defs/CanonicalInternalFinalPromptV2_1"
+            },
+            "propertyName": "schema_version"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CanonicalInternalFinalPromptV2_1"
+            }
+          ],
+          "title": "Internal Final Prompt"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "organization_id",
+        "session_id",
+        "product_state_revision_id",
+        "enrichment_cycle_id",
+        "knowledge_release",
+        "internal_final_prompt_content_hash",
+        "readiness",
+        "ready_for_downstream_preparation",
+        "internal_final_prompt",
+        "content_hash"
+      ],
+      "title": "CanonicalInternalFinalPromptHandoffV2_1",
+      "type": "object"
+    },
+    "CanonicalInternalFinalPromptV2_1": {
+      "additionalProperties": false,
+      "description": "IFP-only capacity successor. The original 2.0 reader remains frozen.",
+      "properties": {
+        "schema_version": {
+          "const": "2.1.0",
+          "default": "2.1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "design_id": {
+          "format": "uuid",
+          "title": "Design Id",
+          "type": "string"
+        },
+        "product_state_revision_id": {
+          "format": "uuid",
+          "title": "Product State Revision Id",
+          "type": "string"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "enrichment_cycle_number": {
+          "title": "Enrichment Cycle Number",
+          "type": "integer"
+        },
+        "locale": {
+          "enum": [
+            "en",
+            "ru"
+          ],
+          "title": "Locale",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/FinalPromptReadiness"
+        },
+        "readiness_reason": {
+          "title": "Readiness Reason",
+          "type": "string"
+        },
+        "description_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Description Content Hash",
+          "type": "string"
+        },
+        "prompt_text": {
+          "maxLength": 32000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Prompt Text",
+          "type": "string"
+        },
+        "design_facts": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptDesignFact"
+          },
+          "title": "Design Facts",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptConstraint"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "unresolved_details": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptUnresolvedDetail"
+          },
+          "title": "Unresolved Details",
+          "type": "array"
+        },
+        "enrichment_evidence": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptEnrichmentEvidence"
+          },
+          "title": "Enrichment Evidence",
+          "type": "array"
+        },
+        "decision_lineage": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptDecisionLineage"
+          },
+          "title": "Decision Lineage",
+          "type": "array"
+        },
+        "constraint_evidence": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptConstraintEvidence"
+          },
+          "title": "Constraint Evidence",
+          "type": "array"
+        },
+        "knowledge_release": {
+          "$ref": "#/$defs/KnowledgeReleaseReference"
+        },
+        "artifact_versions": {
+          "$ref": "#/$defs/FinalPromptArtifactVersions"
+        },
+        "enrichment_result_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Enrichment Result Content Hash",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "description": {
+          "$ref": "#/$defs/UserReadableJewelryDescription"
+        },
+        "parametric_references": {
+          "items": {
+            "$ref": "#/$defs/ParametricEnrichmentReference"
+          },
+          "title": "Parametric References",
+          "type": "array"
+        },
+        "disclosures": {
+          "items": {
+            "$ref": "#/$defs/PromptDisclosure"
+          },
+          "title": "Disclosures",
+          "type": "array"
+        }
+      },
+      "required": [
+        "session_id",
+        "organization_id",
+        "design_id",
+        "product_state_revision_id",
+        "enrichment_cycle_id",
+        "enrichment_cycle_number",
+        "locale",
+        "readiness",
+        "readiness_reason",
+        "description_content_hash",
+        "prompt_text",
+        "design_facts",
+        "constraints",
+        "unresolved_details",
+        "enrichment_evidence",
+        "decision_lineage",
+        "constraint_evidence",
+        "knowledge_release",
+        "artifact_versions",
+        "enrichment_result_content_hash",
+        "content_hash",
+        "description",
+        "parametric_references",
+        "disclosures"
+      ],
+      "title": "CanonicalInternalFinalPromptV2_1",
+      "type": "object"
+    },
     "CoatingV1_1": {
       "additionalProperties": false,
       "properties": {
@@ -6831,7 +7087,22 @@
           "type": "string"
         },
         "source_handoff": {
-          "$ref": "#/$defs/CanonicalInternalFinalPromptHandoff"
+          "discriminator": {
+            "mapping": {
+              "2.0.0": "#/$defs/CanonicalInternalFinalPromptHandoff",
+              "2.1.0": "#/$defs/CanonicalInternalFinalPromptHandoffV2_1"
+            },
+            "propertyName": "schema_version"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CanonicalInternalFinalPromptHandoff"
+            },
+            {
+              "$ref": "#/$defs/CanonicalInternalFinalPromptHandoffV2_1"
+            }
+          ],
+          "title": "Source Handoff"
         },
         "gate_evidence": {
           "$ref": "#/$defs/PreparationGateEvidence"
@@ -10346,7 +10617,21 @@
       ]
     },
     {
-      "$ref": "#/$defs/CanonicalInternalFinalPromptHandoff"
+      "discriminator": {
+        "mapping": {
+          "2.0.0": "#/$defs/CanonicalInternalFinalPromptHandoff",
+          "2.1.0": "#/$defs/CanonicalInternalFinalPromptHandoffV2_1"
+        },
+        "propertyName": "schema_version"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/CanonicalInternalFinalPromptHandoff"
+        },
+        {
+          "$ref": "#/$defs/CanonicalInternalFinalPromptHandoffV2_1"
+        }
+      ]
     },
     {
       "$ref": "#/$defs/GenerationPreparationPayload"

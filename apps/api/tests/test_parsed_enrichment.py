@@ -28,7 +28,7 @@ from jewelai_parser import (
     parse_full_message,
 )
 from jewelai_prompts import (
-    CanonicalInternalFinalPrompt as InternalFinalPrompt,
+    CanonicalInternalFinalPromptV2_1 as InternalFinalPrompt,
 )
 from jewelai_prompts import (
     EnrichmentProposal,

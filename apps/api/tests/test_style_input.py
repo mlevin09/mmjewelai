@@ -9,7 +9,7 @@ from conftest import NOW, create_hierarchy
 from jewelai_domain.models import MessageSource
 from jewelai_parser import CandidateClassification, StructuredTarget, parse_full_message
 from jewelai_persistence import NotFoundError
-from jewelai_prompts import CanonicalInternalFinalPrompt as InternalFinalPrompt
+from jewelai_prompts import CanonicalInternalFinalPromptV2_1 as InternalFinalPrompt
 from test_effective_readiness import (  # noqa: F401
     _answer,
     _assert_current_ready,
