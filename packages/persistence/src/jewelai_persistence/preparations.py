@@ -136,7 +136,7 @@ def _validate_row(repository, db, session, row):
         ):
             raise ValueError("source binding mismatch")
         verified_cycle = repository._enrichment_cycle_record(
-            cycle, repository._knowledge_release_pin(session)
+            cycle, repository._knowledge_release_pin(session, db=db)
         )
         if verified_cycle.result.content_hash != p.enrichment_result_hash:
             raise ValueError("cycle hash mismatch")

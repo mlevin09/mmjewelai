@@ -7,12 +7,12 @@ from types import MappingProxyType
 from typing import Literal
 
 from jewelai_domain.knowledge_library import (
-    CompiledKnowledgeLibrary,
     CompiledLanguageMapping,
     ConceptId,
     MappingMode,
     MappingQuality,
 )
+from jewelai_domain.knowledge_runtime import AnyCompiledKnowledge, validate_compiled_knowledge
 from jewelai_domain.models import ImmutableModel
 from pydantic import Field
 
@@ -155,8 +155,8 @@ def ru_morphology_key(value: str) -> str:
 class KnowledgeLibraryMatcher:
     """Immutable deterministic matcher over one compiled Knowledge Library runtime."""
 
-    def __init__(self, runtime: CompiledKnowledgeLibrary):
-        self.runtime = CompiledKnowledgeLibrary.model_validate(runtime)
+    def __init__(self, runtime: AnyCompiledKnowledge):
+        self.runtime = validate_compiled_knowledge(runtime)
         exact: dict[tuple[str, str], list[_IndexedMapping]] = {}
         morphology: dict[str, list[_IndexedMapping]] = {}
         for mapping in self.runtime.language_mappings:

@@ -12,13 +12,15 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import UUID
 
-from jewelai_domain.knowledge_activation import (
-    ActiveKnowledgeRuntime,
-    ProductionValidationReport,
+from jewelai_domain.knowledge_runtime import (
+    AnyActiveKnowledge,
+    AnyKnowledgeStore,
+    AnyValidationReport,
+    bind_verified_release,
+    knowledge_store_version,
 )
 from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
-    KnowledgeArtifactStore,
 )
 from jewelai_domain.models import ImmutableModel, MessageSource
 from jewelai_domain.revisions import RevisionConflict, revise_design
@@ -198,12 +200,12 @@ class PromptEnrichmentRuntimeService:
         self,
         repository: PersistenceRepository,
         artifacts: RuntimeArtifacts,
-        artifact_store: KnowledgeArtifactStore,
+        artifact_store: AnyKnowledgeStore,
         *,
         knowledge_package_id: str,
         knowledge_artifact_version: str,
-        active_release: ActiveKnowledgeRuntime | object,
-        validation_report: ProductionValidationReport | object,
+        active_release: AnyActiveKnowledge | object,
+        validation_report: AnyValidationReport | object,
         clock: Callable[[], datetime],
         uuid_factory: Callable[[], UUID],
     ):
@@ -242,6 +244,18 @@ class PromptEnrichmentRuntimeService:
                 request.session_id, request.message_id, request.organization_id
             )
             verified = self._load_release()
+            if knowledge_store_version(self.artifact_store) != "1.1.0":
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_KNOWLEDGE_RELEASE,
+                    "New controlled enrichment sessions require Knowledge Contract 1.1.0",
+                )
+            release_binding = bind_verified_release(
+                self.artifact_store,
+                self.knowledge_package_id,
+                self.knowledge_artifact_version,
+                active_release=self.active_release,
+                validation_report=self.validation_report,
+            )
             source = MessageSource(
                 message_id=str(message.message_id),
                 recorded_at=_aware(message.created_at),
@@ -299,6 +313,7 @@ class PromptEnrichmentRuntimeService:
                 created_at=self._clock(),
                 clarification_plan_id=clarification_plan_id,
                 clarification_plan_payload=clarification.model_dump(mode="json"),
+                release_binding=release_binding,
             )
             workflow = self._state_from_cycle(
                 session_id=request.session_id,
@@ -1193,9 +1208,9 @@ def build_final_prompt_snapshot(
     session_id: UUID,
     organization_id: UUID,
     artifacts: RuntimeArtifacts,
-    artifact_store: KnowledgeArtifactStore,
-    active_release: ActiveKnowledgeRuntime | object,
-    validation_report: ProductionValidationReport | object,
+    artifact_store: AnyKnowledgeStore,
+    active_release: AnyActiveKnowledge | object,
+    validation_report: AnyValidationReport | object,
 ) -> FinalPromptSnapshot:
     """Restore one consistent organization-scoped durable snapshot for Step #12."""
 

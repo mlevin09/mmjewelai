@@ -6,8 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from jewelai_domain import compile_knowledge_library, promote_knowledge_runtime, revise_design
-from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
+from jewelai_domain import revise_design
 from jewelai_domain.models import MessageSource
 from jewelai_domain.models_v1_1 import DesignV1_1, migrate_design_revision_v1_to_v1_1
 from jewelai_persistence import Base, create_database_engine, create_session_factory
@@ -39,12 +38,25 @@ def _content_hash(payload):
 
 
 def _runtime(service, tmp_path):
+    from jewelai_domain.knowledge_activation_v1_1 import (
+        ProductionValidationReportV1_1,
+        promote_knowledge_runtime_v1_1,
+    )
+    from jewelai_domain.knowledge_library_v1_1 import compile_knowledge_library_v1_1
+    from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
+
     payload = json.loads(KNOWLEDGE.read_text(encoding="utf-8"))
-    store = KnowledgeArtifactStore(tmp_path / "knowledge")
+    payload["contract_version"] = "1.1.0"
+    store = KnowledgeArtifactStoreV1_1(tmp_path / "knowledge")
     stored = store.publish(payload)
-    compiled, _ = compile_knowledge_library(payload)
-    report = _report(compiled)
-    active = promote_knowledge_runtime(compiled, report)
+    compiled, _ = compile_knowledge_library_v1_1(payload)
+    report = ProductionValidationReportV1_1(
+        package_id=compiled.package_id,
+        artifact_version=compiled.artifact_version,
+        runtime_sha256=compiled.sha256,
+        checks=_report(compiled).checks,
+    )
+    active = promote_knowledge_runtime_v1_1(compiled, report)
     runtime = PromptEnrichmentRuntimeService(
         service.repository,
         service.artifacts,

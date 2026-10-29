@@ -22,6 +22,7 @@ from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
 )
+from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
 
 
@@ -56,14 +57,14 @@ def engine(monkeypatch, capfd):
         command.current(cfg)
         # Unsupported online downgrade refuses even with empty retained tables.
         retained = retention_snapshot(scoped)
-        with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+        with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
             command.downgrade(cfg, "0015_reference_verification")
         assert retention_snapshot(scoped) == retained
         command.check(cfg)
         with scoped.connect() as db:
             assert (
                 db.scalar(text("SELECT version_num FROM alembic_version"))
-                == "0016_generation_preparations"
+                == "0017_knowledge_release_bindings"
             )
             assert (
                 db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
@@ -140,6 +141,11 @@ def test_scoped_url_preserves_driver_options_and_alembic_interpolation():
     cfg = Config()
     cfg.set_main_option("sqlalchemy.url", url)
     assert cfg.get_main_option("sqlalchemy.url") == url
+
+
+def test_knowledge_binding_preparation_post_get_replay(ready_session, engine):
+    # Same durability assertions on verified PostgreSQL; not a claim of the SQLite defect there.
+    assert_preparation_roundtrip(ready_session(), engine)
 
 
 def test_same_revision_c3_to_c4_no_halo_race(ready_session, engine, capfd):
@@ -245,7 +251,7 @@ def test_postgres_immutability_and_scope_foreign_keys(ready_session, engine):
                 db.execute(GenerationPreparationRow.__table__.insert().values(**invalid))
     assert counts(engine) == (1, 1, 0, 0)
     before = retention_snapshot(engine)
-    with pytest.raises(RuntimeError, match="0016 online downgrade is unsupported"):
+    with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
         command.downgrade(
             Config(str(ROOT / "packages/persistence/alembic.ini")), "0015_reference_verification"
         )

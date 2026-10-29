@@ -202,8 +202,33 @@ class PromptRevisionRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
+class KnowledgeReleaseBindingRow(Base):
+    __tablename__ = "knowledge_release_binding"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["session_id", "enrichment_cycle_id", "cycle_number", "specification_revision_id"],
+            [
+                "enrichment_cycle.session_id",
+                "enrichment_cycle.enrichment_cycle_id",
+                "enrichment_cycle.cycle_number",
+                "enrichment_cycle.specification_revision_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("cycle_number = 1", name="ck_knowledge_binding_initial_cycle"),
+    )
+    session_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    enrichment_cycle_id: Mapped[UUID] = mapped_column(Uuid)
+    cycle_number: Mapped[int] = mapped_column(Integer)
+    specification_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    organization_id: Mapped[UUID] = mapped_column(ForeignKey("organization.organization_id"))
+    payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64))
+
+
 class EnrichmentCycleRow(Base):
     __tablename__ = "enrichment_cycle"
+    knowledge_contract_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     __table_args__ = (
         UniqueConstraint(
             "session_id",

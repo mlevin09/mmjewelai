@@ -572,6 +572,25 @@ def test_combined_four_turn_halo_history_uses_collision_release(
     from jewelai_api.prompt_enrichment_runtime import PromptEnrichmentRuntimeService
 
     store, stored, _, report, active = collision_release
+    from jewelai_domain.knowledge_activation_v1_1 import (
+        ProductionValidationReportV1_1,
+        promote_knowledge_runtime_v1_1,
+    )
+    from jewelai_domain.knowledge_library_v1_1 import compile_knowledge_library_v1_1
+    from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
+
+    payload = json.loads((Path(stored.release_path) / "source.json").read_text())
+    payload["contract_version"] = "1.1.0"
+    store = KnowledgeArtifactStoreV1_1(tmp_path / "session-collision-v1-1")
+    stored = store.publish(payload)
+    compiled, _ = compile_knowledge_library_v1_1(payload)
+    report = ProductionValidationReportV1_1(
+        package_id=compiled.package_id,
+        artifact_version=compiled.artifact_version,
+        runtime_sha256=compiled.sha256,
+        checks=report.checks,
+    )
+    active = promote_knowledge_runtime_v1_1(compiled, report)
 
     def runtime_factory(service, _tmp_path):
         runtime = PromptEnrichmentRuntimeService(
