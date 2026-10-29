@@ -7,7 +7,7 @@ from pathlib import Path
 from pydantic import TypeAdapter
 
 from .downstream_preparation import (
-    CanonicalInternalFinalPromptHandoff,
+    AnyCanonicalInternalFinalPromptHandoff,
     GenerationPreparationPayload,
 )
 from .enrichment import AnyPromptEnrichmentResult
@@ -16,7 +16,7 @@ from .enrichment import AnyPromptEnrichmentResult
 def canonical_json_schema() -> dict:
     return TypeAdapter(
         AnyPromptEnrichmentResult
-        | CanonicalInternalFinalPromptHandoff
+        | AnyCanonicalInternalFinalPromptHandoff
         | GenerationPreparationPayload
     ).json_schema(ref_template="#/$defs/{model}")
 

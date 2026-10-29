@@ -7,8 +7,10 @@ the worker/Web cutover. No professional release is activated or qualified by syn
 
 Current enrichment emits `StructuredPromptEnrichmentResult` **1.3.0**: existing matrix/decisions,
 release lineage, typed references, structured revision entries/locks/disclosures and template pin.
-It uses `project_revision`, never the legacy text compiler. Current final-output/handoff builders
-emit B1's **2.0.0** contracts. Existing enrichment **1.2.0**, IFP **1.1.0**, handoff **1.0.0** and
+It uses `project_revision`, never the legacy text compiler. B2 initially emitted B1's **2.0.0**
+final-output/handoff contracts. The bounded [IFP capacity successor](../adr/0034-versioned-ifp-capacity-v2-1.md)
+selects **2.1.0** for new assembly while preserving exact 2.0 readers and preparation replay.
+Existing enrichment **1.2.0**, IFP **1.1.0**, handoff **1.0.0** and
 prompt-revision bytes retain original readers, JSON schemas and hashes. Historical nested results
 are decoded by their original version; they are not rewritten into 1.3. Existing policy, parser,
 authority precedence and professional source data are unchanged.

@@ -25,7 +25,7 @@ from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import AnyParserProposal, ParserCandidate
 from jewelai_prompts import (
-    CanonicalInternalFinalPrompt as InternalFinalPrompt,
+    CanonicalInternalFinalPromptV2_1 as InternalFinalPrompt,
 )
 from jewelai_prompts import (
     CompiledPrompt,

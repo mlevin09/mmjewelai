@@ -1,12 +1,13 @@
-"""Pure B1 preparation contracts. No runtime writer, release loader, clock or provider calls.
+"""Pure canonical preparation and exact-version IFP readers; no provider or storage calls.
 
-The v2 source types are staged contracts only. Existing enrichment/handoff writers stay unchanged.
-The final artifact owns immutable canonical bytes; mutable JSON views are always defensive copies.
+Current IFP/handoff writers select 2.1; retained 2.0 sources keep their original validation.
+The preparation owns canonical bytes; mutable JSON views are always defensive copies.
 """
 
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -26,8 +27,11 @@ from pydantic import (
     Field,
     StrictBool,
     StrictInt,
+    StringConstraints,
+    TypeAdapter,
     ValidationError,
     field_serializer,
+    field_validator,
     model_validator,
 )
 
@@ -48,6 +52,9 @@ SOURCE_MAX_BYTES = 1_048_576
 ARTIFACT_MAX_BYTES = 2_097_152
 RENDER_MAX_CHARACTERS = 20_000
 RENDER_MAX_BYTES = 80_000
+# IFP-only successor capacity; not the description or execution-rendering policy.
+IFP_V2_1_MAX_CHARACTERS = 32_000
+IFP_V2_1_MAX_BYTES = 128_000
 RENDERER_ID = "jewelai.semantic-text"
 RENDERER_VERSION = "1.0.0"
 
@@ -154,7 +161,7 @@ def render_canonical_source_text(prompt: CanonicalInternalFinalPrompt) -> str:
         prompt.parametric_references,
     )
     _, body = text.split("\n", 1)
-    return "JEWELAI INTERNAL FINAL PROMPT 2.0.0\n" + body
+    return f"JEWELAI INTERNAL FINAL PROMPT {prompt.schema_version}\n" + body
 
 
 class CanonicalFinalPromptAssembly(FinalPromptAssembly):
@@ -165,6 +172,82 @@ class CanonicalInternalFinalPromptHandoff(InternalFinalPromptHandoff):
     schema_version: Literal["2.0.0"] = "2.0.0"
     internal_final_prompt_schema_version: Literal["2.0.0"] = "2.0.0"
     internal_final_prompt: CanonicalInternalFinalPrompt
+
+
+def check_ifp_v2_1_capacity(text: str) -> None:
+    if len(text) > IFP_V2_1_MAX_CHARACTERS or len(text.encode("utf-8")) > IFP_V2_1_MAX_BYTES:
+        raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
+
+
+class CanonicalInternalFinalPromptV2_1(CanonicalInternalFinalPrompt):
+    """IFP-only capacity successor. The original 2.0 reader remains frozen."""
+
+    schema_version: Literal["2.1.0"] = "2.1.0"
+    prompt_text: Annotated[str, StringConstraints(min_length=1, max_length=32_000, pattern=r"\S")]
+
+    @field_validator("prompt_text", mode="before")
+    @classmethod
+    def validate_capacity(cls, value):
+        if isinstance(value, str):
+            check_ifp_v2_1_capacity(value)
+        return value
+
+
+class CanonicalFinalPromptAssemblyV2_1(CanonicalFinalPromptAssembly):
+    internal_final_prompt: CanonicalInternalFinalPromptV2_1
+
+
+class CanonicalInternalFinalPromptHandoffV2_1(CanonicalInternalFinalPromptHandoff):
+    schema_version: Literal["2.1.0"] = "2.1.0"
+    internal_final_prompt_schema_version: Literal["2.1.0"] = "2.1.0"
+    internal_final_prompt: Annotated[
+        CanonicalInternalFinalPromptV2_1, Field(discriminator="schema_version")
+    ]
+
+
+AnyCanonicalInternalFinalPrompt = Annotated[
+    CanonicalInternalFinalPrompt | CanonicalInternalFinalPromptV2_1,
+    Field(discriminator="schema_version"),
+]
+AnyCanonicalInternalFinalPromptHandoff = Annotated[
+    CanonicalInternalFinalPromptHandoff | CanonicalInternalFinalPromptHandoffV2_1,
+    Field(discriminator="schema_version"),
+]
+_IFP_DECODER = TypeAdapter(AnyCanonicalInternalFinalPrompt)
+_HANDOFF_DECODER = TypeAdapter(AnyCanonicalInternalFinalPromptHandoff)
+
+
+def _explicit_canonical_version(value: object) -> str:
+    """Check wire input before Pydantic can fill frozen-model version defaults."""
+    if not isinstance(value, Mapping):
+        raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
+    version = value.get("schema_version")
+    if not isinstance(version, str) or version not in ("2.0.0", "2.1.0"):
+        raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
+    return version
+
+
+def decode_canonical_internal_final_prompt(value: object) -> AnyCanonicalInternalFinalPrompt:
+    if isinstance(value, (bytes, str)):
+        value = _strict_json(value)
+    elif hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    _explicit_canonical_version(value)
+    return _IFP_DECODER.validate_python(value)
+
+
+def decode_canonical_handoff(value: object) -> AnyCanonicalInternalFinalPromptHandoff:
+    if isinstance(value, (bytes, str)):
+        value = _strict_json(value)
+    elif hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    version = _explicit_canonical_version(value)
+    if (
+        value.get("internal_final_prompt_schema_version") != version
+        or _explicit_canonical_version(value.get("internal_final_prompt")) != version
+    ):
+        raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
+    return _HANDOFF_DECODER.validate_python(value)
 
 
 class DecisionReference(ImmutableModel):
@@ -518,10 +601,10 @@ def _safe_value(value, aliases, target):
 
 
 def render_semantic_source(
-    source: CanonicalInternalFinalPromptHandoff, gate: PreparationGateEvidence
+    source: AnyCanonicalInternalFinalPromptHandoff, gate: PreparationGateEvidence
 ) -> SemanticRendering:
     """Validate and render exact typed semantics, never parse free text or call the compiler."""
-    source = CanonicalInternalFinalPromptHandoff.model_validate_json(canonical_bytes(source))
+    source = decode_canonical_handoff(source)
     gate = PreparationGateEvidence.model_validate_json(canonical_bytes(gate))
     _check_source(source, gate)
     prompt = source.internal_final_prompt
@@ -648,7 +731,7 @@ class GenerationPreparationPayload(ImmutableModel):
     enrichment_cycle_id: UUID
     enrichment_cycle_number: Annotated[StrictInt, Field(ge=1)]
     enrichment_result_hash: Sha256
-    source_handoff: CanonicalInternalFinalPromptHandoff
+    source_handoff: AnyCanonicalInternalFinalPromptHandoff
     gate_evidence: PreparationGateEvidence
     source_handoff_hash: Sha256
     source_bytes_sha256: Sha256
@@ -737,7 +820,7 @@ class GenerationPreparation:
 
 
 def build_generation_preparation(
-    source_handoff: CanonicalInternalFinalPromptHandoff | object,
+    source_handoff: AnyCanonicalInternalFinalPromptHandoff | object,
     gate_evidence: PreparationGateEvidence | object,
     *,
     preparation_id: UUID,
@@ -747,7 +830,7 @@ def build_generation_preparation(
     original_source = canonical_bytes(source_handoff)
     original_gate = canonical_bytes(gate_evidence)
     try:
-        source = CanonicalInternalFinalPromptHandoff.model_validate_json(original_source)
+        source = decode_canonical_handoff(source_handoff)
         gate = PreparationGateEvidence.model_validate_json(original_gate)
     except ValidationError:
         raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE) from None
