@@ -22,6 +22,7 @@ from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
 )
+from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
 
 
@@ -140,6 +141,11 @@ def test_scoped_url_preserves_driver_options_and_alembic_interpolation():
     cfg = Config()
     cfg.set_main_option("sqlalchemy.url", url)
     assert cfg.get_main_option("sqlalchemy.url") == url
+
+
+def test_knowledge_binding_preparation_post_get_replay(ready_session, engine):
+    # Same durability assertions on verified PostgreSQL; not a claim of the SQLite defect there.
+    assert_preparation_roundtrip(ready_session(), engine)
 
 
 def test_same_revision_c3_to_c4_no_halo_race(ready_session, engine, capfd):

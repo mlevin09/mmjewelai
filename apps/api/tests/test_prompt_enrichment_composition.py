@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 from uuid import uuid4
 
@@ -47,8 +48,10 @@ CONTROLLED_PATHS = (
 )
 
 
-def _release(tmp_path: Path, version: str = "1.0.0"):
-    payload = json.loads(KNOWLEDGE.read_text(encoding="utf-8"))
+def _release(tmp_path: Path, version: str = "1.0.0", *, bundle=None):
+    payload = (
+        json.loads(KNOWLEDGE.read_text(encoding="utf-8")) if bundle is None else deepcopy(bundle)
+    )
     payload["artifact_version"] = version
     payload["contract_version"] = "1.1.0"
     artifact_root = tmp_path / f"knowledge-{version}"

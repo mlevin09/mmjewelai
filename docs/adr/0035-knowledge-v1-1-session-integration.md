@@ -37,6 +37,7 @@ single transaction. PostgreSQL rejects binding UPDATE/DELETE. Read paths validat
 relational hash, release tuple, marker and organization scope, then reverify the actual release.
 Correction validation reuses its existing transactional Session for binding reads; it must not open
 a nested Session that could roll back a shared in-memory connection's outer transaction.
+Preparation row validation likewise passes its existing transaction to release-pin verification.
 
 Historical cycle/answer/correction/IFP bytes and schemas are not rewritten. Existing four-field
 references associate indirectly through the immutable binding. A historical NULL marker/no binding
@@ -75,7 +76,7 @@ runtime must not reinterpret a v1.1 session as v1.0.
 | 003 | P0-21 standalone tests; test_exact_identity_binding_and_unchanged_models |
 | 004 | composition missing/corrupt/tampered-evidence tests; failed-initial report case |
 | 005 | test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_cycle (EN/RU/mixed, observed real parser) |
-| 006 | P0-21 policy/template tests; existing canonical nested LOCK and stable-ID suites |
+| 006 | test_v1_1_only_policy_survives_full_http_lifecycle: composition.symmetry_mode policy in all three cycles; existing LOCK/stable-ID suites |
 | 007 | full HTTP cycle; binding counts/identity assertions |
 | 008 | full HTTP cycle clarification question/SELECT_OPTION |
 | 009 | full HTTP cycle correction; four-turn collision regression |
@@ -83,11 +84,11 @@ runtime must not reinterpret a v1.1 session as v1.0.
 | 011 | full HTTP final output; real READY capacity sessions; frozen handoff reader tests |
 | 012 | explicit-version and binding tamper tests; wrong-report rollback case |
 | 013 | test_verified_binding_requires_actual_immutable_artifacts; existing store collision tests |
-| 014 | atomic initial failure, concurrent initial binding and PostgreSQL variants; existing tenant/CAS tests |
+| 014 | atomic/concurrent binding tests; test_staticpool_preparation_post_get_replay_are_durable and PostgreSQL roundtrip variant; tenant/CAS tests |
 | 015 | existing canonical LOCK/provenance tests and real READY projection equality |
 | 016 | existing parser/policy invalid target/group and unsupported evidence tests |
 | 017 | existing 32,000/32,001 and UTF-8 capacity tests; unchanged renderer limits |
-| 018 | duplicate/concurrent binding, full HTTP restart, retained preparation replay and old hashes |
+| 018 | duplicate/concurrent binding, full HTTP restart, StaticPool preparation GET/replay, retained preparation replay and old hashes |
 
 Only actual passing runs count as evidence. PostgreSQL tests use the existing independently verified
 CI container/schema gate; absence of verified disposable PostgreSQL is a SKIP, not a local PASS.
