@@ -8,6 +8,133 @@ from conftest import ROOT, create_hierarchy
 from test_prompt_enrichment_composition import _client, _release
 from test_prompt_enrichment_http import _message
 
+REVIEW_NEGATIVES = (
+    "Асимметричное кольцо не нужно.",
+    "Не хочу, чтобы было асимметричное кольцо.",
+    "An asymmetric ring is not what I want.",
+    "Я сомневаюсь, нужно ли асимметричное кольцо.",
+    "An asymmetric design for the website.",
+    "An asymmetric composition for the photograph.",
+)
+
+
+def exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text):
+    config, active, report = _release(tmp_path, bundle=p010_bundle())
+    client, app, provider = _client(engine, config)
+    observed = []
+    from jewelai_parser import parse_full_message
+
+    def observe(*args, **kwargs):
+        result = parse_full_message(*args, **kwargs)
+        observed.append(result)
+        return result
+
+    monkeypatch.setattr("jewelai_api.prompt_enrichment_runtime.parse_full_message", observe)
+    with client:
+        org, project, _ = create_hierarchy(client)
+        response = client.post(
+            f"/projects/{project}/sessions",
+            headers={"X-Organization-ID": org},
+            json={"role_id": "retail_client", "locale": "ru-RU" if "кольцо" in text else "en-US"},
+        )
+        assert response.status_code == 201
+        sid = response.json()["session_id"]
+        headers = {"X-Organization-ID": org}
+        upgrade = client.post(
+            f"/sessions/{sid}/schema-v1-1-upgrade",
+            headers=headers,
+            json={"expected_revision_id": response.json()["current_revision_id"]},
+        )
+        assert upgrade.status_code == 200 and upgrade.json()["design"]["composition"] is None
+        message = _message(client, sid, org, text)
+        result = client.post(
+            f"/v1/sessions/{sid}/prompt-enrichment/initial",
+            headers=headers,
+            json={
+                "expected_revision_id": upgrade.json()["revision_id"],
+                "message_id": message["message_id"],
+            },
+        )
+        assert result.status_code == 201, result.json()
+        repo = app.state.prompt_enrichment_service.repository
+        revision = repo.get_current_revision(UUID(sid), UUID(org))
+        assert revision.design.composition is None
+        # Existing parser may retain the explicitly mentioned product category;
+        # no composition or unrelated design facts may be invented.
+        assert {
+            key: value
+            for key, value in revision.design.model_dump(mode="json").items()
+            if key != "jewelry_type"
+        } == {
+            key: value for key, value in upgrade.json()["design"].items() if key != "jewelry_type"
+        }
+        assert observed[0].original_text == text
+        assert observed[0].knowledge_runtime_sha256 == active.runtime_sha256
+        assert not any(
+            c.semantic_subject == "composition.symmetry_mode"
+            and c.classification == "requirement"
+            and c.certainty == "explicit"
+            for c in observed[0].candidates
+        )
+        cycles = repo.list_enrichment_cycles(UUID(sid), UUID(org))
+        assert len(cycles) == 1
+        assert not any(
+            d.outcome == "APPLIED" and d.target in {"composition", "composition.symmetry_mode"}
+            for d in cycles[0].result.decisions
+        )
+        binding = repo.get_knowledge_release_pin(UUID(sid), UUID(org))
+        assert binding.binding.runtime_sha256 == active.runtime_sha256
+        assert binding.binding.validation_report_sha256 == report.sha256
+        assert repo.get_message(UUID(sid), UUID(message["message_id"]), UUID(org)).content == text
+        state = client.get(f"/v1/sessions/{sid}/prompt-enrichment/state", headers=headers)
+        assert state.status_code == 200
+        plan = app.state.prompt_enrichment_service.restore_clarification_plan(
+            UUID(sid), UUID(org), UUID(state.json()["clarification_plan_id"]), require_current=True
+        )
+        assert not any(
+            e.semantic_subject == "composition.symmetry_mode"
+            and e.kind == "preservation"
+            and e.status == "active"
+            for e in plan.constraint_evidence
+        )
+        assert provider.calls == []
+        revision_url = f"/sessions/{sid}/revisions/{revision.revision_id}"
+        persisted = client.get(revision_url, headers=headers)
+        assert persisted.status_code == 200
+        assert persisted.json()["design"] == revision.design.model_dump(mode="json")
+
+    restarted, restored_app, restored_provider = _client(engine, config)
+    with restarted:
+        state = restarted.get(f"/v1/sessions/{sid}/prompt-enrichment/state", headers=headers)
+        assert state.status_code == 200, state.json()
+        restored_repo = restored_app.state.prompt_enrichment_service.repository
+        assert restored_repo.get_current_revision(UUID(sid), UUID(org)) == revision
+        assert restored_repo.list_enrichment_cycles(UUID(sid), UUID(org)) == cycles
+        assert restored_repo.get_knowledge_release_pin(UUID(sid), UUID(org)) == binding
+        restored_plan = restored_app.state.prompt_enrichment_service.restore_clarification_plan(
+            UUID(sid), UUID(org), UUID(state.json()["clarification_plan_id"]), require_current=True
+        )
+        assert restored_plan == plan
+        restored_revision = restarted.get(revision_url, headers=headers)
+        assert restored_revision.status_code == 200 and restored_revision.json() == persisted.json()
+        assert restored_provider.calls == []
+
+
+@pytest.mark.parametrize("text", REVIEW_NEGATIVES)
+def test_review_false_positives_do_not_persist_across_restart(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "An asymmetric ring is not what I want — do not make it symmetrical.",
+        "An asymmetric composition for the photograph — do not make it symmetrical.",
+    ],
+)
+def test_rejected_symmetry_cannot_activate_preservation(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text)
+
 
 def p010_bundle():
     # Test identity/report is synthetic. Original professional slice bytes/IDs

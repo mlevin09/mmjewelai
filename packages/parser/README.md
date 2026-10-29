@@ -23,13 +23,19 @@ inventing precedence; existing final-snapshot conflict validation remains author
 
 The bounded Owner-approved P0-10 T10-10 binding recognizes the exact RU surface
 `асимметричное` and EN `asymmetric` / `asymmetrical` only with an adjacent explicit
-product/composition referent and the scoped v1.1 Knowledge record graph. It emits
+jewelry referent and the scoped v1.1 Knowledge record graph. It emits
 ordinary structured evidence (`semantic_subject=composition.symmetry_mode`), not
 a new legacy `ParserTarget`. The API consumer re-verifies the evidence against the
 pinned runtime before proposing the approved `asymmetrical` value to Matrix/Policy.
 Negation, uncertainty, recommendations and competing symmetry evidence cannot
 become a positive canonical fact. Style labels alone provide no symmetry inference.
 The exact T10-10 preservation phrase is evidence, never implicit confirmation or LOCK.
+The referent must be jewelry-specific (for example, ring or jewelry design);
+generic design/composition and their Russian equivalents are insufficient.
+The scoped recognizer checks rejection/doubt on both sides of the phrase within
+its sentence, retaining scope across commas. Only a complete approved preservation
+instruction clause is exempted from rejection. Unclear mixed scope is not applied;
+independent sentences retain separate negation scope and original evidence offsets.
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for

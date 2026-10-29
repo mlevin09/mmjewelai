@@ -22,6 +22,7 @@ from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
 )
+from test_p010_symmetry_runtime import REVIEW_NEGATIVES, exercise_p010_rejected_http
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
 
@@ -30,6 +31,11 @@ def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypa
     from test_p010_symmetry_runtime import exercise_p010_http
 
     exercise_p010_http(engine, tmp_path, monkeypatch)
+
+
+@pytest.mark.parametrize("text", REVIEW_NEGATIVES)
+def test_p010_rejected_raw_message_postgres(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text)
 
 
 @pytest.fixture

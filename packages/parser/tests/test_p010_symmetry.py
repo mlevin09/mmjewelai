@@ -11,6 +11,30 @@ from jewelai_parser.p010_symmetry import TARGET, has_p010_binding
 ROOT = Path(__file__).resolve().parents[3]
 SLICE = ROOT / "data/knowledge/v1_1/p010-symmetry-0.1.0.json"
 ORIGINAL = "Асимметричное кольцо — не выравнивай его."
+REVIEW_NEGATIVES = (
+    "Асимметричное кольцо не нужно.",
+    "Не хочу, чтобы было асимметричное кольцо.",
+    "An asymmetric ring is not what I want.",
+    "Я сомневаюсь, нужно ли асимметричное кольцо.",
+    "An asymmetric design for the website.",
+    "An asymmetric composition for the photograph.",
+)
+
+
+@pytest.mark.parametrize("text", REVIEW_NEGATIVES)
+def test_review_false_positives_never_assert_symmetry(text):
+    parsed = parse(text)
+    assert parsed.original_text == text
+    assert not any(
+        c.semantic_subject == TARGET
+        and c.classification == "requirement"
+        and c.certainty == "explicit"
+        for c in parsed.candidates
+    )
+    assert not any(
+        c.semantic_subject == TARGET and c.classification == "preservation"
+        for c in parsed.candidates
+    )
 
 
 def parse(text, payload=None):
@@ -19,7 +43,7 @@ def parse(text, payload=None):
     )[0]
     return parse_full_message(
         text,
-        locale="ru" if text == ORIGINAL else "en",
+        locale="ru" if any("а" <= char.casefold() <= "я" for char in text) else "en",
         dictionary=load_domain_dictionary(ROOT / "data/dictionary/v1.0.0.json"),
         knowledge_runtime=runtime,
     )
@@ -31,7 +55,14 @@ def parse(text, payload=None):
         ORIGINAL,
         "An asymmetric ring.",
         "An asymmetrical ring.",
+        "An asymmetrical jewelry design.",
+        "The jewelry design is asymmetric.",
+        "Асимметричное ювелирное украшение.",
         "An asymmetric ring. Do not make it symmetrical.",
+        "Асимметричное кольцо, не выравнивай его.",
+        "An asymmetric ring, do not make it symmetrical.",
+        "No halo. An asymmetric ring.",
+        "An asymmetric ring. No halo.",
     ],
 )
 def test_p010_explicit_user_evidence_uses_real_knowledge(text):
@@ -75,6 +106,18 @@ def test_p010_explicit_user_evidence_uses_real_knowledge(text):
         "An asymmetric ring-shaped box.",
         "The earring is asymmetric.",
         "An asymmetric ring. No asymmetric ring.",
+        "An asymmetric ring isn't wanted.",
+        "I do not want, despite appearances, an asymmetric ring.",
+        "Асимметричное кольцо, но оно не нужно.",
+        "An asymmetric ring is not what I want — do not make it symmetrical.",
+        "Я не уверен, что нужно асимметричное кольцо.",
+        "Нужно ли асимметричное кольцо?",
+        "I am unsure whether an asymmetric ring is needed.",
+        "An asymmetric ring?",
+        "Асимметричное украшение для сайта.",
+        "Асимметричное композиция для фотографии.",
+        "An asymmetric website design with a ring.",
+        "An asymmetric design. Do not make it symmetrical.",
     ],
 )
 def test_p010_does_not_turn_negation_uncertainty_or_style_into_a_fact(text):
