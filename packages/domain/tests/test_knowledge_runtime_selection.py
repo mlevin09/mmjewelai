@@ -134,3 +134,39 @@ def test_explicit_store_version_never_falls_back(release):
             active_release=active,
             validation_report=validation,
         )
+
+
+@pytest.mark.parametrize("outcome", ["INCOMPLETE", "EXPECTED_GAP", "FAIL"])
+def test_v1_1_non_pass_evidence_never_qualifies(release, outcome):
+    from jewelai_domain.knowledge_activation_v1_1 import (
+        ProductionValidationReportV1_1,
+        promote_knowledge_runtime_v1_1,
+    )
+    from jewelai_domain.knowledge_qualification import KnowledgeReleaseCandidateSelection
+    from jewelai_domain.knowledge_qualification_v1_1 import qualify_knowledge_release_v1_1
+
+    store, runtime, active, validation = release
+    payload = validation.model_dump(mode="json")
+    if outcome == "INCOMPLETE":
+        payload["checks"].pop()
+    else:
+        payload["checks"][0]["outcome"] = outcome
+    invalid = ProductionValidationReportV1_1.model_validate(payload)
+    selection = KnowledgeReleaseCandidateSelection(
+        package_id=runtime.package_id, artifact_version=runtime.artifact_version, kind="SYNTHETIC"
+    )
+    result = qualify_knowledge_release_v1_1(
+        store, selection, active_release=active, validation_report=invalid
+    )
+    assert result.status.value == "BLOCKED"
+    assert result.blockers[0].code.value == "validation_gate_blocked"
+    with pytest.raises(ValueError):
+        promote_knowledge_runtime_v1_1(runtime, invalid)
+    with pytest.raises(ValueError):
+        bind_verified_release(
+            store,
+            runtime.package_id,
+            runtime.artifact_version,
+            active_release=active,
+            validation_report=invalid,
+        )
