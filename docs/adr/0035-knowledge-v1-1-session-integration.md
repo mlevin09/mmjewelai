@@ -35,6 +35,8 @@ via a composite FK, plus a nullable Knowledge contract marker on the initial cyc
 four-field session pin, optional revision, first cycle and clarification plan commit in the existing
 single transaction. PostgreSQL rejects binding UPDATE/DELETE. Read paths validate the payload hash,
 relational hash, release tuple, marker and organization scope, then reverify the actual release.
+Correction validation reuses its existing transactional Session for binding reads; it must not open
+a nested Session that could roll back a shared in-memory connection's outer transaction.
 
 Historical cycle/answer/correction/IFP bytes and schemas are not rewritten. Existing four-field
 references associate indirectly through the immutable binding. A historical NULL marker/no binding

@@ -180,3 +180,27 @@ def test_duplicate_and_concurrent_initial_are_single_binding(engine, tmp_path):
         active_release=active,
         validation_report=report,
     )
+
+
+def test_in_memory_session_correction_keeps_outer_transaction(tmp_path, monkeypatch):
+    from jewelai_persistence import Base
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+    from test_prompt_enrichment_composition import (
+        test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_cycle as cycle,
+    )
+
+    memory = create_engine(
+        "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(memory)
+    try:
+        cycle(
+            memory,
+            tmp_path,
+            monkeypatch,
+            "en-US",
+            "A white or yellow-gold three-stone ring with an oval sapphire and no halo.",
+        )
+    finally:
+        memory.dispose()

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -22,16 +23,14 @@ from jewelai_auth import (
     MembershipRole,
     VerifiedIdentity,
 )
-from jewelai_domain.knowledge_activation import (
-    ActiveKnowledgeRuntime,
-    ProductionValidationReport,
-)
 from jewelai_domain.knowledge_runtime import (
+    AnyActiveKnowledge,
+    AnyKnowledgeStore,
+    AnyValidationReport,
     KnowledgeReleaseBinding,
     bind_verified_release,
     knowledge_store_version,
 )
-from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
 from jewelai_domain.models_v1_1 import (
     AnyDesignRevision,
     DesignRevisionV1_1,
@@ -238,11 +237,11 @@ class KnowledgeReleasePinRecord:
 
     def restore_verified_runtime(
         self,
-        artifact_store: KnowledgeArtifactStore,
+        artifact_store: AnyKnowledgeStore,
         *,
-        active_release: ActiveKnowledgeRuntime | object,
-        validation_report: ProductionValidationReport | object,
-    ) -> ActiveKnowledgeRuntime:
+        active_release: AnyActiveKnowledge | object,
+        validation_report: AnyValidationReport | object,
+    ) -> AnyActiveKnowledge:
         expected_version = self.binding.knowledge_contract_version if self.binding else "1.0.0"
         if knowledge_store_version(artifact_store) != expected_version:
             raise KnowledgeReleasePinConflictError("Knowledge contract does not match session pin")
@@ -1187,11 +1186,11 @@ class PersistenceRepository:
         self,
         session_id: UUID,
         organization_id: UUID,
-        artifact_store: KnowledgeArtifactStore,
+        artifact_store: AnyKnowledgeStore,
         *,
-        active_release: ActiveKnowledgeRuntime | object,
-        validation_report: ProductionValidationReport | object,
-    ) -> ActiveKnowledgeRuntime:
+        active_release: AnyActiveKnowledge | object,
+        validation_report: AnyValidationReport | object,
+    ) -> AnyActiveKnowledge:
         pin = self.get_knowledge_release_pin(session_id, organization_id)
         return pin.restore_verified_runtime(
             artifact_store,
@@ -3029,7 +3028,9 @@ class PersistenceRepository:
             )
         return result
 
-    def _knowledge_release_pin(self, session: DesignSessionRow) -> KnowledgeReleasePinRecord:
+    def _knowledge_release_pin(
+        self, session: DesignSessionRow, *, db: Session | None = None
+    ) -> KnowledgeReleasePinRecord:
         values = (
             session.knowledge_package_id,
             session.knowledge_artifact_version,
@@ -3039,7 +3040,7 @@ class PersistenceRepository:
         if any(value is None for value in values):
             raise NotFoundError("Session has no verified Knowledge release pin")
         binding = None
-        with self._session_factory() as db:
+        with self._session_factory() if db is None else nullcontext(db) as db:
             first_cycle = db.scalar(
                 select(EnrichmentCycleRow).where(
                     EnrichmentCycleRow.session_id == session.session_id,
@@ -3476,7 +3477,7 @@ class PersistenceRepository:
             or next_cycle.content_hash != next_enrichment.content_hash
         ):
             raise UserCorrectionIntegrityError("stored correction cycle lineage is inconsistent")
-        self._enrichment_cycle_record(next_cycle, self._knowledge_release_pin(session))
+        self._enrichment_cycle_record(next_cycle, self._knowledge_release_pin(session, db=db))
         self._validate_prior_answer_lineage(
             db,
             session,

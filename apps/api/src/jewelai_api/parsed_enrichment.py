@@ -7,12 +7,12 @@ without making parser or prompt packages depend on one another.
 from enum import StrEnum
 
 from jewelai_domain.dictionary import DictionaryLocale, DictionaryRegistry, UnsupportedMatch
-from jewelai_domain.knowledge_activation import (
-    ActiveKnowledgeRuntime,
-    ProductionValidationReport,
-)
 from jewelai_domain.knowledge_policy import RuntimeProvenance, RuntimeSemanticState
-from jewelai_domain.knowledge_storage import KnowledgeArtifactStore
+from jewelai_domain.knowledge_runtime import (
+    AnyActiveKnowledge,
+    AnyKnowledgeStore,
+    AnyValidationReport,
+)
 from jewelai_domain.models import ImmutableModel, MessageSource
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_parser import (
@@ -133,11 +133,11 @@ def enrich_parsed_candidates_with_active_release(
     source: MessageSource,
     dictionary: DictionaryRegistry,
     templates: PromptTemplateBundle,
-    artifact_store: KnowledgeArtifactStore,
+    artifact_store: AnyKnowledgeStore,
     knowledge_package_id: str,
     knowledge_artifact_version: str,
-    active_release: ActiveKnowledgeRuntime | object,
-    validation_report: ProductionValidationReport | object,
+    active_release: AnyActiveKnowledge | object,
+    validation_report: AnyValidationReport | object,
     parametric_catalog_id: str | None = None,
     parametric_artifact_version: str | None = None,
     parametric_catalog_sha256: str | None = None,
@@ -305,7 +305,7 @@ def enrich_parsed_candidates_with_active_release(
 
 def _verify_parse_release(
     parsed: FullMessageParseResult,
-    verified: ActiveKnowledgeRuntime,
+    verified: AnyActiveKnowledge,
 ) -> ParseKnowledgeLineage:
     if parsed.knowledge_package_id is None:
         return ParseKnowledgeLineage.ABSENT

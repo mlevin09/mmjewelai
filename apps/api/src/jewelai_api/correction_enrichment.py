@@ -14,15 +14,15 @@ from typing import Literal
 from uuid import UUID
 
 from jewelai_domain.dictionary import DictionaryRegistry
-from jewelai_domain.knowledge_activation import (
-    ActiveKnowledgeRuntime,
-    ProductionValidationReport,
-    Sha256,
-)
+from jewelai_domain.knowledge_activation import Sha256
 from jewelai_domain.knowledge_base import ParametricKnowledgeBundle
+from jewelai_domain.knowledge_runtime import (
+    AnyActiveKnowledge,
+    AnyKnowledgeStore,
+    AnyValidationReport,
+)
 from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
-    KnowledgeArtifactStore,
 )
 from jewelai_domain.models import ImmutableModel, MessageSource, Text
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
@@ -180,9 +180,9 @@ def process_user_correction(
     prior_answer_results: tuple[ClarificationAnswerResult, ...],
     dictionary: DictionaryRegistry,
     templates: PromptTemplateBundle,
-    artifact_store: KnowledgeArtifactStore,
-    active_release: ActiveKnowledgeRuntime | object,
-    validation_report: ProductionValidationReport | object,
+    artifact_store: AnyKnowledgeStore,
+    active_release: AnyActiveKnowledge | object,
+    validation_report: AnyValidationReport | object,
     parametric_knowledge: ParametricKnowledgeBundle,
     created_at: datetime,
     template_id: str = "jewelry_visualization",
