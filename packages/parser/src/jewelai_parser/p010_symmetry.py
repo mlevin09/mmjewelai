@@ -58,7 +58,17 @@ def _preservation_instructions(text: str):
     for match in _PRESERVE.finditer(text):
         left, right = _bounds(text, match.start(), match.end(), _INSTRUCTION_BOUNDARIES)
         if not text[left : match.start()].strip() and not text[match.end() : right].strip():
-            yield match
+            sentence_left, sentence_right = _bounds(
+                text, match.start(), match.end(), _SENTENCE_BOUNDARIES
+            )
+            surrounding = text[sentence_left : match.start()] + text[match.end() : sentence_right]
+            if (
+                not _REJECT.search(surrounding)
+                and not _UNCERTAIN.search(surrounding)
+                and not _NON_JEWELRY_CONTEXT.search(surrounding)
+                and text[sentence_right : sentence_right + 1] != "?"
+            ):
+                yield match
 
 
 def has_p010_binding(runtime) -> bool:

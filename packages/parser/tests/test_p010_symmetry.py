@@ -158,3 +158,26 @@ def test_future_library_alias_does_not_expand_the_approved_binding():
     assert not any(
         c.semantic_subject == TARGET for c in parse("An unbalanced ring.", payload).candidates
     )
+
+
+@pytest.mark.parametrize(
+    "continuation",
+    [
+        "I don't mean, do not make it symmetrical.",
+        "Maybe, do not make it symmetrical.",
+        "Do not make it symmetrical?",
+        "For the website, do not make it symmetrical.",
+    ],
+)
+def test_governed_or_questioned_preservation_is_not_exempted(continuation):
+    parsed = parse(f"An asymmetric ring. {continuation}")
+    assert any(
+        c.semantic_subject == TARGET
+        and c.classification == "requirement"
+        and c.certainty == "explicit"
+        for c in parsed.candidates
+    )
+    assert not any(
+        c.semantic_subject == TARGET and c.classification == "preservation"
+        for c in parsed.candidates
+    )
