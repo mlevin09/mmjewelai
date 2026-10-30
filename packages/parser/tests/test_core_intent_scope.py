@@ -25,6 +25,9 @@ def dictionary():
         ("I reject gold.", "gold"),
         ("An unwanted gold ring.", "gold"),
         ("An unnecessary platinum ring.", "platinum"),
+        ("A gold ring doesn't suit me.", "gold"),
+        ("A platinum ring does not appeal to me.", "platinum"),
+        ("I wouldn't choose platinum.", "platinum"),
         ("Нежелательное золото. Кольцо.", "золото"),
     ),
 )
@@ -62,6 +65,7 @@ def test_tentative_single_value_is_not_explicit_authority(dictionary, text):
         ("An oval diamond ring without side stones.", "oval", "center_stone.shape"),
         ("A gold ring. No prongs.", "gold", "metal.material"),
         ("A gold ring without prongs.", "gold", "metal.material"),
+        ("A gold ring doesn't have prongs.", "gold", "metal.material"),
         ("Кольцо из золота. Крапаны не нужны.", "золота", "metal.material"),
         (
             "An oval diamond center stone. Боковые камни не нужны.",

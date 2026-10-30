@@ -230,8 +230,12 @@ _PREFERENCE = re.compile(
     re.IGNORECASE,
 )
 _AMBIGUITY = re.compile(r"\b(?:maybe|perhaps|possibly|either|or|возможно|может|либо|или)\b", re.I)
+_NEGATED_AUXILIARY = (
+    r"(?:(?:is|are|was|were|do|does|did|would|will|can|should)\s+not|cannot|"
+    r"(?:isn|aren|wasn|weren|don|doesn|didn|wouldn|won|shouldn|can)['’]t)"
+)
 _NEGATION = re.compile(
-    r"\b(?:not|no|without|never|do\s+not|don['’]t|reject\w*|avoid|"
+    r"\b(?:" + _NEGATED_AUXILIARY + r"|not|no|without|never|reject\w*|avoid|"
     r"unwanted|unnecessary|undesired|ненуж\w*|нежелательн\w*|без|не|никак\w*)\b",
     re.I,
 )
@@ -239,9 +243,8 @@ _NEGATION = re.compile(
 # negative object ("gold ring without side stones"). No canonical value is inferred.
 _REJECTED_ASSERTION = re.compile(
     r"\b(?:(?:is|are|was|were)\s+(?:not\s+|never\s+)?"
-    r"(?:unwanted|unnecessary|undesired)|"
-    r"(?:(?:is|are|was|were)\s+not|(?:isn|aren|wasn|weren)['’]t)\s+"
-    r"(?:what|want\w*|need\w*|desir\w*|suit\w*|accept\w*)|"
+    r"(?:unwanted|unnecessary|undesired)|" + _NEGATED_AUXILIARY + r"\s+(?:be\s+)?"
+    r"(?:what|want\w*|need\w*|desir\w*|suit\w*|accept\w*|appeal\w*|interest\w*|choos\w*)|"
     r"не\s+(?:нуж\w*|подход\w*|устраива\w*|интересу\w*|хочу|то\b))\b",
     re.I,
 )

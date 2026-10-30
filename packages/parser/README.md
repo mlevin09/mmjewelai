@@ -99,7 +99,9 @@ Independent read-only functional acceptance on the final PR head remains a separ
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
 Core intent handling uses the same bounded statement/clause context for polarity,
-certainty and component ownership. Recognized trailing rejection cannot create a
+certainty and component ownership. General classification, ownership and the
+symmetry scope guard share one negative-operator vocabulary, including auxiliary
+and contraction forms. Recognized trailing rejection cannot create a
 positive requirement; tentative Dictionary terms and special instructions remain
 ambiguous evidence. Independent statements and explicit contrast clauses retain
 their own facts. A comma after a hedge or within its list does not grant fresh

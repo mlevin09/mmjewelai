@@ -8,6 +8,7 @@ import re
 
 from jewelai_domain.knowledge_runtime import validate_compiled_knowledge
 
+from .full_message import _NEGATION as _REJECT
 from .knowledge_matcher import KnowledgeLibraryMatcher, ResolvedKnowledgeMatch
 
 TARGET = "composition.symmetry_mode"
@@ -39,12 +40,6 @@ _PRESERVE = re.compile(r"\bне\s+выравнивай\s+его\b|\bdo\s+not\s+m
 _SYMMETRIC = re.compile(r"\b(?:symmetrical|symmetric|симметрич\w*)\b", re.I)
 # Blocking evidence only: nominal references do not extend the approved positive binding.
 _SYMMETRY_REFERENCE = re.compile(r"\b(?:asymmetr\w*|асимметр\w*)\b", re.I)
-_REJECT = re.compile(
-    r"\b(?:not|no|without|never|reject\w*|avoid|unwanted|unnecessary|undesired|"
-    r"не|без|ненуж\w*|нежелательн\w*)\b|"
-    r"\b(?:don|doesn|isn|wasn|wouldn|shouldn|can)['’]t\b",
-    re.I,
-)
 _NON_JEWELRY_CONTEXT = re.compile(r"\b(?:website|photograph\w*|сайт\w*|фотограф\w*)\b", re.I)
 _SENTENCE_BOUNDARIES = ".!?;"
 _INSTRUCTION_BOUNDARIES = _SENTENCE_BOUNDARIES + ",—–"
