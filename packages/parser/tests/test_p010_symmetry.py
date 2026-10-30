@@ -53,6 +53,96 @@ def test_f00_shared_scope_does_not_apply_other_negative_list_objects():
     assert not any(c.parser_update for c in parsed.candidates if c.target != "jewelry_type")
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "An asymmetric ring, no diamond, yellow gold.",
+        "An asymmetric ring, no yellow gold, oval diamond.",
+        "An asymmetric ring, without sapphire, white gold.",
+        "Асимметричное кольцо, без сапфира, белое золото.",
+        "An asymmetric ring, not diamond, yellow gold.",
+        "An asymmetric ring, no mysterious object, yellow gold.",
+    ],
+)
+def test_dictionary_negative_object_scope_cannot_create_positive_facts(text):
+    parsed = parse(text)
+    assert not any(c.parser_update for c in parsed.candidates if c.target != "jewelry_type")
+    assert not any(
+        c.semantic_subject == TARGET and c.certainty == "explicit" for c in parsed.candidates
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "An asymmetric ring. No halo, engraving or side stones.",
+        "No halo, engraving or side stones. An asymmetric ring.",
+        "An asymmetric ring.\nNo halo, engraving or side stones.",
+        "No diamond, yellow gold. An asymmetric ring.",
+        "Асимметричное кольцо. Без гало, гравировки или боковых камней.",
+        "An asymmetric ring. No asymmetric photograph.",
+        "An asymmetric ring. A symmetrical photograph.",
+    ],
+)
+def test_independent_negative_statement_does_not_poison_positive_requirement(text):
+    assert any(
+        c.semantic_subject == TARGET
+        and c.classification == "requirement"
+        and c.certainty == "explicit"
+        for c in parse(text).candidates
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "An asymmetric ring, no diamond.",
+        "An asymmetric ring, no yellow gold.",
+        "No diamond, oval stone. An asymmetric ring in yellow gold.",
+        "An asymmetric ring in yellow gold. No diamond, oval stone.",
+    ],
+)
+def test_closed_objects_and_independent_positive_dictionary_facts(text):
+    parsed = parse(text)
+    assert any(
+        c.semantic_subject == TARGET and c.certainty == "explicit" for c in parsed.candidates
+    )
+    if "in yellow gold" in text:
+        assert {c.target for c in parsed.candidates if c.parser_update} >= {
+            "metal.color",
+            "metal.material",
+        }
+
+
+@pytest.mark.parametrize(
+    "text", ["An asymmetric ring. No asymmetry.", "Без асимметрии. Асимметричное кольцо."]
+)
+def test_same_property_negative_statement_still_conflicts(text):
+    assert not any(
+        c.semantic_subject == TARGET
+        and c.certainty == "explicit"
+        and c.classification == "requirement"
+        for c in parse(text).candidates
+    )
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "An asymmetric ring is not what I want in gold.",
+        "An asymmetric ring is not.",
+        "An asymmetric ring is unwanted in yellow gold.",
+    ],
+)
+def test_dictionary_word_cannot_hide_governing_rejection(text):
+    assert not any(
+        c.semantic_subject == TARGET
+        and c.certainty == "explicit"
+        and c.classification == "requirement"
+        for c in parse(text).candidates
+    )
+
+
 @pytest.mark.parametrize("text", ["An asymmetric ring road.", "An asymmetric jewelry diagram."])
 def test_f00_unknown_product_compound_is_not_a_jewelry_assertion(text):
     parsed = parse(text)

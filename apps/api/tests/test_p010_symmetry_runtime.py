@@ -76,7 +76,17 @@ SCOPE_CONTROLS = (
 
 
 def exercise_p010_rejected_http(
-    engine, tmp_path, monkeypatch, text, *, symmetry=False, keep=False, halo=False, finish=False
+    engine,
+    tmp_path,
+    monkeypatch,
+    text,
+    *,
+    symmetry=False,
+    keep=False,
+    halo=False,
+    finish=False,
+    metal=False,
+    unresolved_symmetry=False,
 ):
     config, active, report = _release(tmp_path, bundle=p010_bundle())
     client, app, provider = _client(engine, config)
@@ -135,15 +145,21 @@ def exercise_p010_rejected_http(
             assert revision.design.composition is None
         # Existing parser may retain the explicitly mentioned product category;
         # no composition or unrelated design facts may be invented.
+        allowed = (
+            {"jewelry_type"}
+            | ({"composition"} if symmetry else set())
+            | ({"metal"} if metal else set())
+        )
         assert {
             key: value
             for key, value in revision.design.model_dump(mode="json").items()
-            if key not in ({"jewelry_type", "composition"} if symmetry else {"jewelry_type"})
-        } == {
-            key: value
-            for key, value in upgrade.json()["design"].items()
-            if key not in ({"jewelry_type", "composition"} if symmetry else {"jewelry_type"})
-        }
+            if key not in allowed
+        } == {key: value for key, value in upgrade.json()["design"].items() if key not in allowed}
+        if metal:
+            assert revision.design.metal.color.value == "yellow"
+            assert revision.design.metal.material.value == "gold"
+            assert revision.design.metal.color.source.message_id == message["message_id"]
+            assert revision.design.metal.material.source.message_id == message["message_id"]
         assert observed[0].original_text == text
         assert observed[0].knowledge_runtime_sha256 == active.runtime_sha256
         assert (
@@ -184,6 +200,31 @@ def exercise_p010_rejected_http(
         plan = app.state.prompt_enrichment_service.restore_clarification_plan(
             UUID(sid), UUID(org), UUID(state.json()["clarification_plan_id"]), require_current=True
         )
+        if symmetry:
+            requirement = next(
+                e
+                for e in plan.constraint_evidence
+                if e.semantic_subject == "composition.symmetry_mode"
+                and e.kind == "requirement"
+                and e.canonical_target == "composition.symmetry_mode"
+            )
+            assert requirement.canonical_target == "composition.symmetry_mode"
+            assert requirement.status == ("superseded" if keep else "active")
+            assert requirement.source.message_id == message["message_id"]
+            assert (
+                text[requirement.source_span_start : requirement.source_span_end]
+                == requirement.original_wording
+            )
+            assert requirement.source_candidate_id in {
+                c.candidate_id for c in observed[0].candidates
+            }
+            if keep:
+                assert any(
+                    e.evidence_id == requirement.superseded_by_evidence_id
+                    and e.kind == "preservation"
+                    and e.status == "active"
+                    for e in plan.constraint_evidence
+                )
         assert (
             any(
                 e.semantic_subject == "composition.symmetry_mode"
@@ -244,6 +285,32 @@ def exercise_p010_rejected_http(
                 for d in evaluations[0].enrichment_result.decisions
             ],
             "canonical_symmetry": "asymmetrical" if symmetry else None,
+            "initial_dictionary_fields": {
+                "metal": revision.design.metal.model_dump(mode="json"),
+                "center_stone": revision.design.center_stone.model_dump(mode="json"),
+            },
+            "dictionary_dispositions": [
+                {
+                    "target": d.candidate.target,
+                    "wording": d.candidate.evidence.text,
+                    "outcome": d.outcome,
+                    "reason": d.reason,
+                }
+                for d in evaluations[0].dispositions
+                if d.candidate.target is not None
+            ],
+            "constraint_evidence": [
+                {
+                    "subject": e.semantic_subject,
+                    "kind": e.kind,
+                    "status": e.status,
+                    "canonical_target": e.canonical_target,
+                    "source_candidate_id": e.source_candidate_id,
+                    "span": [e.source_span_start, e.source_span_end],
+                    "wording": e.original_wording,
+                }
+                for e in plan.constraint_evidence
+            ],
             "active_constraints": [
                 e.semantic_subject for e in plan.constraint_evidence if e.status == "active"
             ],
@@ -280,6 +347,8 @@ def exercise_p010_rejected_http(
                     for e in plan.constraint_evidence
                     if e.status == "active"
                 ),
+                message["message_id"],
+                unresolved_symmetry,
             )
             trace["ifp_symmetry"] = [
                 f["value"]
@@ -290,6 +359,16 @@ def exercise_p010_rejected_http(
                 c["target"] == "composition.symmetry_mode" and c["kind"] == "preservation"
                 for c in prompt["constraints"]
             )
+            trace["description"] = prompt["description"]["text"]
+            trace["ifp_unresolved_targets"] = [d["target"] for d in prompt["unresolved_details"]]
+            if "that part" in text:
+                # Fixing a fulfilled canonical requirement must not suppress an
+                # independent, genuinely unresolved preservation instruction.
+                assert any(
+                    e["status"] == "unresolved" and "that part" in e["original_wording"]
+                    for e in prompt["constraint_evidence"]
+                )
+                assert "constraint.unresolved" in trace["ifp_unresolved_targets"]
     if finish:
         fresh, fresh_app, fresh_provider = _client(engine, config)
         with fresh:
@@ -307,7 +386,18 @@ def exercise_p010_rejected_http(
 
 
 def _finish_f00_lifecycle(
-    client, app, sid, org, headers, state, symmetry, keep, binding, active_constraints
+    client,
+    app,
+    sid,
+    org,
+    headers,
+    state,
+    symmetry,
+    keep,
+    binding,
+    active_constraints,
+    initial_message_id,
+    unresolved_symmetry,
 ):
     correction_message = _message(
         client, sid, org, "A white or yellow gold ring with an oval sapphire center stone. No halo."
@@ -358,6 +448,27 @@ def _finish_f00_lifecycle(
             and not facts[0]["confirmed"]
             and not facts[0]["locked"]
         )
+        assert (
+            any(d["target"] == "composition.symmetry_mode" for d in prompt["unresolved_details"])
+            is unresolved_symmetry
+        ), prompt["description"]
+        assert (
+            any(
+                e["semantic_subject"] == "composition.symmetry_mode" and e["status"] == "unresolved"
+                for e in prompt["constraint_evidence"]
+            )
+            is unresolved_symmetry
+        )
+        description = prompt["description"]["text"]
+        assert ("асимметричная" if prompt["locale"] == "ru" else "asymmetrical") in description
+        if unresolved_symmetry:
+            assert "Unresolved request about composition symmetry mode" in description
+        else:
+            assert "composition symmetry mode: неоднозначно" not in description
+            assert "composition symmetry mode: ambiguous" not in description
+    for fact in prompt["design_facts"]:
+        if fact["target"].startswith(("metal.", "center_stone.")):
+            assert initial_message_id not in fact["source_ids"]
     assert (
         any(
             c["target"] == "composition.symmetry_mode" and c["kind"] == "preservation"
@@ -396,6 +507,29 @@ def _finish_f00_lifecycle(
 
 
 F00_LIFECYCLES = (
+    ("An asymmetric ring is not what I want in gold.", False, False, False),
+    ("An asymmetric ring is not.", False, False, False),
+    ("An asymmetric ring is unwanted in yellow gold.", False, False, False),
+    ("An asymmetric ring, not diamond, yellow gold.", False, False, False),
+    ("An asymmetric ring, no mysterious object, yellow gold.", False, False, False),
+    ("An asymmetric ring. No asymmetric photograph.", True, False, False),
+    ("An asymmetric ring. A symmetrical photograph.", True, False, False),
+    ("An asymmetric ring. Do not change that part.", True, False, False),
+    ("An asymmetric ring, no diamond.", True, False, False),
+    ("An asymmetric ring, no yellow gold.", True, False, False),
+    ("An asymmetric ring. No asymmetry.", False, False, False),
+    # Independent statements remain independent; formatting is not an operator.
+    ("An asymmetric ring. No halo, engraving or side stones.", True, False, True),
+    ("No halo, engraving or side stones. An asymmetric ring.", True, False, True),
+    ("An asymmetric ring.\nNo halo, engraving or side stones.", True, False, True),
+    ("No diamond, yellow gold. An asymmetric ring.", True, False, False),
+    ("Асимметричное кольцо. Без гало, гравировки или боковых камней.", True, False, True),
+    # Dictionary objects must govern their unresolved list, like special features.
+    ("An asymmetric ring, no diamond, yellow gold.", False, False, False),
+    ("An asymmetric ring, no yellow gold, oval diamond.", False, False, False),
+    ("An asymmetric ring, without sapphire, white gold.", False, False, False),
+    ("Асимметричное кольцо, без сапфира, белое золото.", False, False, False),
+    ("An asymmetric ring. No halo, engraving or asymmetry.", False, False, True),
     ("Асимметричное кольцо — не выравнивай его.", True, True, False),
     ("An asymmetric ring, no halo, without engraving.", True, False, True),
     ("An asymmetric ring, no halo, engraving or asymmetry.", False, False, True),
@@ -405,6 +539,31 @@ F00_LIFECYCLES = (
     ("An asymmetric ring. Maybe,\ndo not make it symmetrical.", True, False, False),
     ("An asymmetric ring, no halo, yellow gold or oval diamond.", False, False, True),
 )
+
+
+F00_INDEPENDENT_METAL = (
+    "No diamond, oval stone. An asymmetric ring in yellow gold.",
+    "An asymmetric ring in yellow gold. No diamond, oval stone.",
+)
+
+
+@pytest.mark.parametrize("text", F00_INDEPENDENT_METAL)
+def test_f00_independent_dictionary_facts_persist(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text, symmetry=True, metal=True)
+
+
+def test_f00_unresolved_request_does_not_make_accepted_fact_ambiguous(
+    engine, tmp_path, monkeypatch
+):
+    exercise_p010_rejected_http(
+        engine,
+        tmp_path,
+        monkeypatch,
+        "An asymmetric ring. Maybe an asymmetric ring.",
+        symmetry=True,
+        unresolved_symmetry=True,
+        finish=True,
+    )
 
 
 @pytest.mark.parametrize("text,symmetry,keep,halo", F00_LIFECYCLES)

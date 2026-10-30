@@ -23,12 +23,16 @@ from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
 )
 from test_p010_symmetry_runtime import (
+    F00_INDEPENDENT_METAL,
     F00_LIFECYCLES,
     F00_NEGATIVE_LISTS,
     REVIEW_NEGATIVES,
     SCOPE_CONTROLS,
     SCOPE_REVIEW_CASES,
     exercise_p010_rejected_http,
+)
+from test_p010_symmetry_runtime import (
+    test_f00_unresolved_request_does_not_make_accepted_fact_ambiguous as _unresolved_request,
 )
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
@@ -65,6 +69,15 @@ def test_f00_functional_ifp_postgres(engine, tmp_path, monkeypatch, text, symmet
     exercise_p010_rejected_http(
         engine, tmp_path, monkeypatch, text, symmetry=symmetry, keep=keep, halo=halo, finish=True
     )
+
+
+@pytest.mark.parametrize("text", F00_INDEPENDENT_METAL)
+def test_f00_independent_dictionary_facts_postgres(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text, symmetry=True, metal=True)
+
+
+def test_f00_unresolved_same_target_postgres(engine, tmp_path, monkeypatch):
+    _unresolved_request(engine, tmp_path, monkeypatch)
 
 
 @pytest.fixture

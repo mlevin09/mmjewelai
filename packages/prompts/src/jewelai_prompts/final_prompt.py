@@ -757,6 +757,12 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
     center = _component_sentence("center_stone", fact_map, dictionary, locale, snapshot.locale)
     if center:
         sentences.append(center)
+    symmetry = fact_map.get("composition.symmetry_mode")
+    if symmetry is not None:
+        label = _value_text(symmetry.value, dictionary, locale, target="composition.symmetry_mode")
+        sentences.append(
+            f"Composition: {label}." if snapshot.locale == "en" else f"Композиция: {label}."
+        )
     group_prefixes = sorted(
         {
             ".".join(item.target.split(".")[:2])
@@ -818,11 +824,24 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
             if snapshot.locale == "en"
             else f"Добавлено для проверки, но не подтверждено: {labels}."
         )
-    unresolved_summary = tuple(
-        f"{_target_label(item.target, snapshot.locale)}: "
-        f"{_classification_label(item.classification, snapshot.locale)}"
-        for item in unresolved
-    )
+    unresolved_evidence_ids = {
+        item.evidence_id for item in snapshot.constraint_evidence if item.status == "unresolved"
+    }
+    unresolved_summary = []
+    for item in unresolved:
+        label = _target_label(item.target, snapshot.locale)
+        if item.target in fact_map and unresolved_evidence_ids.intersection(item.source_ids):
+            # An unresolved request is not an ambiguous canonical fact. Keep its
+            # target/source evidence visible without contradicting accepted state.
+            label = (
+                f"Unresolved request about {label}"
+                if snapshot.locale == "en"
+                else f"Неуточнённый запрос о {label}"
+            )
+        unresolved_summary.append(
+            f"{label}: {_classification_label(item.classification, snapshot.locale)}"
+        )
+    unresolved_summary = tuple(unresolved_summary)
     if unresolved_summary:
         sentences.append(
             ("Still open: " if snapshot.locale == "en" else "Остается уточнить: ")
@@ -880,6 +899,8 @@ def _component_sentence(prefix, facts, dictionary, locale, language, group_numbe
 
 
 def _value_text(value, dictionary, locale, *, target=None):
+    if target == "composition.symmetry_mode" and value == "asymmetrical":
+        return "asymmetrical" if locale == DictionaryLocale.EN else "асимметричная"
     if target == "references" and isinstance(value, list):
         count = len(value)
         return (

@@ -269,6 +269,48 @@ def _snapshot(revision, enrichment, *, locale="en", lineage=(), **changes):
     return FinalPromptSnapshot(**payload)
 
 
+@pytest.mark.parametrize("locale", ["en", "ru"])
+@pytest.mark.parametrize("has_symmetry", [False, True])
+def test_description_renders_only_canonical_symmetry(
+    ring, templates, runtime, dictionary, locale, has_symmetry
+):
+    from jewelai_domain.models_v1_1 import (
+        DesignRevisionV1_1,
+        upgrade_design_revision_v1_to_v1_1,
+    )
+
+    payload = upgrade_design_revision_v1_to_v1_1(ring).model_dump(mode="json")
+    if has_symmetry:
+
+        def explicit(value):
+            return dict(
+                availability="value",
+                origin="explicit",
+                value=value,
+                source=payload["event"]["source"],
+                confirmed=False,
+                locked=False,
+            )
+
+        payload["design"]["composition"] = explicit({"symmetry_mode": explicit("asymmetrical")})
+    revision = DesignRevisionV1_1.model_validate(payload)
+    before = revision.model_dump_json()
+    result = enrich_prompt(revision, templates, runtime)
+    data = result.model_dump(mode="json", exclude={"content_hash"})
+    data["knowledge_validation_report_sha256"] = REPORT_HASH
+    enrichment = type(result)(**data, content_hash=_hash(data))
+    assembly = assemble_internal_final_prompt(
+        _snapshot(revision, enrichment, locale=locale), dictionary=dictionary, templates=templates
+    )
+    label = "Composition: asymmetrical." if locale == "en" else "Композиция: асимметричная."
+    assert (label in assembly.description.text) is has_symmetry
+    assert not any(
+        d.target == "composition.symmetry_mode"
+        for d in assembly.internal_final_prompt.unresolved_details
+    )
+    assert revision.model_dump_json() == before
+
+
 def _constraint_evidence(
     revision,
     *,

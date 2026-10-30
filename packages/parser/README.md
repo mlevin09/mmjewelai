@@ -36,7 +36,10 @@ Website/photograph context remains deferred even if a jewelry word also appears.
 The scoped recognizer checks both sides of the phrase using explicit `.?!;`
 statement boundaries. Line breaks remain formatting inside a continued statement;
 the original string and source offsets are never normalized or rewritten.
-The existing special-constraint emitter is reused to identify negative objects.
+The existing lexical extraction path (special constraints and Dictionary/Knowledge
+matches) is reused to identify negative objects, including multiword dictionary
+objects. Unknown objects retain their negative operator as an unclosed scope;
+this does not assign a canonical target or invent a prohibition for them.
 Before excluding a property prohibition from symmetry analysis, the entire remaining
 operator scope must close: only complete existing instructions with their own
 operator and supported clause separators may follow it. Comma/newline-separated
@@ -48,7 +51,10 @@ An independent closed `no halo`/`without engraving` still permits positive symme
 and valid KEEP. Unknown noun compounds after a product word are deferred instead
 of expanding a non-jewelry noun blacklist. Only a complete approved preservation
 instruction with positive governing context is exempted from rejection.
-Independent punctuated sentences retain separate scope; unclear mixed scope is not
+An unrelated unresolved list cannot poison a positive requirement in another
+terminated sentence, in either order. A negative reference to the **same** property
+still blocks it across sentences; nominal mentions are blocking evidence only,
+not additional positive Knowledge bindings. Unclear mixed scope is not
 applied. For example, `No halo\nAn asymmetric ring.` without punctuation and
 `An asymmetric ring, no halo or side stones.` remain non-applied rather than guessing
 the boundaries of an unsupported negative list.
@@ -57,8 +63,28 @@ F00 acceptance tests exercise representative positive, rejected, uncertain,
 coordinated, multiline/non-jewelry and KEEP inputs through actual HTTP, three
 cycles, correction, clarification, revision/CAS, immutable binding and restart to
 IFP 2.1. Trace output reports actual candidates/dispositions, initial Matrix
-decisions, canonical symmetry and final IFP facts/KEEP. The release is explicitly
+decisions, canonical symmetry, final description, unresolved targets and IFP facts/KEEP.
+Accepted symmetry requirements retain their original candidate/span/Message evidence
+as canonical-bound requirements, rather than contradictory unresolved constraints.
+When the same message also supplies the approved KEEP, that preservation instruction
+explicitly supersedes the requirement evidence; both records remain queryable.
+Genuinely unresolved intent is retained. The release is explicitly
 test-only; this is not professional catalog qualification or preproduction evidence.
+The final description renders the accepted canonical symmetry in RU/EN, without
+inventing that fact when it is absent. Provider-facing facts remain canonical.
+If a separate unresolved request concerns an accepted target, its exact evidence
+is still shown as an unresolved **request**, rather than an ambiguous canonical fact.
+
+Reproduce F00-R1/R2/R3 and additional controls with:
+
+```sh
+python -m pytest -c packages/parser/pyproject.toml packages/parser/tests/test_p010_symmetry.py -q
+python -m pytest -c apps/api/pyproject.toml apps/api/tests/test_p010_symmetry_runtime.py -q -s
+```
+
+`F00_TRACE` uses synthetic messages and reports the actual three-cycle HTTP lifecycle;
+the same cases run against independently verified disposable PostgreSQL in Runtime API CI.
+Independent read-only functional acceptance on the final PR head remains a separate gate.
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for

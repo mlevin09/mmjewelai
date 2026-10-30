@@ -194,7 +194,9 @@ def enrich_parsed_candidates_with_active_release(
                 and deferred.reason == CandidateDispositionReason.TARGET_NOT_SUPPORTED_BY_PARSER
                 and candidate.semantic_subject == SYMMETRY_TARGET
                 and candidate.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
-                and verified_symmetry_candidate(candidate, parsed, verified.compiled_runtime)
+                and verified_symmetry_candidate(
+                    candidate, parsed, verified.compiled_runtime, dictionary=dictionary
+                )
             ):
                 symmetry_candidates.append(candidate)
             else:

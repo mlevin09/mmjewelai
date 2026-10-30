@@ -37,6 +37,8 @@ _UNCERTAIN = re.compile(
 )
 _PRESERVE = re.compile(r"\bне\s+выравнивай\s+его\b|\bdo\s+not\s+make\s+it\s+symmetrical\b", re.I)
 _SYMMETRIC = re.compile(r"\b(?:symmetrical|symmetric|симметрич\w*)\b", re.I)
+# Blocking evidence only: nominal references do not extend the approved positive binding.
+_SYMMETRY_REFERENCE = re.compile(r"\b(?:asymmetr\w*|асимметр\w*)\b", re.I)
 _REJECT = re.compile(
     r"\b(?:not|no|without|never|reject\w*|avoid|unwanted|unnecessary|undesired|"
     r"не|без|ненуж\w*|нежелательн\w*)\b|"
@@ -47,6 +49,7 @@ _NON_JEWELRY_CONTEXT = re.compile(r"\b(?:website|photograph\w*|сайт\w*|фо�
 _SENTENCE_BOUNDARIES = ".!?;"
 _INSTRUCTION_BOUNDARIES = _SENTENCE_BOUNDARIES + ",—–"
 _INDEPENDENT_SEPARATOR = re.compile(r"\s*(?:,\s*(?:(?:and|и)\b\s*)?|[—–]\s*|(?:and|и)\b\s+)", re.I)
+_OBJECT_PREFIX = re.compile(r"(?:no|without|без)\s+(?:(?:a|an|the)\s+)?", re.I)
 
 
 def _bounds(text: str, start: int, end: int, separators: str) -> tuple[int, int]:
@@ -81,6 +84,73 @@ def _preservation_clauses(text: str):
             yield match
 
 
+def _scope_constraints(text: str, runtime, dictionary) -> list[dict]:
+    """Re-derive operators/objects from the real lexical path, never supplied candidates.
+
+    Dictionary objects (including multiword metal descriptions) and special
+    constraints participate in the same scope analysis. An unbound tail remains
+    evidence, not a newly invented prohibition or positive fact.
+    """
+    from .full_message import _classification_for, _lexical_candidates
+
+    constraints = []
+    dictionary_objects = {}
+    for candidate in _lexical_candidates(text, dictionary, runtime):
+        if candidate["semantic_subject"] is not None:
+            constraints.append(candidate)
+        elif candidate["classification"] == "prohibition" and candidate["target"] is not None:
+            start, end = candidate["evidence"]["start"], candidate["evidence"]["end"]
+            left, _ = _bounds(text, start, end, _SENTENCE_BOUNDARIES + ",")
+            operators = tuple(_REJECT.finditer(text, left, start))
+            if not operators:
+                continue
+            operator_start = operators[-1].start()
+            previous = dictionary_objects.get(operator_start)
+            if previous is None and not _OBJECT_PREFIX.fullmatch(text[operator_start:start]):
+                # A later dictionary word does not prove that all intervening
+                # language belongs to its object ("not what I want in gold").
+                continue
+            if previous is None or (
+                end > previous["evidence"]["end"]
+                and not text[previous["evidence"]["end"] : start].strip(" \t\r\n-")
+            ):
+                dictionary_objects[operator_start] = dict(
+                    candidate,
+                    semantic_subject=str(candidate["target"]),
+                    evidence={"start": operator_start, "end": end},
+                )
+    constraints.extend(dictionary_objects.values())
+    # An unknown first object cannot make a following comma-separated term
+    # positive either. Keep its operator as an unclosed scope, without assigning
+    # a semantic target or fabricating a prohibition for that object.
+    preservation_spans = tuple(m.span() for m in _preservation_clauses(text))
+    for operator in _REJECT.finditer(text):
+        if not any(
+            c["evidence"]["start"] <= operator.start() < c["evidence"]["end"] for c in constraints
+        ) and not any(a <= operator.start() < b for a, b in preservation_spans):
+            constraints.append(
+                dict(
+                    classification="prohibition",
+                    certainty="explicit",
+                    semantic_subject="constraint.unbound",
+                    evidence={"start": operator.start(), "end": operator.end()},
+                )
+            )
+    # A negative nominal mention of the property can conflict across statements,
+    # but cannot create a canonical symmetry value or a new accepted instruction.
+    for match in _SYMMETRY_REFERENCE.finditer(text):
+        if _classification_for(text, match.start(), match.end()) == "prohibition":
+            constraints.append(
+                dict(
+                    classification="prohibition",
+                    certainty="explicit",
+                    semantic_subject=TARGET,
+                    evidence={"start": match.start(), "end": match.end()},
+                )
+            )
+    return constraints
+
+
 def _negative_object_scopes(text: str, constraints: list[dict]):
     """Prove closure of the ENTIRE negative object scope, not its first match.
 
@@ -107,7 +177,7 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
         start, end = candidate["evidence"]["start"], candidate["evidence"]["end"]
         _, stop = _bounds(text, start, end, _SENTENCE_BOUNDARIES)
         cursor = end
-        closed = True
+        closed = candidate["semantic_subject"] != "constraint.unbound"
         while text[cursor:stop].strip():
             separator = _INDEPENDENT_SEPARATOR.match(text, cursor, stop)
             if separator is None:
@@ -136,13 +206,18 @@ def _property_scoped_text(text: str, anchor_end: int, scopes) -> str:
     )
 
 
-def defer_shared_negative_candidates(text: str, runtime, candidates: list[dict]) -> list[dict]:
+def _statement(text: str, start: int, end: int) -> str:
+    left, right = _bounds(text, start, end, _SENTENCE_BOUNDARIES)
+    return text[left:right]
+
+
+def defer_shared_negative_candidates(
+    text: str, runtime, candidates: list[dict], *, dictionary
+) -> list[dict]:
     """Retain matched terms in unclosed tails without accepting them as facts."""
     if runtime is None or not has_p010_binding(runtime):
         return candidates
-    from .full_message import _special_constraint_candidates
-
-    constraints, _ = _special_constraint_candidates(text)
+    constraints = _scope_constraints(text, runtime, dictionary)
     ranges = [
         (c["evidence"]["end"], stop)
         for c, stop, closed in _negative_object_scopes(text, constraints)
@@ -223,7 +298,7 @@ def has_p010_binding(runtime) -> bool:
     )
 
 
-def symmetry_evidence(text: str, runtime) -> list[dict]:
+def symmetry_evidence(text: str, runtime, *, dictionary) -> list[dict]:
     """Return ordinary StructuredCandidate payloads; caller assigns stable IDs."""
     from .full_message import (
         CandidateCertainty,
@@ -231,7 +306,6 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
         CandidateSubject,
         NormalizationSource,
         _classification_for,
-        _special_constraint_candidates,
         _structured_candidate,
         _tokens,
     )
@@ -241,9 +315,8 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
     matcher = KnowledgeLibraryMatcher(runtime)
     evidence = []
     # Re-derive from raw text, never trust caller-supplied spans to hide negation.
-    constraints, _ = _special_constraint_candidates(text)
+    constraints = _scope_constraints(text, runtime, dictionary)
     scopes = tuple(_negative_object_scopes(text, constraints))
-    unresolved_scope = any(not closed for _, _, closed in scopes)
     preservation_by_anchor = {}
     for token in _tokens(text):
         following_product = _AFTER.search(text[token.end :])
@@ -275,12 +348,24 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
         competing = any(
             _classification_for(scoped_text, m.start(), m.end())
             == CandidateClassification.REQUIREMENT
+            and not _NON_JEWELRY_CONTEXT.search(_statement(scoped_text, m.start(), m.end()))
             for m in _SYMMETRIC.finditer(scoped_text)
         )
         # Commas do not terminate a governing rejection/doubt ("Не хочу, чтобы...").
         # Inspect both sides within this sentence, rather than a token prefix or
         # the entire message. Independent sentences keep their own scope.
         left, right = _bounds(scoped_text, token.start, token.end, _SENTENCE_BOUNDARIES)
+        unresolved_scope = any(
+            (not closed and left <= c["evidence"]["start"] < right)
+            or (
+                _SYMMETRY_REFERENCE.search(text[c["evidence"]["start"] : stop])
+                and not left <= c["evidence"]["start"] < right
+                and not _NON_JEWELRY_CONTEXT.search(
+                    _statement(text, c["evidence"]["start"], c["evidence"]["end"])
+                )
+            )
+            for c, stop, closed in scopes
+        )
         scope = scoped_text[left:right]
         classification = _classification_for(scope, token.start - left, token.end - left)
         if _REJECT.search(scope):
@@ -347,7 +432,7 @@ def symmetry_evidence(text: str, runtime) -> list[dict]:
     return evidence
 
 
-def verified_symmetry_candidate(candidate, parsed, runtime) -> bool:
+def verified_symmetry_candidate(candidate, parsed, runtime, *, dictionary) -> bool:
     """Re-derive scoped evidence from exact text and the verified pinned runtime."""
     from .full_message import StructuredCandidate
 
@@ -357,5 +442,5 @@ def verified_symmetry_candidate(candidate, parsed, runtime) -> bool:
         == StructuredCandidate(candidate_id=candidate.candidate_id, **payload).model_dump(
             mode="json", exclude={"candidate_id"}
         )
-        for payload in symmetry_evidence(parsed.original_text, runtime)
+        for payload in symmetry_evidence(parsed.original_text, runtime, dictionary=dictionary)
     )

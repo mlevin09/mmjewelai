@@ -12,7 +12,7 @@ from jewelai_parser import (
 )
 from jewelai_prompts import FinalPromptConstraintEvidence
 
-from .parsed_enrichment import ParsedCandidateEnrichmentResult
+from .parsed_enrichment import CandidateDispositionOutcome, ParsedCandidateEnrichmentResult
 
 _INSTRUCTIONS = {
     ("feature.halo", "prohibition", "en"): "Do not include a halo.",
@@ -29,6 +29,16 @@ _INSTRUCTIONS = {
     ),
     ("component.band", "preservation", "en"): "Keep the existing band unchanged.",
     ("component.band", "preservation", "ru"): "Сохранить существующую шинку без изменений.",
+    (
+        "composition.symmetry_mode",
+        "requirement",
+        "en",
+    ): "Use the explicitly requested asymmetrical composition.",
+    (
+        "composition.symmetry_mode",
+        "requirement",
+        "ru",
+    ): "Использовать явно заданную асимметричную композицию.",
     ("composition.symmetry_mode", "preservation", "ru"): (
         "Сохранить явно заданную асимметричную композицию; не выравнивать её."
     ),
@@ -83,12 +93,27 @@ def merge_constraint_evidence(
             candidate.certainty == CandidateCertainty.EXPLICIT
             and candidate.semantic_subject is not None
         )
+        canonical_requirement = False
         if candidate.semantic_subject == "composition.symmetry_mode":
             # A rejected/locked conflicting request cannot become an active
             # preservation instruction contradicting the canonical design.
             composition = getattr(revision.design, "composition", None)
             symmetry = getattr(getattr(composition, "value", None), "symmetry_mode", None)
             explicit = explicit and getattr(symmetry, "value", None) == "asymmetrical"
+            if candidate.classification == CandidateClassification.REQUIREMENT:
+                canonical_requirement = explicit and any(
+                    disposition.candidate == candidate
+                    and disposition.outcome
+                    in {
+                        CandidateDispositionOutcome.APPLIED,
+                        CandidateDispositionOutcome.KEPT,
+                        CandidateDispositionOutcome.NO_CHANGE,
+                    }
+                    for disposition in parsed.dispositions
+                )
+                # Only this exact accepted candidate and matching canonical value
+                # can be described as fulfilled. Other unresolved intent is kept.
+                explicit = canonical_requirement
         kind = candidate.classification.value
         identity = {
             "session_id": str(session_id),
@@ -110,7 +135,7 @@ def merge_constraint_evidence(
             "status": "active" if explicit else "unresolved",
             "acceptance": "user_explicit" if explicit else "unresolved",
             "semantic_subject": candidate.semantic_subject,
-            "canonical_target": None,
+            "canonical_target": candidate.semantic_subject if canonical_requirement else None,
             "normalized_instruction": (
                 _INSTRUCTIONS.get(
                     (candidate.semantic_subject, kind, parsed.parse_result.requested_locale)
@@ -131,6 +156,29 @@ def merge_constraint_evidence(
             payload["status"] = "unresolved"
             payload["acceptance"] = "unresolved"
         additions.append(_evidence(payload))
+
+    # The approved KEEP strengthens the same fulfilled canonical requirement.
+    # Retain both original spans/IDs; the current preservation instruction owns
+    # the active slot, with normal explicit supersession lineage to the fact.
+    preservation = next(
+        (
+            item
+            for item in additions
+            if item.status == "active"
+            and item.kind == "preservation"
+            and item.semantic_subject == "composition.symmetry_mode"
+        ),
+        None,
+    )
+    if preservation is not None:
+        additions = [
+            _supersede(item, preservation.evidence_id)
+            if item.status == "active"
+            and item.kind == "requirement"
+            and item.canonical_target == preservation.semantic_subject
+            else item
+            for item in additions
+        ]
 
     for addition in additions:
         if addition.status != "active":
