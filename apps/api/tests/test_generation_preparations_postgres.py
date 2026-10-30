@@ -16,6 +16,20 @@ from jewelai_persistence.models import GenerationCommandRow, GenerationPreparati
 from sqlalchemy import select, text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError, IntegrityError
+from test_core_intent import (
+    C1_CASES,
+    exercise_core_case,
+    exercise_core_lifecycle,
+)
+from test_core_intent import (
+    test_core_confirmed_material_http as _core_confirmed,
+)
+from test_core_intent import (
+    test_core_locked_material_cannot_be_replaced as _core_locked,
+)
+from test_core_intent import (
+    test_core_style_description_http as _core_style,
+)
 from test_effective_readiness import _answer, _correct
 from test_effective_readiness import ready_session as ready_session
 from test_generation_preparations import counts, expected, post
@@ -39,6 +53,31 @@ from test_p010_symmetry_runtime import (
 )
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
+
+
+@pytest.mark.parametrize("binding", (False, True))
+@pytest.mark.parametrize("case", C1_CASES, ids=[c[0] for c in C1_CASES])
+def test_c1_intent_http_postgres(engine, tmp_path, monkeypatch, case, binding):
+    exercise_core_case(engine, tmp_path, monkeypatch, case, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_c1_six_cycle_postgres(engine, tmp_path, monkeypatch, binding):
+    exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding)
+
+
+@pytest.mark.parametrize("locale", ("en", "ru"))
+def test_c1_style_description_postgres(engine, tmp_path, monkeypatch, locale):
+    _core_style(engine, tmp_path, monkeypatch, locale)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_c1_confirmed_authority_postgres(engine, tmp_path, monkeypatch, binding):
+    _core_confirmed(engine, tmp_path, monkeypatch, binding)
+
+
+def test_c1_locked_authority_postgres(engine, tmp_path, monkeypatch):
+    _core_locked(engine, tmp_path, monkeypatch)
 
 
 def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):

@@ -161,6 +161,8 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
     alternatives, incomplete lists and arbitrary words cannot prove closure.
     This never invents a prohibition for an unbound list member.
     """
+    from .full_message import _CONTRAST
+
     instructions = [
         (c["evidence"]["start"], c["evidence"]["end"])
         for c in constraints
@@ -178,6 +180,9 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
             continue
         start, end = candidate["evidence"]["start"], candidate["evidence"]["end"]
         _, stop = _bounds(text, start, end, _SENTENCE_BOUNDARIES)
+        contrast = _CONTRAST.search(text, end, stop)
+        if contrast is not None:
+            stop = contrast.start()
         cursor = end
         closed = candidate["semantic_subject"] != "constraint.unbound"
         while text[cursor:stop].strip():
@@ -217,8 +222,8 @@ def defer_shared_negative_candidates(
     text: str, runtime, candidates: list[dict], *, dictionary
 ) -> list[dict]:
     """Retain matched terms in unclosed tails without accepting them as facts."""
-    if runtime is None or not has_p010_binding(runtime):
-        return candidates
+    # Language polarity is independent of catalog membership. Only the actual
+    # symmetry value binding below requires the approved P0-10 release evidence.
     constraints = _scope_constraints(text, runtime, dictionary)
     ranges = [
         (c["evidence"]["end"], stop)

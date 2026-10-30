@@ -98,6 +98,31 @@ the same cases run against independently verified disposable PostgreSQL in Runti
 Independent read-only functional acceptance on the final PR head remains a separate gate.
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
+Core intent handling uses the same bounded statement/clause context for polarity,
+certainty and component ownership. Recognized trailing rejection cannot create a
+positive requirement; tentative Dictionary terms and special instructions remain
+ambiguous evidence. Independent statements and explicit contrast clauses retain
+their own facts. A later negative component mention cannot steal an earlier
+positive object's ownership. Decimal measurements retain their original spans.
+The existing unclosed-negative-list guard runs independently of optional P0-10
+membership; only the actual symmetry value binding requires that approved content.
+These corrections introduce no conflict-resolution, cancellation, Unknown, group
+creation or component-ID policy. Existing canonical EDIT/CAS, confirmation and
+LOCK/KEEP authority remain unchanged. Readable output also renders the existing
+accepted `style_descriptors` fact via the current Dictionary/value presenter.
+
+```sh
+python -m pytest -c packages/parser/pyproject.toml packages/parser/tests/test_core_intent_scope.py -q
+python -m pytest -c apps/api/pyproject.toml apps/api/tests/test_core_intent.py -q -s
+```
+
+`C1_TRACE` records synthetic raw input, observed candidates/dispositions/Matrix,
+canonical before/after, release identity and description/IFP. The six-cycle tests
+also check an authorized correction, clarification, immutable history, stale CAS,
+tenant isolation and fresh-application restoration. The same C1 scenarios reuse
+the existing independently verified disposable-PostgreSQL fixture in CI. These
+are development observations, not independent acceptance or a real release.
+
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for
 `center_stone.dimensions`. It applies the factor only to an existing known dimensions value;
 missing values produce a typed issue and locked values retain the existing lock-conflict behavior.
