@@ -23,6 +23,9 @@ def dictionary():
         ("Кольцо из золота мне не подходит.", "золота"),
         ("Кольцо из платины не нужно.", "платины"),
         ("I reject gold.", "gold"),
+        ("An unwanted gold ring.", "gold"),
+        ("An unnecessary platinum ring.", "platinum"),
+        ("Нежелательное золото. Кольцо.", "золото"),
     ),
 )
 def test_governed_rejection_is_not_a_positive_candidate(dictionary, text, term):

@@ -231,7 +231,9 @@ _PREFERENCE = re.compile(
 )
 _AMBIGUITY = re.compile(r"\b(?:maybe|perhaps|possibly|either|or|возможно|может|либо|или)\b", re.I)
 _NEGATION = re.compile(
-    r"\b(?:not|no|without|never|do\s+not|don['’]t|reject\w*|avoid|без|не|никак\w*)\b", re.I
+    r"\b(?:not|no|without|never|do\s+not|don['’]t|reject\w*|avoid|"
+    r"unwanted|unnecessary|undesired|ненуж\w*|нежелательн\w*|без|не|никак\w*)\b",
+    re.I,
 )
 # Predicate rejection governs the preceding assertion, unlike a following
 # negative object ("gold ring without side stones"). No canonical value is inferred.

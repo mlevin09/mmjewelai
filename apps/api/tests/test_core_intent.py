@@ -48,6 +48,8 @@ C1_CASES = (
     ("C1-10", "Maybe platinum. A ring.", "en", {}),
     ("C1-11", "A ring, no halo, yellow gold or oval diamond.", "en", {}),
     ("EN-postfix", "This platinum ring is unwanted.", "en", {}),
+    ("EN-prefix-rejection", "An unwanted gold ring.", "en", {}),
+    ("RU-prefix-rejection", "Нежелательное золото. Кольцо.", "ru", {}),
     ("RU-postfix", "Кольцо из золота мне не подходит.", "ru", {}),
     ("mixed-tentative", "Возможно platinum. Кольцо.", "ru", {}),
     ("EN-hedge-comma", "Maybe, platinum. A ring.", "en", {}),
