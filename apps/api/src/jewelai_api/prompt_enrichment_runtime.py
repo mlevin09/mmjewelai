@@ -82,7 +82,7 @@ from .clarification_answers import (
     ClarificationDecision,
     process_clarification_answer,
 )
-from .constraint_evidence import merge_constraint_evidence
+from .constraint_evidence import ConstraintEvidenceIntegrityError, merge_constraint_evidence
 from .correction_enrichment import (
     CorrectionErrorCode,
     CorrectionInputError,
@@ -104,6 +104,7 @@ from .parsed_enrichment import (
     CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
     enrich_parsed_candidates_with_active_release,
+    proposed_design_for_transition,
 )
 from .preparation_contracts import GenerationPreparationRequest
 
@@ -269,10 +270,11 @@ class PromptEnrichmentRuntimeService:
             first = self._evaluate(revision, parsed, source)
             resulting_revision = None
             authoritative = revision
-            if first.parser_proposal.has_changes:
+            proposed_design = proposed_design_for_transition(revision, first)
+            if proposed_design != revision.design:
                 authoritative = revise_design(
                     revision,
-                    first.parser_proposal.proposed_design,
+                    proposed_design,
                     expected_revision_id=revision.revision_id,
                     source=source,
                     reason="Applied explicitly sourced internal full-message parsing",
@@ -548,6 +550,9 @@ class PromptEnrichmentRuntimeService:
                 authoritative_revision=result.authoritative_revision,
                 enrichment_cycle_id=next_cycle_id,
                 previous=previous_plan.constraint_evidence,
+                load_source_revision=lambda revision_id: self.repository.get_revision(
+                    request.session_id, revision_id, organization_id
+                ),
             )
             next_plan = plan_clarifications(
                 result.authoritative_revision,
@@ -607,7 +612,7 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.CORRECTION_CONFLICT,
                 "Correction conflicts with durable history",
             ) from exc
-        except UserCorrectionIntegrityError as exc:
+        except (UserCorrectionIntegrityError, ConstraintEvidenceIntegrityError) as exc:
             raise PromptEnrichmentRuntimeError(
                 PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
                 "Correction history failed integrity validation",

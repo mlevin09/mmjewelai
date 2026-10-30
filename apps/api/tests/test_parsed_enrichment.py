@@ -1959,3 +1959,70 @@ def test_preservation_evidence_is_active_but_does_not_mutate_product_state(
     assert preserved.kind == "preservation"
     assert preserved.status == "active"
     assert ring.model_dump_json() == before
+
+
+@pytest.mark.parametrize(
+    "mode", ["same-value", "changed-value", "missing-source", "wrong-revision", "wrong-design"]
+)
+def test_canonical_keep_compatibility_uses_exact_authoritative_source(ring, mode):
+    from jewelai_domain.models_v1_1 import DesignRevisionV1_1, upgrade_design_revision_v1_to_v1_1
+    from jewelai_domain.revisions import revise_design
+
+    from jewelai_api.constraint_evidence import (
+        ConstraintEvidenceIntegrityError,
+        _same_preserved_fact,
+    )
+
+    source = MessageSource(message_id=str(uuid4()), recorded_at=NOW)
+    payload = upgrade_design_revision_v1_to_v1_1(ring).model_dump(mode="json")
+
+    def explicit(value):
+        return dict(
+            availability="value",
+            origin="explicit",
+            value=value,
+            source=source.model_dump(mode="json"),
+            confirmed=False,
+            locked=False,
+        )
+
+    payload["design"]["composition"] = explicit({"symmetry_mode": explicit("asymmetrical")})
+    original = DesignRevisionV1_1.model_validate(payload)
+    changed = original.design.model_dump(mode="json")
+    child = changed["composition"]["value"]["symmetry_mode"]
+    child["value"] = "symmetrical" if mode == "changed-value" else "asymmetrical"
+    child["source"]["message_id"] = str(uuid4())
+    current = revise_design(
+        original,
+        changed,
+        expected_revision_id=original.revision_id,
+        source=source,
+        reason="Explicit test canonical edit",
+        created_at=NOW,
+    )
+    keeper = SimpleNamespace(
+        source_revision_id=original.revision_id, semantic_subject="composition.symmetry_mode"
+    )
+    requirement = SimpleNamespace(kind="requirement", canonical_target="composition.symmetry_mode")
+    returned = original.model_dump(mode="json")
+    if mode == "wrong-revision":
+        returned["revision_id"] = str(uuid4())
+    if mode == "wrong-design":
+        returned["design_id"] = str(uuid4())
+    calls = []
+
+    def load(revision_id):
+        calls.append(revision_id)
+        return DesignRevisionV1_1.model_validate(returned)
+
+    if mode in {"missing-source", "wrong-revision", "wrong-design"}:
+        with pytest.raises(ConstraintEvidenceIntegrityError):
+            _same_preserved_fact(
+                keeper, requirement, current, None if mode == "missing-source" else load
+            )
+    else:
+        assert _same_preserved_fact(keeper, requirement, current, load) is (mode == "same-value")
+        assert calls == [original.revision_id]
+    # The compatibility rule neither mutates canonical values nor introduces LOCK.
+    assert not current.design.composition.value.symmetry_mode.locked
+    assert original.design.composition.value.symmetry_mode.value == "asymmetrical"

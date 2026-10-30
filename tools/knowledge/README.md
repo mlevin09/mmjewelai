@@ -88,3 +88,27 @@ then real six-category qualification, separately authorized ACTIVE promotion,
 preproduction verification and production release. No live request handling,
 historical fixture, target registry, contract, migration, provider or deployment
 behavior changes in this PR. Issue #125 remains open.
+
+## C2 T10-10 extension (isolated DRAFT 0.2.0)
+
+The subsequent bounded [Owner approval](https://github.com/mlevin09/mmjewelai/issues/125#issuecomment-6502450359)
+permits ten traceable P0-10 v1.1 records for T10-10 only. Their checked-in fragment
+and record hash/source-pointer register are under `data/knowledge/v1_1/`.
+No full private original archive is checked in. Missing IDs use deterministic
+P010/C2/semantic-role or locale names; original `asymmetry` and STYLE-10-02/06/07
+IDs are preserved. `geometric`, eight unrelated overlapping concepts and
+same-URI/different-ID GIA sources are neither imported nor silently reconciled.
+
+```sh
+python tools/knowledge/build_p010_symmetry_draft.py \
+  --output /private/evidence/new-c2-draft-output
+```
+
+This reuses the recovered-core projection, rejects ID collisions in every record
+group and stages 392 records as `jewelai.draft.recovered_core / 0.2.0` through the
+existing immutable v1.1 store. Output must be a new isolated directory. It creates
+no validation report or ACTIVE envelope and never selects a runtime catalog.
+The old 0.1.0 candidate/report remains unchanged and cannot qualify the new hash.
+The actual extended DRAFT is still BLOCKED for release; synthetic qualified HTTP
+fixtures demonstrate machinery only. Full professional provenance/behavioral
+qualification and explicit promotion are still required. Issue #125 stays open.

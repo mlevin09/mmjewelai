@@ -381,27 +381,8 @@ _UNRESOLVED_STOPWORDS = frozenset(
 )
 
 
-def parse_full_message(
-    text: str,
-    *,
-    locale: Literal["en", "ru"],
-    dictionary: DictionaryRegistry,
-    knowledge_runtime: AnyCompiledKnowledge | None = None,
-) -> FullMessageParseResult:
-    """Extract conservative structured evidence without changing canonical Product State."""
-
-    if not isinstance(text, str) or not text or not text.strip():
-        raise ValueError("full-message input must contain non-whitespace text")
-    if len(text) > 2000:
-        raise ValueError("full-message input exceeds the domain text limit")
-
-    runtime = (
-        validate_compiled_knowledge(knowledge_runtime) if knowledge_runtime is not None else None
-    )
-    surfaces = _dictionary_surfaces(dictionary)
-    if runtime is not None:
-        surfaces.extend(_knowledge_surfaces(runtime))
-
+def _special_constraint_candidates(text: str) -> tuple[list[dict], list[tuple[int, int]]]:
+    """Existing property-bound evidence, shared with the scoped symmetry consumer."""
     candidates: list[dict] = []
     protected_spans: list[tuple[int, int]] = []
     for (
@@ -435,17 +416,32 @@ def parse_full_message(
                     detail=detail,
                 )
             )
+    return candidates, protected_spans
 
-    found = _find_surfaces(text, surfaces)
-    found = _mark_choice_ambiguity(text, found)
-    for item in found:
-        if _inside_any(item.start, item.end, protected_spans):
-            continue
-        candidates.append(_candidate_from_surface(text, item, dictionary, runtime))
 
-    candidates.extend(_measurement_candidates(text))
-    candidates.extend(_quantity_candidates(text))
-    candidates.extend(_aesthetic_candidates(text, protected_spans))
+def parse_full_message(
+    text: str,
+    *,
+    locale: Literal["en", "ru"],
+    dictionary: DictionaryRegistry,
+    knowledge_runtime: AnyCompiledKnowledge | None = None,
+) -> FullMessageParseResult:
+    """Extract conservative structured evidence without changing canonical Product State."""
+
+    if not isinstance(text, str) or not text or not text.strip():
+        raise ValueError("full-message input must contain non-whitespace text")
+    if len(text) > 2000:
+        raise ValueError("full-message input exceeds the domain text limit")
+
+    runtime = (
+        validate_compiled_knowledge(knowledge_runtime) if knowledge_runtime is not None else None
+    )
+    candidates = _lexical_candidates(text, dictionary, runtime)
+
+    from .p010_symmetry import defer_shared_negative_candidates, symmetry_evidence
+
+    candidates.extend(symmetry_evidence(text, runtime, dictionary=dictionary))
+    candidates = defer_shared_negative_candidates(text, runtime, candidates, dictionary=dictionary)
 
     recognized = [(item["evidence"]["start"], item["evidence"]["end"]) for item in candidates]
     candidates.extend(_unresolved_candidates(text, recognized))
@@ -482,6 +478,22 @@ def parse_full_message(
         candidates=immutable,
         **identity,
     )
+
+
+def _lexical_candidates(text: str, dictionary: DictionaryRegistry, runtime) -> list[dict]:
+    """One lexical path for extraction and independent raw-text scope verification."""
+    surfaces = _dictionary_surfaces(dictionary)
+    if runtime is not None:
+        surfaces.extend(_knowledge_surfaces(runtime))
+    candidates, protected_spans = _special_constraint_candidates(text)
+    found = _mark_choice_ambiguity(text, _find_surfaces(text, surfaces))
+    for item in found:
+        if not _inside_any(item.start, item.end, protected_spans):
+            candidates.append(_candidate_from_surface(text, item, dictionary, runtime))
+    candidates.extend(_measurement_candidates(text))
+    candidates.extend(_quantity_candidates(text))
+    candidates.extend(_aesthetic_candidates(text, protected_spans))
+    return candidates
 
 
 def _dictionary_surfaces(dictionary: DictionaryRegistry) -> list[_Surface]:

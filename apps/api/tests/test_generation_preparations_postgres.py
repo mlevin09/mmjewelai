@@ -22,8 +22,88 @@ from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
 )
+from test_p010_symmetry_runtime import (
+    F00_INDEPENDENT_METAL,
+    F00_LIFECYCLES,
+    F00_NEGATIVE_LISTS,
+    KEEP_COMPATIBLE_FULL_CORRECTIONS,
+    KEEP_FOLLOWUPS,
+    REVIEW_NEGATIVES,
+    SCOPE_CONTROLS,
+    SCOPE_REVIEW_CASES,
+    exercise_keep_correction_sequence,
+    exercise_p010_rejected_http,
+)
+from test_p010_symmetry_runtime import (
+    test_f00_unresolved_request_does_not_make_accepted_fact_ambiguous as _unresolved_request,
+)
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
+
+
+def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):
+    from test_p010_symmetry_runtime import exercise_p010_http
+
+    exercise_p010_http(engine, tmp_path, monkeypatch)
+
+
+@pytest.mark.parametrize("text", REVIEW_NEGATIVES)
+def test_p010_rejected_raw_message_postgres(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text)
+
+
+@pytest.mark.parametrize(
+    "text,symmetry,keep,halo",
+    SCOPE_REVIEW_CASES + tuple(case for case in SCOPE_CONTROLS if all(case[1:])),
+)
+def test_p010_semantic_scope_postgres(engine, tmp_path, monkeypatch, text, symmetry, keep, halo):
+    exercise_p010_rejected_http(
+        engine, tmp_path, monkeypatch, text, symmetry=symmetry, keep=keep, halo=halo
+    )
+
+
+@pytest.mark.parametrize("text", F00_NEGATIVE_LISTS)
+def test_f00_negative_lists_postgres(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text)
+
+
+@pytest.mark.parametrize("text,symmetry,keep,halo", F00_LIFECYCLES)
+def test_f00_functional_ifp_postgres(engine, tmp_path, monkeypatch, text, symmetry, keep, halo):
+    exercise_p010_rejected_http(
+        engine, tmp_path, monkeypatch, text, symmetry=symmetry, keep=keep, halo=halo, finish=True
+    )
+
+
+@pytest.mark.parametrize("text", F00_INDEPENDENT_METAL)
+def test_f00_independent_dictionary_facts_postgres(engine, tmp_path, monkeypatch, text):
+    exercise_p010_rejected_http(engine, tmp_path, monkeypatch, text, symmetry=True, metal=True)
+
+
+def test_f00_unresolved_same_target_postgres(engine, tmp_path, monkeypatch):
+    _unresolved_request(engine, tmp_path, monkeypatch)
+
+
+@pytest.mark.parametrize("followups", KEEP_FOLLOWUPS)
+def test_f00_keep_corrections_postgres(engine, tmp_path, monkeypatch, followups):
+    exercise_keep_correction_sequence(engine, tmp_path, monkeypatch, followups)
+
+
+@pytest.mark.parametrize("correction", KEEP_COMPATIBLE_FULL_CORRECTIONS)
+def test_f00_keep_three_cycles_postgres(engine, tmp_path, monkeypatch, correction):
+    exercise_p010_rejected_http(
+        engine,
+        tmp_path,
+        monkeypatch,
+        "Асимметричное кольцо — не выравнивай его.",
+        symmetry=True,
+        keep=True,
+        finish=True,
+        finish_correction_text=correction,
+    )
+
+
+def test_f00_keep_authority_postgres(engine, tmp_path, monkeypatch):
+    exercise_keep_correction_sequence(engine, tmp_path, monkeypatch, (), external_edit=True)
 
 
 @pytest.fixture
