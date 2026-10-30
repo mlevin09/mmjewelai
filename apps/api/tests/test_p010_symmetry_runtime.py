@@ -87,6 +87,7 @@ def exercise_p010_rejected_http(
     finish=False,
     metal=False,
     unresolved_symmetry=False,
+    finish_correction_text=None,
 ):
     config, active, report = _release(tmp_path, bundle=p010_bundle())
     client, app, provider = _client(engine, config)
@@ -349,6 +350,7 @@ def exercise_p010_rejected_http(
                 ),
                 message["message_id"],
                 unresolved_symmetry,
+                correction_text=finish_correction_text,
             )
             trace["ifp_symmetry"] = [
                 f["value"]
@@ -398,9 +400,16 @@ def _finish_f00_lifecycle(
     active_constraints,
     initial_message_id,
     unresolved_symmetry,
+    *,
+    correction_text=None,
+    preceding_cycles=1,
 ):
     correction_message = _message(
-        client, sid, org, "A white or yellow gold ring with an oval sapphire center stone. No halo."
+        client,
+        sid,
+        org,
+        correction_text
+        or "A white or yellow gold ring with an oval sapphire center stone. No halo.",
     )
     correction = client.post(
         f"/v1/sessions/{sid}/prompt-enrichment/corrections",
@@ -462,7 +471,11 @@ def _finish_f00_lifecycle(
         description = prompt["description"]["text"]
         assert ("асимметричная" if prompt["locale"] == "ru" else "asymmetrical") in description
         if unresolved_symmetry:
-            assert "Unresolved request about composition symmetry mode" in description
+            assert (
+                "Неуточнённый запрос о composition symmetry mode"
+                if prompt["locale"] == "ru"
+                else "Unresolved request about composition symmetry mode"
+            ) in description
         else:
             assert "composition symmetry mode: неоднозначно" not in description
             assert "composition symmetry mode: ambiguous" not in description
@@ -480,7 +493,7 @@ def _finish_f00_lifecycle(
         assert any(c["target"] == subject and c["kind"] == kind for c in prompt["constraints"])
     repo = app.state.prompt_enrichment_service.repository
     cycles = repo.list_enrichment_cycles(UUID(sid), UUID(org))
-    assert len(cycles) == 3
+    assert len(cycles) == preceding_cycles + 2
     for cycle in cycles:
         cells = [c for c in cycle.result.final_matrix if c.target == "composition.symmetry_mode"]
         assert bool(cells) is symmetry
@@ -573,6 +586,356 @@ def test_f00_unresolved_request_does_not_make_accepted_fact_ambiguous(
 def test_f00_functional_lifecycle_to_ifp(engine, tmp_path, monkeypatch, text, symmetry, keep, halo):
     exercise_p010_rejected_http(
         engine, tmp_path, monkeypatch, text, symmetry=symmetry, keep=keep, halo=halo, finish=True
+    )
+
+
+KEEP_COMPATIBLE_FULL_CORRECTIONS = (
+    "An asymmetric ring in white or yellow gold with an oval diamond. No halo.",
+    "An asymmetrical jewelry design. White or yellow gold, oval diamond. No halo.",
+    "Кольцо должно быть асимметричное. Белое или желтое золото, овальный алмаз. Без гало.",
+)
+
+
+@pytest.mark.parametrize(
+    "correction", KEEP_COMPATIBLE_FULL_CORRECTIONS, ids=("en-facts", "en-independent", "ru-facts")
+)
+def test_keep_survives_compatible_three_cycle_correction(engine, tmp_path, monkeypatch, correction):
+    exercise_p010_rejected_http(
+        engine,
+        tmp_path,
+        monkeypatch,
+        "Асимметричное кольцо — не выравнивай его.",
+        symmetry=True,
+        keep=True,
+        finish=True,
+        finish_correction_text=correction,
+    )
+
+
+KEEP_FOLLOWUPS = (
+    ("An asymmetric ring.",),
+    ("Кольцо должно быть асимметричное.",),
+    ("An asymmetric ring in gold with an oval diamond.",),
+    ("No halo.", "Add a halo."),
+    ("Maybe an asymmetric ring.",),
+    ("An asymmetric ring is not what I want.",),
+    ("Make the ring symmetrical.",),
+    ("Remove the KEEP instruction.",),
+    (
+        "An asymmetric ring.",
+        "An asymmetrical ring — do not make it symmetrical.",
+        "Кольцо должно быть асимметричное.",
+        "No halo.",
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    "followups",
+    KEEP_FOLLOWUPS,
+    ids=(
+        "minimal-en",
+        "compatible-ru",
+        "independent-facts",
+        "halo-replacement",
+        "uncertain",
+        "rejected",
+        "unsupported-conflict",
+        "unsupported-cancel",
+        "replacement-sequence",
+    ),
+)
+def test_keep_correction_sequence_http(engine, tmp_path, monkeypatch, followups):
+    exercise_keep_correction_sequence(engine, tmp_path, monkeypatch, followups)
+
+
+def test_keep_is_not_a_lock_and_cannot_authorize_stale_handoff(engine, tmp_path, monkeypatch):
+    exercise_keep_correction_sequence(engine, tmp_path, monkeypatch, (), external_edit=True)
+
+
+def exercise_keep_correction_sequence(
+    engine, tmp_path, monkeypatch, followups, *, external_edit=False
+):
+    """Real persisted Messages/corrections; inspect each authoritative cycle, then restart."""
+    from jewelai_api.durable_enrichment import list_user_correction_results
+
+    config, active, report = _release(tmp_path, bundle=p010_bundle())
+    client, app, provider = _client(engine, config)
+    snapshots = []
+    with client:
+        org, project, _ = create_hierarchy(client)
+        headers = {"X-Organization-ID": org}
+        response = client.post(
+            f"/projects/{project}/sessions",
+            headers=headers,
+            json={"role_id": "retail_client", "locale": "ru-RU"},
+        )
+        assert response.status_code == 201
+        sid = response.json()["session_id"]
+        upgraded = client.post(
+            f"/sessions/{sid}/schema-v1-1-upgrade",
+            headers=headers,
+            json={"expected_revision_id": response.json()["current_revision_id"]},
+        )
+        assert upgraded.status_code == 200
+        initial = _message(client, sid, org, "Асимметричное кольцо — не выравнивай его.")
+        response = client.post(
+            f"/v1/sessions/{sid}/prompt-enrichment/initial",
+            headers=headers,
+            json={
+                "expected_revision_id": upgraded.json()["revision_id"],
+                "message_id": initial["message_id"],
+            },
+        )
+        assert response.status_code == 201, response.json()
+        repo = app.state.prompt_enrichment_service.repository
+        binding = repo.get_knowledge_release_pin(UUID(sid), UUID(org))
+        assert binding.binding.runtime_sha256 == active.runtime_sha256
+        assert binding.binding.validation_report_sha256 == report.sha256
+        current_keep = None
+        history = []
+
+        def snapshot(label, expected_message_id, *, replaces=False):
+            nonlocal current_keep
+            state = client.get(f"/v1/sessions/{sid}/prompt-enrichment/state", headers=headers)
+            assert state.status_code == 200, state.json()
+            state = state.json()
+            runtime = app.state.prompt_enrichment_service
+            plan = runtime.restore_clarification_plan(
+                UUID(sid), UUID(org), UUID(state["clarification_plan_id"]), require_current=True
+            )
+            evidence = [
+                e
+                for e in plan.constraint_evidence
+                if e.semantic_subject == "composition.symmetry_mode"
+            ]
+            active_evidence = [e for e in evidence if e.status == "active"]
+            assert len(active_evidence) == 1 and active_evidence[0].kind == "preservation", evidence
+            keeper = active_evidence[0]
+            assert keeper.source.message_id == expected_message_id
+            original = repo.get_message(UUID(sid), UUID(expected_message_id), UUID(org)).content
+            assert (
+                original[keeper.source_span_start : keeper.source_span_end]
+                == keeper.original_wording
+            )
+            if current_keep is not None:
+                if replaces:
+                    old = next(e for e in evidence if e.evidence_id == current_keep.evidence_id)
+                    assert (
+                        old.status == "superseded"
+                        and old.superseded_by_evidence_id == keeper.evidence_id
+                    )
+                else:
+                    assert keeper == current_keep
+            current_keep = keeper
+            revision = repo.get_current_revision(UUID(sid), UUID(org))
+            value = revision.design.composition.value.symmetry_mode
+            assert value.value == "asymmetrical" and not value.locked and not value.confirmed
+            assert value.source.message_id == initial["message_id"]
+            assembly = runtime.get_current_state(UUID(sid), UUID(org)).final_output
+            prompt = assembly.internal_final_prompt
+            keeps = [
+                c
+                for c in prompt.constraints
+                if c.kind == "preservation" and c.target == keeper.semantic_subject
+            ]
+            assert len(keeps) == 1 and keeper.evidence_id in keeps[0].source_ids
+            assert keeper.normalized_instruction in prompt.prompt_text
+            requirements = [
+                c
+                for c in prompt.constraints
+                if c.kind == "requirement" and c.target == keeper.semantic_subject
+            ]
+            assert len(requirements) == 1 and requirements[0].value == "asymmetrical"
+            for record in history:
+                assert (
+                    repo.get_clarification_plan_for_cycle(
+                        UUID(sid), record.enrichment_cycle_id, UUID(org)
+                    )
+                    == record
+                )
+            record = repo.get_clarification_plan_for_cycle(
+                UUID(sid), UUID(state["enrichment_cycle_id"]), UUID(org)
+            )
+            history.append(record)
+            snapshots.append(
+                {
+                    "stage": label,
+                    "cycle": state["enrichment_cycle_number"],
+                    "keeper": keeper.model_dump(mode="json"),
+                    "revision_id": str(revision.revision_id),
+                    "ifp_keep": True,
+                }
+            )
+            return state
+
+        state = snapshot("initial", initial["message_id"])
+        if external_edit:
+            # Existing structured EDIT authority is independent of KEEP evidence.
+            # It may change an unlocked fact, but cannot reuse an older enrichment
+            # cycle/constraint as a valid current handoff. No revocation is invented.
+            from conftest import NOW
+            from jewelai_domain.revisions import revise_design
+
+            change = _message(client, sid, org, "Explicit test change to symmetrical composition.")
+            source = {
+                "kind": "message",
+                "message_id": change["message_id"],
+                "recorded_at": NOW.isoformat(),
+            }
+            revision = repo.get_current_revision(UUID(sid), UUID(org))
+            design = revision.design.model_dump(mode="json")
+            design["composition"]["value"]["symmetry_mode"]["value"] = "symmetrical"
+            design["composition"]["value"]["symmetry_mode"]["source"] = source
+            # Reuse the existing internal Schema1.1 EDIT/CAS boundary; the
+            # legacy public revisions route intentionally remains Schema1.0.
+            edited = revise_design(
+                revision,
+                design,
+                expected_revision_id=revision.revision_id,
+                source=source,
+                reason="Explicit test authorized edit",
+                created_at=NOW,
+            )
+            repo.append_revision_cas(UUID(sid), UUID(org), revision.revision_id, edited)
+            assert (
+                repo.get_current_revision(
+                    UUID(sid), UUID(org)
+                ).design.composition.value.symmetry_mode.value
+                == "symmetrical"
+            )
+            blocked = client.get(
+                f"/v1/sessions/{sid}/prompt-enrichment/final-output", headers=headers
+            )
+            assert blocked.status_code == 409, blocked.json()
+            assert (
+                repo.get_clarification_plan_for_cycle(
+                    UUID(sid), history[0].enrichment_cycle_id, UUID(org)
+                )
+                == history[0]
+            )
+            assert provider.calls == []
+            print(
+                "F00_KEEP_AUTHORITY_TRACE canonical_edit=APPLIED stale_handoff=409 "
+                "historical_evidence_unchanged=true"
+            )
+            return
+        keeper_message_id = initial["message_id"]
+        for text in followups:
+            message = _message(client, sid, org, text)
+            response = client.post(
+                f"/v1/sessions/{sid}/prompt-enrichment/corrections",
+                headers=headers,
+                json={
+                    "expected_revision_id": state["authoritative_revision_id"],
+                    "message_id": message["message_id"],
+                },
+            )
+            assert response.status_code == 200, response.json()
+            correction = next(
+                item
+                for item in list_user_correction_results(
+                    repo, session_id=UUID(sid), organization_id=UUID(org)
+                )
+                if item.source.message_id == message["message_id"]
+            )
+            new_keep = any(
+                c.classification == "preservation"
+                and c.certainty == "explicit"
+                and c.semantic_subject == "composition.symmetry_mode"
+                for c in correction.parsed_correction.candidates
+            )
+            if new_keep:
+                keeper_message_id = message["message_id"]
+            state = snapshot(text, keeper_message_id, replaces=new_keep)
+            accepted_reaffirmations = [
+                d
+                for d in correction.correction_evaluation.dispositions
+                if d.candidate.semantic_subject == "composition.symmetry_mode"
+                and d.candidate.classification == "requirement"
+                and d.candidate.certainty == "explicit"
+            ]
+            if accepted_reaffirmations:
+                assert all(d.outcome in {"KEPT", "NO_CHANGE"} for d in accepted_reaffirmations)
+                plan = app.state.prompt_enrichment_service.restore_clarification_plan(
+                    UUID(sid), UUID(org), UUID(state["clarification_plan_id"]), require_current=True
+                )
+                reaffirmation = next(
+                    e
+                    for e in plan.constraint_evidence
+                    if e.source.message_id == message["message_id"]
+                    and e.canonical_target == "composition.symmetry_mode"
+                    and e.kind == "requirement"
+                )
+                assert reaffirmation.status == "superseded"
+                assert reaffirmation.superseded_by_evidence_id == current_keep.evidence_id
+            if text.endswith("in gold with an oval diamond."):
+                revision = repo.get_current_revision(UUID(sid), UUID(org))
+                assert revision.design.metal.material.value == "gold"
+                assert revision.design.center_stone.shape.value == "oval"
+                assert revision.design.center_stone.material.value == "diamond"
+                assert revision.design.center_stone.shape.source.message_id == message["message_id"]
+            snapshots[-1]["symmetry_decisions"] = [
+                d.outcome
+                for d in correction.correction_evaluation.dispositions
+                if d.candidate.semantic_subject == "composition.symmetry_mode"
+            ]
+            snapshots[-1]["correction_outcome"] = correction.outcome
+            assert repo.get_knowledge_release_pin(UUID(sid), UUID(org)) == binding
+        before_restart = repo.list_enrichment_cycles(UUID(sid), UUID(org))
+        assert provider.calls == []
+
+    restarted, restored_app, restored_provider = _client(engine, config)
+    with restarted:
+        state_response = restarted.get(
+            f"/v1/sessions/{sid}/prompt-enrichment/state", headers=headers
+        )
+        assert state_response.status_code == 200
+        state = state_response.json()
+        restored_repo = restored_app.state.prompt_enrichment_service.repository
+        assert restored_repo.list_enrichment_cycles(UUID(sid), UUID(org)) == before_restart
+        prompt = _finish_f00_lifecycle(
+            restarted,
+            restored_app,
+            sid,
+            org,
+            headers,
+            state,
+            True,
+            True,
+            binding,
+            (("composition.symmetry_mode", "preservation"),),
+            initial["message_id"],
+            any(
+                e.status == "unresolved" and e.semantic_subject == "composition.symmetry_mode"
+                for e in restored_app.state.prompt_enrichment_service.restore_clarification_plan(
+                    UUID(sid), UUID(org), UUID(state["clarification_plan_id"]), require_current=True
+                ).constraint_evidence
+            ),
+            preceding_cycles=1 + len(followups),
+        )
+        assert any(
+            e["evidence_id"] == current_keep.evidence_id and e["status"] == "active"
+            for e in prompt["constraint_evidence"]
+        )
+        assert restored_provider.calls == []
+    fresh, fresh_app, fresh_provider = _client(engine, config)
+    with fresh:
+        final = fresh.get(f"/v1/sessions/{sid}/prompt-enrichment/final-output", headers=headers)
+        assert final.status_code == 200 and final.json()["internal_final_prompt"] == prompt
+        assert (
+            fresh_app.state.prompt_enrichment_service.repository.get_knowledge_release_pin(
+                UUID(sid), UUID(org)
+            )
+            == binding
+        )
+        assert fresh_provider.calls == []
+    print(
+        "F00_KEEP_TRACE "
+        + json.dumps(
+            {"followups": followups, "stages": snapshots, "final_ifp_keep": True},
+            ensure_ascii=False,
+        )
     )
 
 

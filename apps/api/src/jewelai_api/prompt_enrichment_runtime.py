@@ -82,7 +82,7 @@ from .clarification_answers import (
     ClarificationDecision,
     process_clarification_answer,
 )
-from .constraint_evidence import merge_constraint_evidence
+from .constraint_evidence import ConstraintEvidenceIntegrityError, merge_constraint_evidence
 from .correction_enrichment import (
     CorrectionErrorCode,
     CorrectionInputError,
@@ -550,6 +550,9 @@ class PromptEnrichmentRuntimeService:
                 authoritative_revision=result.authoritative_revision,
                 enrichment_cycle_id=next_cycle_id,
                 previous=previous_plan.constraint_evidence,
+                load_source_revision=lambda revision_id: self.repository.get_revision(
+                    request.session_id, revision_id, organization_id
+                ),
             )
             next_plan = plan_clarifications(
                 result.authoritative_revision,
@@ -609,7 +612,7 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.CORRECTION_CONFLICT,
                 "Correction conflicts with durable history",
             ) from exc
-        except UserCorrectionIntegrityError as exc:
+        except (UserCorrectionIntegrityError, ConstraintEvidenceIntegrityError) as exc:
             raise PromptEnrichmentRuntimeError(
                 PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
                 "Correction history failed integrity validation",

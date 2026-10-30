@@ -68,6 +68,14 @@ Accepted symmetry requirements retain their original candidate/span/Message evid
 as canonical-bound requirements, rather than contradictory unresolved constraints.
 When the same message also supplies the approved KEEP, that preservation instruction
 explicitly supersedes the requirement evidence; both records remain queryable.
+Across corrections, a canonical requirement that reaffirms the preserved value is
+covered by the active KEEP, rather than revoking it. Compatibility compares actual
+canonical values in the KEEP's immutable source revision and the current revision;
+historical reads stay organization/session scoped. The KEEP retains its exact ID,
+hash, wording and source. A new explicit KEEP can supersede it under the existing
+same-kind authority; uncertain or unsupported cancellation/conflict text cannot.
+This adds no cancellation action or intrinsic LOCK. Missing/mismatched historical
+source evidence fails closed instead of guessing compatibility.
 Genuinely unresolved intent is retained. The release is explicitly
 test-only; this is not professional catalog qualification or preproduction evidence.
 The final description renders the accepted canonical symmetry in RU/EN, without

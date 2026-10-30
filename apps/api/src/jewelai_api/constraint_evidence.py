@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections.abc import Callable
 from uuid import UUID
 
 from jewelai_domain.models import MessageSource
@@ -10,9 +11,14 @@ from jewelai_parser import (
     CandidateCertainty,
     CandidateClassification,
 )
-from jewelai_prompts import FinalPromptConstraintEvidence
+from jewelai_prompts import FinalPromptConstraintEvidence, project_revision
 
 from .parsed_enrichment import CandidateDispositionOutcome, ParsedCandidateEnrichmentResult
+
+
+class ConstraintEvidenceIntegrityError(ValueError):
+    """Canonical preservation cannot be reconciled with its immutable source."""
+
 
 _INSTRUCTIONS = {
     ("feature.halo", "prohibition", "en"): "Do not include a halo.",
@@ -61,6 +67,7 @@ def merge_constraint_evidence(
     authoritative_revision: AnyDesignRevision | object,
     enrichment_cycle_id: UUID,
     previous: tuple[FinalPromptConstraintEvidence, ...] = (),
+    load_source_revision: Callable[[UUID], AnyDesignRevision] | None = None,
 ) -> tuple[FinalPromptConstraintEvidence, ...]:
     """Append verified parser evidence and deterministically supersede prior active constraints."""
 
@@ -180,8 +187,24 @@ def merge_constraint_evidence(
             for item in additions
         ]
 
-    for addition in additions:
+    for index, addition in enumerate(additions):
         if addition.status != "active":
+            continue
+        # Reaffirmation is not revocation. Compare the original preserved fact
+        # with current canonical state, not wording, locale or matrix outcome
+        # alone. This grants neither cancellation authority nor an intrinsic lock.
+        covering = next(
+            (
+                item
+                for item in retained
+                if item.status == "active"
+                and item.kind == "preservation"
+                and _same_preserved_fact(item, addition, revision, load_source_revision)
+            ),
+            None,
+        )
+        if covering is not None:
+            additions[index] = _supersede(addition, covering.evidence_id)
             continue
         retained = [
             _supersede(item, addition.evidence_id)
@@ -191,6 +214,40 @@ def merge_constraint_evidence(
         ]
     by_id = {item.evidence_id: item for item in (*retained, *additions)}
     return tuple(by_id[key] for key in sorted(by_id))
+
+
+def _same_preserved_fact(keeper, requirement, revision, load_source_revision):
+    target = requirement.canonical_target
+    if requirement.kind != "requirement" or target is None or target != keeper.semantic_subject:
+        return False
+    if keeper.source_revision_id == revision.revision_id:
+        original = revision
+    else:
+        if load_source_revision is None:
+            raise ConstraintEvidenceIntegrityError(
+                "canonical preservation requires its source revision"
+            )
+        # Trusted callers must use the existing organization/session-scoped read.
+        original = validate_design_revision(load_source_revision(keeper.source_revision_id))
+        if (
+            original.revision_id != keeper.source_revision_id
+            or original.design_id != revision.design_id
+        ):
+            raise ConstraintEvidenceIntegrityError(
+                "canonical preservation source revision mismatch"
+            )
+    previous = {e.concrete_target: e for e in project_revision(original).specification_entries}.get(
+        target
+    )
+    current = {e.concrete_target: e for e in project_revision(revision).specification_entries}.get(
+        target
+    )
+    return (
+        previous is not None
+        and current is not None
+        and previous.applicability == current.applicability == "value"
+        and previous.value == current.value
+    )
 
 
 def _supersede(item: FinalPromptConstraintEvidence, replacement_id: str):
