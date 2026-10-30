@@ -270,9 +270,18 @@ def _snapshot(revision, enrichment, *, locale="en", lineage=(), **changes):
 
 
 @pytest.mark.parametrize("locale", ["en", "ru"])
-@pytest.mark.parametrize("has_symmetry", [False, True])
+@pytest.mark.parametrize(
+    "has_symmetry,evidence_status",
+    [
+        (False, None),
+        (True, None),
+        (True, "active"),
+        (True, "rejected"),
+        (True, "replacement"),
+    ],
+)
 def test_description_renders_only_canonical_symmetry(
-    ring, templates, runtime, dictionary, locale, has_symmetry
+    ring, templates, runtime, dictionary, locale, has_symmetry, evidence_status
 ):
     from jewelai_domain.models_v1_1 import (
         DesignRevisionV1_1,
@@ -299,8 +308,34 @@ def test_description_renders_only_canonical_symmetry(
     data = result.model_dump(mode="json", exclude={"content_hash"})
     data["knowledge_validation_report_sha256"] = REPORT_HASH
     enrichment = type(result)(**data, content_hash=_hash(data))
+    instruction = (
+        "Preserve explicit asymmetry." if locale == "en" else "Сохранить явную асимметрию."
+    )
+    evidence = ()
+    if evidence_status is not None:
+        current = _constraint_evidence(
+            revision,
+            kind="preservation",
+            subject="composition.symmetry_mode",
+            instruction=instruction,
+            status="rejected" if evidence_status == "rejected" else "active",
+            evidence_id="constraint_222222222222222222222222",
+        )
+        evidence = (current,)
+        if evidence_status == "replacement":
+            old = _constraint_evidence(
+                revision,
+                kind="preservation",
+                subject="composition.symmetry_mode",
+                instruction="Old KEEP.",
+                status="superseded",
+                superseded_by=current.evidence_id,
+            )
+            evidence = (old, current)
     assembly = assemble_internal_final_prompt(
-        _snapshot(revision, enrichment, locale=locale), dictionary=dictionary, templates=templates
+        _snapshot(revision, enrichment, locale=locale, constraint_evidence=evidence),
+        dictionary=dictionary,
+        templates=templates,
     )
     label = "Composition: asymmetrical." if locale == "en" else "Композиция: асимметричная."
     assert (label in assembly.description.text) is has_symmetry
@@ -309,6 +344,10 @@ def test_description_renders_only_canonical_symmetry(
         for d in assembly.internal_final_prompt.unresolved_details
     )
     assert revision.model_dump_json() == before
+    assert assembly.description.text.count(instruction) == int(
+        evidence_status in {"active", "replacement"}
+    )
+    assert "Old KEEP." not in assembly.description.text
 
 
 def _constraint_evidence(

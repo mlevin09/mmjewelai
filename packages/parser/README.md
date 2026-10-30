@@ -76,6 +76,9 @@ hash, wording and source. A new explicit KEEP can supersede it under the existin
 same-kind authority; uncertain or unsupported cancellation/conflict text cannot.
 This adds no cancellation action or intrinsic LOCK. Missing/mismatched historical
 source evidence fails closed instead of guessing compatibility.
+Active explicit KEEP is shown once in the user-readable description as well as
+the structured IFP. Superseded/rejected evidence and implicit LOCK renderings do
+not create duplicate preservation instructions in the description.
 Genuinely unresolved intent is retained. The release is explicitly
 test-only; this is not professional catalog qualification or preproduction evidence.
 The final description renders the accepted canonical symmetry in RU/EN, without

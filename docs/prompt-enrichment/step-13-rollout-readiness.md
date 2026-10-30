@@ -59,6 +59,8 @@ description, exact Product State revision, and exact pinned Knowledge release.
   source revision and current canonical state, not wording, locale, or Matrix outcome alone.
   New approved preservation still uses normal same-kind supersession. This grants no cancellation
   action or intrinsic LOCK; unsupported conflicting/cancellation requests remain non-authoritative.
+  The description displays active explicit preservation evidence, including canonical targets,
+  once; superseded/rejected evidence does not become a displayed instruction.
   Ambiguous evidence remains unresolved and recommendations remain non-authoritative until accepted.
 - The user-readable description and provider-neutral `InternalFinalPrompt` are assembled from the
   same authoritative revision and carry deterministic hashes and exact Knowledge release lineage.

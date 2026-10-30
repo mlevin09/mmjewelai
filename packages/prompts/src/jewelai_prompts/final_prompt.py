@@ -808,11 +808,19 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
             if snapshot.locale == "en"
             else f"Явные требования: {labels}"
         )
-    noncanonical_preservation = [
-        item for item in constraints if item.kind == "preservation" and item.target not in fact_map
+    explicit_preservation_ids = {
+        item.evidence_id
+        for item in snapshot.constraint_evidence
+        if item.status == "active" and item.kind == "preservation"
+    }
+    preservation_instructions = [
+        item
+        for item in constraints
+        if item.kind == "preservation"
+        and (item.target not in fact_map or explicit_preservation_ids.intersection(item.source_ids))
     ]
-    if noncanonical_preservation:
-        labels = "; ".join(item.instruction for item in noncanonical_preservation)
+    if preservation_instructions:
+        labels = "; ".join(item.instruction for item in preservation_instructions)
         sentences.append(
             f"Preserve: {labels}" if snapshot.locale == "en" else f"Сохранить: {labels}"
         )

@@ -741,6 +741,7 @@ def exercise_keep_correction_sequence(
             ]
             assert len(keeps) == 1 and keeper.evidence_id in keeps[0].source_ids
             assert keeper.normalized_instruction in prompt.prompt_text
+            assert state["description"]["text"].count(keeper.normalized_instruction) == 1
             requirements = [
                 c
                 for c in prompt.constraints
@@ -918,6 +919,13 @@ def exercise_keep_correction_sequence(
             e["evidence_id"] == current_keep.evidence_id and e["status"] == "active"
             for e in prompt["constraint_evidence"]
         )
+        final_keeps = [
+            c
+            for c in prompt["constraints"]
+            if c["kind"] == "preservation" and c["target"] == "composition.symmetry_mode"
+        ]
+        assert len(final_keeps) == 1 and current_keep.evidence_id in final_keeps[0]["source_ids"]
+        assert prompt["description"]["text"].count(current_keep.normalized_instruction) == 1
         assert restored_provider.calls == []
     fresh, fresh_app, fresh_provider = _client(engine, config)
     with fresh:
