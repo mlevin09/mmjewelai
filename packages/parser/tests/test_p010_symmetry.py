@@ -62,6 +62,8 @@ def test_f00_shared_scope_does_not_apply_other_negative_list_objects():
         "Асимметричное кольцо, без сапфира, белое золото.",
         "An asymmetric ring, not diamond, yellow gold.",
         "An asymmetric ring, no mysterious object, yellow gold.",
+        "An asymmetric ring, no white or yellow gold, oval diamond.",
+        "An asymmetric ring, no oval or round diamond, yellow gold.",
     ],
 )
 def test_dictionary_negative_object_scope_cannot_create_positive_facts(text):
@@ -82,6 +84,7 @@ def test_dictionary_negative_object_scope_cannot_create_positive_facts(text):
         "Асимметричное кольцо. Без гало, гравировки или боковых камней.",
         "An asymmetric ring. No asymmetric photograph.",
         "An asymmetric ring. A symmetrical photograph.",
+        "No white or yellow gold, oval diamond. An asymmetric ring.",
     ],
 )
 def test_independent_negative_statement_does_not_poison_positive_requirement(text):

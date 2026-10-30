@@ -126,7 +126,9 @@ def _scope_constraints(text: str, runtime, dictionary) -> list[dict]:
     preservation_spans = tuple(m.span() for m in _preservation_clauses(text))
     for operator in _REJECT.finditer(text):
         if not any(
-            c["evidence"]["start"] <= operator.start() < c["evidence"]["end"] for c in constraints
+            c["certainty"] == "explicit"
+            and c["evidence"]["start"] <= operator.start() < c["evidence"]["end"]
+            for c in constraints
         ) and not any(a <= operator.start() < b for a, b in preservation_spans):
             constraints.append(
                 dict(

@@ -507,6 +507,9 @@ def _finish_f00_lifecycle(
 
 
 F00_LIFECYCLES = (
+    ("No white or yellow gold, oval diamond. An asymmetric ring.", True, False, False),
+    ("An asymmetric ring, no white or yellow gold, oval diamond.", False, False, False),
+    ("An asymmetric ring, no oval or round diamond, yellow gold.", False, False, False),
     ("An asymmetric ring is not what I want in gold.", False, False, False),
     ("An asymmetric ring is not.", False, False, False),
     ("An asymmetric ring is unwanted in yellow gold.", False, False, False),
