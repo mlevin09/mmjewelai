@@ -102,7 +102,8 @@ Core intent handling uses the same bounded statement/clause context for polarity
 certainty and component ownership. Recognized trailing rejection cannot create a
 positive requirement; tentative Dictionary terms and special instructions remain
 ambiguous evidence. Independent statements and explicit contrast clauses retain
-their own facts. A later negative component mention cannot steal an earlier
+their own facts. A comma after a hedge or within its list does not grant fresh
+explicit authority. A later negative component mention cannot steal an earlier
 positive object's ownership. Decimal measurements retain their original spans.
 The existing unclosed-negative-list guard runs independently of optional P0-10
 membership; only the actual symmetry value binding requires that approved content.

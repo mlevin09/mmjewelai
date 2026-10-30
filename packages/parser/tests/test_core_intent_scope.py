@@ -39,6 +39,9 @@ def test_governed_rejection_is_not_a_positive_candidate(dictionary, text, term):
         "Perhaps platinum. A ring.",
         "Возможно платина. Кольцо.",
         "A platinum ring, perhaps.",
+        "Maybe, platinum. A ring.",
+        "Я сомневаюсь, платина. Кольцо.",
+        "Perhaps gold, platinum.",
     ),
 )
 def test_tentative_single_value_is_not_explicit_authority(dictionary, text):

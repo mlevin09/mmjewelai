@@ -797,8 +797,14 @@ def _certainty_for(text, start, end, current):
     left, right = _intent_bounds(text, start, end)
     if _TENTATIVE.search(text[left:right]):
         return CandidateCertainty.AMBIGUOUS
+    # Commas cannot close a qualifier or prove that its bare list continuation
+    # is an independent assertion. A sentence or explicit contrast can.
+    sentence_start, sentence_end = _sentence_bounds(text, start, end)
+    prefix = text[sentence_start:left]
+    qualifier = tuple(_TENTATIVE.finditer(prefix))
+    if qualifier and not _CONTRAST.search(prefix, qualifier[-1].end()):
+        return CandidateCertainty.AMBIGUOUS
     # A standalone trailing hedge belongs to this assertion, not the next object.
-    _, sentence_end = _sentence_bounds(text, start, end)
     tail = text[right:sentence_end].strip()
     if tail.startswith(",") and _TENTATIVE.fullmatch(tail[1:].strip()):
         return CandidateCertainty.AMBIGUOUS

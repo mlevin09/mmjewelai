@@ -50,6 +50,15 @@ C1_CASES = (
     ("EN-postfix", "This platinum ring is unwanted.", "en", {}),
     ("RU-postfix", "Кольцо из золота мне не подходит.", "ru", {}),
     ("mixed-tentative", "Возможно platinum. Кольцо.", "ru", {}),
+    ("EN-hedge-comma", "Maybe, platinum. A ring.", "en", {}),
+    ("RU-hedge-comma", "Я сомневаюсь, платина. Кольцо.", "ru", {}),
+    ("tentative-list", "Perhaps gold, platinum. A ring.", "en", {}),
+    (
+        "tentative-contrast",
+        "Perhaps platinum, but an oval diamond ring.",
+        "en",
+        {"center_stone.shape": "oval", "center_stone.material": "diamond"},
+    ),
     (
         "EN-lines",
         "An oval diamond ring.\nNo side stones.\nGold body.",
