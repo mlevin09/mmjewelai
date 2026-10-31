@@ -102,6 +102,104 @@ C1_CASES = (
 )
 CHECKED_FIELDS = ("metal.material", "metal.color", "center_stone.shape", "center_stone.material")
 
+# Independent predicates must not share polarity; a bare coordinated object list
+# still shares its governor. These use the same persisted lifecycle and PG gate.
+REVIEW_CASES = (
+    (
+        "review-forward",
+        "I want a gold ring and I do not want a platinum ring.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-reverse",
+        "I do not want a platinum ring and I want a gold ring.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-nominal-postfix",
+        "I want a gold ring and a platinum ring is not what I want.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    ("review-shared-postfix", "A gold ring and a platinum ring is not what I want.", "en", {}),
+    (
+        "review-contrast",
+        "A gold ring, but a platinum ring is not what I want.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-center",
+        "An oval diamond center stone and no side stones.",
+        "en",
+        {"center_stone.shape": "oval", "center_stone.material": "diamond"},
+    ),
+    (
+        "review-owners",
+        "I want an oval diamond center stone and I do not want round side stones.",
+        "en",
+        {"center_stone.shape": "oval", "center_stone.material": "diamond"},
+    ),
+    (
+        "review-unrelated",
+        "I do not want platinum and I want an oval diamond center stone.",
+        "en",
+        {"center_stone.shape": "oval", "center_stone.material": "diamond"},
+    ),
+    (
+        "review-comma",
+        "I do not want platinum, I want a gold ring.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-lines",
+        "I want a gold ring\nI do not want platinum.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-lines-reverse",
+        "I do not want platinum\nI want a gold ring.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    ("review-mixed", "I want a gold ring и не хочу платину.", "ru", {"metal.material": "gold"}),
+    (
+        "review-mixed-reverse",
+        "Не хочу платину and I want a gold ring.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-bare-negation",
+        "I want a gold ring and not platinum.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    ("review-halo-restart", "No halo and I want a gold ring.", "en", {"metal.material": "gold"}),
+    ("review-hedge", "I want a gold ring and perhaps platinum.", "en", {"metal.material": "gold"}),
+    ("review-shared-negative-list", "No platinum and gold. A ring.", "en", {}),
+    ("review-shared-positive-list", "I want gold and platinum. A ring.", "en", {}),
+    ("review-unclosed-list", "No halo, engraving and gold. A ring.", "en", {}),
+    (
+        "review-period",
+        "I want a gold ring. I do not want platinum.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+)
+C1_CASES += REVIEW_CASES
+
+REVIEW_RU = (
+    "Хочу золото и не хочу платину.",
+    "Не хочу платину и хочу золото.",
+    "Хочу золото, но платина мне не подходит.",
+    "I do not want platinum и хочу золото.",
+)
+
 
 def _field(revision, path):
     value = revision.design
@@ -271,6 +369,44 @@ def test_core_initial_http(engine, tmp_path, monkeypatch, case, binding):
     exercise_core_case(engine, tmp_path, monkeypatch, case, binding)
 
 
+@pytest.mark.parametrize("binding", (False, True))
+@pytest.mark.parametrize("text", REVIEW_RU)
+def test_review_ru_preference_and_correction_http(engine, tmp_path, monkeypatch, binding, text):
+    # Existing Russian 'хочу' preference authority is deliberately unchanged.
+    with _scenario(engine, tmp_path, monkeypatch, binding=binding, locale="ru") as ctx:
+        _, revision, state, _ = _submit(ctx, text)
+        metals = [c for c in ctx.evaluations[0][1].candidates if c.target == "metal.material"]
+        gold = next(c for c in metals if c.normalized_values == ("gold",))
+        platinum = next(c for c in metals if c.normalized_values == ("platinum",))
+        assert gold.classification == "preference" and gold.certainty == "explicit"
+        assert platinum.classification == "prohibition" and platinum.parser_update is None
+        assert revision.design.metal.material is None
+        assert any(
+            e.candidate_id == gold.candidate_id and e.reason == "unsupported_answer_path"
+            for e in state.clarification_plan.unasked_evidence
+        )
+        # No material acceptance question exists in the approved catalog. Use
+        # the existing explicit correction instead of inventing an answer path.
+        _, corrected, corrected_state, message = _submit(ctx, "Кольцо из золота.", "corrections")
+        final = corrected_state.final_output
+        material = corrected.design.metal.material
+        assert material.value == "gold" and not material.confirmed
+        assert material.source.message_id == message["message_id"]
+        assert "золото" in final.description.text
+        fact = next(
+            f for f in final.internal_final_prompt.design_facts if f.target == "metal.material"
+        )
+        assert fact.value == "gold" and message["message_id"] in fact.source_ids
+        output = final.model_dump(mode="json")
+    restarted, app, provider = _client(engine, ctx.config)
+    with restarted:
+        response = restarted.get(
+            f"/v1/sessions/{ctx.sid}/prompt-enrichment/final-output", headers=ctx.headers
+        )
+        assert response.status_code == 200 and response.json() == output
+        assert provider.calls == []
+
+
 def _seed(ctx, *, style=False, material=False):
     """Existing authorized domain/CAS boundary, not a new text-to-target binding."""
     current = _current(ctx)
@@ -436,22 +572,38 @@ def _immutable_history(ctx):
     }
 
 
-def exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding):
+def exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding, *, coordinated=False):
     with _scenario(engine, tmp_path, monkeypatch, binding=binding) as ctx:
         original = _seed(ctx, material=True)
-        _, _, initial, _ = _submit(ctx, "A gold ring. No prongs.")
+        _, _, initial, _ = _submit(
+            ctx, "A gold ring and no prongs." if coordinated else "A gold ring. No prongs."
+        )
         initial_history = _immutable_history(ctx)
         initial_pin = ctx.repo.get_knowledge_release_pin(ctx.sid, ctx.org)
-        _, rejected, _, _ = _submit(ctx, "A platinum ring is not what I want.", "corrections")
+        _, rejected, _, _ = _submit(
+            ctx,
+            "I want a gold ring and I do not want a platinum ring."
+            if coordinated
+            else "A platinum ring is not what I want.",
+            "corrections",
+        )
         assert rejected.design.metal.material == original.design.metal.material
         _, changed, _, material_message = _submit(
-            ctx, "Change the metal to platinum.", "corrections"
+            ctx,
+            "I want platinum and I do not want gold."
+            if coordinated
+            else "Change the metal to platinum.",
+            "corrections",
         )
         assert changed.design.metal.material.value == "platinum"
         assert not changed.design.metal.material.confirmed
         assert changed.design.metal.material.source.message_id == material_message["message_id"]
         material = changed.design.metal.material
-        _, _, preference, _ = _submit(ctx, "I prefer white.", "corrections")
+        _, _, preference, _ = _submit(
+            ctx,
+            "I prefer white and I do not want yellow." if coordinated else "I prefer white.",
+            "corrections",
+        )
         question = next(
             q for q in preference.clarification_plan.questions if q.target.value == "metal.color"
         )
@@ -470,7 +622,11 @@ def exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding):
         )
         assert answer.status_code == 200, answer.json()
         _, final_revision, final_state, stone_message = _submit(
-            ctx, "An oval diamond center stone in a prong setting. No side stones.", "corrections"
+            ctx,
+            "No side stones and I want an oval diamond center stone in a prong setting."
+            if coordinated
+            else "An oval diamond center stone in a prong setting. No side stones.",
+            "corrections",
         )
         assert final_revision.design.metal.material == material
         assert final_revision.design.metal.color.value == "white"
@@ -553,6 +709,7 @@ def exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding):
             {
                 "backend": ctx.backend,
                 "p010": binding,
+                "coordinated": coordinated,
                 "cycles": 6,
                 "confirmed_rejection_preserved": True,
                 "authorized_correction": "platinum",
@@ -572,3 +729,8 @@ def exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding):
 @pytest.mark.parametrize("binding", (False, True))
 def test_core_six_cycle_http(engine, tmp_path, monkeypatch, binding):
     exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_review_coordinated_six_cycle_http(engine, tmp_path, monkeypatch, binding):
+    exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding, coordinated=True)

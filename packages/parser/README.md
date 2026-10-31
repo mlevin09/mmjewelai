@@ -114,6 +114,21 @@ creation or component-ID policy. Existing canonical EDIT/CAS, confirmation and
 LOCK/KEEP authority remain unchanged. Readable output also renders the existing
 accepted `style_descriptors` fact via the current Dictionary/value presenter.
 
+Independent request/rejection predicates also delimit conjunction and newline
+scope. `I want gold and I do not want platinum` preserves positive gold; the
+reverse order does too. A bare coordinated object list retains its shared
+governor: `Gold and platinum is not what I want` rejects both. The same original
+offset boundaries govern polarity, certainty, component ownership and closure of
+negative lists. A bare object after `no halo, ...` does not gain positive authority
+merely from a comma or `and`. Postfix rejection remains supported. This is bounded
+deterministic language support, not a general grammar or a conflict winner policy.
+
+Existing Russian `хочу` remains a preference. Material preferences are retained
+as evidence; the current Question Catalog has no `metal.material` acceptance
+question. An explicit supported correction such as `Кольцо из золота` can apply
+gold through the existing revision boundary. This correction does not silently
+accept a preference or add a new clarification contract.
+
 ```sh
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests/test_core_intent_scope.py -q
 python -m pytest -c apps/api/pyproject.toml apps/api/tests/test_core_intent.py -q -s

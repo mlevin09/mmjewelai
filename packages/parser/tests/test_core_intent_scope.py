@@ -156,3 +156,115 @@ def test_decimal_point_is_not_an_alternative_statement_boundary(dictionary):
     metals = [c for c in parsed.candidates if c.target == "metal.material"]
     assert len(metals) == 2 and all(c.certainty == "ambiguous" for c in metals)
     assert all(c.parser_update is None for c in metals)
+
+
+@pytest.mark.parametrize(
+    "text,positive,rejected,classification",
+    (
+        (
+            "I want a gold ring and I do not want a platinum ring.",
+            "gold",
+            "platinum",
+            "requirement",
+        ),
+        (
+            "I do not want a platinum ring and I want a gold ring.",
+            "gold",
+            "platinum",
+            "requirement",
+        ),
+        (
+            "I want a gold ring and a platinum ring is not what I want.",
+            "gold",
+            "platinum",
+            "requirement",
+        ),
+        ("Хочу золото и не хочу платину.", "золото", "платину", "preference"),
+        ("Не хочу платину и хочу золото.", "золото", "платину", "preference"),
+        ("I want a gold ring и не хочу платину.", "gold", "платину", "requirement"),
+        ("No platinum and I want a gold ring.", "gold", "platinum", "requirement"),
+        ("I reject platinum and want gold.", "gold", "platinum", "requirement"),
+        ("I want gold and reject platinum.", "gold", "platinum", "requirement"),
+        ("A gold ring, but a platinum ring is not what I want.", "gold", "platinum", "requirement"),
+        ("I do not want platinum, I want a gold ring.", "gold", "platinum", "requirement"),
+        ("I want gold\nI do not want platinum.", "gold", "platinum", "requirement"),
+        ("I do not want platinum\nI want gold.", "gold", "platinum", "requirement"),
+        ("I want gold and not platinum.", "gold", "platinum", "requirement"),
+    ),
+)
+def test_independent_predicates_do_not_share_rejection(
+    dictionary, text, positive, rejected, classification
+):
+    parsed = parse_full_message(text, locale="en", dictionary=dictionary)
+    yes = next(c for c in parsed.candidates if c.evidence.text == positive)
+    no = next(c for c in parsed.candidates if c.evidence.text == rejected)
+    assert yes.classification == classification and yes.certainty == "explicit"
+    assert yes.parser_update is not None
+    assert no.classification == "prohibition" and no.parser_update is None
+    assert parsed == parse_full_message(text, locale="en", dictionary=dictionary)
+
+
+@pytest.mark.parametrize(
+    "text",
+    (
+        "A gold ring and a platinum ring is not what I want.",
+        "A gold ring and a platinum ring are unwanted.",
+        "No gold and platinum.",
+        "I do not want gold and platinum.",
+    ),
+)
+def test_coordinated_objects_keep_their_shared_rejection(dictionary, text):
+    metals = [
+        c
+        for c in parse_full_message(text, locale="en", dictionary=dictionary).candidates
+        if c.target == "metal.material"
+    ]
+    assert len(metals) == 2
+    assert all(c.classification == "prohibition" and c.parser_update is None for c in metals)
+
+
+@pytest.mark.parametrize(
+    "text,term,target,certainty",
+    (
+        ("Perhaps platinum and I want gold.", "gold", "metal.material", "explicit"),
+        ("I want gold and perhaps platinum.", "gold", "metal.material", "explicit"),
+        ("I want gold and perhaps platinum.", "platinum", "metal.material", "ambiguous"),
+        ("No halo, engraving and gold.", "gold", "metal.material", "ambiguous"),
+        (
+            "No halo, white gold and I want an oval diamond center stone.",
+            "gold",
+            "metal.material",
+            "ambiguous",
+        ),
+        (
+            "No halo, white gold and I want an oval diamond center stone.",
+            "diamond",
+            "center_stone.material",
+            "explicit",
+        ),
+        (
+            "I want an oval diamond center stone and no gold prongs.",
+            "diamond",
+            "center_stone.material",
+            "explicit",
+        ),
+        (
+            "No side stones and I want an oval diamond center stone.",
+            "oval",
+            "center_stone.shape",
+            "explicit",
+        ),
+    ),
+)
+def test_assertion_boundary_is_shared_by_certainty_and_ownership(
+    dictionary, text, term, target, certainty
+):
+    parsed = parse_full_message(text, locale="en", dictionary=dictionary)
+    candidate = next(c for c in parsed.candidates if c.evidence.text == term)
+    assert candidate.target == target and candidate.certainty == certainty
+    assert (candidate.parser_update is not None) == (certainty == "explicit")
+    if certainty == "explicit":
+        assert candidate.classification == "requirement"
+    assert all(
+        text[c.evidence.start : c.evidence.end] == c.evidence.text for c in parsed.candidates
+    )

@@ -156,7 +156,7 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
     alternatives, incomplete lists and arbitrary words cannot prove closure.
     This never invents a prohibition for an unbound list member.
     """
-    from .full_message import _CONTRAST
+    from .full_message import _assertion_breaks
 
     instructions = [
         (c["evidence"]["start"], c["evidence"]["end"])
@@ -175,9 +175,7 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
             continue
         start, end = candidate["evidence"]["start"], candidate["evidence"]["end"]
         _, stop = _bounds(text, start, end, _SENTENCE_BOUNDARIES)
-        contrast = _CONTRAST.search(text, end, stop)
-        if contrast is not None:
-            stop = contrast.start()
+        stop = min((a for a, _ in _assertion_breaks(text) if end <= a < stop), default=stop)
         cursor = end
         closed = candidate["semantic_subject"] != "constraint.unbound"
         while text[cursor:stop].strip():

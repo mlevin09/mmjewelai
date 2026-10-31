@@ -254,6 +254,12 @@ _TENTATIVE = re.compile(
     re.I,
 )
 _CONTRAST = re.compile(r"\b(?:but|however|но|однако)\b", re.I)
+_COORDINATION = re.compile(r",\s*(?:(?:and|и)\b\s*)?|\b(?:and|и)\b|\r?\n", re.I)
+_REQUEST_START = re.compile(
+    r"\b(?:(?:I|we|я|мы)\s+)?(?:(?:" + _NEGATED_AUXILIARY + r"|не)\s+)?"
+    r"(?:want|need|prefer|choose|reject|avoid|хочу|хотим|предпочита\w*)\b",
+    re.I,
+)
 _TOKEN = re.compile(r"[^\W_]+|\d+(?:[.,]\d+)?", re.UNICODE)
 
 _SPECIAL_CONSTRAINTS = (
@@ -655,6 +661,8 @@ def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
             between = text[left.end : right.start]
             if _sentence_bounds(text, left.start, left.end)[1] < right.start:
                 continue
+            if any(left.end <= a and b <= right.start for a, b in _assertion_breaks(text)):
+                continue
             if _AMBIGUITY.search(between):
                 left_key = (
                     left.start,
@@ -805,6 +813,9 @@ def _certainty_for(text, start, end, current):
     # Commas cannot close a qualifier or prove that its bare list continuation
     # is an independent assertion. A sentence or explicit contrast can.
     sentence_start, sentence_end = _sentence_bounds(text, start, end)
+    for _, boundary_end in _assertion_breaks(text):
+        if sentence_start < boundary_end <= left:
+            sentence_start = boundary_end
     prefix = text[sentence_start:left]
     qualifier = tuple(_TENTATIVE.finditer(prefix))
     if qualifier and not _CONTRAST.search(prefix, qualifier[-1].end()):
@@ -827,13 +838,38 @@ def _intent_bounds(text: str, start: int, end: int) -> tuple[int, int]:
     from .p010_symmetry import _bounds
 
     left, right = _bounds(text, start, end, ".!?;,—–")
-    for match in _CONTRAST.finditer(text, left, right):
-        if match.end() <= start:
-            left = match.end()
-        elif match.start() >= end:
-            right = match.start()
+    for boundary_start, boundary_end in _assertion_breaks(text):
+        if left <= boundary_start and boundary_end <= start:
+            left = boundary_end
+        elif end <= boundary_start < right:
+            right = boundary_start
             break
     return left, right
+
+
+def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
+    """Original-offset boundaries proved by a new governor, not by 'and' alone.
+
+    A coordinated bare object retains its shared prefix/postfix predicate. A
+    fresh request, rejection or qualifier governs its own assertion instead.
+    The negative-list and ownership consumers must use the same boundary proof.
+    This classifies evidence only; it cannot select a canonical conflict winner.
+    """
+    boundaries = [match.span() for match in _CONTRAST.finditer(text)]
+    for match in _COORDINATION.finditer(text):
+        left, right = _sentence_bounds(text, match.start(), match.end())
+        before, after = text[left : match.start()], text[match.end() : right].lstrip()
+        if _REQUEST_START.match(after) or _NEGATION.match(after) or _TENTATIVE.match(after):
+            boundaries.append(match.span())
+        elif (
+            _REQUEST_START.search(before)
+            and not _NEGATION.search(before)
+            and _REJECTED_ASSERTION.search(after)
+        ):
+            # 'I want gold and platinum is not what I want' has two predicates;
+            # 'gold and platinum is not what I want' has one shared predicate.
+            boundaries.append(match.span())
+    return tuple(sorted(set(boundaries)))
 
 
 def _subject_for(
