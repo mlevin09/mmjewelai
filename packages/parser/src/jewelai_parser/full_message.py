@@ -256,8 +256,8 @@ _TENTATIVE = re.compile(
 _CONTRAST = re.compile(r"\b(?:but|however|но|однако)\b", re.I)
 _COORDINATION = re.compile(r",\s*(?:(?:and|и)\b\s*)?|\b(?:and|и)\b|\r?\n", re.I)
 _REQUEST_START = re.compile(
-    r"\b(?:(?:I|we|я|мы)\s+)?(?:(?:" + _NEGATED_AUXILIARY + r"|не)\s+)?"
-    r"(?:want|need|prefer|choose|reject|avoid|хочу|хотим|предпочита\w*)\b",
+    r"\b(?:(?:I|we|я|мы|мне|нам)\s+)?(?:(?:" + _NEGATED_AUXILIARY + r"|не)\s+)?"
+    r"(?:want|need|choose|reject|avoid|хотим|нуж(?:ен|на|но|ны)|" + _PREFERENCE.pattern + r")\b",
     re.I,
 )
 _TOKEN = re.compile(r"[^\W_]+|\d+(?:[.,]\d+)?", re.UNICODE)

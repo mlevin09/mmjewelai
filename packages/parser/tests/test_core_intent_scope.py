@@ -190,6 +190,9 @@ def test_decimal_point_is_not_an_alternative_statement_boundary(dictionary):
         ("I want gold\nI do not want platinum.", "gold", "platinum", "requirement"),
         ("I do not want platinum\nI want gold.", "gold", "platinum", "requirement"),
         ("I want gold and not platinum.", "gold", "platinum", "requirement"),
+        ("Мне нужно золото и мне не нужна платина.", "золото", "платина", "requirement"),
+        ("Мне не нужна платина и нужно золото.", "золото", "платина", "requirement"),
+        ("I do not want yellow and I would like white.", "white", "yellow", "preference"),
     ),
 )
 def test_independent_predicates_do_not_share_rejection(

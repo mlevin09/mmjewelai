@@ -191,6 +191,21 @@ REVIEW_CASES = (
         {"metal.material": "gold"},
     ),
 )
+REVIEW_CASES += (
+    (
+        "review-ru-need",
+        "Мне нужно золото и мне не нужна платина.",
+        "ru",
+        {"metal.material": "gold"},
+    ),
+    (
+        "review-ru-need-reverse",
+        "Мне не нужна платина и нужно золото.",
+        "ru",
+        {"metal.material": "gold"},
+    ),
+)
+
 C1_CASES += REVIEW_CASES
 
 REVIEW_RU = (
@@ -601,7 +616,7 @@ def exercise_core_lifecycle(engine, tmp_path, monkeypatch, binding, *, coordinat
         material = changed.design.metal.material
         _, _, preference, _ = _submit(
             ctx,
-            "I prefer white and I do not want yellow." if coordinated else "I prefer white.",
+            "I do not want yellow and I would like white." if coordinated else "I prefer white.",
             "corrections",
         )
         question = next(
