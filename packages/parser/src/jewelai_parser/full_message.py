@@ -757,10 +757,17 @@ def _candidate_from_surface(
     application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
     parser_update = None
 
-    owner_left, owner_right, _ = _ownership_context(text, item.start, item.end)
+    owner_left, owner_right, owner_anchors = _ownership_context(text, item.start, item.end)
     component_setting = (
         item.surface.category == DictionaryCategory.STONE_SETTING
         and evidence.casefold() in {"prongs", "prong", "крапаны", "крапанах"}
+        # A named stone still owns its setting independently of prong metal.
+        and not any(
+            owner_left <= a
+            and b <= owner_right
+            and owner in {CandidateSubject.CENTER_STONE, CandidateSubject.SIDE_STONES}
+            for a, b, owner, _ in owner_anchors
+        )
         and any(
             owner_left <= other.start
             and other.end <= owner_right

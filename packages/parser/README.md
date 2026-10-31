@@ -174,7 +174,7 @@ that the preceding metal belongs only to a shank component.
 | Body metal | Existing gold/platinum and white/yellow/rose vocabulary → independent material/color proposals |
 | Named component metal | Band/prongs retain their existing subjects; head/basket/etc. retain source labels with UNKNOWN typed subject when no enum exists. **No global metal target or update**, no component ID inference, even if a component already exists |
 | Center stone | Dictionary diamond/emerald, oval/emerald-cut, brilliant/step cut, supported setting and explicit stone measurements → existing typed proposals, subject to certainty, LOCK and canonical transition |
-| Side stones | Preserve material/shape/cut/measurement owner evidence. Only existing quantity binding may address one existing group; no group creation or material/shape fallback to center, including when zero/multiple groups exist |
+| Side stones | Preserve material/shape/cut/setting/measurement owner evidence. Only existing quantity binding may address one existing group; no group creation or material/shape fallback to center, including when zero/multiple groups exist |
 | Style | Existing Dictionary style target; component-specific style is not silently promoted to overall style |
 | Finish/color/orientation/construction | Recognize available supplied Library mappings of any kind and existing Dictionary construction vocabulary. Unbound kinds have no invented canonical target; unknown wording retains local owner and source. Schema field existence alone grants no parser authority |
 | Purity | Typed structured ParserCandidate purity exists, but the full-message StructuredTarget/binding is absent. Preserve source wording; no karat/fineness conversion or implicit alloy |
@@ -186,6 +186,9 @@ material inside an approved compound metal-color term; it still does not turn
 subject so generic recognition cannot erase an approved explicit binding.
 Measurements share the same certainty/negative governance and cannot become
 center-stone updates when explicitly attached to a component.
+Component metal alone does not establish a center setting. When a stone is
+explicitly named in the same nominal scope, its setting keeps that stone owner;
+the independently unbound prong-metal relationship still remains non-applied.
 
 The controlled API retains unapplied source-backed requirements through the
 existing unresolved constraint-evidence DTO and original Message. The source

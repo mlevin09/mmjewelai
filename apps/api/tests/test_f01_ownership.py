@@ -116,6 +116,24 @@ F01_CASES = (
 
 F01_CASES += (
     (
+        "control-center-setting",
+        "A white gold ring with an oval diamond center stone in platinum prongs.",
+        "en",
+        {
+            "metal.material": "gold",
+            "metal.color": "white",
+            "center_stone.material": "diamond",
+            "center_stone.shape": "oval",
+            "center_stone.setting": "prong_setting",
+        },
+    ),
+    (
+        "control-side-setting",
+        "A gold ring with round sapphire side stones in platinum prongs.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
         "control-component-material-list",
         "A gold ring with platinum and rose-gold prongs.",
         "en",
@@ -272,6 +290,10 @@ def exercise_f01_case(engine, tmp_path, monkeypatch, case, binding):
         if case_id == "F01-05":
             assert actual.design.center_stone.setting is None
             assert all(c.parser_update is None for c in parsed.candidates)
+        if case_id == "control-side-setting":
+            assert all(
+                c.subject == "side_stones" for c in parsed.candidates if c.evidence.text == "prongs"
+            )
         if "ring" in text.casefold() or "Кольцо" in text:
             assert actual.design.jewelry_type.value == "ring"
             assert facts["jewelry_type"].value == "ring"
