@@ -36,6 +36,12 @@ from test_core_intent import (
 )
 from test_effective_readiness import _answer, _correct
 from test_effective_readiness import ready_session as ready_session
+from test_f01_ownership import F01_CASES, exercise_f01_case
+from test_f01_ownership import test_existing_ids_are_never_invented_or_rebound as _f01_ids
+from test_f01_ownership import (
+    test_f01_locked_body_not_replaced_by_component_or_global_request as _f01_lock,
+)
+from test_f01_ownership import test_f01_three_cycle_keep_and_component_delta as _f01_keep
 from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
@@ -93,6 +99,25 @@ def test_c1_confirmed_authority_postgres(engine, tmp_path, monkeypatch, binding)
 
 def test_c1_locked_authority_postgres(engine, tmp_path, monkeypatch):
     _core_locked(engine, tmp_path, monkeypatch)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+@pytest.mark.parametrize("case", F01_CASES, ids=[c[0] for c in F01_CASES])
+def test_f01_owned_http_postgres(engine, tmp_path, monkeypatch, case, binding):
+    exercise_f01_case(engine, tmp_path, monkeypatch, case, binding)
+
+
+@pytest.mark.parametrize("groups", (0, 1, 2))
+def test_f01_existing_objects_postgres(engine, tmp_path, monkeypatch, groups):
+    _f01_ids(engine, tmp_path, monkeypatch, groups)
+
+
+def test_f01_lock_postgres(engine, tmp_path, monkeypatch):
+    _f01_lock(engine, tmp_path, monkeypatch)
+
+
+def test_f01_keep_postgres(engine, tmp_path, monkeypatch):
+    _f01_keep(engine, tmp_path, monkeypatch)
 
 
 def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):

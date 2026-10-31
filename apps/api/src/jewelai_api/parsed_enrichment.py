@@ -460,13 +460,27 @@ def _prepare_candidate(
             **common,
             reason=CandidateDispositionReason.PREFERENCE_REQUIRES_ACCEPTANCE,
         )
-    if candidate.subject == CandidateSubject.PRONGS and candidate.target in {
+    if candidate.subject != CandidateSubject.PRODUCT_BODY and candidate.target in {
         StructuredTarget.METAL_MATERIAL,
         StructuredTarget.METAL_COLOR,
     }:
         return None, CandidateDisposition(
             **common,
             reason=CandidateDispositionReason.COMPONENT_TARGET_NOT_REPRESENTABLE,
+        )
+    if (
+        candidate.target == StructuredTarget.STYLE
+        and candidate.subject != CandidateSubject.OVERALL_DESIGN
+    ):
+        return None, CandidateDisposition(
+            **common, reason=CandidateDispositionReason.COMPONENT_TARGET_NOT_REPRESENTABLE
+        )
+    if candidate.target is None and candidate.subject in {
+        CandidateSubject.PRONGS,
+        CandidateSubject.BAND,
+    }:
+        return None, CandidateDisposition(
+            **common, reason=CandidateDispositionReason.COMPONENT_TARGET_NOT_REPRESENTABLE
         )
     if candidate.application == CandidateApplication.PARSER_CANDIDATE_READY:
         update = candidate.parser_update

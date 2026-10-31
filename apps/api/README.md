@@ -306,3 +306,24 @@ Generated-Asset reconciliation and failed-run orphan cleanup are intentionally n
 They are bounded operator commands in `workers/generation`, with separate metadata-read and
 version-conditional-delete authority. Existing Asset metadata and signed-access API contracts are
 unchanged.
+
+### F01 unapplied relationship evidence
+
+Controlled Prompt Enrichment distinguishes body metal from named components and
+center from side-stone statements before building proposals. Non-representable
+component metal cannot become global metal. Existing stable IDs are preserved;
+only the already-supported single-group quantity path may apply to an existing
+side group. Other component/group bindings require separately approved contracts.
+
+Unapplied source-backed requirements use the existing unresolved evidence payload,
+with original Message identity and a quoted nominal-phrase citation. They remain
+non-authoritative after restart and are presented separately from accepted facts.
+Equivalent accepted Dictionary/binding evidence is not duplicated as unapplied;
+supported ambiguity stays under its existing clarification/answer lifecycle.
+Unresolved evidence does not implement new conflict/cancellation/Unknown policy.
+Original source citations may retain historical wording after a correction;
+they are explicitly labelled as unapplied details, separate from current facts.
+They cannot become active requirements or override the current canonical value.
+Missing/ambiguous side groups retain the existing typed deferred correction
+reason independently of whether parser syntax words produce unresolved tokens.
+There is no migration, provider call, catalog promotion or public schema expansion.

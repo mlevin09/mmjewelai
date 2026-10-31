@@ -11,8 +11,10 @@ from jewelai_parser import (
     CandidateCertainty,
     CandidateClassification,
 )
+from jewelai_parser.full_message import _ownership_context
 from jewelai_prompts import FinalPromptConstraintEvidence, project_revision
 
+from .clarification import _TARGET_QUESTION
 from .parsed_enrichment import CandidateDispositionOutcome, ParsedCandidateEnrichmentResult
 
 
@@ -91,11 +93,60 @@ def merge_constraint_evidence(
             CandidateClassification.PRESERVATION,
         }:
             continue
-        if candidate.semantic_subject is None and candidate.classification not in {
-            CandidateClassification.PROHIBITION,
-            CandidateClassification.PRESERVATION,
-        }:
-            continue
+        context_span = None
+        if (
+            candidate.semantic_subject is None
+            and candidate.classification == CandidateClassification.REQUIREMENT
+        ):
+            disposition = next(d for d in parsed.dispositions if d.candidate == candidate)
+            if (
+                candidate.certainty == CandidateCertainty.AMBIGUOUS
+                and candidate.target in _TARGET_QUESTION
+            ):
+                continue  # The existing answer/plan lineage owns this ambiguity.
+            if any(
+                d.candidate.evidence == candidate.evidence
+                and (
+                    (
+                        d.candidate.normalized_values == candidate.normalized_values
+                        and (
+                            d.candidate.subject == candidate.subject
+                            or d.candidate.semantic_subject is not None
+                        )
+                    )
+                    or (
+                        candidate.target is not None
+                        and d.candidate.target == candidate.target
+                        and d.candidate.subject == candidate.subject
+                    )
+                )
+                and d.outcome
+                in {
+                    CandidateDispositionOutcome.APPLIED,
+                    CandidateDispositionOutcome.KEPT,
+                    CandidateDispositionOutcome.NO_CHANGE,
+                }
+                for d in parsed.dispositions
+            ):
+                continue  # The same sourced intent already has its approved binding.
+            # Recognition is not acceptance. Preserve unsupported user wording
+            # with its original Message/span through the existing unresolved DTO.
+            # Accepted Dictionary facts keep their canonical provenance instead.
+            if disposition.outcome != CandidateDispositionOutcome.DEFERRED:
+                continue
+            if candidate.subject.value == "unknown" and not candidate.normalized_values:
+                continue
+            left, right, _ = _ownership_context(
+                parsed.parse_result.original_text, candidate.evidence.start, candidate.evidence.end
+            )
+            # Cite the source phrase, so "gold prongs" is not presented as an
+            # unresolved global "gold" fact. This is quotation, never binding.
+            text = parsed.parse_result.original_text
+            while left < right and text[left].isspace():
+                left += 1
+            while right > left and text[right - 1].isspace():
+                right -= 1
+            context_span = (left, right)
         explicit = (
             candidate.certainty == CandidateCertainty.EXPLICIT
             and candidate.semantic_subject is not None
@@ -121,14 +172,16 @@ def merge_constraint_evidence(
                 # Only this exact accepted candidate and matching canonical value
                 # can be described as fulfilled. Other unresolved intent is kept.
                 explicit = canonical_requirement
+        span_start, span_end = context_span or (candidate.evidence.start, candidate.evidence.end)
+        wording = parsed.parse_result.original_text[span_start:span_end]
         kind = candidate.classification.value
         identity = {
             "session_id": str(session_id),
             "organization_id": str(organization_id),
             "message_id": source.message_id,
             "candidate_id": candidate.candidate_id,
-            "span_start": candidate.evidence.start,
-            "span_end": candidate.evidence.end,
+            "span_start": span_start,
+            "span_end": span_end,
             "kind": kind,
             "semantic_subject": candidate.semantic_subject,
         }
@@ -150,11 +203,11 @@ def merge_constraint_evidence(
                 if explicit
                 else None
             ),
-            "original_wording": candidate.evidence.text,
+            "original_wording": wording,
             "source": source,
             "source_candidate_id": candidate.candidate_id,
-            "source_span_start": candidate.evidence.start,
-            "source_span_end": candidate.evidence.end,
+            "source_span_start": span_start,
+            "source_span_end": span_end,
             "source_revision_id": revision.revision_id,
             "source_enrichment_cycle_id": enrichment_cycle_id,
             "superseded_by_evidence_id": None,

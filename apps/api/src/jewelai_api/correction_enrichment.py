@@ -488,6 +488,8 @@ def _nonmutating_outcome(evaluation):
         CandidateDispositionReason.AMBIGUOUS_CANDIDATE,
         CandidateDispositionReason.UNRESOLVED_CANDIDATE,
         CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES,
+        CandidateDispositionReason.SIDE_STONE_GROUP_MISSING,
+        CandidateDispositionReason.SIDE_STONE_GROUP_AMBIGUOUS,
     }:
         return CorrectionOutcome.DEFERRED, CorrectionReason.AMBIGUOUS_OR_UNRESOLVED
     if any(
