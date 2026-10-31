@@ -42,6 +42,13 @@ from test_f01_ownership import (
     test_f01_locked_body_not_replaced_by_component_or_global_request as _f01_lock,
 )
 from test_f01_ownership import test_f01_three_cycle_keep_and_component_delta as _f01_keep
+from test_f02_binding import (
+    F02_CASES,
+    LINEAGE_CASES,
+    exercise_f02_correction,
+    exercise_f02_knowledge_lineage,
+    exercise_f02_lineage,
+)
 from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
@@ -118,6 +125,28 @@ def test_f01_lock_postgres(engine, tmp_path, monkeypatch):
 
 def test_f01_keep_postgres(engine, tmp_path, monkeypatch):
     _f01_keep(engine, tmp_path, monkeypatch)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+@pytest.mark.parametrize("case", F02_CASES, ids=[c[0] for c in F02_CASES])
+def test_f02_binding_http_postgres(engine, tmp_path, monkeypatch, case, binding):
+    exercise_f01_case(engine, tmp_path, monkeypatch, case, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+@pytest.mark.parametrize("case", LINEAGE_CASES)
+def test_f02_alias_lineage_postgres(engine, tmp_path, monkeypatch, case, binding):
+    exercise_f02_lineage(engine, tmp_path, monkeypatch, binding, case)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_f02_correction_clarification_postgres(engine, tmp_path, monkeypatch, binding):
+    exercise_f02_correction(engine, tmp_path, monkeypatch, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_f02_knowledge_only_pinned_graph_postgres(engine, tmp_path, monkeypatch, binding):
+    exercise_f02_knowledge_lineage(engine, tmp_path, monkeypatch, binding)
 
 
 def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):
