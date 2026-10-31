@@ -302,9 +302,17 @@ def test_component_and_unknown_evidence_remain_non_authoritative(dictionary, col
         dictionary=dictionary,
         knowledge_runtime=collision_runtime,
     )
-    metals = [item for item in result.candidates if item.target == StructuredTarget.METAL_MATERIAL]
-    assert {item.normalized_values for item in metals} == {("gold",), ("platinum",)}
-    assert all(item.parser_update is None for item in metals)
+    gold = _find(result, text="gold")
+    assert gold.subject == CandidateSubject.PRONGS and gold.target is None
+    assert gold.parser_update is None
+    platinum = next(
+        c
+        for c in result.candidates
+        if c.evidence.text == "platinum"
+        and c.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+    )
+    assert platinum.subject == CandidateSubject.PRODUCT_BODY
+    assert platinum.target == StructuredTarget.METAL_MATERIAL and platinum.parser_update is not None
     sapphire = _find(result, text="sapphire")
     assert sapphire.normalization_source == NormalizationSource.KNOWLEDGE_LIBRARY
     assert sapphire.parser_update is None
@@ -469,14 +477,8 @@ def test_complex_english_message_preserves_roles_constraints_and_intent(dictiona
         "scope": "per_item",
     }
 
-    assert (
-        _find(result, target=StructuredTarget.METAL_MATERIAL, text="gold").subject
-        == CandidateSubject.BAND
-    )
-    assert (
-        _find(result, target=StructuredTarget.METAL_COLOR, text="yellow").subject
-        == CandidateSubject.BAND
-    )
+    assert _find(result, text="gold").subject == CandidateSubject.BAND
+    assert _find(result, text="yellow").subject == CandidateSubject.BAND
     prohibition = _find(result, classification=CandidateClassification.PROHIBITION, text="no halo")
     assert prohibition.parser_update is None
     assert set(prohibition.normalized_values) == {"halo_setting", "halo_style"}
@@ -545,14 +547,12 @@ def test_component_material_and_preservation_are_not_collapsed(dictionary, termi
     assert _find(result, target=StructuredTarget.CENTER_STONE_MATERIAL, text="diamond")
     assert _find(result, target=StructuredTarget.CENTER_STONE_SHAPE, text="emerald-cut")
 
-    prong_gold = _find(result, target=StructuredTarget.METAL_MATERIAL, text="gold")
+    prong_gold = _find(result, text="gold")
     assert prong_gold.subject == CandidateSubject.PRONGS
     assert prong_gold.parser_update is None
-    assert "not represented" in prong_gold.detail
-    assert (
-        _find(result, target=StructuredTarget.METAL_COLOR, text="yellow").subject
-        == CandidateSubject.PRONGS
-    )
+    assert prong_gold.target is None
+    assert "stable component binding" in prong_gold.detail
+    assert _find(result, text="yellow").subject == CandidateSubject.PRONGS
     assert _find(
         result, classification=CandidateClassification.PROHIBITION, text="No additional stones"
     )

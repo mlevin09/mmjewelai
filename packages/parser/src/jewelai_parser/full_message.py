@@ -177,9 +177,10 @@ class FullMessageParseResult(ImmutableModel):
 class _Surface:
     text: str
     locale: Literal["en", "ru"]
-    category: DictionaryCategory
+    category: DictionaryCategory | None
     normalized_id: str
     source: NormalizationSource
+    kind: str | None = None
 
 
 @dataclass(frozen=True)
@@ -218,10 +219,13 @@ _SUBJECT_PATTERNS = {
     ),
     CandidateSubject.SIDE_STONES: re.compile(
         r"\b(?:side[\s-]*stones?|stones?\s+on\s+the\s+sides?|diamonds?\s+on\s+the\s+sides?)\b|"
-        r"(?:боков\w*\s+кам\w*|кам\w*\s+по\s+бокам|бриллиант\w*\s+по\s+бокам)",
+        r"(?:боков\w*\s+кам\w*|кам\w*\s+по\s+бокам|бриллиант\w*\s+по\s+бокам|по\s+бокам|сбоку)",
         re.IGNORECASE,
     ),
     CandidateSubject.PRONGS: re.compile(r"\bprongs?\b|крапан\w*", re.IGNORECASE),
+    CandidateSubject.SETTING: re.compile(
+        r"\b(?:setting|mount|mounting)\b|закрепк\w*|оправ\w*", re.I
+    ),
     CandidateSubject.BAND: re.compile(r"\b(?:band|shank)\b|шинк\w*", re.IGNORECASE),
 }
 
@@ -524,7 +528,7 @@ def _lexical_candidates(text: str, dictionary: DictionaryRegistry, runtime) -> l
     found = _mark_choice_ambiguity(text, _find_surfaces(text, surfaces))
     for item in found:
         if not _inside_any(item.start, item.end, protected_spans):
-            candidates.append(_candidate_from_surface(text, item, dictionary, runtime))
+            candidates.append(_candidate_from_surface(text, item, dictionary, runtime, found))
     candidates.extend(_measurement_candidates(text))
     candidates.extend(_quantity_candidates(text))
     candidates.extend(_aesthetic_candidates(text, protected_spans))
@@ -572,8 +576,6 @@ def _knowledge_surfaces(runtime: AnyCompiledKnowledge) -> list[_Surface]:
     surfaces = []
     for mapping in runtime.language_mappings:
         category = _KIND_TO_CATEGORY.get(kinds.get(mapping.concept_id, ""))
-        if category is None:
-            continue
         for term in (mapping.canonical_term, *mapping.aliases):
             surfaces.append(
                 _Surface(
@@ -582,6 +584,7 @@ def _knowledge_surfaces(runtime: AnyCompiledKnowledge) -> list[_Surface]:
                     category=category,
                     normalized_id=mapping.concept_id,
                     source=NormalizationSource.KNOWLEDGE_LIBRARY,
+                    kind=kinds.get(mapping.concept_id),
                 )
             )
     return surfaces
@@ -594,7 +597,9 @@ def _tokens(text: str) -> tuple[_Token, ...]:
 
 
 def _surface_key(value: str, locale: str) -> str:
-    normalized = normalize_knowledge_text(value).replace("ё", "е")
+    normalized = (
+        normalize_knowledge_text(value).replace("ё", "е").replace("-", " ").replace("‑", " ")
+    )
     if locale == "ru":
         return ru_morphology_key(normalized).replace("ё", "е")
     words = normalized.split()
@@ -638,6 +643,10 @@ def _find_surfaces(text: str, surfaces: list[_Surface]) -> list[_Found]:
         # recognition must neither replace nor suppress supported Dictionary facts.
         if any(
             existing.surface.source == item.surface.source
+            and not (
+                existing.surface.category == DictionaryCategory.METAL_COLOR
+                and item.surface.category == DictionaryCategory.METAL_MATERIAL
+            )
             and existing.start <= item.start
             and existing.end >= item.end
             for existing in kept
@@ -708,9 +717,10 @@ def _candidate_from_surface(
     item: _Found,
     dictionary: DictionaryRegistry,
     runtime: AnyCompiledKnowledge | None,
+    found: list[_Found],
 ) -> dict:
     evidence = text[item.start : item.end]
-    subject = _subject_for(text, item.start, item.end, item.surface.category)
+    subject, owner_detail = _owner_for(text, item.start, item.end, item.surface.category)
     certainty = _certainty_for(text, item.start, item.end, item.certainty)
     normalized_values = item.normalized_values or (item.surface.normalized_id,)
     source = item.surface.source
@@ -747,11 +757,30 @@ def _candidate_from_surface(
     application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
     parser_update = None
 
-    if subject == CandidateSubject.PRONGS and item.surface.category in {
-        DictionaryCategory.METAL_MATERIAL,
-        DictionaryCategory.METAL_COLOR,
-    }:
-        detail = "Component-specific prong metal is not represented by Product State v1."
+    owner_left, owner_right, _ = _ownership_context(text, item.start, item.end)
+    component_setting = (
+        item.surface.category == DictionaryCategory.STONE_SETTING
+        and evidence.casefold() in {"prongs", "prong", "крапаны", "крапанах"}
+        and any(
+            owner_left <= other.start
+            and other.end <= owner_right
+            and other.surface.category
+            in {DictionaryCategory.METAL_MATERIAL, DictionaryCategory.METAL_COLOR}
+            and _subject_for(text, other.start, other.end, other.surface.category)
+            == CandidateSubject.PRONGS
+            for other in found
+        )
+    )
+    if component_setting:
+        subject, target, parser_target = CandidateSubject.PRONGS, None, None
+        detail = "Component-specific prong metal does not establish a center-stone setting."
+    elif (
+        item.surface.category in {DictionaryCategory.METAL_MATERIAL, DictionaryCategory.METAL_COLOR}
+        and subject != CandidateSubject.PRODUCT_BODY
+    ):
+        detail = (
+            f"Component-specific {owner_detail} metal has no approved stable component binding."
+        )
     elif target in {
         StructuredTarget.SIDE_STONE_MATERIAL,
         StructuredTarget.SIDE_STONE_SHAPE,
@@ -766,7 +795,8 @@ def _candidate_from_surface(
     elif source == NormalizationSource.KNOWLEDGE_LIBRARY:
         detail = (
             "Knowledge terminology recognition remains structured evidence until an approved "
-            "Matrix binding produces a valid parser proposal."
+            "Matrix binding produces a valid parser proposal. "
+            f"Recognized kind: {item.surface.kind}."
         )
     elif parser_target is not None:
         value = (
@@ -872,50 +902,129 @@ def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
     return tuple(sorted(set(boundaries)))
 
 
-def _subject_for(
-    text: str,
-    start: int,
-    end: int,
-    category: DictionaryCategory,
-) -> CandidateSubject:
-    if category == DictionaryCategory.JEWELRY_TYPE:
-        return CandidateSubject.PRODUCT
+# Nominal ownership is independent of intent: an object list can share polarity
+# while naming different owners. No stable IDs or new public subject types here.
+_OBJECT_JOIN = re.compile(r"\b(?:with|and|и|с|со)\b", re.I)
+_PRODUCT_NOUN = re.compile(
+    r"\b(?:ring(?![- ]shaped)|pendant|jewel(?:ry|lery)|body|кольц\w*|подвес\w*|издели\w*)\b", re.I
+)
+_UNREPRESENTED_COMPONENT = re.compile(
+    r"\b(?:head|basket|gallery|shoulders?|coating|plating|plated|colou?red|головк\w*|каст\w*|корзин\w*|галере\w*|плеч\w*)\b",
+    re.I,
+)
+_STONE_NOUN = re.compile(
+    r"\b(?:stones?|gems?|diamond\w*|emerald\w*|sapphire\w*|кам\w*|алмаз\w*|бриллиант\w*|изумруд\w*|сапфир\w*)\b",
+    re.I,
+)
+_BODY_METAL = re.compile(r"\b(?:metal|gold|platinum|металл\w*|золот\w*|платин\w*)\b", re.I)
+
+
+def _ownership_context(text, start, end):
     left, right = _intent_bounds(text, start, end)
-    candidates = []
-    if category in {DictionaryCategory.METAL_MATERIAL, DictionaryCategory.METAL_COLOR}:
-        allowed_subjects = {CandidateSubject.PRONGS, CandidateSubject.BAND}
-    elif category in {
-        DictionaryCategory.GEMSTONE_MATERIAL,
-        DictionaryCategory.STONE_SHAPE,
-        DictionaryCategory.STONE_CUT,
-        DictionaryCategory.STONE_SETTING,
-    }:
-        allowed_subjects = {CandidateSubject.CENTER_STONE, CandidateSubject.SIDE_STONES}
-    else:
-        allowed_subjects = set(_SUBJECT_PATTERNS)
+    anchors = []
     for subject, pattern in _SUBJECT_PATTERNS.items():
-        if subject not in allowed_subjects:
-            continue
         for match in pattern.finditer(text, left, right):
-            if match.start() >= end and _NEGATION.search(text[end : match.start()]):
-                continue
-            distance = min(abs(match.start() - end), abs(start - match.end()))
-            if distance <= 45:
-                candidates.append((distance, subject))
-    if candidates:
-        return min(candidates, key=lambda item: (item[0], item[1].value))[1]
-    if category in {DictionaryCategory.METAL_MATERIAL, DictionaryCategory.METAL_COLOR}:
-        return CandidateSubject.PRODUCT_BODY
-    if category in {
+            if (
+                subject == CandidateSubject.BAND
+                and re.search(r"(?:split[- ]|раздвоенн\w*\s+)$", text[left : match.start()], re.I)
+                and _PRODUCT_NOUN.match(text[match.end() : right].lstrip())
+            ):
+                continue  # A construction adjective is not a metal component.
+            anchors.append((match.start(), match.end(), subject, match.group()))
+    anchors.extend(
+        (m.start(), m.end(), CandidateSubject.PRODUCT_BODY, m.group())
+        for m in _PRODUCT_NOUN.finditer(text, left, right)
+    )
+    anchors.extend(
+        (m.start(), m.end(), CandidateSubject.UNKNOWN, m.group())
+        for m in _UNREPRESENTED_COMPONENT.finditer(text, left, right)
+    )
+    # A bare gemstone noun proves a stone relationship, not a canonical material.
+    # Explicit side/center anchors always take precedence over this fallback.
+    if not any(
+        a[2] in {CandidateSubject.CENTER_STONE, CandidateSubject.SIDE_STONES} for a in anchors
+    ):
+        anchors.extend(
+            (m.start(), m.end(), CandidateSubject.CENTER_STONE, m.group())
+            for m in _STONE_NOUN.finditer(text, left, right)
+        )
+    anchors.extend(
+        (m.start(), m.end(), CandidateSubject.OVERALL_DESIGN, m.group())
+        for m in re.compile(
+            r"\b(?:style|appearance|look|design|стиль|облик|дизайн)\b", re.I
+        ).finditer(text, left, right)
+    )
+    joins = tuple(_OBJECT_JOIN.finditer(text, left, right))
+    for index, join in enumerate(joins):
+        following = joins[index + 1].start() if index + 1 < len(joins) else right
+        before = any(left <= a and b <= join.start() for a, b, _, _ in anchors)
+        after = any(join.end() <= a and b <= following for a, b, _, _ in anchors)
+        if after and (before or join.group().casefold() in {"with", "с", "со"}):
+            if join.end() <= start:
+                left = join.end()
+            elif end <= join.start():
+                right = join.start()
+                break
+    return left, right, anchors
+
+
+def _owner_for(text, start, end, category):
+    if category == DictionaryCategory.JEWELRY_TYPE:
+        return CandidateSubject.PRODUCT, "product"
+    left, right, anchors = _ownership_context(text, start, end)
+    candidates = []
+    stone = category in {
         DictionaryCategory.GEMSTONE_MATERIAL,
         DictionaryCategory.STONE_SHAPE,
         DictionaryCategory.STONE_CUT,
         DictionaryCategory.STONE_SETTING,
-    }:
-        return CandidateSubject.CENTER_STONE
+    }
+    metal = category in {
+        DictionaryCategory.METAL_MATERIAL,
+        DictionaryCategory.METAL_COLOR,
+        DictionaryCategory.METAL_PURITY,
+    }
+    for a, b, subject, label in anchors:
+        if a < left or b > right:
+            continue
+        if a >= end and _NEGATION.search(text[end:a]):
+            continue
+        if metal and subject in {CandidateSubject.CENTER_STONE, CandidateSubject.SIDE_STONES}:
+            continue
+        if stone and subject in {
+            CandidateSubject.PRODUCT_BODY,
+            CandidateSubject.OVERALL_DESIGN,
+            CandidateSubject.SETTING,
+        }:
+            continue
+        if category == DictionaryCategory.STONE_SETTING and subject == CandidateSubject.PRONGS:
+            continue  # Explicit setting vocabulary is handled independently.
+        distance = min(abs(a - end), abs(start - b))
+        candidates.append((distance, subject.value, subject, label))
+    if candidates:
+        _, _, subject, label = min(candidates)
+        if category == DictionaryCategory.STYLE and subject == CandidateSubject.PRODUCT_BODY:
+            subject = CandidateSubject.OVERALL_DESIGN
+        if category == DictionaryCategory.CONSTRUCTION:
+            subject = CandidateSubject.PRODUCT
+        return subject, label
+    if metal:
+        return CandidateSubject.PRODUCT_BODY, "product body"
+    if stone:
+        return CandidateSubject.CENTER_STONE, "center stone"
     if category == DictionaryCategory.STYLE:
-        return CandidateSubject.OVERALL_DESIGN
-    return CandidateSubject.UNKNOWN
+        return CandidateSubject.OVERALL_DESIGN, "overall design"
+    if category == DictionaryCategory.CONSTRUCTION:
+        return CandidateSubject.PRODUCT, "construction"
+    if _STONE_NOUN.search(text[left:right]):
+        return CandidateSubject.CENTER_STONE, "stone"
+    if _BODY_METAL.search(text[left:right]):
+        return CandidateSubject.PRODUCT_BODY, "product body"
+    return CandidateSubject.UNKNOWN, "unresolved owner"
+
+
+def _subject_for(text, start, end, category):
+    return _owner_for(text, start, end, category)[0]
 
 
 def _target_for(
@@ -925,11 +1034,13 @@ def _target_for(
     if category == DictionaryCategory.JEWELRY_TYPE:
         return StructuredTarget.JEWELRY_TYPE
     if category == DictionaryCategory.METAL_MATERIAL:
-        return StructuredTarget.METAL_MATERIAL
+        return StructuredTarget.METAL_MATERIAL if subject == CandidateSubject.PRODUCT_BODY else None
     if category == DictionaryCategory.METAL_COLOR:
-        return StructuredTarget.METAL_COLOR
+        return StructuredTarget.METAL_COLOR if subject == CandidateSubject.PRODUCT_BODY else None
     if category == DictionaryCategory.STYLE:
-        return StructuredTarget.STYLE
+        return StructuredTarget.STYLE if subject == CandidateSubject.OVERALL_DESIGN else None
+    if subject not in {CandidateSubject.CENTER_STONE, CandidateSubject.SIDE_STONES}:
+        return None
     side = subject == CandidateSubject.SIDE_STONES
     return {
         DictionaryCategory.GEMSTONE_MATERIAL: (
@@ -970,13 +1081,21 @@ def _measurement_candidates(text: str) -> list[dict]:
         target = (
             StructuredTarget.SIDE_STONE_DIMENSIONS
             if subject == CandidateSubject.SIDE_STONES
-            else StructuredTarget.CENTER_STONE_DIMENSIONS
+            else (
+                StructuredTarget.CENTER_STONE_DIMENSIONS
+                if subject == CandidateSubject.CENTER_STONE
+                else None
+            )
         )
         values = tuple(float(match.group(key).replace(",", ".")) for key in ("a", "b", "c"))
         update = None
         application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
-        detail = "A stable existing side-stone group_id is required before application."
-        if subject != CandidateSubject.SIDE_STONES:
+        detail = (
+            "A stable existing side-stone group_id is required before application."
+            if subject == CandidateSubject.SIDE_STONES
+            else "Component-specific measurement has no approved parser target binding."
+        )
+        if subject == CandidateSubject.CENTER_STONE:
             update = CandidateUpdate(
                 target=ParserTarget.CENTER_STONE_DIMENSIONS,
                 value=DimensionsCandidate(
@@ -1020,12 +1139,20 @@ def _measurement_candidates(text: str) -> list[dict]:
         target = (
             StructuredTarget.SIDE_STONE_WEIGHT
             if subject == CandidateSubject.SIDE_STONES
-            else StructuredTarget.CENTER_STONE_WEIGHT
+            else (
+                StructuredTarget.CENTER_STONE_WEIGHT
+                if subject == CandidateSubject.CENTER_STONE
+                else None
+            )
         )
         update = None
         application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
-        detail = "A stable existing side-stone group_id is required before application."
-        if subject != CandidateSubject.SIDE_STONES:
+        detail = (
+            "A stable existing side-stone group_id is required before application."
+            if subject == CandidateSubject.SIDE_STONES
+            else "Component-specific measurement has no approved parser target binding."
+        )
+        if subject == CandidateSubject.CENTER_STONE:
             update = CandidateUpdate(
                 target=ParserTarget.CENTER_STONE_WEIGHT,
                 value=WeightCandidate(value={"value": value, "unit": "ct"}),
@@ -1104,14 +1231,20 @@ def _aesthetic_candidates(text: str, protected: list[tuple[int, int]]) -> list[d
     for match in _AESTHETIC.finditer(text):
         if _inside_any(match.start(), match.end(), protected):
             continue
+        subject = _subject_for(text, match.start(), match.end(), DictionaryCategory.STYLE)
+        classification = _classification_for(text, match.start(), match.end())
         candidates.append(
             _structured_candidate(
                 text,
                 match.start(),
                 match.end(),
-                target=StructuredTarget.STYLE,
-                subject=CandidateSubject.OVERALL_DESIGN,
-                classification=CandidateClassification.PREFERENCE,
+                target=_target_for(DictionaryCategory.STYLE, subject),
+                subject=subject,
+                classification=(
+                    CandidateClassification.PROHIBITION
+                    if classification == CandidateClassification.PROHIBITION
+                    else CandidateClassification.PREFERENCE
+                ),
                 certainty=CandidateCertainty.UNRESOLVED,
                 raw_value=match.group(0),
                 normalization_source=NormalizationSource.NONE,
@@ -1122,13 +1255,25 @@ def _aesthetic_candidates(text: str, protected: list[tuple[int, int]]) -> list[d
     return candidates
 
 
+_OWNER_WORD = re.compile(
+    r"(?:center|central|centre|stone|stones|side|sides|prong|prongs|shank|band|head|basket|gallery|shoulder|shoulders|style|appearance|look|"
+    r"центральн\w*|боков\w*|крапан\w*|шинк\w*|камн\w*|камень|головк\w*|корзин\w*|галере\w*|плеч\w*|стиль)",
+    re.I,
+)
+
+
 def _unresolved_candidates(text: str, recognized: list[tuple[int, int]]) -> list[dict]:
     candidates = []
     for token in _tokens(text):
         normalized = normalize_knowledge_text(token.text).replace("ё", "е")
+        owner_left, owner_right, _ = _ownership_context(text, token.start, token.end)
         if (
             len(normalized) < 3
             or normalized in _UNRESOLVED_STOPWORDS
+            or (
+                _OWNER_WORD.fullmatch(token.text)
+                and any(owner_left <= a and b <= owner_right for a, b in recognized)
+            )
             or normalized.isdigit()
             or _inside_any(token.start, token.end, recognized)
         ):
@@ -1139,7 +1284,7 @@ def _unresolved_candidates(text: str, recognized: list[tuple[int, int]]) -> list
                 token.start,
                 token.end,
                 target=None,
-                subject=CandidateSubject.UNKNOWN,
+                subject=_subject_for(text, token.start, token.end, None),
                 classification=_classification_for(text, token.start, token.end),
                 certainty=CandidateCertainty.UNRESOLVED,
                 raw_value=token.text,
@@ -1168,6 +1313,15 @@ def _structured_candidate(
     parser_update: CandidateUpdate | None = None,
     detail: str | None,
 ) -> dict:
+    if certainty == CandidateCertainty.EXPLICIT:
+        certainty = _certainty_for(text, start, end, certainty)
+    if (
+        classification
+        in {CandidateClassification.PROHIBITION, CandidateClassification.PRESERVATION}
+        or certainty != CandidateCertainty.EXPLICIT
+    ):
+        parser_update = None
+        application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
     return {
         "target": target,
         "subject": subject,
@@ -1192,6 +1346,7 @@ def _deduplicate(candidates: list[dict]) -> list[dict]:
             item["evidence"]["start"],
             item["evidence"]["end"],
             item.get("target"),
+            item.get("semantic_subject"),
             item["subject"],
             item["classification"],
             item["normalization_source"],

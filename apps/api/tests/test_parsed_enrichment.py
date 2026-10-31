@@ -690,11 +690,18 @@ def test_ru_en_and_mixed_candidates_flow_through_existing_parser_and_matrix(
         active_release=active_release,
     )
 
-    platinum = _find(result, target=StructuredTarget.METAL_MATERIAL, text=expected_text)
-    assert platinum.outcome == CandidateDispositionOutcome.APPLIED
-    assert platinum.enrichment_proposal.provenance == RuntimeProvenance.NORMALIZED_FROM_USER
-    assert platinum.enrichment_decision.proposal == platinum.enrichment_proposal
-    assert platinum.enrichment_decision.result.value == "platinum"
+    platinum = _find(result, text=expected_text)
+    if "band" in text:
+        assert platinum.candidate.subject == CandidateSubject.BAND
+        assert platinum.candidate.target is None
+        assert platinum.reason == CandidateDispositionReason.COMPONENT_TARGET_NOT_REPRESENTABLE
+        assert result.parser_proposal.proposed_design.metal.material is None
+    else:
+        assert platinum.candidate.subject == CandidateSubject.PRODUCT_BODY
+        assert platinum.outcome == CandidateDispositionOutcome.APPLIED
+        assert platinum.enrichment_proposal.provenance == RuntimeProvenance.NORMALIZED_FROM_USER
+        assert platinum.enrichment_decision.proposal == platinum.enrichment_proposal
+        assert platinum.enrichment_decision.result.value == "platinum"
     center = _find(
         result,
         target=StructuredTarget.CENTER_STONE_MATERIAL,
@@ -725,8 +732,9 @@ def test_constraints_component_roles_and_knowledge_terms_remain_explicit_evidenc
     knowledge_style = _find(result, target=StructuredTarget.STYLE, text="three-stone")
     assert knowledge_style.reason == CandidateDispositionReason.TARGET_NOT_SUPPORTED_BY_PARSER
     assert knowledge_style.enrichment_proposal is None
-    for target in (StructuredTarget.METAL_MATERIAL, StructuredTarget.METAL_COLOR):
-        prong = _find(result, target=target, subject=CandidateSubject.PRONGS)
+    for text in ("gold", "yellow"):
+        prong = _find(result, text=text, subject=CandidateSubject.PRONGS)
+        assert prong.candidate.target is None
         assert prong.reason == CandidateDispositionReason.COMPONENT_TARGET_NOT_REPRESENTABLE
     assert (
         _find(result, classification=CandidateClassification.PROHIBITION).reason

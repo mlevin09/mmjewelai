@@ -154,3 +154,59 @@ python -m pip install -e './packages/domain[test]'
 python -m pip install -e './packages/parser[test]'
 python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
 ```
+
+## F01 text understanding and object ownership
+
+Nominal object scope and intent scope are separate. `and` can coordinate two
+objects under one predicate; it is not automatically a new positive assertion.
+Named product/component/center/side anchors and connectors resolve the local
+owner without allowing a nearby prong/shank to steal a product-body fact.
+Hyphenated spellings reuse existing Dictionary surfaces (including compound
+metal colors), while material/color remain distinct properties with original
+source spans. Construction adjectives such as `split-shank ring` are not evidence
+that the preceding metal belongs only to a shank component.
+
+| Surface | Current recognition/application boundary |
+| --- | --- |
+| Product | Existing Dictionary ring/pendant terms and RU inflections → existing `jewelry_type` proposal |
+| Body metal | Existing gold/platinum and white/yellow/rose vocabulary → independent material/color proposals |
+| Named component metal | Band/prongs retain their existing subjects; head/basket/etc. retain source labels with UNKNOWN typed subject when no enum exists. **No global metal target or update**, no component ID inference, even if a component already exists |
+| Center stone | Dictionary diamond/emerald, oval/emerald-cut, brilliant/step cut, supported setting and explicit stone measurements → existing typed proposals, subject to certainty, LOCK and canonical transition |
+| Side stones | Preserve material/shape/cut/measurement owner evidence. Only existing quantity binding may address one existing group; no group creation or material/shape fallback to center, including when zero/multiple groups exist |
+| Style | Existing Dictionary style target; component-specific style is not silently promoted to overall style |
+| Finish/color/orientation/construction | Recognize available supplied Library mappings of any kind and existing Dictionary construction vocabulary. Unbound kinds have no invented canonical target; unknown wording retains local owner and source. Schema field existence alone grants no parser authority |
+| Purity | Typed structured ParserCandidate purity exists, but the full-message StructuredTarget/binding is absent. Preserve source wording; no karat/fineness conversion or implicit alloy |
+
+Library recognition cannot create accepted requirements without an approved
+binding. Longest-match suppression is source-local and preserves independent
+material inside an approved compound metal-color term; it still does not turn
+`emerald-cut diamond` into emerald material. Deduplication includes semantic
+subject so generic recognition cannot erase an approved explicit binding.
+Measurements share the same certainty/negative governance and cannot become
+center-stone updates when explicitly attached to a component.
+
+The controlled API retains unapplied source-backed requirements through the
+existing unresolved constraint-evidence DTO and original Message. The source
+citation uses the original nominal phrase, distinguishing `gold prongs` from
+accepted body gold; matched Parser spans remain unchanged. Accepted equivalent
+Dictionary/approved-binding evidence is not labelled unapplied. Existing
+clarification-plan/answer lineage continues to own supported ambiguity; preferences
+are not converted into requirement evidence. The review description quotes
+unapplied source wording separately from canonical facts, without internal IDs or
+raw JSON. This introduces no new DTO, target enum, conflict resolution, history
+rewrite or Knowledge activation.
+
+Expanded canonical bindings still require an Owner decision on versioned targets,
+value types and stable identity resolution (Issue #120); conflict resolution,
+Missing/Unknown and professional rules remain #121/#124/#122 scopes. Russian
+`хочу` remains a preference and no material ACCEPT question is invented.
+
+```sh
+python3 -m pytest -c packages/parser/pyproject.toml packages/parser/tests/test_f01_ownership.py -q
+python3 -m pytest -c apps/api/pyproject.toml apps/api/tests/test_f01_ownership.py -q -s
+```
+
+`F01_TRACE` and the existing detailed `C1_TRACE` expose synthetic raw input,
+release identity, candidate/disposition/Matrix, canonical state and final output.
+PostgreSQL counterparts use the existing independently verified disposable fixture;
+none of these synthetic tests qualify a professional catalog or live deployment.

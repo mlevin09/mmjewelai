@@ -836,8 +836,27 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
     unresolved_evidence_ids = {
         item.evidence_id for item in snapshot.constraint_evidence if item.status == "unresolved"
     }
+    unresolved_wording = {
+        evidence.evidence_id: evidence.original_wording
+        for evidence in snapshot.constraint_evidence
+        if evidence.status == "unresolved"
+        and evidence.kind == "requirement"
+        and evidence.semantic_subject is None
+    }
     unresolved_summary = []
     for item in unresolved:
+        wording = next(
+            (unresolved_wording[i] for i in item.source_ids if i in unresolved_wording), None
+        )
+        if wording is not None:
+            label = (
+                "Source phrase with unresolved details"
+                if snapshot.locale == "en"
+                else "Исходная фраза с неприменёнными деталями"
+            ) + f": «{wording}»"
+            if label not in unresolved_summary:
+                unresolved_summary.append(label)
+            continue
         label = _target_label(item.target, snapshot.locale)
         if item.target in fact_map and unresolved_evidence_ids.intersection(item.source_ids):
             # An unresolved request is not an ambiguous canonical fact. Keep its
