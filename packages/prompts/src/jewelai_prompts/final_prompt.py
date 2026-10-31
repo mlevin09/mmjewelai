@@ -778,6 +778,7 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
             sentences.append(sentence)
     for target, en_label, ru_label in (
         ("style", "Style", "Стиль"),
+        ("style_descriptors", "Style descriptors", "Характеристики стиля"),
         ("visual_constraints", "Visual requirements", "Визуальные требования"),
         ("references", "References", "Референсы"),
     ):

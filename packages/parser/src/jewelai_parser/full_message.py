@@ -230,7 +230,36 @@ _PREFERENCE = re.compile(
     re.IGNORECASE,
 )
 _AMBIGUITY = re.compile(r"\b(?:maybe|perhaps|possibly|either|or|возможно|может|либо|или)\b", re.I)
-_NEGATION = re.compile(r"\b(?:no|without|do\s+not|don't|без|не|никак\w*)\b", re.IGNORECASE)
+_NEGATED_AUXILIARY = (
+    r"(?:(?:is|are|was|were|do|does|did|would|will|can|should)\s+not|cannot|"
+    r"(?:isn|aren|wasn|weren|don|doesn|didn|wouldn|won|shouldn|can)['’]t)"
+)
+_NEGATION = re.compile(
+    r"\b(?:" + _NEGATED_AUXILIARY + r"|not|no|without|never|reject\w*|avoid|"
+    r"unwanted|unnecessary|undesired|ненуж\w*|нежелательн\w*|без|не|никак\w*)\b",
+    re.I,
+)
+# Predicate rejection governs the preceding assertion, unlike a following
+# negative object ("gold ring without side stones"). No canonical value is inferred.
+_REJECTED_ASSERTION = re.compile(
+    r"\b(?:(?:is|are|was|were)\s+(?:not\s+|never\s+)?"
+    r"(?:unwanted|unnecessary|undesired)|" + _NEGATED_AUXILIARY + r"\s+(?:be\s+)?"
+    r"(?:what|want\w*|need\w*|desir\w*|suit\w*|accept\w*|appeal\w*|interest\w*|choos\w*)|"
+    r"не\s+(?:нуж\w*|подход\w*|устраива\w*|интересу\w*|хочу|то\b))\b",
+    re.I,
+)
+_TENTATIVE = re.compile(
+    r"\b(?:maybe|perhaps|possibly|might|could|not\s+sure|unsure|uncertain|"
+    r"возможно|может(?:\s+быть)?|сомнева\w*|не\s+уверен\w*)\b",
+    re.I,
+)
+_CONTRAST = re.compile(r"\b(?:but|however|но|однако)\b", re.I)
+_COORDINATION = re.compile(r",\s*(?:(?:and|и)\b\s*)?|\b(?:and|и)\b|\r?\n", re.I)
+_REQUEST_START = re.compile(
+    r"\b(?:(?:I|we|я|мы|мне|нам)\s+)?(?:(?:" + _NEGATED_AUXILIARY + r"|не)\s+)?"
+    r"(?:want|need|choose|reject|avoid|хотим|нуж(?:ен|на|но|ны)|" + _PREFERENCE.pattern + r")\b",
+    re.I,
+)
 _TOKEN = re.compile(r"[^\W_]+|\d+(?:[.,]\d+)?", re.UNICODE)
 
 _SPECIAL_CONSTRAINTS = (
@@ -407,8 +436,14 @@ def _special_constraint_candidates(text: str) -> tuple[list[dict], list[tuple[in
                     match.end(),
                     target=None,
                     subject=subject,
-                    classification=classification,
-                    certainty=certainty,
+                    classification=(
+                        CandidateClassification.PREFERENCE
+                        if classification == CandidateClassification.REQUIREMENT
+                        and _classification_for(text, match.start(), match.end())
+                        == CandidateClassification.PREFERENCE
+                        else classification
+                    ),
+                    certainty=_certainty_for(text, match.start(), match.end(), certainty),
                     raw_value=match.group(0),
                     normalized_values=normalized_values,
                     semantic_subject=semantic_subject,
@@ -624,6 +659,10 @@ def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
             ):
                 continue
             between = text[left.end : right.start]
+            if _sentence_bounds(text, left.start, left.end)[1] < right.start:
+                continue
+            if any(left.end <= a and b <= right.start for a, b in _assertion_breaks(text)):
+                continue
             if _AMBIGUITY.search(between):
                 left_key = (
                     left.start,
@@ -672,7 +711,7 @@ def _candidate_from_surface(
 ) -> dict:
     evidence = text[item.start : item.end]
     subject = _subject_for(text, item.start, item.end, item.surface.category)
-    certainty = item.certainty
+    certainty = _certainty_for(text, item.start, item.end, item.certainty)
     normalized_values = item.normalized_values or (item.surface.normalized_id,)
     source = item.surface.source
     detail = None
@@ -758,13 +797,79 @@ def _candidate_from_surface(
 
 
 def _classification_for(text: str, start: int, end: int) -> CandidateClassification:
-    clause_start = max(text.rfind(mark, 0, start) for mark in (".", "!", "?", ";", ",")) + 1
-    context = text[clause_start:end]
-    if _NEGATION.search(context):
+    left, right = _intent_bounds(text, start, end)
+    context = text[left:end]
+    if _NEGATION.search(_TENTATIVE.sub("", context)) or _REJECTED_ASSERTION.search(text[end:right]):
         return CandidateClassification.PROHIBITION
     if _PREFERENCE.search(context):
         return CandidateClassification.PREFERENCE
     return CandidateClassification.REQUIREMENT
+
+
+def _certainty_for(text, start, end, current):
+    left, right = _intent_bounds(text, start, end)
+    if _TENTATIVE.search(text[left:right]):
+        return CandidateCertainty.AMBIGUOUS
+    # Commas cannot close a qualifier or prove that its bare list continuation
+    # is an independent assertion. A sentence or explicit contrast can.
+    sentence_start, sentence_end = _sentence_bounds(text, start, end)
+    for _, boundary_end in _assertion_breaks(text):
+        if sentence_start < boundary_end <= left:
+            sentence_start = boundary_end
+    prefix = text[sentence_start:left]
+    qualifier = tuple(_TENTATIVE.finditer(prefix))
+    if qualifier and not _CONTRAST.search(prefix, qualifier[-1].end()):
+        return CandidateCertainty.AMBIGUOUS
+    # A standalone trailing hedge belongs to this assertion, not the next object.
+    tail = text[right:sentence_end].strip()
+    if tail.startswith(",") and _TENTATIVE.fullmatch(tail[1:].strip()):
+        return CandidateCertainty.AMBIGUOUS
+    return current
+
+
+def _sentence_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    # Reuse the existing offset-preserving, decimal-aware scope primitive.
+    from .p010_symmetry import _bounds
+
+    return _bounds(text, start, end, ".!?;")
+
+
+def _intent_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+    from .p010_symmetry import _bounds
+
+    left, right = _bounds(text, start, end, ".!?;,—–")
+    for boundary_start, boundary_end in _assertion_breaks(text):
+        if left <= boundary_start and boundary_end <= start:
+            left = boundary_end
+        elif end <= boundary_start < right:
+            right = boundary_start
+            break
+    return left, right
+
+
+def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
+    """Original-offset boundaries proved by a new governor, not by 'and' alone.
+
+    A coordinated bare object retains its shared prefix/postfix predicate. A
+    fresh request, rejection or qualifier governs its own assertion instead.
+    The negative-list and ownership consumers must use the same boundary proof.
+    This classifies evidence only; it cannot select a canonical conflict winner.
+    """
+    boundaries = [match.span() for match in _CONTRAST.finditer(text)]
+    for match in _COORDINATION.finditer(text):
+        left, right = _sentence_bounds(text, match.start(), match.end())
+        before, after = text[left : match.start()], text[match.end() : right].lstrip()
+        if _REQUEST_START.match(after) or _NEGATION.match(after) or _TENTATIVE.match(after):
+            boundaries.append(match.span())
+        elif (
+            _REQUEST_START.search(before)
+            and not _NEGATION.search(before)
+            and _REJECTED_ASSERTION.search(after)
+        ):
+            # 'I want gold and platinum is not what I want' has two predicates;
+            # 'gold and platinum is not what I want' has one shared predicate.
+            boundaries.append(match.span())
+    return tuple(sorted(set(boundaries)))
 
 
 def _subject_for(
@@ -775,6 +880,7 @@ def _subject_for(
 ) -> CandidateSubject:
     if category == DictionaryCategory.JEWELRY_TYPE:
         return CandidateSubject.PRODUCT
+    left, right = _intent_bounds(text, start, end)
     candidates = []
     if category in {DictionaryCategory.METAL_MATERIAL, DictionaryCategory.METAL_COLOR}:
         allowed_subjects = {CandidateSubject.PRONGS, CandidateSubject.BAND}
@@ -790,7 +896,9 @@ def _subject_for(
     for subject, pattern in _SUBJECT_PATTERNS.items():
         if subject not in allowed_subjects:
             continue
-        for match in pattern.finditer(text):
+        for match in pattern.finditer(text, left, right):
+            if match.start() >= end and _NEGATION.search(text[end : match.start()]):
+                continue
             distance = min(abs(match.start() - end), abs(start - match.end()))
             if distance <= 45:
                 candidates.append((distance, subject))

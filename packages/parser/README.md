@@ -98,6 +98,49 @@ the same cases run against independently verified disposable PostgreSQL in Runti
 Independent read-only functional acceptance on the final PR head remains a separate gate.
 See the [scoped integration decision](../../docs/adr/0035-knowledge-v1-1-session-integration.md).
 
+Core intent handling uses the same bounded statement/clause context for polarity,
+certainty and component ownership. General classification, ownership and the
+symmetry scope guard share one negative-operator vocabulary, including auxiliary
+and contraction forms. Recognized trailing rejection cannot create a
+positive requirement; tentative Dictionary terms and special instructions remain
+ambiguous evidence. Independent statements and explicit contrast clauses retain
+their own facts. A comma after a hedge or within its list does not grant fresh
+explicit authority. A later negative component mention cannot steal an earlier
+positive object's ownership. Decimal measurements retain their original spans.
+The existing unclosed-negative-list guard runs independently of optional P0-10
+membership; only the actual symmetry value binding requires that approved content.
+These corrections introduce no conflict-resolution, cancellation, Unknown, group
+creation or component-ID policy. Existing canonical EDIT/CAS, confirmation and
+LOCK/KEEP authority remain unchanged. Readable output also renders the existing
+accepted `style_descriptors` fact via the current Dictionary/value presenter.
+
+Independent request/rejection predicates also delimit conjunction and newline
+scope. `I want gold and I do not want platinum` preserves positive gold; the
+reverse order does too. A bare coordinated object list retains its shared
+governor: `Gold and platinum is not what I want` rejects both. The same original
+offset boundaries govern polarity, certainty, component ownership and closure of
+negative lists. A bare object after `no halo, ...` does not gain positive authority
+merely from a comma or `and`. Postfix rejection remains supported. This is bounded
+deterministic language support, not a general grammar or a conflict winner policy.
+
+Existing Russian `хочу` remains a preference. Material preferences are retained
+as evidence; the current Question Catalog has no `metal.material` acceptance
+question. An explicit supported correction such as `Кольцо из золота` can apply
+gold through the existing revision boundary. This correction does not silently
+accept a preference or add a new clarification contract.
+
+```sh
+python -m pytest -c packages/parser/pyproject.toml packages/parser/tests/test_core_intent_scope.py -q
+python -m pytest -c apps/api/pyproject.toml apps/api/tests/test_core_intent.py -q -s
+```
+
+`C1_TRACE` records synthetic raw input, observed candidates/dispositions/Matrix,
+canonical before/after, release identity and description/IFP. The six-cycle tests
+also check an authorized correction, clarification, immutable history, stale CAS,
+tenant isolation and fresh-application restoration. The same C1 scenarios reuse
+the existing independently verified disposable-PostgreSQL fixture in CI. These
+are development observations, not independent acceptance or a real release.
+
 Iterative Editing v1 accepts a bounded `dimensions_scale` candidate for
 `center_stone.dimensions`. It applies the factor only to an existing known dimensions value;
 missing values produce a typed issue and locked values retain the existing lock-conflict behavior.

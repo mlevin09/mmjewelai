@@ -8,6 +8,7 @@ import re
 
 from jewelai_domain.knowledge_runtime import validate_compiled_knowledge
 
+from .full_message import _NEGATION as _REJECT
 from .knowledge_matcher import KnowledgeLibraryMatcher, ResolvedKnowledgeMatch
 
 TARGET = "composition.symmetry_mode"
@@ -39,12 +40,6 @@ _PRESERVE = re.compile(r"\bне\s+выравнивай\s+его\b|\bdo\s+not\s+m
 _SYMMETRIC = re.compile(r"\b(?:symmetrical|symmetric|симметрич\w*)\b", re.I)
 # Blocking evidence only: nominal references do not extend the approved positive binding.
 _SYMMETRY_REFERENCE = re.compile(r"\b(?:asymmetr\w*|асимметр\w*)\b", re.I)
-_REJECT = re.compile(
-    r"\b(?:not|no|without|never|reject\w*|avoid|unwanted|unnecessary|undesired|"
-    r"не|без|ненуж\w*|нежелательн\w*)\b|"
-    r"\b(?:don|doesn|isn|wasn|wouldn|shouldn|can)['’]t\b",
-    re.I,
-)
 _NON_JEWELRY_CONTEXT = re.compile(r"\b(?:website|photograph\w*|сайт\w*|фотограф\w*)\b", re.I)
 _SENTENCE_BOUNDARIES = ".!?;"
 _INSTRUCTION_BOUNDARIES = _SENTENCE_BOUNDARIES + ",—–"
@@ -161,6 +156,8 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
     alternatives, incomplete lists and arbitrary words cannot prove closure.
     This never invents a prohibition for an unbound list member.
     """
+    from .full_message import _assertion_breaks
+
     instructions = [
         (c["evidence"]["start"], c["evidence"]["end"])
         for c in constraints
@@ -178,6 +175,7 @@ def _negative_object_scopes(text: str, constraints: list[dict]):
             continue
         start, end = candidate["evidence"]["start"], candidate["evidence"]["end"]
         _, stop = _bounds(text, start, end, _SENTENCE_BOUNDARIES)
+        stop = min((a for a, _ in _assertion_breaks(text) if end <= a < stop), default=stop)
         cursor = end
         closed = candidate["semantic_subject"] != "constraint.unbound"
         while text[cursor:stop].strip():
@@ -217,8 +215,8 @@ def defer_shared_negative_candidates(
     text: str, runtime, candidates: list[dict], *, dictionary
 ) -> list[dict]:
     """Retain matched terms in unclosed tails without accepting them as facts."""
-    if runtime is None or not has_p010_binding(runtime):
-        return candidates
+    # Language polarity is independent of catalog membership. Only the actual
+    # symmetry value binding below requires the approved P0-10 release evidence.
     constraints = _scope_constraints(text, runtime, dictionary)
     ranges = [
         (c["evidence"]["end"], stop)
