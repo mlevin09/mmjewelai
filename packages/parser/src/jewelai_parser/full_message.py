@@ -218,7 +218,7 @@ _SUBJECT_PATTERNS = {
         re.IGNORECASE,
     ),
     CandidateSubject.SIDE_STONES: re.compile(
-        r"\b(?:side[\s-]*stones?|stones?\s+on\s+the\s+sides?|diamonds?\s+on\s+the\s+sides?)\b|"
+        r"\b(?:side[\s-]*stones?|stones?\s+on\s+the\s+sides?|diamonds?\s+on\s+the\s+sides?|on\s+(?:each|both)\s+sides?)\b|"
         r"(?:боков\w*\s+кам\w*|кам\w*\s+по\s+бокам|бриллиант\w*\s+по\s+бокам|по\s+бокам|сбоку)",
         re.IGNORECASE,
     ),
@@ -955,12 +955,14 @@ def _ownership_context(text, start, end):
             (m.start(), m.end(), CandidateSubject.CENTER_STONE, m.group())
             for m in _STONE_NOUN.finditer(text, left, right)
         )
-    anchors.extend(
-        (m.start(), m.end(), CandidateSubject.OVERALL_DESIGN, m.group())
-        for m in re.compile(
-            r"\b(?:style|appearance|look|design|стиль|облик|дизайн)\b", re.I
-        ).finditer(text, left, right)
-    )
+    for match in re.compile(
+        r"\b(?:style|appearance|look|design|стиль|облик|дизайн)\b", re.I
+    ).finditer(text, left, right):
+        if match.group().casefold() == "design" and text[
+            left : match.start()
+        ].strip().casefold() in {"", "please"}:
+            continue  # Imperative "Design ..." is not an object owning later properties.
+        anchors.append((match.start(), match.end(), CandidateSubject.OVERALL_DESIGN, match.group()))
     joins = tuple(_OBJECT_JOIN.finditer(text, left, right))
     for join in joins:
         before = any(left <= a and b <= join.start() for a, b, _, _ in anchors)
@@ -998,7 +1000,11 @@ def _owner_for(text, start, end, category):
             continue
         if a >= end and _NEGATION.search(text[end:a]):
             continue
-        if metal and subject in {CandidateSubject.CENTER_STONE, CandidateSubject.SIDE_STONES}:
+        if metal and subject in {
+            CandidateSubject.CENTER_STONE,
+            CandidateSubject.SIDE_STONES,
+            CandidateSubject.OVERALL_DESIGN,
+        }:
             continue
         if stone and subject in {
             CandidateSubject.PRODUCT_BODY,

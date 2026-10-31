@@ -387,6 +387,26 @@ def exercise_p010_rejected_http(
     return trace
 
 
+def _description_without_unapplied_citations(prompt):
+    """Keep negative fact-claim assertions strict while checking sourced quotations separately."""
+    text = prompt["description"]["text"]
+    prefix = (
+        "Source phrase with unresolved details"
+        if prompt["locale"] == "en"
+        else "Исходная фраза с неприменёнными деталями"
+    )
+    for evidence in prompt["constraint_evidence"]:
+        if (
+            evidence["kind"] == "requirement"
+            and evidence["status"] == "unresolved"
+            and evidence["semantic_subject"] is None
+            and evidence["canonical_target"] is None
+        ):
+            assert evidence["acceptance"] == "unresolved"
+            text = text.replace(f"{prefix}: «{evidence['original_wording']}»", "")
+    return text
+
+
 def _finish_f00_lifecycle(
     client,
     app,
@@ -449,8 +469,13 @@ def _finish_f00_lifecycle(
     assert bool(facts) is symmetry
     assert ('composition.symmetry_mode = "asymmetrical"' in prompt["prompt_text"]) is symmetry
     if not symmetry:
-        assert "asymmetrical" not in prompt["description"]["text"].casefold()
-        assert "асимметрич" not in prompt["description"]["text"].casefold()
+        current_claims = _description_without_unapplied_citations(prompt).casefold()
+        assert "asymmetrical" not in current_claims
+        assert "асимметрич" not in current_claims
+        assert not any(
+            c["target"] == "composition.symmetry_mode" and c["kind"] != "prohibition"
+            for c in prompt["constraints"]
+        )
     if symmetry:
         assert (
             facts[0]["value"] == "asymmetrical"

@@ -28,6 +28,15 @@ def context(request):
     (
         ("A platinum ring with gold prongs.", "platinum", "product_body", "metal.material", True),
         ("A gold ring with a platinum shank.", "gold", "product_body", "metal.material", True),
+        ("Design a platinum engagement ring.", "platinum", "product_body", "metal.material", True),
+        ("Please design white and yellow gold prongs.", "white", "prongs", None, False),
+        (
+            "A gold ring with an oval emerald center stone and two small diamonds on each side.",
+            "diamonds",
+            "side_stones",
+            "side_stones.{group_id}.stones.material",
+            False,
+        ),
         ("A gold ring with platinum and rose-gold prongs.", "platinum", "prongs", None, False),
         ("A platinum ring with white and yellow gold prongs.", "white", "prongs", None, False),
         (

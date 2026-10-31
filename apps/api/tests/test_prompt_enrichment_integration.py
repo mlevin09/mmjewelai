@@ -16,6 +16,7 @@ from jewelai_persistence.models import ClarificationPlanRow, EnrichmentCycleRow
 from jewelai_prompts import CanonicalInternalFinalPromptV2_1 as InternalFinalPrompt
 from jewelai_prompts import FinalPromptConstraintEvidence
 from sqlalchemy import func, select
+from test_p010_symmetry_runtime import _description_without_unapplied_citations
 from test_persistence import build_service
 from test_prompt_enrichment_http import _client, _message
 from test_prompt_enrichment_runtime import _runtime
@@ -362,11 +363,22 @@ def test_full_http_cycle_restores_retries_corrects_and_preserves_authority(engin
 
     initial_durable = runtime.get_current_state(UUID(session_id), UUID(organization_id))
     initial_constraints = initial_durable.clarification_plan.constraint_evidence
-    assert len(initial_constraints) == 1
-    assert initial_constraints[0].kind == "prohibition"
-    assert initial_constraints[0].status == "active"
-    assert initial_constraints[0].semantic_subject == "feature.halo"
-    assert initial_constraints[0].original_wording == "no halo"
+    active_constraints = tuple(e for e in initial_constraints if e.status == "active")
+    assert len(active_constraints) == 1
+    assert active_constraints[0].kind == "prohibition"
+    assert active_constraints[0].semantic_subject == "feature.halo"
+    assert active_constraints[0].original_wording == "no halo"
+    unapplied = tuple(e for e in initial_constraints if e.status != "active")
+    assert unapplied
+    assert all(
+        e.status == "unresolved" and e.acceptance == "unresolved" and e.canonical_target is None
+        for e in unapplied
+    )
+    assert all(e.source.message_id == message["message_id"] for e in unapplied)
+    assert all(
+        request_text[e.source_span_start : e.source_span_end] == e.original_wording
+        for e in unapplied
+    )
 
     original_revision = service.repository.get_current_revision(
         UUID(session_id), UUID(organization_id)
@@ -474,7 +486,11 @@ def test_full_http_cycle_restores_retries_corrects_and_preserves_authority(engin
         assert prompt["product_state_revision_id"] == corrected["authoritative_revision_id"]
         assert prompt["knowledge_release"] == _release_payload(runtime)
         assert prompt["description_content_hash"] == output["description"]["content_hash"]
-        assert "oval" not in output["description"]["text"].casefold()
+        assert "oval" not in _description_without_unapplied_citations(prompt).casefold()
+        assert (
+            next(f for f in prompt["design_facts"] if f["target"] == "center_stone.shape")["value"]
+            == "emerald_cut"
+        )
         assert "Do not include a halo" in prompt["prompt_text"]
         assert "Do not include a halo" in output["description"]["text"]
         halo_constraints = [

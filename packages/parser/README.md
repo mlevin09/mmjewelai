@@ -163,6 +163,8 @@ Named product/component/center/side anchors and connectors resolve the local
 owner without allowing a nearby prong/shank to steal a product-body fact.
 Coordinated modifiers such as `white and yellow gold prongs` share their later
 owner; a conjunction between modifiers does not create a new body-metal scope.
+An imperative `Design ...` is not a style owner; `on each side` names a side
+relationship without creating a group or transferring those stones to center.
 Hyphenated spellings reuse existing Dictionary surfaces (including compound
 metal colors), while material/color remain distinct properties with original
 source spans. Construction adjectives such as `split-shank ring` are not evidence

@@ -115,6 +115,23 @@ F01_CASES = (
 
 
 F01_CASES += (
+    ("control-design-component", "Please design white and yellow gold prongs.", "en", {}),
+    (
+        "control-design-command",
+        "Design a platinum engagement ring.",
+        "en",
+        {"metal.material": "platinum"},
+    ),
+    (
+        "control-each-side",
+        "A gold ring with an oval emerald center stone and two small diamonds on each side.",
+        "en",
+        {
+            "metal.material": "gold",
+            "center_stone.material": "emerald",
+            "center_stone.shape": "oval",
+        },
+    ),
     (
         "control-center-setting",
         "A white gold ring with an oval diamond center stone in platinum prongs.",
