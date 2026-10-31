@@ -183,6 +183,21 @@ LINEAGE_CASES = (
         "synonym",
     ),
     ("en", "A rose gold ring with an oval shape diamond.", "center_stone.shape", "oval", "synonym"),
+    (
+        "en",
+        "A gold ring. Алмаз изумрудной формы.",
+        "center_stone.shape",
+        "emerald_cut",
+        "deprecated_alias",
+    ),
+    (
+        "ru",
+        "Кольцо из золота. An emerald shape diamond.",
+        "center_stone.shape",
+        "emerald_cut",
+        "deprecated_alias",
+    ),
+    ("en", "A gold ring с бриллиантом.", "center_stone.material", "diamond", "synonym"),
 )
 
 
@@ -205,7 +220,16 @@ def exercise_f02_lineage(engine, tmp_path, monkeypatch, binding, case):
         assert disposition.enrichment_proposal.provenance == "NORMALIZED_FROM_USER"
         assert disposition.enrichment_decision.result.value == canonical_id
         candidate = disposition.candidate
+        assert accepted.candidate_value == candidate.parser_update.value
         assert text[candidate.evidence.start : candidate.evidence.end] == candidate.evidence.text
+        # Initial runtime re-evaluates after the canonical transition. Alias
+        # warnings must also survive a now-already-current target.
+        current_proposal = ctx.evaluations[-1][2].parser_proposal
+        if kind == "deprecated_alias":
+            assert any(
+                w.code == "DEPRECATED_ALIAS_USED" and w.concrete_target == target
+                for w in current_proposal.warnings
+            )
         output = state.final_output.model_dump(mode="json")
         history = _immutable_history(ctx)
         pin = ctx.repo.get_knowledge_release_pin(ctx.sid, ctx.org)
@@ -251,6 +275,125 @@ def exercise_f02_lineage(engine, tmp_path, monkeypatch, binding, case):
 @pytest.mark.parametrize("case", LINEAGE_CASES)
 def test_f02_alias_lineage_http(engine, tmp_path, monkeypatch, binding, case):
     exercise_f02_lineage(engine, tmp_path, monkeypatch, binding, case)
+
+
+def test_locale_metadata_cannot_rebind_a_different_dictionary_value(engine, tmp_path, monkeypatch):
+    from jewelai_parser import CandidateUpdate
+    from jewelai_parser.models import TermCandidate
+
+    from jewelai_api.parsed_enrichment import _retain_source_normalization
+
+    with _scenario(engine, tmp_path, monkeypatch) as ctx:
+        _submit(ctx, "A gold ring.")
+        revision, _, evaluated = ctx.evaluations[0]
+        proposal = evaluated.parser_proposal
+        candidates = {
+            d.concrete_target: d.candidate for d in evaluated.dispositions if d.concrete_target
+        }
+        candidates["metal.material"] = candidates["metal.material"].model_copy(
+            update={
+                "parser_update": CandidateUpdate(
+                    target="metal.material", value=TermCandidate(text="платина")
+                ),
+            }
+        )
+        result = _retain_source_normalization(
+            proposal, revision, candidates, ctx.runtime.artifacts.dictionary
+        )
+        # A foreign-language lookup proving platinum cannot annotate/rebind gold.
+        assert result == proposal
+
+
+def exercise_f02_knowledge_lineage(engine, tmp_path, monkeypatch, binding):
+    from jewelai_parser.knowledge_matcher import KnowledgeLibraryMatcher
+
+    with _scenario(engine, tmp_path, monkeypatch, binding=binding) as ctx:
+        _, revision, state, message = _submit(ctx, "A gold three-stone ring.")
+        parsed = ctx.evaluations[0][1]
+        # These are distinct EXISTING concepts in the two selected fixtures.
+        concept_id = "three_stone" if binding else "style.three_stone"
+        candidate = next(
+            c
+            for c in parsed.candidates
+            if c.normalization_source == "knowledge_library"
+            and c.normalized_values == (concept_id,)
+        )
+        assert candidate.parser_update is None and revision.design.style is None
+        original_runtime = ctx.runtime._load_release().compiled_runtime
+        match = KnowledgeLibraryMatcher(original_runtime).match(
+            candidate.evidence.text, locale="en"
+        )
+        assert match.outcome == "resolved"
+        assert match.candidate.mapping_id == "LANG-EN-THREE-STONE"
+        assert match.candidate.concept_id == concept_id
+        evidence = next(
+            e
+            for e in state.clarification_plan.constraint_evidence
+            if e.source_candidate_id == candidate.candidate_id
+        )
+        assert evidence.status == "unresolved" and evidence.canonical_target is None
+        pin = ctx.repo.get_knowledge_release_pin(ctx.sid, ctx.org)
+        output = state.final_output.model_dump(mode="json")
+    restarted, app, provider = _client(engine, ctx.config)
+    with restarted:
+        runtime = app.state.prompt_enrichment_service
+        restored = runtime.repository.restore_pinned_knowledge_runtime(
+            ctx.sid,
+            ctx.org,
+            runtime.artifact_store,
+            active_release=runtime.active_release,
+            validation_report=runtime.validation_report,
+        )
+        stored_message = runtime.repository.get_message(
+            ctx.sid, UUID(message["message_id"]), ctx.org
+        )
+        # Existing contracts retain raw spans + exact release graph, not a new
+        # first-class durable mapping DTO. Re-resolve that immutable graph.
+        surface = stored_message.content[candidate.evidence.start : candidate.evidence.end]
+        assert (
+            KnowledgeLibraryMatcher(restored.compiled_runtime).match(surface, locale="en") == match
+        )
+        concept = next(
+            c
+            for c in restored.compiled_runtime.domain_knowledge
+            if c.concept_id == match.candidate.concept_id
+        )
+        assert concept.claim_ids == (("CLM-RING-STYLES",) if binding else ("CLM-THREE-STONE",))
+        claim = next(
+            c for c in restored.compiled_runtime.claims if c.claim_id == concept.claim_ids[0]
+        )
+        assert claim.source_id == (
+            "SRC-GIA-RING-SETTINGS-2026" if binding else "SRC-THREE-STONE-VALIDATION"
+        )
+        assert runtime.repository.get_knowledge_release_pin(ctx.sid, ctx.org) == pin
+        assert (
+            restarted.get(
+                f"/v1/sessions/{ctx.sid}/prompt-enrichment/final-output", headers=ctx.headers
+            ).json()
+            == output
+        )
+        assert provider.calls == []
+        print(
+            "F02_KNOWLEDGE_LINEAGE "
+            + json.dumps(
+                {
+                    "backend": engine.dialect.name,
+                    "p010": binding,
+                    "message_id": message["message_id"],
+                    "candidate": candidate.model_dump(mode="json"),
+                    "match": match.model_dump(mode="json"),
+                    "claim_id": claim.claim_id,
+                    "source_id": claim.source_id,
+                    "runtime_sha256": restored.runtime_sha256,
+                    "restart_mapping_identical": True,
+                }
+            )
+        )
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_f02_knowledge_only_pinned_graph_restart(engine, tmp_path, monkeypatch, binding):
+    exercise_f02_knowledge_lineage(engine, tmp_path, monkeypatch, binding)
 
 
 def exercise_f02_correction(engine, tmp_path, monkeypatch, binding):

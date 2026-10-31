@@ -46,6 +46,7 @@ from test_f02_binding import (
     F02_CASES,
     LINEAGE_CASES,
     exercise_f02_correction,
+    exercise_f02_knowledge_lineage,
     exercise_f02_lineage,
 )
 from test_generation_preparations import counts, expected, post
@@ -141,6 +142,11 @@ def test_f02_alias_lineage_postgres(engine, tmp_path, monkeypatch, case, binding
 @pytest.mark.parametrize("binding", (False, True))
 def test_f02_correction_clarification_postgres(engine, tmp_path, monkeypatch, binding):
     exercise_f02_correction(engine, tmp_path, monkeypatch, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_f02_knowledge_only_pinned_graph_postgres(engine, tmp_path, monkeypatch, binding):
+    exercise_f02_knowledge_lineage(engine, tmp_path, monkeypatch, binding)
 
 
 def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):
