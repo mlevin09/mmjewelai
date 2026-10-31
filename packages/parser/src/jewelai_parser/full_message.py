@@ -955,10 +955,12 @@ def _ownership_context(text, start, end):
         ).finditer(text, left, right)
     )
     joins = tuple(_OBJECT_JOIN.finditer(text, left, right))
-    for index, join in enumerate(joins):
-        following = joins[index + 1].start() if index + 1 < len(joins) else right
+    for join in joins:
         before = any(left <= a and b <= join.start() for a, b, _, _ in anchors)
-        after = any(join.end() <= a and b <= following for a, b, _, _ in anchors)
+        # An owner's coordinated modifiers may contain another conjunction:
+        # "with white and yellow gold prongs" still names one component.
+        # Only a preceding owner makes a later join separate another object.
+        after = any(join.end() <= a and b <= right for a, b, _, _ in anchors)
         if after and (before or join.group().casefold() in {"with", "с", "со"}):
             if join.end() <= start:
                 left = join.end()

@@ -28,6 +28,16 @@ def context(request):
     (
         ("A platinum ring with gold prongs.", "platinum", "product_body", "metal.material", True),
         ("A gold ring with a platinum shank.", "gold", "product_body", "metal.material", True),
+        ("A gold ring with platinum and rose-gold prongs.", "platinum", "prongs", None, False),
+        ("A platinum ring with white and yellow gold prongs.", "white", "prongs", None, False),
+        (
+            "Кольцо из золота с платиной и розовым золотом в крапанах.",
+            "платиной",
+            "prongs",
+            None,
+            False,
+        ),
+        ("Gold ring с белым и жёлтым золотом в крапанах.", "белым", "prongs", None, False),
         ("A gold ring with a platinum head.", "gold", "product_body", "metal.material", True),
         ("Platinum shank with rose-gold prongs.", "Platinum", "band", None, False),
         ("Platinum shank with rose-gold prongs.", "rose", "prongs", None, False),

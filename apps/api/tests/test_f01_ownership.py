@@ -115,6 +115,30 @@ F01_CASES = (
 
 
 F01_CASES += (
+    (
+        "control-component-material-list",
+        "A gold ring with platinum and rose-gold prongs.",
+        "en",
+        {"metal.material": "gold"},
+    ),
+    (
+        "control-component-color-list",
+        "A platinum ring with white and yellow gold prongs.",
+        "en",
+        {"metal.material": "platinum"},
+    ),
+    (
+        "control-component-material-list-ru",
+        "Кольцо из золота с платиной и розовым золотом в крапанах.",
+        "ru",
+        {"metal.material": "gold"},
+    ),
+    (
+        "control-component-color-list-mixed",
+        "Gold ring с белым и жёлтым золотом в крапанах.",
+        "ru",
+        {"metal.material": "gold"},
+    ),
     ("control-coating", "A platinum ring with gold coating.", "en", {"metal.material": "platinum"}),
     (
         "control-components",

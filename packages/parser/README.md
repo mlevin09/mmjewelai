@@ -161,6 +161,8 @@ Nominal object scope and intent scope are separate. `and` can coordinate two
 objects under one predicate; it is not automatically a new positive assertion.
 Named product/component/center/side anchors and connectors resolve the local
 owner without allowing a nearby prong/shank to steal a product-body fact.
+Coordinated modifiers such as `white and yellow gold prongs` share their later
+owner; a conjunction between modifiers does not create a new body-metal scope.
 Hyphenated spellings reuse existing Dictionary surfaces (including compound
 metal colors), while material/color remain distinct properties with original
 source spans. Construction adjectives such as `split-shank ring` are not evidence
