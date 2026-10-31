@@ -123,3 +123,9 @@ def test_real_content_and_conditional_review_status_are_not_invented(dictionary)
     assert dictionary["emerald_cut"].deprecated_aliases[1].term == "изумрудная форма"
     assert dictionary.normalize("halo", locale="en").outcome == "ambiguous"
     assert dictionary.normalize("palladium", locale="en").outcome == "unsupported"
+    core = json.loads((ROOT / "data/knowledge/v1/jewelry-core-1.0.0.json").read_text())
+    assert any(c["concept_id"] == "palladium" for c in core["domain_knowledge"])
+    # F02-14 requires absence from BOTH checked vocabularies. Palladium is
+    # Knowledge-only, whereas ruthenium has no entry in the supplied artifacts.
+    assert dictionary.normalize("ruthenium", locale="en").outcome == "unsupported"
+    assert "ruthenium" not in json.dumps(core).casefold()

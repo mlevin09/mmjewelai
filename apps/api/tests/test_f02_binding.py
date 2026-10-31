@@ -95,7 +95,8 @@ F02_CASES = (
         {"metal.material": "platinum"},
     ),
     ("F02-13", "Maybe platinum. A ring.", "en", {}),
-    ("F02-14", "A palladium ring.", "en", {}),
+    ("F02-14", "A ruthenium ring.", "en", {}),
+    ("control-unbound-palladium", "A palladium ring.", "en", {}),
     (
         "hyphen-cut",
         "A white-gold ring with an emerald-cut diamond.",
