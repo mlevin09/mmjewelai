@@ -38,6 +38,8 @@ def _revision_ref(revision):
 
 def _verified_corrections(service, repo, native, sid, oid):
     """Actual legacy parse/proposal and accepted transition, never parser1.2."""
+    if not native.corrections:
+        return ()
     verified = repo.restore_pinned_knowledge_runtime(
         sid,
         oid,
@@ -112,7 +114,11 @@ def causal_unknown_proofs(
     service, repo, native, sid, oid, verified_corrections=None, verified_answers=()
 ):
     """Only required UNKNOWN whose exact gap was actually corrected can discharge."""
-    corrections = verified_corrections or _verified_corrections(service, repo, native, sid, oid)
+    corrections = (
+        _verified_corrections(service, repo, native, sid, oid)
+        if verified_corrections is None
+        else verified_corrections
+    )
     plans = {r.content_hash: r for r in repo.list_clarification_plans(sid, oid)}
     accepted_events = [
         ("correction", cr.correction_record_id, cr.content_hash, c, b, a)
@@ -250,7 +256,11 @@ _CLAUSE_BREAK = re.compile(r"[.!?;\n]")
 
 
 def context_consumption_proofs(service, repo, native, sid, oid, verified_corrections=None):
-    corrections = verified_corrections or _verified_corrections(service, repo, native, sid, oid)
+    corrections = (
+        _verified_corrections(service, repo, native, sid, oid)
+        if verified_corrections is None
+        else verified_corrections
+    )
     proofs = []
     covered_records = set()
     for record, correction, _before, after in corrections:

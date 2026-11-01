@@ -139,7 +139,12 @@ def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail
                             record["source"]["message_id"]
                             for record in payload["corrections"] + payload["answers"]
                             if record.get("source", {}).get("kind") == "message"
+                            and record.get("correction_version") != "3.0.0"
+                            and record.get("answer_version") != "3.0.0"
                         )
+                        payload["supplemental_reparsed_sources_interpreter"] = "legacy-bc34-1.1"
+                        # New3 corrections already contain their actual Parse1.2;
+                        # typed consent/admission/resume are not text parses.
                         payload["supplemental_reparsed_sources"] = []
                         for mid in sorted(sources):
                             message = repo.get_message(sid, UUID(mid), UUID(org))

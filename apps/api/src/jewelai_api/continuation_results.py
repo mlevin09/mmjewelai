@@ -407,3 +407,70 @@ class NativeAnswerResultV3(_AnswerResultV3):
 ContinuationAnswerResult = Annotated[
     KeepAnswerResultV3 | NativeAnswerResultV3, Field(discriminator="answer_kind")
 ]
+
+
+class ContinuationResumeResult(StrictEvidenceModel):
+    schema_version: Literal["3.0.0"]
+    request_id: UUID
+    resume_kind: Literal["NATIVE", "KEEP_RELEASE"]
+    resource_id: str
+    request_hash: Sha256
+    emitted_plan_id: UUID
+    emitted_plan_hash: Sha256
+    enrichment_cycle_id: UUID
+    emitted_question_ids: tuple[str, ...]
+    content_hash: Sha256
+
+    @model_validator(mode="after")
+    def validate_result(self):
+        if self.emitted_question_ids != tuple(sorted(set(self.emitted_question_ids))):
+            raise ValueError("Resume3 emitted questions must be unique and ordered")
+        if self.content_hash != contract_hash(
+            "jewelai.ResumeResult/3.0.0", self.model_dump(mode="json", exclude={"content_hash"})
+        ):
+            raise ValueError("Resume3 result integrity mismatch")
+        return self
+
+
+def derive_resume_result(plan):
+    """Derived after sealing; the result cannot participate in its own plan hash."""
+    if plan.trigger.trigger_kind != "RESUME":
+        raise ValueError("Resume3 result requires its actual sealed resume plan")
+    request = plan.trigger.request
+    questions = tuple(
+        sorted(
+            q.offer.offer_id
+            if request.resume_kind == "KEEP_RELEASE"
+            else q.native_question.clarification_id
+            for q in plan.questions
+            if (
+                request.resume_kind == "KEEP_RELEASE"
+                and q.question_kind == "KEEP_RELEASE"
+                and q.offer.intent_id == request.intent_id
+            )
+            or (
+                request.resume_kind == "NATIVE"
+                and q.question_kind == "NATIVE"
+                and q.native_question.cause_id == request.cause_id
+                and q.native_question.offer_trigger == "explicit_resume"
+            )
+        )
+    )
+    if not questions:
+        raise ValueError("Resume3 plan has no emitted question for the requested resource")
+    p = dict(
+        schema_version="3.0.0",
+        request_id=request.request_id,
+        resume_kind=request.resume_kind,
+        resource_id=request.intent_id
+        if request.resume_kind == "KEEP_RELEASE"
+        else request.cause_id,
+        request_hash=plan.trigger.request_hash,
+        emitted_plan_id=plan.allocated_current_frame_core.plan_id,
+        emitted_plan_hash=plan.content_hash,
+        enrichment_cycle_id=plan.allocated_current_frame_core.enrichment_cycle_id,
+        emitted_question_ids=questions,
+    )
+    return ContinuationResumeResult(
+        **p, content_hash=contract_hash("jewelai.ResumeResult/3.0.0", p)
+    )

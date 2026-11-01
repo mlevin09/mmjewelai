@@ -70,12 +70,13 @@ def current_offer(current):
 @pytest.mark.parametrize("language", ["EN", "RU", "MIXED"])
 @pytest.mark.parametrize("family", [1, 2, 3, 4, 5, 6, 7, 11, 12])
 @pytest.mark.parametrize("base", ["L", "F"])
-def test_r2_persisted_language_journey(engine, tmp_path, language, family, base):
+@pytest.mark.parametrize("schema11", [False, True])
+@pytest.mark.parametrize("binding", [False, True])
+def test_r2_persisted_language_journey(engine, tmp_path, language, family, base, schema11, binding):
     # Both retained schemas and optional TEST-ONLY bindings are exercised; no
     # fixture binding is an authority to accept unsupported or protected facts.
-    schema11 = family % 2 == 1
     with f04_session(
-        engine, tmp_path, locale="ru" if language == "RU" else "en", binding=family % 2 == 0
+        engine, tmp_path, locale="ru" if language == "RU" else "en", binding=binding
     ) as ctx:
         current = source_setup(ctx, base, language, schema11)
         before = ctx.repo.get_current_revision(ctx.sid, ctx.org)

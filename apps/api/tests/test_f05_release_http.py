@@ -1,6 +1,6 @@
 """Persisted typed consent, one-field provenance, duplicate CAS and restart."""
 
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from test_f04_http import f04_session, restart
@@ -119,6 +119,19 @@ def test_resume_rebinds_only_requested_pending_intent(engine, tmp_path, base):
         )
         result = ctx.client.post(path, headers=ctx.headers, json=payload)
         assert result.status_code == 200, result.json()
+        from jewelai_api.continuation_plan import ContinuationPlan
+        from jewelai_api.continuation_results import derive_resume_result
+
+        plan = ContinuationPlan.model_validate(
+            ctx.repo.get_clarification_plan_for_cycle(
+                ctx.sid,
+                UUID(result.json()["current_state"]["current_frame"]["enrichment_cycle_id"]),
+                ctx.org,
+            ).plan_payload
+        )
+        derived = derive_resume_result(plan)
+        assert result.json()["committed_result_hash"] == derived.content_hash
+        assert derived.content_hash != plan.content_hash
         updated = result.json()["current_state"]
         assert updated["protection_projection"]["pending_requests"][0]["status"] == "PENDING"
         assert (
@@ -171,6 +184,37 @@ def test_new_specific_root_does_not_cancel_generic_root(engine, tmp_path, base):
         roots = state["protection_projection"]["roots"]
         assert len(roots) == 2 and old_ids.issubset({r["root_ref"]["evidence_id"] for r in roots})
         assert sorted(len(r["scope_targets"]) for r in roots) == [1, 8]
+        before = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        state = correct3(ctx, state, "Emerald cut center stone.")
+        state = answer3(
+            ctx,
+            state,
+            next(q["offer"] for q in state["questions"] if q["question_kind"] == "KEEP_RELEASE"),
+            "ACCEPT",
+        )
+        state = correct3(ctx, state, "Keep the center stone unchanged.")
+        assert len(state["protection_projection"]["roots"]) == 3
+        state = correct3(ctx, state, "Oval center stone.")
+        offer = next(q["offer"] for q in state["questions"] if q["question_kind"] == "KEEP_RELEASE")
+        assert len(offer["binding"]["applicable_keep_roots"]) == 3
+        state = answer3(ctx, state, offer, "ACCEPT")
+        after = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        assert after.design.center_stone.shape.value == "oval"
+        for field in type(before.design.center_stone).model_fields:
+            if field != "shape":
+                assert getattr(before.design.center_stone, field) == getattr(
+                    after.design.center_stone, field
+                )
+        assert (
+            len(
+                {
+                    a["baseline_state_sha256"]
+                    for a in state["protection_projection"]["anchors"]
+                    if a["target"]["concrete_target"] == "center_stone.shape"
+                }
+            )
+            == 1
+        )
         with restart(ctx, engine):
             ctx.runtime.continuation_enabled = True
             read = ctx.client.get(
@@ -351,7 +395,6 @@ def test_two_same_field_intents_survive_accept_until_explicit_reject_closure(
 def test_schema11_all_additive_wrappers_survive_actual_release(
     engine, tmp_path, base, availability
 ):
-    from uuid import UUID
 
     from jewelai_domain.models import MessageSource
     from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
@@ -438,3 +481,44 @@ def test_schema11_all_additive_wrappers_survive_actual_release(
         with restart(ctx, engine):
             assert state(ctx)["current_frame"] == current["current_frame"]
             assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == after
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_multiple_delta_batch_is_not_partially_committed(engine, tmp_path, base):
+    with f04_session(engine, tmp_path) as ctx:
+        initial(ctx, base)
+        ctx.runtime.continuation_enabled = True
+        a, _ = admit(ctx)
+        assert a.status_code == 201, a.json()
+        before = rows(ctx)
+        current = correct3(
+            ctx, a.json()["current_state"], "A platinum ring and an emerald cut center stone."
+        )
+        result = ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1].result_payload
+        assert result["outcome"] == "DEFERRED"
+        assert result["reason"] == "multiple_delta_release_unsupported"
+        assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == before[0]
+        assert result["new_revision_id"] is None and result["keep_intents"] == []
+        targets = {u["concrete_target"] for u in result["native_proposal"]["accepted_updates"]}
+        assert {"metal.material", "center_stone.shape"}.issubset(targets)
+        assert len(rows(ctx)[1]) == len(before[1]) + 1
+        assert len(rows(ctx)[2]) == len(before[2]) + 1
+        current = correct3(ctx, current, "A platinum ring.")
+        assert (
+            ctx.repo.get_current_revision(ctx.sid, ctx.org).design.metal.material.value
+            == "platinum"
+        )
+        current = correct3(ctx, current, "Emerald cut center stone.")
+        assert current["status"] == "awaiting_keep_release"
+        assert (
+            ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value
+            == "oval"
+        )
+        with restart(ctx, engine):
+            ctx.runtime.continuation_enabled = True
+            read = ctx.client.get(
+                f"/v1/sessions/{ctx.sid}/prompt-enrichment/state?workflow_version=3.0.0",
+                headers=ctx.headers,
+            )
+            assert read.status_code == 200, read.json()
+            assert read.json() == current

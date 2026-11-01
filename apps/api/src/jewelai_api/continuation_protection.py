@@ -30,7 +30,7 @@ def correction_constraints(previous, evaluation, source, revision, cycle_id, rep
     )
 
 
-def extend_protection(protection, revision, constraints, cycle_id):
+def extend_protection(protection, revision, constraints, cycle_id, *, source_text):
     from jewelai_domain.preservation import build_preservation_root
 
     from .continuation_history import preservation_field
@@ -53,7 +53,12 @@ def extend_protection(protection, revision, constraints, cycle_id):
                 evidence_hash=e.content_hash,
                 source_revision=revision,
                 source_cycle_id=cycle_id,
-                field=preservation_field(e.original_wording),
+                field=preservation_field(
+                    e.original_wording,
+                    source_text=source_text,
+                    span_start=e.source_span_start,
+                    span_end=e.source_span_end,
+                ),
             )
         )
     if not roots:

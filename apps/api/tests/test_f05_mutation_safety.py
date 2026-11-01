@@ -17,6 +17,7 @@ from test_f05_release_http import (
     correction_payload,
     pending_fixture,
 )
+from test_prompt_enrichment_http import _message
 
 
 @pytest.mark.parametrize("base", ["L", "F"])
@@ -54,6 +55,9 @@ def test_stale_changed_identity_tenant_disabled_writer_and_read_only(engine, tmp
             f"/v1/sessions/{ctx.sid}/prompt-enrichment/corrections", headers=ctx.headers, json=fresh
         )
         assert disabled.status_code == 409, disabled.json()
+        duplicate = ctx.client.post(path, headers=ctx.headers, json=original)
+        assert duplicate.status_code == 200 and duplicate.json()["replayed"], duplicate.json()
+        assert duplicate.json()["current_state"]["continuation_enabled"] is False
         assert rows(ctx) == committed
         statements = []
 
@@ -144,3 +148,80 @@ def test_rehashed_answer_source_corruption_fails_actual_source_replay(engine, tm
         )
         assert r.status_code == 500, r.json()
         assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == revision
+
+
+@pytest.mark.parametrize("length,expected", [(20000, 200), (20001, 422)])
+def test_pending_description_exact_capacity_is_typed_and_read_only(
+    engine, tmp_path, monkeypatch, length, expected
+):
+    from jewelai_api import continuation_planning
+
+    with f04_session(engine, tmp_path) as ctx:
+        current, _ = pending_fixture(ctx, "L")
+        description = current["description"]
+        old_line = description["unresolved_summary"][-1]
+        assert description["text"].endswith(old_line)
+        base_length = len(description["text"]) - len(old_line) - 1
+        # Synthetic renderer-sized input; source/intent/row validation still runs.
+        monkeypatch.setattr(
+            continuation_planning,
+            "pending_descriptions",
+            lambda *args: ("X" * (length - base_length - 1),),
+        )
+        statements = []
+
+        def observe(conn, cursor, statement, parameters, context, executemany):
+            statements.append(statement.lstrip().split()[0].upper())
+
+        event.listen(engine, "before_cursor_execute", observe)
+        try:
+            response = ctx.client.get(
+                f"/v1/sessions/{ctx.sid}/prompt-enrichment/state?workflow_version=3.0.0",
+                headers=ctx.headers,
+            )
+        finally:
+            event.remove(engine, "before_cursor_execute", observe)
+        assert response.status_code == expected, response.json()
+        if expected == 200:
+            assert len(response.json()["description"]["text"]) == length
+        else:
+            assert response.json()["error"] == "artifact_capacity_exceeded"
+        assert not set(statements) & {"INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP"}
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_pending_offer_cannot_be_changed_by_legacy_confirmation_or_lock_writer(
+    engine, tmp_path, base
+):
+    with f04_session(engine, tmp_path) as ctx:
+        current, _ = pending_fixture(ctx, base)
+        msg = _message(
+            ctx.client, str(ctx.sid), str(ctx.org), "Explicit synthetic legacy authority attempt."
+        )
+        before = rows(ctx)
+        source = dict(
+            kind="message",
+            message_id=msg["message_id"],
+            recorded_at=before[0].created_at.isoformat(),
+        )
+        for action in ("confirm", "lock"):
+            response = ctx.client.post(
+                f"/sessions/{ctx.sid}/revisions",
+                headers=ctx.headers,
+                json=dict(
+                    action=action,
+                    target="center_stone.shape",
+                    expected_revision_id=current["current_frame"]["revision_id"],
+                    source=source,
+                    reason="Synthetic legacy authority attempt",
+                ),
+            )
+            # The old lock transition rejects an unconfirmed value before its
+            # writer; confirm reaches the version guard. Neither can alter an
+            # admitted frame or manufacture an untracked LOCK event.
+            assert response.status_code == (409 if action == "confirm" else 422), response.json()
+            assert response.json()["error"] == (
+                "unsupported_workflow_version" if action == "confirm" else "invalid_transition"
+            )
+            assert rows(ctx) == before
+        assert state(ctx) == current

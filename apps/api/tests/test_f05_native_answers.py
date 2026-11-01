@@ -58,6 +58,7 @@ def test_native_answer_cannot_bypass_current_keep(engine, tmp_path, base, decisi
         )
         assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == before[0]
         if decision in {"SELECT_OPTION", "ACCEPT"}:
+            assert response.json()["error"] == "keep_release_confirmation_required"
             assert rows(ctx) == before
         else:
             from copy import deepcopy

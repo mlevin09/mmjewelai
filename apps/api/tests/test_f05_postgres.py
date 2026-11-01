@@ -156,3 +156,20 @@ def test_f05_competing_scoped_decisions_postgres(engine, tmp_path, base):
         assert winner.json()["current_state"]["current_frame"]["revision_id"] == str(
             after[0].revision_id
         )
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize("availability", ["required", "explicit"])
+def test_f05_schema11_release_state_roundtrip_postgres(engine, tmp_path, base, availability):
+    from test_f05_release_http import test_schema11_all_additive_wrappers_survive_actual_release
+
+    test_schema11_all_additive_wrappers_survive_actual_release(engine, tmp_path, base, availability)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_f05_release_fault_rollback_postgres(engine, tmp_path, base):
+    from test_f05_release_http import (
+        test_release_plan_insert_failure_rolls_back_revision_answer_and_cycle,
+    )
+
+    test_release_plan_insert_failure_rolls_back_revision_answer_and_cycle(engine, tmp_path, base)

@@ -84,7 +84,10 @@ def release_offer(
         isinstance(state, KnownValue)
         and requested_value_hash(state.value) == intent.requested_value_sha256
     )
-    actions = ("REJECT",) if current else ("ACCEPT", "REJECT")
+    from jewelai_domain.lock_protection import locked_ancestor, state_fields
+
+    locked = locked_ancestor(state_fields(before.design), tuple(field.split("."))) is not None
+    actions = ("REJECT",) if current or locked else ("ACCEPT", "REJECT")
     p = dict(
         schema_version="1.0.0",
         intent_id=intent.intent_id,
@@ -125,6 +128,12 @@ def release_offer(
             )
         )
     )
+    if locked:
+        text = (
+            "This field is locked. Close the pending request; preserve its current value."
+            if locale == "en"
+            else "Поле заблокировано. Закрыть ожидающий запрос и сохранить текущее значение."
+        )
     p = dict(
         schema_version="1.0.0",
         intent_id=intent.intent_id,
@@ -145,6 +154,7 @@ def correction_native_plan(
 ):
     """Reuse existing deterministic planners, returning only native base evidence."""
     from .clarification import plan_clarifications
+    from .clarification_v2 import AcceptedResultTrigger
     from .continuation_evaluation import ParsedEvaluationV3
     from .continuation_plan import NativeFPlanEvidence, NativeLPlanEvidence
     from .f04_frontier import advance_frontier, relevant_reoffers
@@ -212,7 +222,7 @@ def correction_native_plan(
         plan_id=plan_id,
         cycle_id=result.next_enrichment_cycle_id,
         cycle_number=result.next_enrichment_cycle_number,
-        trigger=SimpleNamespace(
+        trigger=AcceptedResultTrigger(
             kind="correction",
             record_id=record_id,
             content_hash=result.content_hash,
@@ -309,6 +319,7 @@ def native_offers(prefix, verified, sid, oid, base):
 
 def answer_native_plan(service, previous, result, revision, *, plan_id, cycle_id, offer_history):
     from .clarification import continue_clarification_plan
+    from .clarification_v2 import AcceptedResultTrigger
     from .continuation_plan import NativeFPlanEvidence, NativeLPlanEvidence
     from .f04_frontier import advance_frontier, relevant_reoffers
     from .f04_planning import plan_f04
@@ -379,7 +390,7 @@ def answer_native_plan(service, previous, result, revision, *, plan_id, cycle_id
             availability_overlay=result.next_enrichment_result.native.availability_overlay,
         ), payload["unasked_evidence"]
 
-    trigger = SimpleNamespace(
+    trigger = AcceptedResultTrigger(
         kind="answer",
         record_id=result.answer_id,
         content_hash=result.content_hash,

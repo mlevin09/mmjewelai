@@ -178,3 +178,15 @@ Current constraints, pending requests and the native question plan retain their
 separate sourced evidence. Answer3 likewise derives the next current projection
 from its actual committed canonical child. This preserves the approved authority
 boundary for scalar, dimensional and other supported values equally.
+
+
+Native question trigger references reuse the existing immutable source-reference
+DTOs with the actual version3 record ID/hash and previous Plan3 binding. They are
+not relabelled legacy results or plans. ResumeResult3 is derived from the sealed
+Plan3 and only its requested emitted questions; its hash is distinct from the
+plan hash. Result derivation and envelope validation precede the atomic commit.
+Exact committed retries remain readable under current tenant authorization when
+new continuation writes are disabled; new work still fails the capability gate.
+A historical parser1.1 span truncated before an explicit center-shape qualifier
+is scoped using that actual governed source phrase, without rewriting the saved
+span/parse or inspecting a later independent assertion.

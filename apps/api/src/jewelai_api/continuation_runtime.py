@@ -521,10 +521,6 @@ def admitted_view(service, repo, sid, oid):
 
 
 def admit(service, sid, oid, request, *, principal_id):
-    if not getattr(service, "continuation_enabled", False):
-        raise ContinuationReadError(
-            409, "continuation_unavailable", "Explicit continuation capability is unavailable"
-        )
 
     def build(repo):
         _, sha = message_source(repo, sid, oid, request.message_id)
@@ -547,6 +543,10 @@ def admit(service, sid, oid, request, *, principal_id):
                     return dict(replayed=True, committed_frame=frame, plan=plan)
             raise ContinuationReadError(
                 409, "already_admitted", "Session already has explicit continuation admission"
+            )
+        if not service.continuation_enabled:
+            raise ContinuationReadError(
+                409, "continuation_unavailable", "Continuation writes are disabled"
             )
         native = read_native_frame(service, repo, sid, oid)
         if request.expected_head != native.frame:
@@ -600,10 +600,6 @@ def admit(service, sid, oid, request, *, principal_id):
 
 def correct(service, sid, oid, request, *, principal_id):
     """Scoped Correction3 duplicate lookup, full-frame CAS and one atomic append."""
-    if not getattr(service, "continuation_enabled", False):
-        raise ContinuationReadError(
-            409, "continuation_unavailable", "Explicit continuation capability is unavailable"
-        )
     from .continuation_corrections import prepare_correction
     from .continuation_mutation import correction_plan, current_view
     from .continuation_preview import read_preview
@@ -729,10 +725,6 @@ def correct(service, sid, oid, request, *, principal_id):
 
 def answer(service, sid, oid, request, *, principal_id):
     """Answer3 idempotency and consent are resolved under the current tenant lock."""
-    if not getattr(service, "continuation_enabled", False):
-        raise ContinuationReadError(
-            409, "continuation_unavailable", "Explicit continuation capability is unavailable"
-        )
     from pydantic import TypeAdapter
 
     from .continuation_answers import prepare_answer
@@ -853,6 +845,7 @@ def answer(service, sid, oid, request, *, principal_id):
 def resume(service, sid, oid, request, *, principal_id):
     from .continuation_mutation import current_view
     from .continuation_preview import read_preview
+    from .continuation_results import derive_resume_result
     from .continuation_resume import prepare_resume
 
     def build(repo):
@@ -914,6 +907,9 @@ def resume(service, sid, oid, request, *, principal_id):
             intents=intents,
             offers=offers,
         )
+        # The exact result is derived from an already sealed plan, but verified
+        # before committing so a non-emitting resume cannot partially append.
+        check_capacity(cycle, plan, derive_resume_result(plan))
         return dict(
             replayed=False,
             cycle_id=cycle_id,
@@ -936,7 +932,7 @@ def resume(service, sid, oid, request, *, principal_id):
     return dict(
         schema_version="3.0.0",
         command_kind="RESUME",
-        committed_result_hash=committed["plan"].content_hash,
+        committed_result_hash=derive_resume_result(committed["plan"]).content_hash,
         committed_frame=committed.get("committed_frame") or state.current_frame,
         current_state=state,
         replayed=committed["replayed"],

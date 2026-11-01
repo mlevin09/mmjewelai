@@ -268,7 +268,7 @@ def prepare_answer(
             }:
                 raise ContinuationReadError(
                     409,
-                    "clarification_conflict",
+                    "keep_release_confirmation_required",
                     "A different preserved value requires separate scoped KEEP confirmation",
                 )
             if context.retained_base == "F" and same:

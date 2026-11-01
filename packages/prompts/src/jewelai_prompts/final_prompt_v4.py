@@ -45,6 +45,7 @@ from .final_prompt import (
     FinalPromptSnapshot,
     FinalPromptUnresolvedDetail,
     UserReadableJewelryDescription,
+    _check_current_text_capacity,
     _constraints,
     _description,
     _design_facts,
@@ -473,6 +474,9 @@ def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates, _pendi
         if snapshot.native_frontier
         else None,
     )
+    # Pending disclosures are part of the description budget too. Reuse the
+    # existing typed capacity error before Pydantic's structural validation.
+    _check_current_text_capacity(description_payload["text"])
     description = UserReadableJewelryDescriptionV3(
         **description_payload,
         content_hash=contract_hash(

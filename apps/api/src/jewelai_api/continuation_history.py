@@ -49,16 +49,24 @@ def _message_sources(value):
             yield from _message_sources(item)
 
 
-def preservation_field(wording):
-    # Scope comes from the actual preservation span, never surrounding facts.
-    # The approved v1 grammar binds generic center preservation or shape only;
-    # an unrecognized narrower instruction must not silently acquire whole scope.
-    if re.search(r"\bshape\b|\bформ\w*", wording, re.I):
+def preservation_field(wording, *, source_text=None, span_start=None, span_end=None):
+    # Historical 1.1 may retain just "keep the center stone" as its span in
+    # "keep the center stone shape unchanged". Inspect only the governed source
+    # phrase at that exact offset, never a later independent assertion.
+    shape = (
+        r"(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?center[- ]stone\s+shape"
+        r"(?:\s+unchanged)?|не\s+менять\s+форм\w*\s+центральн\w+\s+кам\w*"
+    )
+    if re.fullmatch(shape, wording.strip(), re.I):
         return "shape"
+    if source_text is not None:
+        match = re.compile(shape, re.I).match(source_text, span_start)
+        if match is not None and match.end() >= span_end:
+            return "shape"
     if re.fullmatch(
         r"\s*(?:(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?center[- ]stone"
-        r"(?:\s+unchanged)?|(?:сохранить|не\s+менять)\s+(?:существующ\w+\s+)?"
-        r"центральн\w+\s+кам\w*(?:\s+без\s+изменений)?)\s*[.!]?\s*",
+        r"(?:\s+(?:unchanged|exactly\s+as\s+specified))?|(?:сохранить|не\s+менять)\s+"
+        r"(?:существующ\w+\s+)?центральн\w+\s+кам\w*(?:\s+без\s+изменений)?)\s*[.!]?\s*",
         wording,
         re.I,
     ):
@@ -92,7 +100,12 @@ def _native_roots(repo, sid, oid, plan):
         source_cycle = repo.get_enrichment_cycle(sid, evidence.source_enrichment_cycle_id, oid)
         if source_cycle.specification_revision_id != source_revision.revision_id:
             raise ValueError("Preservation source cycle/revision does not match actual history")
-        field = preservation_field(evidence.original_wording)
+        field = preservation_field(
+            evidence.original_wording,
+            source_text=message.content,
+            span_start=evidence.source_span_start,
+            span_end=evidence.source_span_end,
+        )
         roots.append(
             build_preservation_root(
                 evidence_id=evidence.evidence_id,

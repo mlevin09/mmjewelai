@@ -242,7 +242,9 @@ def prepare_correction(
     from .continuation_protection import correction_constraints, extend_protection
 
     constraints = correction_constraints(plan, post, source, authoritative, cycle_id, repo)
-    carried = extend_protection(carried, authoritative, constraints, cycle_id)
+    carried = extend_protection(
+        carried, authoritative, constraints, cycle_id, source_text=message.content
+    )
     enriched = continuation_cycle(
         context,
         canonical_native_result(bound, authoritative, context, native_context=native_context),

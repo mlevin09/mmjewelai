@@ -2,6 +2,7 @@
 
 from uuid import UUID, uuid4
 
+import pytest
 from conftest import NOW
 from jewelai_domain.models import MessageSource
 from jewelai_domain.revisions import revise_design
@@ -107,7 +108,14 @@ def test_original_unknown_requires_actual_keep_accept_to_discharge(engine, tmp_p
         )
         assert proof["accepted_event_ref"]["kind"] == "keep_release_answer"
         assert not current["compatibility_projection"]["remaining_blocker_refs"]
-        assert ctx.repo.list_clarification_answers(ctx.sid, ctx.org)[0].result_payload == original
+        assert (
+            next(
+                row.result_payload
+                for row in ctx.repo.list_clarification_answers(ctx.sid, ctx.org)
+                if row.content_hash == original["content_hash"]
+            )
+            == original
+        )
         assert original["blocks_progression"] is True
         final = output(ctx, current)
         assert final.status_code == 200, final.json()
@@ -115,3 +123,56 @@ def test_original_unknown_requires_actual_keep_accept_to_discharge(engine, tmp_p
             ctx.runtime.continuation_enabled = True
             assert state(ctx) == current
             assert output(ctx, current).json() == final.json()
+
+
+@pytest.mark.parametrize("binding", [False, True])
+@pytest.mark.parametrize(
+    "text,proof_allowed",
+    [
+        ("Yellow metal.", True),
+        ("Желтый металл.", True),
+        ("Yellow металл.", True),
+        ("Maybe yellow metal.", False),
+        ("Возможно желтый металл.", False),
+        ("No yellow metal.", False),
+        ("Без желтого металла.", False),
+        ("Yellow metal or white metal.", False),
+        ("Желтый или белый металл.", False),
+        ("Yellow platinum prongs.", False),
+        ("Yellow metal. A yellow center stone.", True),
+    ],
+)
+def test_admitted_context_proof_never_grants_unowned_or_negative_color(
+    engine, tmp_path, binding, text, proof_allowed
+):
+    from test_f05_history import READY
+    from test_f05_release_http import correct3
+
+    with f04_session(engine, tmp_path, binding=binding) as ctx:
+        initial(ctx, "L", READY)
+        ctx.runtime.continuation_enabled = True
+        a, _ = admit(ctx)
+        assert a.status_code == 201, a.json()
+        current = correct3(ctx, a.json()["current_state"], text)
+        actual = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        assert actual.design.center_stone.color is None
+        proofs = current["compatibility_projection"]["proofs"]
+        if not proof_allowed:
+            assert not proofs
+        else:
+            assert proofs
+            assert actual.design.metal.color.value == "yellow"
+        for proof in proofs:
+            assert proof["kind"] == "context_owner_token_consumed"
+            assert proof["accepted_target"]["concrete_target"].startswith("metal.")
+            original = ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1].result_payload
+            residual = next(
+                c
+                for c in original["source_parse"]["candidates"]
+                if c["candidate_id"] == proof["residual_candidate_id"]
+            )
+            assert residual["subject"] == "product_body"
+            if "A yellow center stone" in text:
+                assert residual["evidence"]["end"] <= len("Yellow metal.")
+        with restart(ctx, engine):
+            assert state(ctx)["current_frame"] == current["current_frame"]
