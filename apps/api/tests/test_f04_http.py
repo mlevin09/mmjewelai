@@ -1042,3 +1042,26 @@ def test_f04_keep_compatible_corrections_retain_original_evidence_http(engine, t
             assert preserved == keep
             with restart(ctx, engine):
                 assert state_get(ctx) == state
+
+
+def test_f04_authentication_precedes_duplicate_wire_validation(engine, tmp_path):
+    with f04_session(engine, tmp_path) as ctx:
+        current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        message = _message(ctx.client, str(ctx.sid), str(ctx.org), "A gold ring.")
+        request = (
+            '{"schema_version":"2.0.0","message_id":"'
+            + message["message_id"]
+            + '","message_id":"'
+            + message["message_id"]
+            + '","expected_revision_id":"'
+            + str(current.revision_id)
+            + '"}'
+        )
+        ctx.client.headers.pop("Authorization")
+        response = ctx.client.post(
+            f"/v1/sessions/{ctx.sid}/prompt-enrichment/initial",
+            headers={**ctx.headers, "Content-Type": "application/json"},
+            content=request,
+        )
+        assert response.status_code == 401, response.json()
+        assert ctx.repo.get_design_session(ctx.sid, ctx.org).knowledge_package_id is None

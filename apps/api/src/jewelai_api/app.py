@@ -604,6 +604,10 @@ def create_app(
 
     AuthorizedOrganization = Annotated[UUID, Depends(require_header_organization)]
 
+    async def validate_f04_request_body(request: Request, organization_id: AuthorizedOrganization):
+        # Authorization remains ahead of new wire validation and duplicate handling.
+        await _strict_f04_request_body(request)
+
     @app.get("/me", response_model=MeResponse)
     def get_me(principal: Authenticated):
         return service.get_me(principal)
@@ -618,7 +622,7 @@ def create_app(
 
     @app.post(
         "/sessions/{session_id}/generation-preparations",
-        dependencies=[Depends(_strict_f04_request_body)],
+        dependencies=[Depends(validate_f04_request_body)],
         response_model=GenerationPreparationSummary | GenerationPreparationSummaryV2,
     )
     def create_generation_preparation(
@@ -1102,7 +1106,7 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/initial",
-            dependencies=[Depends(_strict_f04_request_body)],
+            dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentStateResponse | PromptEnrichmentStateResponseV2,
             status_code=201,
         )
@@ -1142,7 +1146,7 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarification-answers",
-            dependencies=[Depends(_strict_f04_request_body)],
+            dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentAnswerResponse | PromptEnrichmentAnswerResponseV2,
         )
         def answer_prompt_enrichment_clarification(
@@ -1193,7 +1197,7 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/corrections",
-            dependencies=[Depends(_strict_f04_request_body)],
+            dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentCorrectionResponse
             | PromptEnrichmentCorrectionResponseV2,
         )
@@ -1245,7 +1249,7 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarifications/{cause_id}/resume",
-            dependencies=[Depends(_strict_f04_request_body)],
+            dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentResumeResponse,
         )
         def resume_prompt_enrichment_clarification(

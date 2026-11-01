@@ -38,6 +38,28 @@ def evidence_hash(value):
 class StrictEvidenceModel(ImmutableModel):
     """New F evidence rejects silent wire normalization; legacy models are untouched."""
 
+    @classmethod
+    def model_validate_json(cls, json_data, **kwargs):
+        def pairs(items):
+            result = {}
+            for key, value in items:
+                if key in result:
+                    raise ValueError("Duplicate F04 JSON evidence key")
+                result[key] = value
+            return result
+
+        def nonfinite(_):
+            raise ValueError("F04 JSON evidence requires finite numbers")
+
+        try:
+            value = json.loads(json_data, object_pairs_hook=pairs, parse_constant=nonfinite)
+        except (ValueError, UnicodeError):
+            raise ValueError("Invalid F04 JSON evidence") from None
+        checked = cls.model_validate(value, **kwargs)
+        if evidence_bytes(value) != evidence_bytes(checked):
+            raise ValueError("F04 JSON evidence requires complete explicit fields")
+        return checked
+
     @model_validator(mode="wrap")
     @classmethod
     def preserve_wire_values(cls, value, handler):

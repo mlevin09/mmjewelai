@@ -10,7 +10,7 @@ from jewelai_domain.revisions import lock_field, revise_design
 from jewelai_prompts.downstream_preparation import GenerationPreparationError, canonical_bytes
 from jewelai_prompts.downstream_preparation_v2 import render_semantic_source_v2
 from pydantic import ValidationError
-from test_f04_http import READY_TEXT, answer, f04_session, initial, restart, state_get
+from test_f04_http import READY_TEXT, answer, correct, f04_session, initial, restart, state_get
 from test_generation_preparations import counts
 from test_prompt_enrichment_http import _message
 
@@ -185,3 +185,48 @@ def test_f04_canonical_unknown_and_sourced_na_survive_http_restart(
                 canonical_bytes(ctx.runtime.get_current_state(ctx.sid, ctx.org).final_output)
                 == snapshot
             )
+
+
+def test_f04_resolved_material_source_is_not_rendered_as_current_unresolved_request(
+    engine, tmp_path
+):
+    with f04_session(engine, tmp_path) as ctx:
+        state = initial(ctx, READY_TEXT)
+        selected, _ = answer(ctx, state)
+        assert selected.status_code == 200, selected.json()
+        source, gate = ctx.runtime.build_preparation_source(ctx.repo, ctx.sid, ctx.org)
+        rendered = render_semantic_source_v2(source, gate)
+        assert not any(
+            "Gold or platinum ring" in line
+            for line in rendered.rendering_text.splitlines()
+            if "UNRESOLVED USER REQUEST" in line
+        )
+        # Unrelated unbound source evidence is not globally cleared by resolving
+        # the material choice; its distinct source remains explicitly unaccepted.
+        plan = ctx.repo.get_clarification_plan(
+            ctx.sid, UUID(selected.json()["state"]["clarification_plan_id"]), ctx.org
+        ).plan_payload
+        conflict = next(c for c in plan["conflicts"] if c["kind"] == "alternative")
+        assert len(conflict["occurrences"]) == 2
+        assert source.internal_final_prompt.design_facts
+
+
+def test_f04_unbound_component_request_remains_visible_without_canonical_authority(
+    engine, tmp_path
+):
+    with f04_session(engine, tmp_path) as ctx:
+        state = initial(ctx, READY_TEXT)
+        selected, _ = answer(ctx, state)
+        assert selected.status_code == 200
+        before = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        phrase = "Platinum shank and rose-gold prongs."
+        state = correct(ctx, selected.json()["state"], phrase)
+        current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        assert current.design == before.design
+        assert "Platinum shank" in state["description"]["text"]
+        assert "rose-gold prongs" in state["description"]["text"]
+        assert state["internal_final_prompt_readiness"] == "ready_with_unresolved"
+        source, gate = ctx.runtime.build_preparation_source(ctx.repo, ctx.sid, ctx.org)
+        assert "UNRESOLVED USER REQUEST" in render_semantic_source_v2(source, gate).rendering_text
+        with restart(ctx, engine):
+            assert state_get(ctx) == state

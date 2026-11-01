@@ -255,6 +255,26 @@ def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
                 if snapshot.locale == "en"
                 else f"{label}: уточнение остаётся открытым"
             )
+    # Unbound source requests cannot be assigned invented canonical owners or
+    # causal TargetRefs. Retain their exact wording as noncanonical disclosure.
+    # Multiple recognition mirrors may share a phrase; display it once while
+    # retaining every immutable source-evidence entry in the IFP audit.
+    unbound_wording = tuple(
+        dict.fromkeys(
+            e.original_wording for e in snapshot.constraint_evidence if e.status == "unresolved"
+        )
+    )
+    summaries.extend(
+        (
+            "Unaccepted source request: "
+            if snapshot.locale == "en"
+            else "Непринятый исходный запрос: "
+        )
+        + "«"
+        + wording
+        + "»"
+        for wording in unbound_wording
+    )
     base_description = _description(
         snapshot,
         dictionary,
@@ -314,7 +334,7 @@ def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
         if snapshot.rule_decision.decision != "ready"
         or any(s.blocks_current for s in frontier.frontier_core.cause_states)
         else FinalPromptReadiness.READY_WITH_UNRESOLVED
-        if unresolved
+        if unresolved or unbound_wording
         else FinalPromptReadiness.READY
     )
     payload = dict(

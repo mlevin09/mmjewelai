@@ -70,6 +70,7 @@ def merge_constraint_evidence(
     enrichment_cycle_id: UUID,
     previous: tuple[FinalPromptConstraintEvidence, ...] = (),
     load_source_revision: Callable[[UUID], AnyDesignRevision] | None = None,
+    _handled_candidate_ids: tuple[str, ...] = (),
 ) -> tuple[FinalPromptConstraintEvidence, ...]:
     """Append verified parser evidence and deterministically supersede prior active constraints."""
 
@@ -91,8 +92,16 @@ def merge_constraint_evidence(
     ):
         raise ValueError("constraint evidence belongs to another session scope")
 
+    handled = frozenset(_handled_candidate_ids)
+    if not handled.issubset({c.candidate_id for c in parsed.parse_result.candidates}):
+        raise ValueError("Handled source candidates do not belong to the actual parse")
     additions = []
     for candidate in parsed.parse_result.candidates:
+        if candidate.candidate_id in handled:
+            # A verified F material choice already owns these exact occurrences.
+            # Its immutable conflict/plan history retains every source span. Do
+            # not also create an unrelated unbound request that survives resolution.
+            continue
         if candidate.classification not in {
             CandidateClassification.REQUIREMENT,
             CandidateClassification.PROHIBITION,

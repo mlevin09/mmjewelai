@@ -288,6 +288,9 @@ def start_initial_message(service, request):
         source=source,
         authoritative_revision=authoritative,
         enrichment_cycle_id=cycle_id,
+        _handled_candidate_ids=tuple(o.candidate_id for o in conflict.occurrences)
+        if conflict and conflict.kind != "equivalent"
+        else (),
     )
     plan = plan_f04(
         authoritative,
@@ -609,6 +612,13 @@ def _verify_source_plan(
         authoritative_revision=revision,
         enrichment_cycle_id=plan.enrichment_cycle_id,
         previous=previous.constraint_evidence if previous else (),
+        _handled_candidate_ids=tuple(
+            o.candidate_id
+            for c in plan.conflicts
+            if c.context.source_enrichment_cycle_id == plan.enrichment_cycle_id
+            and c.kind != "equivalent"
+            for o in c.occurrences
+        ),
         load_source_revision=lambda rid: repo.get_revision(
             plan.scope.session_id, rid, plan.scope.organization_id
         ),
@@ -1583,6 +1593,9 @@ def apply_persisted_user_correction(service, organization_id, request):
         authoritative_revision=result.authoritative_revision,
         enrichment_cycle_id=cycle_id,
         previous=plan.constraint_evidence,
+        _handled_candidate_ids=tuple(o.candidate_id for o in conflict.occurrences)
+        if conflict and conflict.kind != "equivalent"
+        else (),
         load_source_revision=lambda rid: repo.get_revision(
             request.session_id, rid, organization_id
         ),

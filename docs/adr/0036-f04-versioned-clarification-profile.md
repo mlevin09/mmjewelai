@@ -62,6 +62,11 @@ frontier and availability overlay. Preparation audit `DecisionFrontier` remains 
 retains actual question IDs separately from Rules2 cause IDs. Source3 is never downgraded to
 source2.1; all existing capacity limits and private evidence boundaries remain in force.
 
+Verified material-choice occurrences are owned by the conflict/plan lifecycle, retaining all source
+spans there; they are not duplicated as unrelated unbound requests that outlive resolution. Truly
+unbound requests retain their exact source wording as explicitly noncanonical, nonblocking
+Description2/IFP3/rendering disclosures without fabricated owners, TargetRefs or criticality.
+
 New F evidence rejects silent wire coercion, noncanonical UUIDs, duplicate JSON keys and nonfinite
 numbers. Frozen L contract readers, hash domains, catalog files and default behavior remain intact.
 A blank accepted-fact set receives only a neutral no-facts description in F, not invented facts.

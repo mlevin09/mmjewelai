@@ -127,3 +127,18 @@ def test_original_v1_schema_supported_without_snapshot_upgrade():
     overlay = build_availability_overlay(revision, scope=scope(revision))
     assert overlay.design_schema_version == "1.0.0"
     assert all(e.target.group_id is None for e in overlay.entries)
+
+
+def test_f04_json_reader_rejects_duplicate_keys_without_rewriting_values():
+    import json
+
+    s = scope(revision_v1_1())
+    raw = s.model_dump_json()
+    assert EvidenceScope.model_validate_json(raw) == s
+    duplicate = raw[:-1] + ',"organization_id":' + json.dumps(str(s.organization_id)) + "}"
+    with pytest.raises(ValueError, match="Invalid F04 JSON evidence"):
+        EvidenceScope.model_validate_json(duplicate)
+    uppercase = s.model_dump(mode="json")
+    uppercase["organization_id"] = uppercase["organization_id"].upper()
+    with pytest.raises(ValueError, match="exact typed wire"):
+        EvidenceScope.model_validate_json(json.dumps(uppercase))
