@@ -1,5 +1,6 @@
 """F04 bounded Rules2 extension using the existing Rules interpreter and five-target gaps."""
 
+from functools import partial
 from typing import Annotated, Literal
 
 from pydantic import Field, model_validator
@@ -114,9 +115,9 @@ class RuleContextV2(ImmutableModel):
 
 
 class EvaluationFieldsV2(ImmutableModel):
-    evaluation_version: Literal["2.0.0"] = "2.0.0"
-    blocking_cause_ids: tuple[str, ...] = ()
-    eligible_clarification_cause_ids: tuple[str, ...] = ()
+    evaluation_version: Literal["2.0.0"]
+    blocking_cause_ids: tuple[str, ...]
+    eligible_clarification_cause_ids: tuple[str, ...]
 
 
 class AskDecisionV2(AskDecision, EvaluationFieldsV2):
@@ -145,11 +146,37 @@ class ReadyDecisionV2(ReadyDecision, EvaluationFieldsV2):
 class RuleRegistryV2(RuleRegistry):
     _bundle_type = RulesBundleV2
     _trace_type = RuleTraceV2
-    _ask_type = AskDecisionV2
-    _block_type = BlockDecisionV2
-    _derive_type = DeriveDecisionV2
-    _assume_type = AssumeDecisionV2
-    _ready_type = ReadyDecisionV2
+    # Writers supply explicit tags. Readers cannot manufacture missing version/frontier fields.
+    _ask_type = partial(
+        AskDecisionV2,
+        evaluation_version="2.0.0",
+        blocking_cause_ids=(),
+        eligible_clarification_cause_ids=(),
+    )
+    _block_type = partial(
+        BlockDecisionV2,
+        evaluation_version="2.0.0",
+        blocking_cause_ids=(),
+        eligible_clarification_cause_ids=(),
+    )
+    _derive_type = partial(
+        DeriveDecisionV2,
+        evaluation_version="2.0.0",
+        blocking_cause_ids=(),
+        eligible_clarification_cause_ids=(),
+    )
+    _assume_type = partial(
+        AssumeDecisionV2,
+        evaluation_version="2.0.0",
+        blocking_cause_ids=(),
+        eligible_clarification_cause_ids=(),
+    )
+    _ready_type = partial(
+        ReadyDecisionV2,
+        evaluation_version="2.0.0",
+        blocking_cause_ids=(),
+        eligible_clarification_cause_ids=(),
+    )
 
     def evaluate(
         self,

@@ -143,6 +143,11 @@ def test_f04_material_rule_is_contextual_and_legacy_gaps_are_unchanged():
     assert (decision.priority, decision.tie_order) == (950, 15)
     assert decision.concrete_target == "metal.material"
     assert revision.model_dump_json() == before
+    for field in ("evaluation_version", "blocking_cause_ids", "eligible_clarification_cause_ids"):
+        wire = decision.model_dump(mode="json")
+        wire.pop(field)
+        with pytest.raises(ValidationError):
+            type(decision).model_validate(wire)
 
 
 def test_f04_rule_artifact_and_schema_are_exact():
