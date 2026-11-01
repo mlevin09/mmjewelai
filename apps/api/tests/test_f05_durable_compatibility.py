@@ -139,7 +139,7 @@ def test_original_unknown_requires_actual_keep_accept_to_discharge(engine, tmp_p
         ("Yellow metal or white metal.", False),
         ("Желтый или белый металл.", False),
         ("Yellow platinum prongs.", False),
-        ("Yellow metal. A yellow center stone.", True),
+        ("Yellow metal. A yellow center stone.", False),
     ],
 )
 def test_admitted_context_proof_never_grants_unowned_or_negative_color(
@@ -162,6 +162,15 @@ def test_admitted_context_proof_never_grants_unowned_or_negative_color(
         else:
             assert proofs
             assert actual.design.metal.color.value == "yellow"
+        if text == "Yellow metal. A yellow center stone.":
+            # Native duplicate-target ambiguity has not accepted a body delta.
+            # L2 must not manufacture acceptance merely because an owned-looking
+            # clause exists. Retain both source candidates and the blocker.
+            source = ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1].result_payload
+            assert source["outcome"] == "DEFERRED"
+            assert source["native_proposal"]["accepted_updates"] == []
+            assert actual.design.metal.color.value == "white"
+            assert current["compatibility_projection"]["remaining_blocker_refs"]
         for proof in proofs:
             assert proof["kind"] == "context_owner_token_consumed"
             assert proof["accepted_target"]["concrete_target"].startswith("metal.")
@@ -176,3 +185,32 @@ def test_admitted_context_proof_never_grants_unowned_or_negative_color(
                 assert residual["evidence"]["end"] <= len("Yellow metal.")
         with restart(ctx, engine):
             assert state(ctx)["current_frame"] == current["current_frame"]
+
+
+@pytest.mark.parametrize("binding", [False, True])
+def test_accepted_body_proof_survives_later_independent_uncertain_request(
+    engine, tmp_path, binding
+):
+    from test_f05_release_http import correct3
+
+    with f04_session(engine, tmp_path, binding=binding) as ctx:
+        initial(ctx, "L")
+        ctx.runtime.continuation_enabled = True
+        a, _ = admit(ctx)
+        current = correct3(ctx, a.json()["current_state"], "Yellow metal.")
+        original = ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1].result_payload
+        assert current["compatibility_projection"]["proofs"]
+        assert output(ctx, current).status_code == 200
+        current = correct3(ctx, current, "Maybe rose gold.")
+        actual = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        assert actual.design.metal.color.value == "yellow"
+        assert actual.design.center_stone.color is None
+        assert current["compatibility_projection"]["remaining_blocker_refs"]
+        assert any(
+            p["original_correction_ref"]["hash"] == original["content_hash"]
+            for p in current["compatibility_projection"]["proofs"]
+        )
+        assert output(ctx, current).status_code == 409
+        with restart(ctx, engine):
+            assert state(ctx)["current_frame"] == current["current_frame"]
+            assert output(ctx, current).status_code == 409
