@@ -791,6 +791,8 @@ def test_f04_protected_material_cannot_be_overwritten_http(engine, tmp_path, pro
             if c["availability_target_ref"]["concrete_target"] == "metal.material"
         )
         assert protected_cause["criticality"] == "NONBLOCKING"
+        assert "Unaccepted request about product-body metal" in state["description"]["text"]
+        assert "Product-body metal choice remains unresolved" not in state["description"]["text"]
         state = correct(ctx, state, "A platinum ring.")
         current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
         if protection == "confirmed":

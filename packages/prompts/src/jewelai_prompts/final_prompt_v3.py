@@ -232,10 +232,22 @@ def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
                 else f"Неотвеченное необязательное предложение о параметре «{label}»"
             )
         elif cause.kind.startswith("material_"):
+            known = any(
+                e.target == cause.target and e.availability == "VALUE"
+                for e in snapshot.enrichment_result.availability_overlay.entries
+            )
             summaries.append(
-                "Product-body metal choice remains unresolved"
-                if snapshot.locale == "en"
-                else "Выбор металла основы изделия остаётся неуточнённым"
+                (
+                    "Unaccepted request about product-body metal remains unanswered"
+                    if snapshot.locale == "en"
+                    else "Непринятый запрос о металле основы изделия остаётся без ответа"
+                )
+                if known
+                else (
+                    "Product-body metal choice remains unresolved"
+                    if snapshot.locale == "en"
+                    else "Выбор металла основы изделия остаётся неуточнённым"
+                )
             )
         else:
             summaries.append(
