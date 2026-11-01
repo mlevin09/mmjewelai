@@ -5,8 +5,8 @@ from uuid import UUID, uuid4
 import pytest
 from conftest import NOW
 from jewelai_domain.models import MessageSource
-from jewelai_domain.revisions import revise_design
-from test_f04_http import f04_session
+from jewelai_domain.revisions import lock_field, revise_design
+from test_f04_http import f04_session, restart
 from test_f05_history import frame, initial
 from test_prompt_enrichment_http import _message
 
@@ -44,6 +44,12 @@ def test_required_unknown_is_discharged_only_by_actual_same_target_correction(
         source = MessageSource(message_id=msg["message_id"], recorded_at=NOW)
         design = old.design.model_dump(mode="json")
         design["center_stone"]["dimensions"] = dict(availability="unknown", requirement="required")
+        design["construction"]["clasp"] = dict(
+            availability="not_applicable",
+            reason="Explicit synthetic ring fixture",
+            source=source.model_dump(mode="json"),
+            locked=False,
+        )
         seeded = revise_design(
             old,
             design,
@@ -53,6 +59,16 @@ def test_required_unknown_is_discharged_only_by_actual_same_target_correction(
             created_at=NOW,
         )
         ctx.repo.append_revision_cas(ctx.sid, ctx.org, old.revision_id, seeded)
+        locked = lock_field(
+            seeded,
+            "construction.clasp",
+            expected_revision_id=seeded.revision_id,
+            source=source,
+            reason="Synthetic explicit N/A lock",
+            created_at=NOW,
+        )
+        ctx.repo.append_revision_cas(ctx.sid, ctx.org, seeded.revision_id, locked)
+        seeded = locked
         initial(ctx, "L", "A white gold ring with an oval diamond center stone in prong setting.")
         state = ctx.client.get(
             f"/v1/sessions/{ctx.sid}/prompt-enrichment/state", headers=ctx.headers
@@ -123,6 +139,19 @@ def test_required_unknown_is_discharged_only_by_actual_same_target_correction(
         assert ctx.repo.list_clarification_answers(ctx.sid, ctx.org)[0].result_payload == original
         # The new output is derived, never persisted or selected as the native source.
         assert read_preview(ctx.runtime, ctx.sid, ctx.org).continuation_enabled is False
+        assert ctx.repo.get_current_revision(ctx.sid, ctx.org).design.construction.clasp == (
+            seeded.design.construction.clasp
+        )
+        with restart(ctx, engine):
+            reopened = read_preview(ctx.runtime, ctx.sid, ctx.org)
+            assert reopened.current_frame.model_dump(mode="json") == current
+            restored = ctx.client.get(
+                f"/v1/sessions/{ctx.sid}/prompt-enrichment/final-output"
+                "?output_version=4.0.0&projection=jewelai.legacy-l.compat/1.0.0",
+                headers={**ctx.headers, "If-Match": current["history_root_sha256"]},
+            )
+            assert restored.status_code == 200, restored.json()
+            assert restored.json() == repaired.json()
 
 
 @pytest.mark.parametrize(
