@@ -127,3 +127,13 @@ This admission implementation does not establish the complete F05 workflow:
 Answer3, Correction3, Resume3, bound KEEP_RELEASE HTTP consent, ordinary native
 answer protection and D2 composition with new decisions still require delivery.
 The approved 36+18 matrix cannot be marked complete from admission tests alone.
+
+
+The internal Parse1.2 → ParsedEvaluation3 bridge invokes the existing
+ParserProposal/Matrix evaluator with explicitly selected new readers/builders.
+Frozen defaults remain Parse1.1 and evaluation1/2. It binds actual Message
+identity/time/session, schema, retained context and release; returns source-backed
+proposal/disposition/native-rule evidence with its own hash; and performs no
+canonical mutation or network call. Unsupported, negative and uncertain input
+cannot become affirmative updates. This bridge is not Correction3 persistence,
+KEEP-release authority or completion of the pending HTTP workflow.

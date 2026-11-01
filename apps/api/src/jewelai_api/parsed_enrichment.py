@@ -159,11 +159,13 @@ def enrich_parsed_candidates_with_active_release(
     parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
     equivalent_candidate_ids: tuple[str, ...] = (),
+    _parse_reader=FullMessageParseResult,
+    _result_builder=ParsedCandidateEnrichmentResult,
 ) -> ParsedCandidateEnrichmentResult:
     """Evaluate safe parsed candidates without mutating the authoritative revision."""
 
     revision = validate_design_revision(revision)
-    parsed = FullMessageParseResult.model_validate(parse_result)
+    parsed = _parse_reader.model_validate(parse_result)
     source = MessageSource.model_validate(source)
     templates = PromptTemplateBundle.model_validate(templates)
 
@@ -399,7 +401,7 @@ def enrich_parsed_candidates_with_active_release(
             enrichment_decision=decision,
         )
 
-    return ParsedCandidateEnrichmentResult(
+    return _result_builder(
         parse_result=parsed,
         parse_knowledge_lineage=parse_lineage,
         parser_proposal=parser_proposal,
