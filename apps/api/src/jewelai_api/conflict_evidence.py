@@ -23,6 +23,7 @@ from jewelai_parser.full_message import (
     _sentence_bounds,
     _source_dictionary_material_ids,
 )
+from jewelai_parser.p010_symmetry import defer_shared_negative_candidates
 from pydantic import Field, model_validator
 
 
@@ -167,6 +168,16 @@ def product_body_material_conflict(parsed, *, message, context, dictionary, know
             _classification_for(text, c.evidence.start, c.evidence.end) != "requirement"
             or _certainty_for(text, c.evidence.start, c.evidence.end, "explicit") != "explicit"
         ):
+            unresolved = True
+            continue
+        # Choice ambiguity is eligible, but a term deferred by the existing
+        # negative-object governor cannot become an affirmative material offer.
+        probe = c.model_dump(mode="python")
+        probe["certainty"] = "explicit"
+        governed = defer_shared_negative_candidates(
+            text, knowledge_runtime, [probe], dictionary=dictionary
+        )[0]
+        if governed["certainty"] != "explicit":
             unresolved = True
             continue
         # Existing deterministic parsing owns inflection/alias normalization. Revalidation above

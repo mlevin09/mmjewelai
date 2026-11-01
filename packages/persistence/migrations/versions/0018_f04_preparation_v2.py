@@ -28,6 +28,17 @@ def upgrade():
 
 
 def downgrade():
+    # The older preparation boundary deliberately refuses online downgrade. Do
+    # not acquire new CHECK DDL locks before that inevitable refusal when an
+    # operator asks to cross it. A direct 0018 -> 0017 CHECK rollback is separate.
+    destination = op.get_context().opts.get("destination_rev")
+    if destination is not None and destination not in {
+        down_revision,
+        "-1",
+        "0018_f04_preparation_v2-1",
+        "head-1",
+    }:
+        raise RuntimeError("Preparation online downgrade is unsupported below 0017")
     # Check before any DDL. Never remove or reinterpret a retained new-version record.
     exists = op.get_bind().scalar(
         sa.text(

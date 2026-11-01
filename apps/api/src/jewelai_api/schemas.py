@@ -20,6 +20,7 @@ from jewelai_domain import (
     RenderedQuestion,
     VisualizationVerificationResult,
 )
+from jewelai_domain.clarification_state import CauseState, Sha256
 from jewelai_domain.models import MessageSource
 from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_model_gateway import GenerationRun
@@ -32,11 +33,16 @@ from jewelai_prompts import (
     KnowledgeReleaseReference,
     UserReadableJewelryDescription,
 )
+from jewelai_prompts.final_prompt_v3 import (
+    CanonicalInternalFinalPromptV3,
+    UserReadableJewelryDescriptionV2,
+)
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from .clarification_answers import ClarificationDecision
+from .clarification_v2 import ClarificationQuestionV2, ResumeResult
 from .generation import ProfileId
-from .preparation_contracts import GenerationPreparationRequest
+from .preparation_contracts import GenerationPreparationRequest, GenerationPreparationRequestV2
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
 Reason = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2000)]
@@ -271,6 +277,34 @@ class PromptEnrichmentFinalOutputResponse(ApiModel):
     internal_final_prompt: InternalFinalPrompt
 
 
+class PromptEnrichmentStateResponseV2(PromptEnrichmentStateResponse):
+    schema_version: Literal["2.0.0"]
+    contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
+    current_plan_version: Literal["2.0.0"]
+    clarification_questions: tuple[ClarificationQuestionV2, ...]
+    description: UserReadableJewelryDescriptionV2
+    preparation_expectations: GenerationPreparationRequestV2 | None
+    availability_overlay_hash: Sha256
+    effective_unresolved_frontier_hash: Sha256
+    current_unresolved_causal_summaries: tuple[CauseState, ...]
+
+
+class PromptEnrichmentAnswerResponseV2(PromptEnrichmentAnswerResponse):
+    schema_version: Literal["2.0.0"]
+    state: PromptEnrichmentStateResponseV2
+
+
+class PromptEnrichmentCorrectionResponseV2(PromptEnrichmentCorrectionResponse):
+    schema_version: Literal["2.0.0"]
+    state: PromptEnrichmentStateResponseV2
+
+
+class PromptEnrichmentFinalOutputResponseV3(ApiModel):
+    schema_version: Literal["3.0.0"]
+    description: UserReadableJewelryDescriptionV2
+    internal_final_prompt: CanonicalInternalFinalPromptV3
+
+
 class IterativeEditRequest(ApiModel):
     expected_revision_id: UUID
     content: MessageContent
@@ -465,3 +499,9 @@ class RevisionListResponse(ApiModel):
 
 
 IterativeEditResponse.model_rebuild()
+
+
+class PromptEnrichmentResumeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    result: ResumeResult
+    state: PromptEnrichmentStateResponseV2

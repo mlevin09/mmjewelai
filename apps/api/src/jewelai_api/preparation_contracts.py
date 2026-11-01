@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
+from jewelai_domain.clarification_state import StrictEvidenceModel
 from jewelai_domain.models import ImmutableModel
 from jewelai_prompts import FinalPromptReadiness
 from jewelai_prompts.models import Sha256
@@ -34,3 +35,12 @@ class GenerationPreparationSummary(ImmutableModel):
     readiness: FinalPromptReadiness
     unresolved_summary: tuple[str, ...]
     created_at: datetime
+
+
+class GenerationPreparationRequestV2(GenerationPreparationRequest, StrictEvidenceModel):
+    schema_version: Literal["2.0.0"]
+    expected_effective_frontier_hash: Sha256
+
+
+class GenerationPreparationSummaryV2(GenerationPreparationSummary):
+    schema_version: Literal["2.0.0"]

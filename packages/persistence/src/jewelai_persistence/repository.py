@@ -2,7 +2,7 @@
 
 import hashlib
 import json
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
@@ -22,6 +22,11 @@ from jewelai_auth import (
     MembershipNotFoundError,
     MembershipRole,
     VerifiedIdentity,
+)
+from jewelai_domain.clarification_state import (
+    EvidenceScope,
+    evidence_hash,
+    validate_availability_overlay,
 )
 from jewelai_domain.knowledge_runtime import (
     AnyActiveKnowledge,
@@ -51,8 +56,11 @@ from jewelai_model_gateway import (
 from jewelai_prompts import (
     AnyPromptEnrichmentResult,
     CompiledPrompt,
-    decode_prompt_enrichment_result,
 )
+from jewelai_prompts import (
+    decode_prompt_enrichment_result as _decode_legacy_enrichment,
+)
+from jewelai_prompts.enrichment import decode_f04_prompt_enrichment_result
 from pydantic import ValidationError
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
@@ -82,6 +90,13 @@ from .models import (
     VisualizationSelectionRow,
     VisualizationVerificationRow,
 )
+
+
+def _decode_enrichment_payload(value):
+    payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+    if isinstance(payload, dict) and payload.get("enrichment_version") == "2.0.0":
+        return decode_f04_prompt_enrichment_result(payload)
+    return _decode_legacy_enrichment(payload)
 
 
 class PersistenceError(RuntimeError):
@@ -899,9 +914,11 @@ class PersistenceRepository:
         """Atomically pin one verified release and append one immutable enrichment cycle."""
 
         try:
-            enrichment = decode_prompt_enrichment_result(result)
+            enrichment = _decode_enrichment_payload(result)
         except ValidationError as exc:
             raise EnrichmentIntegrityError("enrichment result is invalid") from exc
+        if enrichment.enrichment_version == "2.0.0":
+            raise EnrichmentIntegrityError("F04 cycles require an atomic typed plan commit")
         if enrichment.knowledge_validation_report_sha256 is None:
             raise EnrichmentIntegrityError(
                 "persisted enrichment requires verified ACTIVE release provenance"
@@ -1024,7 +1041,7 @@ class PersistenceRepository:
         """Atomically commit the optional first edit, release pin, and first cycle."""
 
         try:
-            enrichment = decode_prompt_enrichment_result(result)
+            enrichment = _decode_enrichment_payload(result)
             revision = (
                 validate_design_revision(resulting_revision)
                 if resulting_revision is not None
@@ -1069,6 +1086,8 @@ class PersistenceRepository:
             specification_revision_id=authoritative_revision_id,
             release_identity=pin_identity,
         )
+        if enrichment.enrichment_version == "2.0.0" and plan_payload is None:
+            raise EnrichmentIntegrityError("F04 initial enrichment requires an atomic Plan2")
         try:
             with self._session_factory.begin() as db:
                 session = db.scalar(
@@ -1198,6 +1217,23 @@ class PersistenceRepository:
             validation_report=validation_report,
         )
 
+    @contextmanager
+    def read_enrichment_history(self, session_id, organization_id):
+        """One scoped frame, serialized with existing session-first command writers.
+
+        Reuse the preparation reader so nested loads neither reopen nor close the
+        transaction. This also works when the caller already holds its write lock.
+        """
+        from .preparations import locked_reader
+
+        with self._session_factory() as db:
+            row = db.scalar(
+                self._scoped_session_query(session_id, organization_id).with_for_update(read=True)
+            )
+            if row is None:
+                raise NotFoundError("Session not found")
+            yield locked_reader(db)
+
     def get_enrichment_cycle(
         self,
         session_id: UUID,
@@ -1215,7 +1251,7 @@ class PersistenceRepository:
             )
             if row is None:
                 raise NotFoundError("Enrichment cycle not found")
-            return self._enrichment_cycle_record(row, pin)
+            return self._enrichment_cycle_record(row, pin, db=db, session=session)
 
     def list_enrichment_cycles(
         self, session_id: UUID, organization_id: UUID
@@ -1228,7 +1264,9 @@ class PersistenceRepository:
                 .where(EnrichmentCycleRow.session_id == session_id)
                 .order_by(EnrichmentCycleRow.cycle_number)
             ).all()
-            return tuple(self._enrichment_cycle_record(row, pin) for row in rows)
+            return tuple(
+                self._enrichment_cycle_record(row, pin, db=db, session=session) for row in rows
+            )
 
     def get_clarification_plan(
         self,
@@ -1351,7 +1389,7 @@ class PersistenceRepository:
         next_enrichment = None
         if next_enrichment_result is not None:
             try:
-                next_enrichment = decode_prompt_enrichment_result(next_enrichment_result)
+                next_enrichment = _decode_enrichment_payload(next_enrichment_result)
             except ValidationError as exc:
                 raise ClarificationDecisionIntegrityError(
                     "clarification re-enrichment result is invalid"
@@ -1381,6 +1419,12 @@ class PersistenceRepository:
                 payload["knowledge_validation_report_sha256"],
             ),
         )
+        if payload.get("answer_version") == "2.0.0" and (
+            next_plan_payload is None or next_enrichment is None
+        ):
+            raise ClarificationDecisionIntegrityError(
+                "F04 answers require an atomic cycle and Plan2"
+            )
         if next_plan_payload is not None and next_enrichment is None:
             raise ClarificationDecisionIntegrityError(
                 "a clarification plan requires its enrichment cycle"
@@ -1446,7 +1490,25 @@ class PersistenceRepository:
                         raise EnrichmentCycleConflictError(
                             "authoritative enrichment cycle changed before answer commit"
                         )
+                    if payload.get("answer_version") == "2.0.0":
+                        if (
+                            clarification_plan_id is None
+                            or plan.enrichment_cycle_id != latest_cycle.enrichment_cycle_id
+                            or UUID(payload["source_plan_id"]) != plan.clarification_plan_id
+                            or next_plan_payload is None
+                            or next_plan_payload["trigger"]["previous_plan_id"]
+                            != str(plan.clarification_plan_id)
+                            or next_plan_payload["trigger"]["previous_plan_hash"]
+                            != plan.content_hash
+                        ):
+                            raise EnrichmentCycleConflictError(
+                                "F answer requires the exact current plan/cycle"
+                            )
                 parent = self._locked_revision(db, session_id, expected_revision_id)
+                if payload.get("answer_version") == "2.0.0":
+                    self._validate_f04_result_evidence(
+                        db, session, payload, parent, resulting_revision
+                    )
                 if resulting_revision is not None:
                     self._validate_next_revision(parent, resulting_revision)
                     db.add(self._revision_row(session_id, resulting_revision))
@@ -1513,6 +1575,155 @@ class PersistenceRepository:
         except IntegrityError as exc:
             raise ClarificationDecisionConflictError(
                 "clarification answer or revision already exists"
+            ) from exc
+
+    def commit_clarification_resume(
+        self,
+        *,
+        session_id,
+        organization_id,
+        request_payload,
+        request_hash,
+        cause_id,
+        next_enrichment_cycle_id,
+        next_enrichment_result,
+        next_clarification_plan_id,
+        next_clarification_plan_payload,
+        created_at,
+    ):
+        """Append one F resume plan/cycle atomically; never manufacture an answer/edit."""
+        enriched = _decode_enrichment_payload(next_enrichment_result)
+        payload = self._prepare_clarification_plan(
+            clarification_plan_id=next_clarification_plan_id,
+            clarification_plan_payload=next_clarification_plan_payload,
+            session_id=session_id,
+            specification_revision_id=UUID(request_payload["expected_revision_id"]),
+            release_identity=(
+                enriched.knowledge_package_id,
+                enriched.knowledge_artifact_version,
+                enriched.knowledge_runtime_sha256,
+                enriched.knowledge_validation_report_sha256,
+            ),
+        )
+        try:
+            with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise OwnershipMismatchError("Session not found in organization scope")
+                self._validate_release_identity(session, payload)
+                message = db.scalar(
+                    select(MessageRow).where(
+                        MessageRow.session_id == session_id,
+                        MessageRow.message_id == UUID(request_payload["message_id"]),
+                    )
+                )
+                if message is None or message.actor != "user":
+                    raise OwnershipMismatchError("Resume Message not found in user session scope")
+                existing = db.scalars(
+                    select(ClarificationPlanRow).where(
+                        ClarificationPlanRow.session_id == session_id,
+                        ClarificationPlanRow.organization_id == organization_id,
+                    )
+                ).all()
+                for row in existing:
+                    trigger = row.plan_payload.get("trigger", {})
+                    if (
+                        trigger.get("kind") == "explicit_resume"
+                        and trigger.get("request_id") == request_payload["request_id"]
+                    ):
+                        if trigger.get("request_hash") != request_hash:
+                            raise ClarificationDecisionConflictError(
+                                "Resume request already has a different intent"
+                            )
+                        return self._clarification_plan_record(db, row, session)
+                if session.current_revision_id != UUID(request_payload["expected_revision_id"]):
+                    raise StaleRevisionError("Product State changed before resume")
+                latest = db.scalar(
+                    select(EnrichmentCycleRow)
+                    .where(EnrichmentCycleRow.session_id == session_id)
+                    .order_by(EnrichmentCycleRow.cycle_number.desc())
+                    .limit(1)
+                    .with_for_update()
+                )
+                if (
+                    latest is None
+                    or latest.enrichment_cycle_id
+                    != UUID(request_payload["expected_enrichment_cycle_id"])
+                    or latest.content_hash != request_payload["expected_enrichment_result_hash"]
+                ):
+                    raise EnrichmentCycleConflictError("Resume enrichment frame changed")
+                previous = db.scalar(
+                    select(ClarificationPlanRow).where(
+                        ClarificationPlanRow.enrichment_cycle_id == latest.enrichment_cycle_id,
+                        ClarificationPlanRow.session_id == session_id,
+                    )
+                )
+                if (
+                    previous is None
+                    or previous.content_hash != request_payload["expected_clarification_plan_hash"]
+                ):
+                    raise ClarificationDecisionConflictError("Resume clarification frame changed")
+                self._clarification_plan_record(db, previous, session)
+                old_states = {
+                    s["cause_id"]: s for s in previous.plan_payload["frontier_core"]["cause_states"]
+                }
+                old = old_states.get(cause_id)
+                trigger = payload["trigger"]
+                if (
+                    old is None
+                    or (old["status"], old["offer_state"]) != ("OPEN", "DORMANT")
+                    or trigger["kind"] != "explicit_resume"
+                    or trigger["cause_id"] != cause_id
+                    or trigger["request_id"] != request_payload["request_id"]
+                    or trigger["request_hash"] != request_hash
+                    or trigger["previous_plan_id"] != str(previous.clarification_plan_id)
+                    or trigger["previous_plan_hash"] != previous.content_hash
+                    or payload["cause_definitions"] != previous.plan_payload["cause_definitions"]
+                    or enriched.content_hash != latest.content_hash
+                ):
+                    raise ClarificationDecisionConflictError(
+                        "Cause is not eligible for this explicit resume"
+                    )
+                new_states = {s["cause_id"]: s for s in payload["frontier_core"]["cause_states"]}
+                if set(new_states) != set(old_states) or any(
+                    new_states[k]
+                    != {**s, **({"offer_state": "AVAILABLE"} if k == cause_id else {})}
+                    for k, s in old_states.items()
+                ):
+                    raise ClarificationDecisionConflictError("Resume cannot change causal history")
+                row = EnrichmentCycleRow(
+                    enrichment_cycle_id=next_enrichment_cycle_id,
+                    session_id=session_id,
+                    cycle_number=latest.cycle_number + 1,
+                    specification_revision_id=session.current_revision_id,
+                    knowledge_package_id=enriched.knowledge_package_id,
+                    knowledge_artifact_version=enriched.knowledge_artifact_version,
+                    knowledge_runtime_sha256=enriched.knowledge_runtime_sha256,
+                    knowledge_validation_report_sha256=enriched.knowledge_validation_report_sha256,
+                    enrichment_version="2.0.0",
+                    result_payload=enriched.model_dump(mode="json"),
+                    content_hash=enriched.content_hash,
+                    created_at=created_at,
+                )
+                db.add(row)
+                db.flush()
+                self._add_clarification_plan(
+                    db,
+                    clarification_plan_id=next_clarification_plan_id,
+                    organization_id=organization_id,
+                    session=session,
+                    cycle=row,
+                    payload=payload,
+                    created_at=created_at,
+                )
+                db.flush()
+                stored = db.get(ClarificationPlanRow, next_clarification_plan_id)
+                return self._clarification_plan_record(db, stored, session)
+        except IntegrityError as exc:
+            raise ClarificationDecisionConflictError(
+                "Concurrent resume changed the current cycle"
             ) from exc
 
     def get_clarification_answer(
@@ -1599,7 +1810,7 @@ class PersistenceRepository:
                 UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None
             )
             authoritative_revision = validate_design_revision(payload["authoritative_revision"])
-            next_enrichment = decode_prompt_enrichment_result(payload["next_enrichment_result"])
+            next_enrichment = _decode_enrichment_payload(payload["next_enrichment_result"])
             source = payload["source"]
             previous_cycle_id = UUID(payload["previous_enrichment_cycle_id"])
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
@@ -1630,6 +1841,8 @@ class PersistenceRepository:
                 payload["knowledge_validation_report_sha256"],
             ),
         )
+        if payload.get("correction_version") == "2.0.0" and next_plan_payload is None:
+            raise UserCorrectionIntegrityError("F04 corrections require an atomic cycle and Plan2")
         try:
             source_identity_hash = self._canonical_hash(
                 {"kind": source["kind"], "message_id": source["message_id"]}
@@ -1660,6 +1873,10 @@ class PersistenceRepository:
                     )
                 )
                 if existing is not None:
+                    if payload.get("correction_version") == "2.0.0":
+                        raise UserCorrectionConflictError(
+                            "F correction source already has a durable result"
+                        )
                     if existing.semantic_hash != payload["semantic_hash"]:
                         raise UserCorrectionConflictError(
                             "correction source already has a different result"
@@ -1694,6 +1911,32 @@ class PersistenceRepository:
                     expected_revision_id,
                 )
                 parent = self._locked_revision(db, session_id, expected_revision_id)
+                if payload.get("correction_version") == "2.0.0":
+                    source_plan = db.scalar(
+                        select(ClarificationPlanRow).where(
+                            ClarificationPlanRow.enrichment_cycle_id
+                            == latest_cycle.enrichment_cycle_id,
+                            ClarificationPlanRow.session_id == session_id,
+                        )
+                    )
+                    if (
+                        source_plan is None
+                        or next_plan_payload is None
+                        or next_plan_payload["trigger"]["previous_plan_id"]
+                        != str(source_plan.clarification_plan_id)
+                        or next_plan_payload["trigger"]["previous_plan_hash"]
+                        != source_plan.content_hash
+                    ):
+                        raise EnrichmentCycleConflictError(
+                            "F correction requires exact current plan/cycle"
+                        )
+                    self._validate_f04_result_evidence(
+                        db,
+                        session,
+                        payload,
+                        parent,
+                        authoritative_revision if new_revision_id else None,
+                    )
                 if new_revision_id is not None:
                     self._validate_next_revision(parent, authoritative_revision)
                     db.add(self._revision_row(session_id, authoritative_revision))
@@ -3073,13 +3316,17 @@ class PersistenceRepository:
             binding=binding,
         )
 
-    @staticmethod
+    @classmethod
     def _enrichment_cycle_record(
+        cls,
         row: EnrichmentCycleRow,
         session_pin: KnowledgeReleasePinRecord,
+        *,
+        db=None,
+        session=None,
     ) -> EnrichmentCycleRecord:
         try:
-            result = decode_prompt_enrichment_result(row.result_payload)
+            result = _decode_enrichment_payload(row.result_payload)
         except ValidationError as exc:
             raise EnrichmentIntegrityError("stored enrichment result is invalid") from exc
         row_identity = (
@@ -3111,6 +3358,8 @@ class PersistenceRepository:
             raise EnrichmentIntegrityError(
                 "stored enrichment relational metadata does not match its result payload"
             )
+        if db is not None and session is not None:
+            cls._validate_f04_snapshot(db, session, result, row.specification_revision_id)
         return EnrichmentCycleRecord(
             enrichment_cycle_id=row.enrichment_cycle_id,
             session_id=row.session_id,
@@ -3150,7 +3399,7 @@ class PersistenceRepository:
                 payload["knowledge_validation_report_sha256"],
             )
             valid = (
-                payload["plan_version"] == "1.1.0"
+                payload["plan_version"] in {"1.1.0", "2.0.0"}
                 and UUID(payload["design_revision_id"]) == specification_revision_id
                 and supplied_release == release_identity
                 and isinstance(payload["question_artifact_version"], str)
@@ -3165,6 +3414,18 @@ class PersistenceRepository:
             raise ClarificationPlanIntegrityError(
                 "clarification plan lineage does not match its enrichment cycle"
             )
+        if payload["plan_version"] == "2.0.0":
+            try:
+                if (
+                    UUID(payload["plan_id"]) != clarification_plan_id
+                    or UUID(payload["scope"]["session_id"]) != session_id
+                    or payload["contract_profile"] != "jewelai.prompt-enrichment.f04/2.0.0"
+                    or (payload["question_artifact_version"], payload["rules_artifact_version"])
+                    != ("2.0.0", "2.0.0")
+                ):
+                    raise ValueError("F plan context mismatch")
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ClarificationPlanIntegrityError("F plan context is invalid") from exc
         return payload
 
     @staticmethod
@@ -3178,6 +3439,11 @@ class PersistenceRepository:
         payload: dict,
         created_at: datetime,
     ) -> None:
+        if (payload["plan_version"] == "2.0.0") != (
+            (session.question_artifact_version, session.rules_artifact_version)
+            == ("2.0.0", "2.0.0")
+        ):
+            raise ClarificationPlanIntegrityError("Mixed session/plan contract profile")
         if (
             payload["question_artifact_version"] != session.question_artifact_version
             or payload["rules_artifact_version"] != session.rules_artifact_version
@@ -3185,6 +3451,22 @@ class PersistenceRepository:
             raise ClarificationPlanIntegrityError(
                 "clarification plan artifacts do not match the session"
             )
+        result = _decode_enrichment_payload(cycle.result_payload)
+        PersistenceRepository._validate_f04_snapshot(
+            db, session, result, cycle.specification_revision_id
+        )
+        if payload["plan_version"] == "2.0.0":
+            PersistenceRepository._validate_release_identity(session, payload)
+            if (
+                payload["enrichment_result_hash"] != cycle.content_hash
+                or UUID(payload["enrichment_cycle_id"]) != cycle.enrichment_cycle_id
+                or payload["enrichment_cycle_number"] != cycle.cycle_number
+                or payload["revision_sha256"]
+                != result.availability_overlay.canonical_revision_sha256
+                or UUID(payload["scope"]["organization_id"]) != organization_id
+                or payload["scope"] != result.scope.model_dump(mode="json")
+            ):
+                raise ClarificationPlanIntegrityError("F plan/cycle scope or hash mismatch")
         db.add(
             ClarificationPlanRow(
                 clarification_plan_id=clarification_plan_id,
@@ -3205,6 +3487,138 @@ class PersistenceRepository:
                 created_at=created_at,
             )
         )
+
+    @classmethod
+    def _validate_f04_snapshot(cls, db, session, result, revision_id):
+        f04 = (session.question_artifact_version, session.rules_artifact_version) == (
+            "2.0.0",
+            "2.0.0",
+        )
+        if (result.enrichment_version == "2.0.0") != f04:
+            raise EnrichmentIntegrityError("Session/enrichment profile mismatch")
+        if not f04:
+            return
+        current = cls._domain_revision(cls._locked_revision(db, session.session_id, revision_id))
+        organization_id = db.scalar(
+            select(ProjectRow.organization_id).where(ProjectRow.project_id == session.project_id)
+        )
+        scope = EvidenceScope(
+            organization_id=organization_id,
+            session_id=session.session_id,
+            design_id=current.design_id,
+        )
+        try:
+            source = cls._domain_revision(
+                cls._locked_revision(db, session.session_id, result.context.source_revision_id)
+            )
+            pins = result.context.artifact_pins
+            if (
+                result.scope != scope
+                or source.design_id != current.design_id
+                or evidence_hash(source) != result.context.source_revision_sha256
+                or (
+                    pins.role_artifact_version,
+                    pins.dictionary_artifact_version,
+                    pins.question_artifact_version,
+                    pins.rules_artifact_version,
+                    pins.prompt_template_artifact_version,
+                )
+                != (
+                    session.role_artifact_version,
+                    session.dictionary_artifact_version,
+                    session.question_artifact_version,
+                    session.rules_artifact_version,
+                    session.prompt_artifact_version,
+                )
+            ):
+                raise ValueError("F source scope or pins mismatch")
+            validate_availability_overlay(result.availability_overlay, current, scope=scope)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise EnrichmentIntegrityError("F canonical source failed scoped validation") from exc
+
+    @classmethod
+    def _validate_f04_result_evidence(cls, db, session, payload, parent, resulting):
+        """Recheck actual target snapshots/source scope under the existing commit lock."""
+        from jewelai_domain.clarification_state import TargetRef, build_availability_overlay
+        from jewelai_domain.lock_protection import state_fields
+        from jewelai_domain.models import KnownValue
+
+        before = cls._domain_revision(parent)
+        after = resulting or before
+        organization_id = db.scalar(
+            select(ProjectRow.organization_id).where(ProjectRow.project_id == session.project_id)
+        )
+        scope = EvidenceScope(
+            organization_id=organization_id,
+            session_id=session.session_id,
+            design_id=before.design_id,
+        )
+        try:
+            if (
+                payload["scope"] != scope.model_dump(mode="json")
+                or payload["contract_profile"] != "jewelai.prompt-enrichment.f04/2.0.0"
+            ):
+                raise ValueError("Result scope mismatch")
+            targets = {
+                e.target.concrete_target: e.target
+                for e in build_availability_overlay(before, scope=scope).entries
+            }
+            old_fields = state_fields(before.design)
+            new_fields = state_fields(after.design)
+            accepted = payload["accepted_target_evidence"]
+            for item in accepted:
+                target = TargetRef.model_validate(item["target"])
+                path = tuple(target.concrete_target.split("."))
+                message = db.scalar(
+                    select(MessageRow).where(
+                        MessageRow.session_id == session.session_id,
+                        MessageRow.message_id == UUID(item["source_message_id"]),
+                    )
+                )
+                old = old_fields[path]
+                new = new_fields[path]
+                if (
+                    targets.get(target.concrete_target) != target
+                    or message is None
+                    or message.actor != "user"
+                    or not isinstance(new, KnownValue)
+                    or item["before_revision_id"] != str(before.revision_id)
+                    or item["after_revision_id"] != str(after.revision_id)
+                    or item["before_state_sha256"] != evidence_hash(old)
+                    or item["after_state_sha256"] != evidence_hash(new)
+                    or item["accepted_dictionary_value"]
+                    != (new.value if isinstance(new.value, str) else None)
+                    or item["transition"] != ("APPLIED" if resulting else "NO_CHANGE")
+                ):
+                    raise ValueError("Accepted target is not the actual canonical transition")
+            if payload["resolution_assertions"] and payload["outcome"] not in {
+                "APPLIED",
+                "NO_CHANGE",
+                "REJECTED",
+            }:
+                raise ValueError("Unaccepted result cannot resolve a cause")
+            for assertion in payload["resolution_assertions"]:
+                index = assertion["accepted_target_evidence_index"]
+                if assertion["method"] == "offer_rejected":
+                    if payload.get("decision") != "REJECT" or index is not None:
+                        raise ValueError("No real offer rejection")
+                elif (
+                    index is None
+                    or isinstance(index, bool)
+                    or index < 0
+                    or index >= len(accepted)
+                    or accepted[index]["target"] != assertion["target"]
+                ):
+                    raise ValueError("Resolution has no exact accepted target")
+                target = TargetRef.model_validate(assertion["target"])
+                if assertion["resulting_revision_id"] != str(after.revision_id) or assertion[
+                    "post_state_sha256"
+                ] != evidence_hash(new_fields[tuple(target.concrete_target.split("."))]):
+                    raise ValueError("Resolution post-state mismatch")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise EnrichmentIntegrityError(
+                "F accepted-target evidence failed transactional validation"
+            ) from exc
 
     @classmethod
     def _clarification_plan_record(
@@ -3292,6 +3706,20 @@ class PersistenceRepository:
 
     @staticmethod
     def _validate_release_identity(session: DesignSessionRow, payload: dict) -> None:
+        f04 = (session.question_artifact_version, session.rules_artifact_version) == (
+            "2.0.0",
+            "2.0.0",
+        )
+        if not f04 and (session.question_artifact_version, session.rules_artifact_version) != (
+            "1.0.0",
+            "1.0.0",
+        ):
+            raise EnrichmentIntegrityError("Unsupported session profile tuple")
+        for discriminator in ("plan_version", "answer_version", "correction_version"):
+            if discriminator in payload and ((payload[discriminator] == "2.0.0") != f04):
+                raise EnrichmentIntegrityError("Mixed session/durable contract profile")
+        if f04 and payload.get("contract_profile") != "jewelai.prompt-enrichment.f04/2.0.0":
+            raise EnrichmentIntegrityError("Missing F contract profile")
         stored = (
             session.knowledge_package_id,
             session.knowledge_artifact_version,
@@ -3436,7 +3864,7 @@ class PersistenceRepository:
             source = payload["source"]
             previous_cycle = db.get(EnrichmentCycleRow, row.previous_enrichment_cycle_id)
             next_cycle = db.get(EnrichmentCycleRow, row.next_enrichment_cycle_id)
-            next_enrichment = decode_prompt_enrichment_result(payload["next_enrichment_result"])
+            next_enrichment = _decode_enrichment_payload(payload["next_enrichment_result"])
         except (KeyError, TypeError, ValueError, ValidationError) as exc:
             raise UserCorrectionIntegrityError("stored correction result is invalid") from exc
         try:
@@ -3477,7 +3905,9 @@ class PersistenceRepository:
             or next_cycle.content_hash != next_enrichment.content_hash
         ):
             raise UserCorrectionIntegrityError("stored correction cycle lineage is inconsistent")
-        self._enrichment_cycle_record(next_cycle, self._knowledge_release_pin(session, db=db))
+        self._enrichment_cycle_record(
+            next_cycle, self._knowledge_release_pin(session, db=db), db=db, session=session
+        )
         self._validate_prior_answer_lineage(
             db,
             session,

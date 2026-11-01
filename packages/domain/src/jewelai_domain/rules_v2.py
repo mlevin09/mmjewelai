@@ -206,12 +206,81 @@ class RuleRegistryV2(RuleRegistry):
         if unresolved_context is None:
             return decision
         states = unresolved_context.frontier_core.cause_states
+        # A canonical gap can become satisfied independently of an authorized causal
+        # discharge. Current OPEN causes remain blocking; historical flags are not used.
+        if any(c.blocks_current for c in states) and decision.decision != "block":
+            blocking = [c for c in states if c.blocks_current and c.rule_ref is not None]
+            if blocking:
+                selected = min(
+                    blocking,
+                    key=lambda c: (
+                        -self[c.rule_ref.rule_id].priority,
+                        self[c.rule_ref.rule_id].tie_order,
+                        c.cause_id,
+                    ),
+                )
+                rule = self[selected.rule_ref.rule_id]
+                if decision.decision == "ready" or rule.priority > decision.priority:
+                    decision = self._ask_type(
+                        rule_id=rule.rule_id,
+                        rule_version=rule.rule_version,
+                        rules_artifact_version=self.artifact_version,
+                        reason_code=rule.reason_code,
+                        reason=rule.reason,
+                        priority=rule.priority,
+                        tie_order=rule.tie_order,
+                        trace=decision.trace,
+                        target=rule.target,
+                        concrete_target=selected.availability_target_ref.concrete_target,
+                        question_id=rule.action.question_id,
+                    )
         payload = decision.model_dump(mode="json")
         payload["blocking_cause_ids"] = sorted(c.cause_id for c in states if c.blocks_current)
         payload["eligible_clarification_cause_ids"] = sorted(
             c.cause_id for c in states if c.status == "OPEN" and c.offer_state == "AVAILABLE"
         )
         return type(decision).model_validate(payload)
+
+    def clarification_decision(self, revision, role_id, *, unresolved_context):
+        """Select presentation from the same validated core, excluding dormant causes."""
+        decision = self.evaluate(revision, role_id, unresolved_context=unresolved_context)
+        if decision.decision == "block":
+            return decision
+        context = RuleContextV2.model_validate(unresolved_context)
+        eligible = [
+            c
+            for c in context.frontier_core.cause_states
+            if c.blocks_current and c.offer_state == "AVAILABLE" and c.rule_ref is not None
+        ]
+        if not eligible:
+            return decision
+        selected = min(
+            eligible,
+            key=lambda c: (
+                -self[c.rule_ref.rule_id].priority,
+                self[c.rule_ref.rule_id].tie_order,
+                c.cause_id,
+            ),
+        )
+        rule = self[selected.rule_ref.rule_id]
+        return self._ask_type(
+            rule_id=rule.rule_id,
+            rule_version=rule.rule_version,
+            rules_artifact_version=self.artifact_version,
+            reason_code=rule.reason_code,
+            reason=rule.reason,
+            priority=rule.priority,
+            tie_order=rule.tie_order,
+            trace=decision.trace,
+            target=rule.target,
+            concrete_target=selected.availability_target_ref.concrete_target,
+            question_id=rule.action.question_id,
+        ).model_copy(
+            update={
+                "blocking_cause_ids": decision.blocking_cause_ids,
+                "eligible_clarification_cause_ids": decision.eligible_clarification_cause_ids,
+            }
+        )
 
     def _evaluate_condition(self, condition, *, unresolved_context=None, **kwargs):
         if isinstance(condition, ActiveScopedConflictCondition):

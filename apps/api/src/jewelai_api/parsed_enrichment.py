@@ -48,6 +48,7 @@ from jewelai_prompts import (
     PromptTemplateBundle,
     enrich_prompt_with_active_release,
 )
+from jewelai_prompts.enrichment import StructuredPromptEnrichmentResultV2
 from pydantic import BaseModel, model_validator
 
 
@@ -132,6 +133,12 @@ class ParsedCandidateEnrichmentResult(ImmutableModel):
         ):
             raise ValueError("parser and enrichment revision lineage mismatch")
         return self
+
+
+class ParsedCandidateEnrichmentResultV2(ParsedCandidateEnrichmentResult):
+    """F04 retains the same Parser/Matrix evidence under an exact Enrichment2 reader."""
+
+    enrichment_result: StructuredPromptEnrichmentResultV2
 
 
 def enrich_parsed_candidates_with_active_release(

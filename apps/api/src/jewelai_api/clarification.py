@@ -171,11 +171,22 @@ def plan_clarifications(
     questions: QuestionCatalog,
     rules: RuleRegistry,
     constraint_evidence: tuple[FinalPromptConstraintEvidence, ...] = (),
+    _question_builder=None,
+    _plan_builder=None,
+    _unresolved_context=None,
+    _rule_decision_override=None,
 ) -> ClarificationPlan:
     """Build a minimal immutable plan without accepting evidence or changing Product State."""
 
+    question_builder = _question_builder or _question
+    plan_builder = _plan_builder or ClarificationPlan
     revision = validate_design_revision(revision)
-    enrichment = ParsedCandidateEnrichmentResult.model_validate(enrichment)
+    if (questions.artifact_version, rules.artifact_version) == ("2.0.0", "2.0.0"):
+        from .parsed_enrichment import ParsedCandidateEnrichmentResultV2
+
+        enrichment = ParsedCandidateEnrichmentResultV2.model_validate(enrichment)
+    else:
+        enrichment = ParsedCandidateEnrichmentResult.model_validate(enrichment)
     role_id = RoleId(role_id)
     constraint_evidence = tuple(
         sorted(
@@ -211,7 +222,13 @@ def plan_clarifications(
 
     locale = QuestionLocale(enrichment.parse_result.requested_locale)
     effective_revision = _effective_revision(revision, enrichment)
-    rule_decision = rules.evaluate(effective_revision, role_id)
+    rule_decision = rules.evaluate(
+        effective_revision,
+        role_id,
+        **({"unresolved_context": _unresolved_context} if _unresolved_context is not None else {}),
+    )
+    if _rule_decision_override is not None:
+        rule_decision = _rule_decision_override
     rule_question_id = rule_decision.question_id if isinstance(rule_decision, AskDecision) else None
 
     grouped: dict[tuple[QuestionId, ClarificationCategory, CandidateSubject | None], list] = {}
@@ -260,7 +277,7 @@ def plan_clarifications(
             )
         )
         planned.append(
-            _question(
+            question_builder(
                 enrichment,
                 questions=questions,
                 rules=rules,
@@ -289,7 +306,7 @@ def plan_clarifications(
             continue
         options = _proposal_options(proposal.value, proposal.source_id, dictionary, locale)
         planned.append(
-            _question(
+            question_builder(
                 enrichment,
                 questions=questions,
                 rules=rules,
@@ -309,7 +326,7 @@ def plan_clarifications(
 
     if isinstance(rule_decision, AskDecision) and not consumed_rule:
         planned.append(
-            _question(
+            question_builder(
                 enrichment,
                 questions=questions,
                 rules=rules,
@@ -359,7 +376,7 @@ def plan_clarifications(
         "can_continue_without_answers": not isinstance(rule_decision, BlockDecision)
         and not any(item.importance == ClarificationImportance.BLOCKING for item in ordered),
     }
-    return ClarificationPlan(**payload, content_hash=_hash(_json(payload)))
+    return plan_builder(**payload, content_hash=_hash(_json(payload)))
 
 
 def continue_clarification_plan(
@@ -369,15 +386,22 @@ def continue_clarification_plan(
     answered_clarification_ids: tuple[str, ...],
     questions: QuestionCatalog,
     rules: RuleRegistry,
+    _plan_reader=ClarificationPlan,
+    _plan_builder=ClarificationPlan,
+    _rebind_builder=None,
+    _question_builder=None,
+    _rule_decision_override=None,
 ) -> ClarificationPlan:
     """Advance one durable plan without replaying parsing or accepting client plan content."""
 
-    plan = ClarificationPlan.model_validate(previous_plan)
+    plan = _plan_reader.model_validate(previous_plan)
     revision = validate_design_revision(revision)
     answered = set(answered_clarification_ids)
-    rule_decision = rules.evaluate(revision, plan.role_id)
+    rule_decision = _rule_decision_override or rules.evaluate(revision, plan.role_id)
+    rebind = _rebind_builder or _rebind_question
+    question_builder = _question_builder or _rule_question_from_plan
     retained = [
-        _rebind_question(item, revision.revision_id)
+        rebind(item, revision.revision_id)
         for item in plan.questions
         if item.clarification_id not in answered and not _is_confirmed(revision, item.target)
     ]
@@ -385,7 +409,7 @@ def continue_clarification_plan(
         item.semantic_question_id == rule_decision.question_id for item in retained
     ):
         retained.append(
-            _rule_question_from_plan(
+            question_builder(
                 plan,
                 revision.revision_id,
                 rule_decision,
@@ -422,7 +446,7 @@ def continue_clarification_plan(
         "can_continue_without_answers": not isinstance(rule_decision, BlockDecision)
         and not any(item.importance == ClarificationImportance.BLOCKING for item in ordered),
     }
-    return ClarificationPlan(**payload, content_hash=_hash(_json(payload)))
+    return _plan_builder(**payload, content_hash=_hash(_json(payload)))
 
 
 def _rebind_question(question: ClarificationQuestion, revision_id) -> ClarificationQuestion:
@@ -434,7 +458,9 @@ def _rebind_question(question: ClarificationQuestion, revision_id) -> Clarificat
     return ClarificationQuestion.model_validate(payload)
 
 
-def _rule_question_from_plan(plan, revision_id, rule, *, questions, rules):
+def _rule_question_from_plan(
+    plan, revision_id, rule, *, questions, rules, _model_type=ClarificationQuestion
+):
     rendered = questions.render(rule.question_id, plan.role_id, plan.locale.value)
     identity = {
         "design_revision_id": str(revision_id),
@@ -450,7 +476,7 @@ def _rule_question_from_plan(plan, revision_id, rule, *, questions, rules):
         "rule_id": rule.rule_id,
         "rule_version": rule.rule_version,
     }
-    return ClarificationQuestion(
+    return _model_type(
         clarification_id=f"clarification_{_hash(_json(identity))[:24]}",
         semantic_question_id=rule.question_id,
         category=ClarificationCategory.REQUIRED_INFORMATION,
@@ -572,6 +598,7 @@ def _question(
     options,
     proposal_ids=(),
     rule,
+    _model_type=ClarificationQuestion,
 ):
     rendered = questions.render(question_id, role_id, locale.value)
     candidate_ids = tuple(sorted(item.candidate.candidate_id for item in dispositions))
@@ -604,7 +631,7 @@ def _question(
         "rule_version": rule.rule_version if rule is not None else None,
     }
     clarification_id = f"clarification_{_hash(_json(identity))[:24]}"
-    return ClarificationQuestion(
+    return _model_type(
         clarification_id=clarification_id,
         semantic_question_id=question_id,
         category=category,

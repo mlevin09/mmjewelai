@@ -8,6 +8,7 @@ from jewelai_domain.clarification_state import (
     CanonicalAvailabilityOverlay,
     EvidenceScope,
     InputContext,
+    StrictEvidenceModel,
 )
 from jewelai_domain.knowledge_activation import Sha256
 from jewelai_domain.knowledge_policy import (
@@ -229,7 +230,7 @@ class StructuredPromptEnrichmentResult(ImmutableModel):
         return PromptEnrichmentResult.validate_hash(self)
 
 
-class StructuredPromptEnrichmentResultV2(StructuredPromptEnrichmentResult):
+class StructuredPromptEnrichmentResultV2(StructuredPromptEnrichmentResult, StrictEvidenceModel):
     """Opt-in F04 source with lossless canonical availability; no provider behavior."""
 
     enrichment_version: Literal["2.0.0"]
@@ -277,7 +278,11 @@ def decode_f04_prompt_enrichment_result(value: object) -> StructuredPromptEnrich
 
 
 def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjection:
-    result = decode_prompt_enrichment_result(value)
+    result = (
+        decode_f04_prompt_enrichment_result(value)
+        if isinstance(value, StructuredPromptEnrichmentResultV2)
+        else decode_prompt_enrichment_result(value)
+    )
     source = result.compiled_prompt if isinstance(result, PromptEnrichmentResult) else result
     return RevisionProjection(
         specification_entries=source.specification_entries,
@@ -287,7 +292,11 @@ def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjectio
 
 
 def enrichment_template_version(value: AnyPromptEnrichmentResult) -> str:
-    result = decode_prompt_enrichment_result(value)
+    result = (
+        decode_f04_prompt_enrichment_result(value)
+        if isinstance(value, StructuredPromptEnrichmentResultV2)
+        else decode_prompt_enrichment_result(value)
+    )
     return (
         result.compiled_prompt.template_artifact_version
         if isinstance(result, PromptEnrichmentResult)

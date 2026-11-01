@@ -1,6 +1,6 @@
 # ADR 0036: F04 versioned clarification profile
 
-Status: Owner-approved contract; implementation in progress. Date: 2026-11-01.
+Status: Owner-approved contract; Draft implementation, independent acceptance pending. Date: 2026-11-01.
 
 ## Context
 
@@ -41,14 +41,31 @@ ignoring them globally loses causal evidence.
 
 ## Consequences and current implementation boundary
 
-Separate V2 catalog/Rules models reuse the existing registry/interpreter. Source-evidence
-classification and availability contracts are internal foundations. They do not yet constitute
-an operational F04 clarification lifecycle. In particular, the material-answer/resume paths,
-causal durable restoration and description2/IFP3/handoff3/preparation2 integration are not
-implemented by this partial change. No functional acceptance or activation is claimed.
+Separate V2 catalog/Rules models reuse the existing registry/interpreter. Trusted retained
+session Q/R pins select request-local L or F artifacts; client requests cannot choose the
+profile. F initial parsing, strict equivalence, Plan2, material answers, corrections and thin
+resume commands use the existing scoped revision/CAS transactions. Default session creation
+remains L. Missing/mixed versions, changed source/release/artifact hashes and stale frontiers
+fail closed.
+
+An F result stores exact accepted-target snapshots and causal assertions. Restoration verifies
+actual scoped Messages, original parses/proposals, committed revision ancestry, immutable
+plans/results and the deterministic current projection. A self-consistent hash or Matrix APPLIED
+is insufficient. SKIP/UNKNOWN preserve canonical state and retain a dormant OPEN cause; authorized
+same-target correction can resolve it without rewriting historical answer flags. Only explicit
+resume or a verified accepted dependency fingerprint change re-offers a dormant question.
+
+Description2, IFP3, handoff3, Gate2, Rendering2 and Preparation2 consume the same validated effective
+frontier and availability overlay. Preparation audit `DecisionFrontier` remains separate. Gate2
+retains actual question IDs separately from Rules2 cause IDs. Source3 is never downgraded to
+source2.1; all existing capacity limits and private evidence boundaries remain in force.
+
+New F evidence rejects silent wire coercion, noncanonical UUIDs, duplicate JSON keys and nonfinite
+numbers. Frozen L contract readers, hash domains, catalog files and default behavior remain intact.
+A blank accepted-fact set receives only a neutral no-facts description in F, not invented facts.
 
 Migration `0018_f04_preparation_v2` changes only the preparation-version CHECK to admit 2.0.0.
-It neither creates a semantic preparation2 reader nor activates a writer. Downgrade refuses if
+The F writer remains opt-in and version-checked. Downgrade refuses if
 2.0.0 rows exist. Migration code and disposable tests are authorized; applying it in shared,
 preproduction or production environments requires separate approval. Old rows are not backfilled.
 
@@ -57,7 +74,11 @@ Independent review must not interpret foundation tests as completion of the F04 
 
 ## Validation
 
-Existing V1 schema/golden checks, V2 target/category/wording checks, source parsing and negative
-authority controls, canonical availability integrity checks, and isolated CHECK migration tests
-provide bounded implementation evidence. The Draft PR must report the remaining F04 lifecycle
-criteria as unimplemented or not tested, rather than treating these unit tests as HTTP acceptance.
+Existing V1 golden/regression suites coexist with F source and persisted HTTP tests. F tests
+exercise exact six-role RU/EN material wording, mixed input, negative/preference/component controls,
+material selection, blocking/nonblocking unanswered events, correction, restart, causal proof,
+resume/relevant-change gating and immutable preparation2 readback. Transaction fault and concurrency
+proofs reuse the existing independently verified disposable PostgreSQL fixture. Local PostgreSQL
+SKIP is not PASS; exact-head CI receipts and the full scenario/invariant crosswalk belong in the
+Draft PR evidence. No independent functional acceptance, catalog activation or live verification
+is inferred from automated tests.

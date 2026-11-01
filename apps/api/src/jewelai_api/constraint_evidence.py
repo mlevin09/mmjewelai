@@ -73,7 +73,13 @@ def merge_constraint_evidence(
 ) -> tuple[FinalPromptConstraintEvidence, ...]:
     """Append verified parser evidence and deterministically supersede prior active constraints."""
 
-    parsed = ParsedCandidateEnrichmentResult.model_validate(enrichment)
+    from .parsed_enrichment import ParsedCandidateEnrichmentResultV2
+
+    parsed = (
+        ParsedCandidateEnrichmentResultV2.model_validate(enrichment)
+        if isinstance(enrichment, ParsedCandidateEnrichmentResultV2)
+        else ParsedCandidateEnrichmentResult.model_validate(enrichment)
+    )
     source = MessageSource.model_validate(source)
     revision = validate_design_revision(authoritative_revision)
     if source != parsed.parser_proposal.source:

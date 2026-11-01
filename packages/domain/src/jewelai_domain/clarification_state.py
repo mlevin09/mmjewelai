@@ -10,6 +10,7 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import Field, StrictBool, model_validator
+from pydantic_core import to_jsonable_python
 
 from .lock_protection import state_fields
 from .models import DomainId, ImmutableModel, KnownValue, MessageSource, NotApplicable, Unknown
@@ -23,6 +24,8 @@ def evidence_bytes(value):
     """Same pinned compact JSON spelling as the existing canonical preparation boundary."""
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
+    else:
+        value = to_jsonable_python(value)
     return json.dumps(
         value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode("utf-8")
@@ -32,20 +35,50 @@ def evidence_hash(value):
     return hashlib.sha256(evidence_bytes(value)).hexdigest()
 
 
-class EvidenceScope(ImmutableModel):
+class StrictEvidenceModel(ImmutableModel):
+    """New F evidence rejects silent wire normalization; legacy models are untouched."""
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def preserve_wire_values(cls, value, handler):
+        checked = handler(value)
+        if isinstance(value, dict):
+            supplied = to_jsonable_python(value)
+            rendered = checked.model_dump(mode="json")
+
+            def unchanged(raw, canonical):
+                if isinstance(raw, dict):
+                    return isinstance(canonical, dict) and all(
+                        key in canonical and unchanged(item, canonical[key])
+                        for key, item in raw.items()
+                    )
+                if isinstance(raw, list):
+                    return (
+                        isinstance(canonical, list)
+                        and len(raw) == len(canonical)
+                        and all(unchanged(a, b) for a, b in zip(raw, canonical, strict=True))
+                    )
+                return type(raw) is type(canonical) and raw == canonical
+
+            if not unchanged(supplied, rendered):
+                raise ValueError("F04 evidence must retain exact typed wire values")
+        return checked
+
+
+class EvidenceScope(StrictEvidenceModel):
     organization_id: UUID
     session_id: UUID
     design_id: UUID
 
 
-class ReleasePin(ImmutableModel):
+class ReleasePin(StrictEvidenceModel):
     package_id: str
     artifact_version: str
     runtime_sha256: Sha256
     validation_report_sha256: Sha256
 
 
-class ArtifactPins(ImmutableModel):
+class ArtifactPins(StrictEvidenceModel):
     design_schema_version: Literal["1.0.0", "1.1.0"]
     role_artifact_version: str
     dictionary_artifact_version: str
@@ -59,7 +92,7 @@ class ArtifactPins(ImmutableModel):
     rules_sha256: Sha256
 
 
-class InputContext(ImmutableModel):
+class InputContext(StrictEvidenceModel):
     scope: EvidenceScope
     contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
     source_revision_id: UUID
@@ -70,7 +103,7 @@ class InputContext(ImmutableModel):
     artifact_pins: ArtifactPins
 
 
-class TargetRef(ImmutableModel):
+class TargetRef(StrictEvidenceModel):
     concrete_target: str
     owner_kind: Literal[
         "product",
@@ -86,12 +119,12 @@ class TargetRef(ImmutableModel):
     group_id: DomainId | None
 
 
-class NotApplicableEvidence(ImmutableModel):
+class NotApplicableEvidence(StrictEvidenceModel):
     reason: str
     source: MessageSource
 
 
-class AvailabilityEntry(ImmutableModel):
+class AvailabilityEntry(StrictEvidenceModel):
     target: TargetRef
     canonical_pointer: str
     availability: Literal["ABSENT", "UNKNOWN", "NOT_APPLICABLE", "VALUE"]
@@ -104,7 +137,7 @@ class AvailabilityEntry(ImmutableModel):
     not_applicable: NotApplicableEvidence | None
 
 
-class CanonicalAvailabilityOverlay(ImmutableModel):
+class CanonicalAvailabilityOverlay(StrictEvidenceModel):
     schema_version: Literal["1.0.0"]
     scope: EvidenceScope
     design_schema_version: Literal["1.0.0", "1.1.0"]
@@ -214,33 +247,33 @@ def validate_availability_overlay(overlay, revision, *, scope):
     return actual
 
 
-class RuleRef(ImmutableModel):
+class RuleRef(StrictEvidenceModel):
     artifact_version: str
     artifact_sha256: Sha256
     rule_id: str
     rule_version: str
 
 
-class OccurrenceRef(ImmutableModel):
+class OccurrenceRef(StrictEvidenceModel):
     message_id: UUID
     candidate_id: str
     message_content_sha256: Sha256
 
 
-class GapSatisfiedPredicate(ImmutableModel):
+class GapSatisfiedPredicate(StrictEvidenceModel):
     kind: Literal["gap_satisfied"]
     concrete_target: str
     original_gap_state: Literal["absent", "unknown", "unsatisfied"]
 
 
-class MaterialChoicePredicate(ImmutableModel):
+class MaterialChoicePredicate(StrictEvidenceModel):
     kind: Literal["material_choice"]
     target: Literal["metal.material"]
     offered_values: tuple[DomainId, ...] = Field(min_length=2)
     conflict_id: str
 
 
-class OfferDecidedPredicate(ImmutableModel):
+class OfferDecidedPredicate(StrictEvidenceModel):
     kind: Literal["offer_decided"]
     semantic_question_id: str
     offered_values: tuple[DomainId, ...]
@@ -253,7 +286,7 @@ Predicate = Annotated[
 ]
 
 
-class CauseDefinition(ImmutableModel):
+class CauseDefinition(StrictEvidenceModel):
     schema_version: Literal["1.0.0"]
     cause_id: str = Field(pattern=r"^cause_[0-9a-f]{64}$")
     scope: EvidenceScope
@@ -301,21 +334,21 @@ class CauseDefinition(ImmutableModel):
         return self
 
 
-class AnswerReference(ImmutableModel):
+class AnswerReference(StrictEvidenceModel):
     record_id: UUID
     content_hash: Sha256
     decision: Literal["SELECT_OPTION", "ACCEPT", "REJECT", "SKIP", "UNKNOWN"]
     outcome: str
 
 
-class ResolutionReference(ImmutableModel):
+class ResolutionReference(StrictEvidenceModel):
     result_kind: Literal["clarification", "correction"]
     record_id: UUID
     content_hash: Sha256
     assertion_index: int = Field(strict=True, ge=0)
 
 
-class CauseState(ImmutableModel):
+class CauseState(StrictEvidenceModel):
     cause_id: str = Field(pattern=r"^cause_[0-9a-f]{64}$")
     status: Literal["OPEN", "RESOLVED", "SUPERSEDED", "REJECTED"]
     criticality: Literal["BLOCKING", "NONBLOCKING"]
@@ -343,7 +376,7 @@ class CauseState(ImmutableModel):
         return self
 
 
-class FrontierCore(ImmutableModel):
+class FrontierCore(StrictEvidenceModel):
     schema_version: Literal["1.0.0"]
     scope: EvidenceScope
     current_revision_id: UUID
@@ -365,18 +398,18 @@ class FrontierCore(ImmutableModel):
         return self
 
 
-class PlanReference(ImmutableModel):
+class PlanReference(StrictEvidenceModel):
     plan_id: UUID
     content_hash: Sha256
 
 
-class OriginalQuestionReference(ImmutableModel):
+class OriginalQuestionReference(StrictEvidenceModel):
     cause_id: str
     plan_id: UUID
     question_id: str
 
 
-class EffectiveUnresolvedFrontier(ImmutableModel):
+class EffectiveUnresolvedFrontier(StrictEvidenceModel):
     schema_version: Literal["1.0.0"]
     frontier_core: FrontierCore
     current_plan_ref: PlanReference
