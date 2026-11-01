@@ -221,6 +221,12 @@ class CanonicalInternalFinalPromptV4(CanonicalInternalFinalPromptV2_1, StrictEvi
             or protection.scope.design_id != self.design_id
             or protection.current_revision_id != frame.revision_id
             or protection.current_revision_sha256 != frame.revision_sha256
+            or protection.design_schema_version != self.artifact_versions.design_schema_version
+            or (
+                self.artifact_versions.question_artifact_version,
+                self.artifact_versions.rules_artifact_version,
+            )
+            != (("1.0.0", "1.0.0") if self.retained_base == "L" else ("2.0.0", "2.0.0"))
         ):
             raise ValueError("IFP4 evidence/frame/description mismatch")
         if self.retained_base == "L":
@@ -228,6 +234,10 @@ class CanonicalInternalFinalPromptV4(CanonicalInternalFinalPromptV2_1, StrictEvi
                 compat is None
                 or frontier is not None
                 or compat.evidence_head != frame
+                or compat.scope != protection.scope
+                or compat.current_frame_core.model_dump()
+                != frame.model_dump(exclude={"plan_hash", "history_root_sha256"})
+                or compat.legacy_history_root_sha256 != frame.history_root_sha256
                 or self.native_availability_overlay is not None
                 or self.cause_definitions
             ):
@@ -240,9 +250,15 @@ class CanonicalInternalFinalPromptV4(CanonicalInternalFinalPromptV2_1, StrictEvi
                 or frontier.current_plan_ref.plan_id != frame.plan_id
                 or frontier.current_plan_ref.content_hash != frame.plan_hash
                 or frontier.frontier_core.scope != protection.scope
+                or frontier.frontier_core.current_revision_id != frame.revision_id
+                or frontier.frontier_core.revision_sha256 != frame.revision_sha256
                 or self.native_availability_overlay is None
                 or self.native_availability_overlay.scope != protection.scope
                 or self.native_availability_overlay.canonical_revision_id != frame.revision_id
+                or self.native_availability_overlay.canonical_revision_sha256
+                != frame.revision_sha256
+                or self.native_availability_overlay.design_schema_version
+                != protection.design_schema_version
             ):
                 raise ValueError("IFP4 F evidence mismatch")
             states = {c.cause_id: c for c in frontier.frontier_core.cause_states}

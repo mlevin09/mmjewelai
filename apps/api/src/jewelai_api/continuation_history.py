@@ -61,12 +61,20 @@ def _native_roots(repo, sid, oid, plan):
         message = repo.get_message(sid, UUID(evidence.source.message_id), oid)
         if (
             message.actor != "user"
+            or evidence.source.recorded_at
+            != (
+                message.created_at.replace(tzinfo=UTC)
+                if message.created_at.tzinfo is None
+                else message.created_at
+            )
             or message.content[evidence.source_span_start : evidence.source_span_end]
             != evidence.original_wording
         ):
             raise ValueError("Preservation source span does not match actual user Message")
         source_revision = repo.get_revision(sid, evidence.source_revision_id, oid)
-        repo.get_enrichment_cycle(sid, evidence.source_enrichment_cycle_id, oid)
+        source_cycle = repo.get_enrichment_cycle(sid, evidence.source_enrichment_cycle_id, oid)
+        if source_cycle.specification_revision_id != source_revision.revision_id:
+            raise ValueError("Preservation source cycle/revision does not match actual history")
         field = (
             "shape" if re.search(r"\bshape\b|\bформ\w*", evidence.original_wording, re.I) else None
         )

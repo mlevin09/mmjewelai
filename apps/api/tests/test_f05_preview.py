@@ -3,7 +3,9 @@
 from uuid import uuid4
 
 import pytest
+from jewelai_domain.clarification_state import evidence_hash
 from jewelai_domain.preservation import contract_hash
+from jewelai_persistence.models import ClarificationPlanRow
 from jewelai_prompts.downstream_preparation import (
     GenerationPreparationError,
     build_generation_preparation,
@@ -18,7 +20,7 @@ from jewelai_prompts.downstream_preparation_v2 import (
 from jewelai_prompts.final_prompt_v4 import CanonicalInternalFinalPromptV4
 from jewelai_prompts.handoff import build_internal_final_prompt_handoff
 from pydantic import ValidationError
-from sqlalchemy import event
+from sqlalchemy import event, update
 from test_f04_http import f04_session, restart
 from test_f05_compatibility import correction
 from test_f05_history import initial
@@ -220,3 +222,84 @@ def test_f_native_open_causes_stay_blocking_and_typed_in_preview(engine, tmp_pat
         assert blocked.status_code == 409 and blocked.json()["error"] == "final_output_blocked"
         with restart(ctx, engine):
             assert state(ctx) == current
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_ifp_decoder_rejects_rehashed_foreign_nested_evidence(engine, tmp_path, base):
+    with f04_session(engine, tmp_path) as ctx:
+        initial(ctx, base)
+        response = output(ctx, state(ctx), projection=base == "L")
+        assert response.status_code == 200, response.json()
+        source = response.json()["internal_final_prompt"]
+        if base == "L":
+            compat = source["compatibility_projection"]
+            compat["scope"]["session_id"] = str(uuid4())
+            compat["content_hash"] = contract_hash(
+                "jewelai.CompatibilityReadinessProjection/1.0.0",
+                {k: v for k, v in compat.items() if k != "content_hash"},
+            )
+            source["description"]["compatibility_projection_hash"] = compat["content_hash"]
+        else:
+            frontier = source["native_frontier"]
+            core = frontier["frontier_core"]
+            core["current_revision_id"] = str(uuid4())
+            core["content_hash"] = evidence_hash(
+                {k: v for k, v in core.items() if k != "content_hash"}
+            )
+            frontier["content_hash"] = evidence_hash(
+                {k: v for k, v in frontier.items() if k != "content_hash"}
+            )
+            source["description"]["sealed_frontier_hash"] = frontier["content_hash"]
+        source["description"]["content_hash"] = contract_hash(
+            "jewelai.UserReadableJewelryDescription/3.0.0",
+            {k: v for k, v in source["description"].items() if k != "content_hash"},
+        )
+        source["description_content_hash"] = source["description"]["content_hash"]
+        source["content_hash"] = contract_hash(
+            "jewelai.InternalFinalPrompt/4.0.0",
+            {k: v for k, v in source.items() if k != "content_hash"},
+        )
+        with pytest.raises(ValidationError):
+            CanonicalInternalFinalPromptV4.model_validate(source)
+
+
+def test_rehashed_preservation_source_must_match_actual_message_time(engine, tmp_path):
+    from copy import deepcopy
+    from datetime import timedelta
+
+    from jewelai_prompts.final_prompt import _hash as constraint_hash
+
+    from jewelai_api.clarification import _hash as plan_hash
+
+    with f04_session(engine, tmp_path) as ctx:
+        initial(ctx, "L")
+        current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        cycle = ctx.repo.list_enrichment_cycles(ctx.sid, ctx.org)[-1]
+        row = ctx.repo.get_clarification_plan_for_cycle(ctx.sid, cycle.enrichment_cycle_id, ctx.org)
+        bad = deepcopy(row.plan_payload)
+        evidence = next(
+            e
+            for e in bad["constraint_evidence"]
+            if e["kind"] == "preservation" and e["status"] == "active"
+        )
+        evidence["source"]["recorded_at"] = (
+            (current.created_at + timedelta(days=1)).isoformat().replace("+00:00", "Z")
+        )
+        evidence["content_hash"] = constraint_hash(
+            {k: v for k, v in evidence.items() if k != "content_hash"}
+        )
+        bad["content_hash"] = plan_hash({k: v for k, v in bad.items() if k != "content_hash"})
+        # Deliberate corruption of a synthetic disposable SQLite fixture only.
+        with ctx.repo._session_factory.begin() as db:
+            db.execute(
+                update(ClarificationPlanRow)
+                .where(ClarificationPlanRow.clarification_plan_id == row.clarification_plan_id)
+                .values(plan_payload=bad, content_hash=bad["content_hash"])
+            )
+        response = ctx.client.get(
+            f"/v1/sessions/{ctx.sid}/prompt-enrichment/state?workflow_version=3.0.0",
+            headers=ctx.headers,
+        )
+        assert response.status_code == 500, response.json()
+        assert response.json()["error"] == "invalid_durable_history"
+        assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == current

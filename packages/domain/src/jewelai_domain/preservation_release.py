@@ -19,7 +19,7 @@ from .continuation import (
     ContinuationRecordReference,
 )
 from .lock_protection import first_locked_change, state_fields
-from .models import Explicit, KnownValue, MessageSource, State
+from .models import Explicit, KnownValue, MessageSource, State, Text
 from .models_v1_1 import validate_design_revision
 from .preservation import (
     _STONE_MODELS,
@@ -71,7 +71,7 @@ class KeepReleaseIntent(StrictEvidenceModel):
     parse_version: Literal["1.2.0"]
     parse_hash: Sha256
     proposal_hash: Sha256
-    source_candidate_ids: tuple[str, ...] = Field(min_length=1)
+    source_candidate_ids: tuple[Text, ...] = Field(min_length=1)
     source_spans: tuple[CompatibilitySourceSpan, ...] = Field(min_length=1)
     target: TargetRef
     original_before_state: State[JsonValue] | None
@@ -145,7 +145,7 @@ class KeepReleaseOffer(StrictEvidenceModel):
     target: TargetRef
     requested_value_sha256: Sha256
     locale: Literal["en", "ru"]
-    rendered_question: str = Field(min_length=1, max_length=2000)
+    rendered_question: Text
     allowed_decisions: ReleaseActions
     owning_plan_id: UUID
     content_hash: Sha256
