@@ -11,6 +11,44 @@
       "title": "ActionKind",
       "type": "string"
     },
+    "AnswerReference": {
+      "additionalProperties": false,
+      "properties": {
+        "record_id": {
+          "format": "uuid",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "SELECT_OPTION",
+            "ACCEPT",
+            "REJECT",
+            "SKIP",
+            "UNKNOWN"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "outcome": {
+          "title": "Outcome",
+          "type": "string"
+        }
+      },
+      "required": [
+        "record_id",
+        "content_hash",
+        "decision",
+        "outcome"
+      ],
+      "title": "AnswerReference",
+      "type": "object"
+    },
     "AnyDesignRevision": {
       "anyOf": [
         {
@@ -20,6 +58,81 @@
           "$ref": "#/$defs/DesignRevisionV1_1"
         }
       ]
+    },
+    "ArtifactPins": {
+      "additionalProperties": false,
+      "properties": {
+        "design_schema_version": {
+          "enum": [
+            "1.0.0",
+            "1.1.0"
+          ],
+          "title": "Design Schema Version",
+          "type": "string"
+        },
+        "role_artifact_version": {
+          "title": "Role Artifact Version",
+          "type": "string"
+        },
+        "dictionary_artifact_version": {
+          "title": "Dictionary Artifact Version",
+          "type": "string"
+        },
+        "question_schema_version": {
+          "const": "2.0.0",
+          "title": "Question Schema Version",
+          "type": "string"
+        },
+        "question_artifact_version": {
+          "const": "2.0.0",
+          "title": "Question Artifact Version",
+          "type": "string"
+        },
+        "rules_schema_version": {
+          "const": "2.0.0",
+          "title": "Rules Schema Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "const": "2.0.0",
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "prompt_template_artifact_version": {
+          "title": "Prompt Template Artifact Version",
+          "type": "string"
+        },
+        "dictionary_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Dictionary Sha256",
+          "type": "string"
+        },
+        "question_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Question Sha256",
+          "type": "string"
+        },
+        "rules_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Rules Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "design_schema_version",
+        "role_artifact_version",
+        "dictionary_artifact_version",
+        "question_schema_version",
+        "question_artifact_version",
+        "rules_schema_version",
+        "rules_artifact_version",
+        "prompt_template_artifact_version",
+        "dictionary_sha256",
+        "question_sha256",
+        "rules_sha256"
+      ],
+      "title": "ArtifactPins",
+      "type": "object"
     },
     "AskDecision": {
       "additionalProperties": false,
@@ -107,6 +220,116 @@
         "question_id"
       ],
       "title": "AskDecision",
+      "type": "object"
+    },
+    "AskDecisionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_version": {
+          "const": "2.0.0",
+          "title": "Evaluation Version",
+          "type": "string"
+        },
+        "blocking_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Cause Ids",
+          "type": "array"
+        },
+        "eligible_clarification_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Clarification Cause Ids",
+          "type": "array"
+        },
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "trace": {
+          "items": {
+            "$ref": "#/$defs/RuleTraceV2"
+          },
+          "title": "Trace",
+          "type": "array"
+        },
+        "decision": {
+          "const": "ask",
+          "default": "ask",
+          "title": "Decision",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/SchemaTargetV2"
+        },
+        "concrete_target": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "question_id": {
+          "$ref": "#/$defs/QuestionIdV2"
+        },
+        "proposed_change": {
+          "default": null,
+          "title": "Proposed Change",
+          "type": "null"
+        }
+      },
+      "required": [
+        "evaluation_version",
+        "blocking_cause_ids",
+        "eligible_clarification_cause_ids",
+        "rule_id",
+        "rule_version",
+        "rules_artifact_version",
+        "reason_code",
+        "reason",
+        "priority",
+        "tie_order",
+        "trace",
+        "target",
+        "concrete_target",
+        "question_id"
+      ],
+      "title": "AskDecisionV2",
       "type": "object"
     },
     "AssetReference": {
@@ -238,6 +461,116 @@
         "proposed_change"
       ],
       "title": "AssumeDecision",
+      "type": "object"
+    },
+    "AssumeDecisionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_version": {
+          "const": "2.0.0",
+          "title": "Evaluation Version",
+          "type": "string"
+        },
+        "blocking_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Cause Ids",
+          "type": "array"
+        },
+        "eligible_clarification_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Clarification Cause Ids",
+          "type": "array"
+        },
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "trace": {
+          "items": {
+            "$ref": "#/$defs/RuleTraceV2"
+          },
+          "title": "Trace",
+          "type": "array"
+        },
+        "decision": {
+          "const": "assume",
+          "default": "assume",
+          "title": "Decision",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/SchemaTarget"
+        },
+        "concrete_target": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "question_id": {
+          "default": null,
+          "title": "Question Id",
+          "type": "null"
+        },
+        "proposed_change": {
+          "$ref": "#/$defs/ProposedAssumedChange"
+        }
+      },
+      "required": [
+        "evaluation_version",
+        "blocking_cause_ids",
+        "eligible_clarification_cause_ids",
+        "rule_id",
+        "rule_version",
+        "rules_artifact_version",
+        "reason_code",
+        "reason",
+        "priority",
+        "tie_order",
+        "trace",
+        "target",
+        "concrete_target",
+        "proposed_change"
+      ],
+      "title": "AssumeDecisionV2",
       "type": "object"
     },
     "Assumed_Annotated_int__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True___Gt_gt_0_____": {
@@ -1562,6 +1895,103 @@
       "title": "Assumed[tuple[VisualConstraint, ...]]",
       "type": "object"
     },
+    "AvailabilityEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "$ref": "#/$defs/TargetRef"
+        },
+        "canonical_pointer": {
+          "title": "Canonical Pointer",
+          "type": "string"
+        },
+        "availability": {
+          "enum": [
+            "ABSENT",
+            "UNKNOWN",
+            "NOT_APPLICABLE",
+            "VALUE"
+          ],
+          "title": "Availability",
+          "type": "string"
+        },
+        "unknown_requirement": {
+          "anyOf": [
+            {
+              "enum": [
+                "required",
+                "optional",
+                "undetermined"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Unknown Requirement"
+        },
+        "origin": {
+          "anyOf": [
+            {
+              "enum": [
+                "explicit",
+                "derived",
+                "assumed",
+                "unknown"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Origin"
+        },
+        "confirmed": {
+          "title": "Confirmed",
+          "type": "boolean"
+        },
+        "locked": {
+          "title": "Locked",
+          "type": "boolean"
+        },
+        "canonical_state_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Canonical State Sha256",
+          "type": "string"
+        },
+        "revision_event_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Revision Event Sha256",
+          "type": "string"
+        },
+        "not_applicable": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NotApplicableEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "target",
+        "canonical_pointer",
+        "availability",
+        "unknown_requirement",
+        "origin",
+        "confirmed",
+        "locked",
+        "canonical_state_sha256",
+        "revision_event_sha256",
+        "not_applicable"
+      ],
+      "title": "AvailabilityEntry",
+      "type": "object"
+    },
     "BlockDecision": {
       "additionalProperties": false,
       "properties": {
@@ -1672,6 +2102,140 @@
         "concrete_target"
       ],
       "title": "BlockDecision",
+      "type": "object"
+    },
+    "BlockDecisionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_version": {
+          "const": "2.0.0",
+          "title": "Evaluation Version",
+          "type": "string"
+        },
+        "blocking_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Cause Ids",
+          "type": "array"
+        },
+        "eligible_clarification_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Clarification Cause Ids",
+          "type": "array"
+        },
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "trace": {
+          "items": {
+            "$ref": "#/$defs/RuleTraceV2"
+          },
+          "title": "Trace",
+          "type": "array"
+        },
+        "decision": {
+          "const": "block",
+          "default": "block",
+          "title": "Decision",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SchemaTargetV2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "concrete_target": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Concrete Target"
+        },
+        "question_id": {
+          "default": null,
+          "title": "Question Id",
+          "type": "null"
+        },
+        "proposed_change": {
+          "default": null,
+          "title": "Proposed Change",
+          "type": "null"
+        },
+        "conflict_rule_ids": {
+          "default": [],
+          "items": {
+            "pattern": "^[a-z][a-z0-9_]{0,79}$",
+            "type": "string"
+          },
+          "title": "Conflict Rule Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "evaluation_version",
+        "blocking_cause_ids",
+        "eligible_clarification_cause_ids",
+        "rule_id",
+        "rule_version",
+        "rules_artifact_version",
+        "reason_code",
+        "reason",
+        "priority",
+        "tie_order",
+        "trace",
+        "target",
+        "concrete_target"
+      ],
+      "title": "BlockDecisionV2",
       "type": "object"
     },
     "BraceletConstructionV1_1": {
@@ -1884,6 +2448,60 @@
         }
       },
       "title": "BroochConstructionV1_1",
+      "type": "object"
+    },
+    "CanonicalAvailabilityOverlay": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/EvidenceScope"
+        },
+        "design_schema_version": {
+          "enum": [
+            "1.0.0",
+            "1.1.0"
+          ],
+          "title": "Design Schema Version",
+          "type": "string"
+        },
+        "canonical_revision_id": {
+          "format": "uuid",
+          "title": "Canonical Revision Id",
+          "type": "string"
+        },
+        "canonical_revision_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Canonical Revision Sha256",
+          "type": "string"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/AvailabilityEntry"
+          },
+          "title": "Entries",
+          "type": "array"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "scope",
+        "design_schema_version",
+        "canonical_revision_id",
+        "canonical_revision_sha256",
+        "entries",
+        "content_hash"
+      ],
+      "title": "CanonicalAvailabilityOverlay",
       "type": "object"
     },
     "CanonicalInternalFinalPrompt": {
@@ -2216,6 +2834,80 @@
       "title": "CanonicalInternalFinalPromptHandoffV2_1",
       "type": "object"
     },
+    "CanonicalInternalFinalPromptHandoffV3": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "3.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "product_state_revision_id": {
+          "format": "uuid",
+          "title": "Product State Revision Id",
+          "type": "string"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "knowledge_release": {
+          "$ref": "#/$defs/KnowledgeReleaseReference"
+        },
+        "internal_final_prompt_schema_version": {
+          "const": "3.0.0",
+          "title": "Internal Final Prompt Schema Version",
+          "type": "string"
+        },
+        "internal_final_prompt_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Internal Final Prompt Content Hash",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/FinalPromptReadiness"
+        },
+        "ready_for_downstream_preparation": {
+          "title": "Ready For Downstream Preparation",
+          "type": "boolean"
+        },
+        "internal_final_prompt": {
+          "$ref": "#/$defs/CanonicalInternalFinalPromptV3"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "organization_id",
+        "session_id",
+        "product_state_revision_id",
+        "enrichment_cycle_id",
+        "knowledge_release",
+        "internal_final_prompt_schema_version",
+        "internal_final_prompt_content_hash",
+        "readiness",
+        "ready_for_downstream_preparation",
+        "internal_final_prompt",
+        "content_hash"
+      ],
+      "title": "CanonicalInternalFinalPromptHandoffV3",
+      "type": "object"
+    },
     "CanonicalInternalFinalPromptV2_1": {
       "additionalProperties": false,
       "description": "IFP-only capacity successor. The original 2.0 reader remains frozen.",
@@ -2385,6 +3077,286 @@
         "disclosures"
       ],
       "title": "CanonicalInternalFinalPromptV2_1",
+      "type": "object"
+    },
+    "CanonicalInternalFinalPromptV3": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "3.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "design_id": {
+          "format": "uuid",
+          "title": "Design Id",
+          "type": "string"
+        },
+        "product_state_revision_id": {
+          "format": "uuid",
+          "title": "Product State Revision Id",
+          "type": "string"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "enrichment_cycle_number": {
+          "title": "Enrichment Cycle Number",
+          "type": "integer"
+        },
+        "locale": {
+          "enum": [
+            "en",
+            "ru"
+          ],
+          "title": "Locale",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/FinalPromptReadiness"
+        },
+        "readiness_reason": {
+          "title": "Readiness Reason",
+          "type": "string"
+        },
+        "description_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Description Content Hash",
+          "type": "string"
+        },
+        "prompt_text": {
+          "maxLength": 32000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Prompt Text",
+          "type": "string"
+        },
+        "design_facts": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptDesignFact"
+          },
+          "title": "Design Facts",
+          "type": "array"
+        },
+        "constraints": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptConstraint"
+          },
+          "title": "Constraints",
+          "type": "array"
+        },
+        "unresolved_details": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptUnresolvedDetailV3"
+          },
+          "title": "Unresolved Details",
+          "type": "array"
+        },
+        "enrichment_evidence": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptEnrichmentEvidence"
+          },
+          "title": "Enrichment Evidence",
+          "type": "array"
+        },
+        "decision_lineage": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptDecisionLineage"
+          },
+          "title": "Decision Lineage",
+          "type": "array"
+        },
+        "constraint_evidence": {
+          "items": {
+            "$ref": "#/$defs/FinalPromptConstraintEvidence"
+          },
+          "title": "Constraint Evidence",
+          "type": "array"
+        },
+        "knowledge_release": {
+          "$ref": "#/$defs/KnowledgeReleaseReference"
+        },
+        "artifact_versions": {
+          "$ref": "#/$defs/FinalPromptArtifactVersions"
+        },
+        "enrichment_result_content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Enrichment Result Content Hash",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "description": {
+          "$ref": "#/$defs/UserReadableJewelryDescriptionV2"
+        },
+        "parametric_references": {
+          "items": {
+            "$ref": "#/$defs/ParametricEnrichmentReference"
+          },
+          "title": "Parametric References",
+          "type": "array"
+        },
+        "disclosures": {
+          "items": {
+            "$ref": "#/$defs/PromptDisclosure"
+          },
+          "title": "Disclosures",
+          "type": "array"
+        },
+        "contract_profile": {
+          "const": "jewelai.prompt-enrichment.f04/2.0.0",
+          "title": "Contract Profile",
+          "type": "string"
+        },
+        "availability_overlay": {
+          "$ref": "#/$defs/CanonicalAvailabilityOverlay"
+        },
+        "effective_unresolved_frontier": {
+          "$ref": "#/$defs/EffectiveUnresolvedFrontier"
+        }
+      },
+      "required": [
+        "schema_version",
+        "session_id",
+        "organization_id",
+        "design_id",
+        "product_state_revision_id",
+        "enrichment_cycle_id",
+        "enrichment_cycle_number",
+        "locale",
+        "readiness",
+        "readiness_reason",
+        "description_content_hash",
+        "prompt_text",
+        "design_facts",
+        "constraints",
+        "unresolved_details",
+        "enrichment_evidence",
+        "decision_lineage",
+        "constraint_evidence",
+        "knowledge_release",
+        "artifact_versions",
+        "enrichment_result_content_hash",
+        "content_hash",
+        "description",
+        "parametric_references",
+        "disclosures",
+        "contract_profile",
+        "availability_overlay",
+        "effective_unresolved_frontier"
+      ],
+      "title": "CanonicalInternalFinalPromptV3",
+      "type": "object"
+    },
+    "CauseState": {
+      "additionalProperties": false,
+      "properties": {
+        "cause_id": {
+          "pattern": "^cause_[0-9a-f]{64}$",
+          "title": "Cause Id",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "OPEN",
+            "RESOLVED",
+            "SUPERSEDED",
+            "REJECTED"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "criticality": {
+          "enum": [
+            "BLOCKING",
+            "NONBLOCKING"
+          ],
+          "title": "Criticality",
+          "type": "string"
+        },
+        "offer_state": {
+          "enum": [
+            "AVAILABLE",
+            "DORMANT",
+            "UNREPRESENTABLE",
+            "PROTECTED",
+            "NONE"
+          ],
+          "title": "Offer State",
+          "type": "string"
+        },
+        "last_answer_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnswerReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "resolution_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolutionReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "superseded_by_cause_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Superseded By Cause Id"
+        },
+        "rule_ref": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RuleRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "availability_target_ref": {
+          "$ref": "#/$defs/TargetRef"
+        }
+      },
+      "required": [
+        "cause_id",
+        "status",
+        "criticality",
+        "offer_state",
+        "last_answer_ref",
+        "resolution_ref",
+        "superseded_by_cause_id",
+        "rule_ref",
+        "availability_target_ref"
+      ],
+      "title": "CauseState",
       "type": "object"
     },
     "CoatingV1_1": {
@@ -3090,6 +4062,116 @@
         "proposed_change"
       ],
       "title": "DeriveDecision",
+      "type": "object"
+    },
+    "DeriveDecisionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_version": {
+          "const": "2.0.0",
+          "title": "Evaluation Version",
+          "type": "string"
+        },
+        "blocking_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Cause Ids",
+          "type": "array"
+        },
+        "eligible_clarification_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Clarification Cause Ids",
+          "type": "array"
+        },
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "trace": {
+          "items": {
+            "$ref": "#/$defs/RuleTraceV2"
+          },
+          "title": "Trace",
+          "type": "array"
+        },
+        "decision": {
+          "const": "derive",
+          "default": "derive",
+          "title": "Decision",
+          "type": "string"
+        },
+        "target": {
+          "const": "center_stone.dimensions",
+          "title": "Target",
+          "type": "string"
+        },
+        "concrete_target": {
+          "const": "center_stone.dimensions",
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "question_id": {
+          "default": null,
+          "title": "Question Id",
+          "type": "null"
+        },
+        "proposed_change": {
+          "$ref": "#/$defs/ProposedDerivedChange"
+        }
+      },
+      "required": [
+        "evaluation_version",
+        "blocking_cause_ids",
+        "eligible_clarification_cause_ids",
+        "rule_id",
+        "rule_version",
+        "rules_artifact_version",
+        "reason_code",
+        "reason",
+        "priority",
+        "tie_order",
+        "trace",
+        "target",
+        "concrete_target",
+        "proposed_change"
+      ],
+      "title": "DeriveDecisionV2",
       "type": "object"
     },
     "Derived_Annotated_int__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True___Gt_gt_0_____": {
@@ -5149,6 +6231,51 @@
       "title": "EarringConstructionV1_1",
       "type": "object"
     },
+    "EffectiveUnresolvedFrontier": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "frontier_core": {
+          "$ref": "#/$defs/FrontierCore"
+        },
+        "current_plan_ref": {
+          "$ref": "#/$defs/PlanReference"
+        },
+        "origin_plan_refs": {
+          "items": {
+            "$ref": "#/$defs/PlanReference"
+          },
+          "title": "Origin Plan Refs",
+          "type": "array"
+        },
+        "origin_question_refs": {
+          "items": {
+            "$ref": "#/$defs/OriginalQuestionReference"
+          },
+          "title": "Origin Question Refs",
+          "type": "array"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "frontier_core",
+        "current_plan_ref",
+        "origin_plan_refs",
+        "origin_question_refs",
+        "content_hash"
+      ],
+      "title": "EffectiveUnresolvedFrontier",
+      "type": "object"
+    },
     "EnrichmentDecision": {
       "additionalProperties": false,
       "properties": {
@@ -5289,6 +6416,33 @@
         "source_id"
       ],
       "title": "EnrichmentProposal",
+      "type": "object"
+    },
+    "EvidenceScope": {
+      "additionalProperties": false,
+      "properties": {
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "design_id": {
+          "format": "uuid",
+          "title": "Design Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "organization_id",
+        "session_id",
+        "design_id"
+      ],
+      "title": "EvidenceScope",
       "type": "object"
     },
     "Explicit_Annotated_int__FieldInfo_annotation_NoneType__required_True__metadata__Strict_strict_True___Gt_gt_0_____": {
@@ -7009,6 +8163,85 @@
       "title": "FinalPromptUnresolvedDetail",
       "type": "object"
     },
+    "FinalPromptUnresolvedDetailV3": {
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "title": "Target",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "missing",
+            "ambiguous",
+            "unaccepted_recommendation",
+            "skipped",
+            "unknown",
+            "deferred"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "blocking": {
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "source_ids": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        },
+        "cause_id": {
+          "title": "Cause Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "information_gap",
+            "material_alternative",
+            "material_competing",
+            "preference_offer",
+            "knowledge_offer",
+            "unbound_request"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/TargetRef"
+        },
+        "criticality": {
+          "enum": [
+            "BLOCKING",
+            "NONBLOCKING"
+          ],
+          "title": "Criticality",
+          "type": "string"
+        },
+        "source_occurrence_refs": {
+          "items": {
+            "$ref": "#/$defs/OccurrenceRef"
+          },
+          "title": "Source Occurrence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "target",
+        "classification",
+        "blocking",
+        "cause_id",
+        "kind",
+        "owner",
+        "criticality",
+        "source_occurrence_refs"
+      ],
+      "title": "FinalPromptUnresolvedDetailV3",
+      "type": "object"
+    },
     "FinenessPurity": {
       "additionalProperties": false,
       "properties": {
@@ -7029,6 +8262,57 @@
         "value"
       ],
       "title": "FinenessPurity",
+      "type": "object"
+    },
+    "FrontierCore": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/EvidenceScope"
+        },
+        "current_revision_id": {
+          "format": "uuid",
+          "title": "Current Revision Id",
+          "type": "string"
+        },
+        "revision_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Revision Sha256",
+          "type": "string"
+        },
+        "profile": {
+          "const": "jewelai.prompt-enrichment.f04/2.0.0",
+          "title": "Profile",
+          "type": "string"
+        },
+        "cause_states": {
+          "items": {
+            "$ref": "#/$defs/CauseState"
+          },
+          "title": "Cause States",
+          "type": "array"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "scope",
+        "current_revision_id",
+        "revision_sha256",
+        "profile",
+        "cause_states",
+        "content_hash"
+      ],
+      "title": "FrontierCore",
       "type": "object"
     },
     "GenerationPreparationPayload": {
@@ -7152,6 +8436,111 @@
       "title": "GenerationPreparationPayload",
       "type": "object"
     },
+    "GenerationPreparationPayloadV2": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "2.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "preparation_id": {
+          "format": "uuid",
+          "title": "Preparation Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "design_id": {
+          "format": "uuid",
+          "title": "Design Id",
+          "type": "string"
+        },
+        "product_state_revision_id": {
+          "format": "uuid",
+          "title": "Product State Revision Id",
+          "type": "string"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "enrichment_cycle_number": {
+          "minimum": 1,
+          "title": "Enrichment Cycle Number",
+          "type": "integer"
+        },
+        "enrichment_result_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Enrichment Result Hash",
+          "type": "string"
+        },
+        "source_handoff": {
+          "$ref": "#/$defs/CanonicalInternalFinalPromptHandoffV3"
+        },
+        "gate_evidence": {
+          "$ref": "#/$defs/PreparationGateEvidenceV2"
+        },
+        "source_handoff_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Handoff Hash",
+          "type": "string"
+        },
+        "source_bytes_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Bytes Sha256",
+          "type": "string"
+        },
+        "gate_evidence_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Gate Evidence Hash",
+          "type": "string"
+        },
+        "execution": {
+          "$ref": "#/$defs/SemanticRenderingV2"
+        },
+        "artifact_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Artifact Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "preparation_id",
+        "created_at",
+        "organization_id",
+        "session_id",
+        "design_id",
+        "product_state_revision_id",
+        "enrichment_cycle_id",
+        "enrichment_cycle_number",
+        "enrichment_result_hash",
+        "source_handoff",
+        "gate_evidence",
+        "source_handoff_hash",
+        "source_bytes_sha256",
+        "gate_evidence_hash",
+        "execution",
+        "artifact_hash"
+      ],
+      "title": "GenerationPreparationPayloadV2",
+      "type": "object"
+    },
     "HaloV1_1": {
       "additionalProperties": false,
       "properties": {
@@ -7212,6 +8601,57 @@
         }
       },
       "title": "HaloV1_1",
+      "type": "object"
+    },
+    "InputContext": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "$ref": "#/$defs/EvidenceScope"
+        },
+        "contract_profile": {
+          "const": "jewelai.prompt-enrichment.f04/2.0.0",
+          "title": "Contract Profile",
+          "type": "string"
+        },
+        "source_revision_id": {
+          "format": "uuid",
+          "title": "Source Revision Id",
+          "type": "string"
+        },
+        "source_revision_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Revision Sha256",
+          "type": "string"
+        },
+        "source_enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Source Enrichment Cycle Id",
+          "type": "string"
+        },
+        "source_enrichment_cycle_number": {
+          "minimum": 1,
+          "title": "Source Enrichment Cycle Number",
+          "type": "integer"
+        },
+        "release_pin": {
+          "$ref": "#/$defs/ReleasePin"
+        },
+        "artifact_pins": {
+          "$ref": "#/$defs/ArtifactPins"
+        }
+      },
+      "required": [
+        "scope",
+        "contract_profile",
+        "source_revision_id",
+        "source_revision_sha256",
+        "source_enrichment_cycle_id",
+        "source_enrichment_cycle_number",
+        "release_pin",
+        "artifact_pins"
+      ],
+      "title": "InputContext",
       "type": "object"
     },
     "JsonValue": {},
@@ -7727,6 +9167,75 @@
       "title": "NotApplicable",
       "type": "object"
     },
+    "NotApplicableEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/MessageSource"
+        }
+      },
+      "required": [
+        "reason",
+        "source"
+      ],
+      "title": "NotApplicableEvidence",
+      "type": "object"
+    },
+    "OccurrenceRef": {
+      "additionalProperties": false,
+      "properties": {
+        "message_id": {
+          "format": "uuid",
+          "title": "Message Id",
+          "type": "string"
+        },
+        "candidate_id": {
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "message_content_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Message Content Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "message_id",
+        "candidate_id",
+        "message_content_sha256"
+      ],
+      "title": "OccurrenceRef",
+      "type": "object"
+    },
+    "OriginalQuestionReference": {
+      "additionalProperties": false,
+      "properties": {
+        "cause_id": {
+          "title": "Cause Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "format": "uuid",
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "question_id": {
+          "title": "Question Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cause_id",
+        "plan_id",
+        "question_id"
+      ],
+      "title": "OriginalQuestionReference",
+      "type": "object"
+    },
     "ParametricEnrichmentReference": {
       "additionalProperties": false,
       "properties": {
@@ -8008,6 +9517,27 @@
       "title": "PendantConstructionV1_1",
       "type": "object"
     },
+    "PlanReference": {
+      "additionalProperties": false,
+      "properties": {
+        "plan_id": {
+          "format": "uuid",
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "plan_id",
+        "content_hash"
+      ],
+      "title": "PlanReference",
+      "type": "object"
+    },
     "PreparationGateEvidence": {
       "additionalProperties": false,
       "description": "Caller-supplied evidence, not authorization or proof of a transaction/ACTIVE lookup.",
@@ -8148,6 +9678,165 @@
         "release_verified"
       ],
       "title": "PreparationGateEvidence",
+      "type": "object"
+    },
+    "PreparationGateEvidenceV2": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "2.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "organization_id": {
+          "format": "uuid",
+          "title": "Organization Id",
+          "type": "string"
+        },
+        "session_id": {
+          "format": "uuid",
+          "title": "Session Id",
+          "type": "string"
+        },
+        "revision": {
+          "$ref": "#/$defs/AnyDesignRevision"
+        },
+        "enrichment_cycle_id": {
+          "format": "uuid",
+          "title": "Enrichment Cycle Id",
+          "type": "string"
+        },
+        "enrichment_cycle_number": {
+          "minimum": 1,
+          "title": "Enrichment Cycle Number",
+          "type": "integer"
+        },
+        "enrichment_result_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Enrichment Result Hash",
+          "type": "string"
+        },
+        "source_handoff_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Handoff Hash",
+          "type": "string"
+        },
+        "knowledge_release": {
+          "$ref": "#/$defs/KnowledgeReleaseReference"
+        },
+        "rule_decision": {
+          "discriminator": {
+            "mapping": {
+              "ask": "#/$defs/AskDecisionV2",
+              "assume": "#/$defs/AssumeDecisionV2",
+              "block": "#/$defs/BlockDecisionV2",
+              "derive": "#/$defs/DeriveDecisionV2",
+              "ready": "#/$defs/ReadyDecisionV2"
+            },
+            "propertyName": "decision"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AskDecisionV2"
+            },
+            {
+              "$ref": "#/$defs/BlockDecisionV2"
+            },
+            {
+              "$ref": "#/$defs/DeriveDecisionV2"
+            },
+            {
+              "$ref": "#/$defs/AssumeDecisionV2"
+            },
+            {
+              "$ref": "#/$defs/ReadyDecisionV2"
+            }
+          ],
+          "title": "Rule Decision"
+        },
+        "workflow_status": {
+          "enum": [
+            "enrichment_completed",
+            "clarification_available",
+            "blocking_clarification_unresolved",
+            "clarification_answer_recorded",
+            "correction_applied",
+            "correction_deferred",
+            "final_output_ready",
+            "final_output_ready_with_unresolved",
+            "final_output_blocked"
+          ],
+          "title": "Workflow Status",
+          "type": "string"
+        },
+        "clarification_plan_id": {
+          "format": "uuid",
+          "title": "Clarification Plan Id",
+          "type": "string"
+        },
+        "clarification_plan_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Clarification Plan Hash",
+          "type": "string"
+        },
+        "blocking_clarification_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Clarification Ids",
+          "type": "array"
+        },
+        "decision_frontier": {
+          "$ref": "#/$defs/DecisionFrontier"
+        },
+        "decision_frontier_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Decision Frontier Hash",
+          "type": "string"
+        },
+        "release_verified": {
+          "title": "Release Verified",
+          "type": "boolean"
+        },
+        "contract_profile": {
+          "const": "jewelai.prompt-enrichment.f04/2.0.0",
+          "title": "Contract Profile",
+          "type": "string"
+        },
+        "availability_overlay_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Availability Overlay Hash",
+          "type": "string"
+        },
+        "effective_unresolved_frontier_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Effective Unresolved Frontier Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "organization_id",
+        "session_id",
+        "revision",
+        "enrichment_cycle_id",
+        "enrichment_cycle_number",
+        "enrichment_result_hash",
+        "source_handoff_hash",
+        "knowledge_release",
+        "rule_decision",
+        "workflow_status",
+        "clarification_plan_id",
+        "clarification_plan_hash",
+        "blocking_clarification_ids",
+        "decision_frontier",
+        "decision_frontier_hash",
+        "release_verified",
+        "contract_profile",
+        "availability_overlay_hash",
+        "effective_unresolved_frontier_hash"
+      ],
+      "title": "PreparationGateEvidenceV2",
       "type": "object"
     },
     "PreservationIntent": {
@@ -8536,6 +10225,18 @@
       "title": "QuestionId",
       "type": "string"
     },
+    "QuestionIdV2": {
+      "enum": [
+        "CENTER_STONE_SHAPE",
+        "CENTER_STONE_DIMENSIONS",
+        "CENTER_STONE_SETTING",
+        "METAL_COLOR",
+        "SIDE_STONE_QUANTITY",
+        "METAL_MATERIAL"
+      ],
+      "title": "QuestionIdV2",
+      "type": "string"
+    },
     "ReadyDecision": {
       "additionalProperties": false,
       "properties": {
@@ -8623,6 +10324,115 @@
       "title": "ReadyDecision",
       "type": "object"
     },
+    "ReadyDecisionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_version": {
+          "const": "2.0.0",
+          "title": "Evaluation Version",
+          "type": "string"
+        },
+        "blocking_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Blocking Cause Ids",
+          "type": "array"
+        },
+        "eligible_clarification_cause_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Eligible Clarification Cause Ids",
+          "type": "array"
+        },
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rule Version",
+          "type": "string"
+        },
+        "rules_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Rules Artifact Version",
+          "type": "string"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ReasonCode"
+        },
+        "reason": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Reason",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "trace": {
+          "items": {
+            "$ref": "#/$defs/RuleTraceV2"
+          },
+          "title": "Trace",
+          "type": "array"
+        },
+        "decision": {
+          "const": "ready",
+          "default": "ready",
+          "title": "Decision",
+          "type": "string"
+        },
+        "target": {
+          "default": null,
+          "title": "Target",
+          "type": "null"
+        },
+        "concrete_target": {
+          "default": null,
+          "title": "Concrete Target",
+          "type": "null"
+        },
+        "question_id": {
+          "default": null,
+          "title": "Question Id",
+          "type": "null"
+        },
+        "proposed_change": {
+          "default": null,
+          "title": "Proposed Change",
+          "type": "null"
+        }
+      },
+      "required": [
+        "evaluation_version",
+        "blocking_cause_ids",
+        "eligible_clarification_cause_ids",
+        "rule_id",
+        "rule_version",
+        "rules_artifact_version",
+        "reason_code",
+        "reason",
+        "priority",
+        "tie_order",
+        "trace"
+      ],
+      "title": "ReadyDecisionV2",
+      "type": "object"
+    },
     "ReasonCode": {
       "enum": [
         "MISSING_REQUIRED_FIELD",
@@ -8637,6 +10447,73 @@
       ],
       "title": "ReasonCode",
       "type": "string"
+    },
+    "ReleasePin": {
+      "additionalProperties": false,
+      "properties": {
+        "package_id": {
+          "title": "Package Id",
+          "type": "string"
+        },
+        "artifact_version": {
+          "title": "Artifact Version",
+          "type": "string"
+        },
+        "runtime_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Runtime Sha256",
+          "type": "string"
+        },
+        "validation_report_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Validation Report Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "package_id",
+        "artifact_version",
+        "runtime_sha256",
+        "validation_report_sha256"
+      ],
+      "title": "ReleasePin",
+      "type": "object"
+    },
+    "ResolutionReference": {
+      "additionalProperties": false,
+      "properties": {
+        "result_kind": {
+          "enum": [
+            "clarification",
+            "correction"
+          ],
+          "title": "Result Kind",
+          "type": "string"
+        },
+        "record_id": {
+          "format": "uuid",
+          "title": "Record Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "assertion_index": {
+          "minimum": 0,
+          "title": "Assertion Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "result_kind",
+        "record_id",
+        "content_hash",
+        "assertion_index"
+      ],
+      "title": "ResolutionReference",
+      "type": "object"
     },
     "RevisionEvent": {
       "additionalProperties": false,
@@ -8731,6 +10608,36 @@
         }
       },
       "title": "RingConstructionV1_1",
+      "type": "object"
+    },
+    "RuleRef": {
+      "additionalProperties": false,
+      "properties": {
+        "artifact_version": {
+          "title": "Artifact Version",
+          "type": "string"
+        },
+        "artifact_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Artifact Sha256",
+          "type": "string"
+        },
+        "rule_id": {
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "rule_version": {
+          "title": "Rule Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_version",
+        "artifact_sha256",
+        "rule_id",
+        "rule_version"
+      ],
+      "title": "RuleRef",
       "type": "object"
     },
     "RuleSource": {
@@ -8845,6 +10752,83 @@
       "title": "RuleTrace",
       "type": "object"
     },
+    "RuleTraceV2": {
+      "additionalProperties": false,
+      "properties": {
+        "rule_id": {
+          "pattern": "^[a-z][a-z0-9_]{0,79}$",
+          "title": "Rule Id",
+          "type": "string"
+        },
+        "priority": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "tie_order": {
+          "maximum": 10000,
+          "minimum": 0,
+          "title": "Tie Order",
+          "type": "integer"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SchemaTargetV2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "concrete_target": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "minLength": 1,
+              "pattern": "\\S",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Concrete Target"
+        },
+        "action_considered": {
+          "$ref": "#/$defs/ActionKind"
+        },
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/ConditionTrace"
+          },
+          "title": "Conditions",
+          "type": "array"
+        },
+        "applicable": {
+          "title": "Applicable",
+          "type": "boolean"
+        },
+        "selected": {
+          "title": "Selected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rule_id",
+        "priority",
+        "tie_order",
+        "target",
+        "concrete_target",
+        "action_considered",
+        "conditions",
+        "applicable",
+        "selected"
+      ],
+      "title": "RuleTraceV2",
+      "type": "object"
+    },
     "RuntimeProvenance": {
       "enum": [
         "USER_CONFIRMED",
@@ -8884,6 +10868,18 @@
       "title": "SchemaTarget",
       "type": "string"
     },
+    "SchemaTargetV2": {
+      "enum": [
+        "center_stone.shape",
+        "center_stone.dimensions",
+        "center_stone.setting",
+        "metal.color",
+        "side_stones[*].quantity",
+        "metal.material"
+      ],
+      "title": "SchemaTargetV2",
+      "type": "string"
+    },
     "SemanticCoverage": {
       "additionalProperties": false,
       "properties": {
@@ -8914,6 +10910,39 @@
         "rendered_ordinal"
       ],
       "title": "SemanticCoverage",
+      "type": "object"
+    },
+    "SemanticCoverageV2": {
+      "additionalProperties": false,
+      "properties": {
+        "source_pointer": {
+          "title": "Source Pointer",
+          "type": "string"
+        },
+        "rendered_section": {
+          "enum": [
+            "facts",
+            "constraints",
+            "references",
+            "disclosures",
+            "unresolved",
+            "availability"
+          ],
+          "title": "Rendered Section",
+          "type": "string"
+        },
+        "rendered_ordinal": {
+          "minimum": 1,
+          "title": "Rendered Ordinal",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_pointer",
+        "rendered_section",
+        "rendered_ordinal"
+      ],
+      "title": "SemanticCoverageV2",
       "type": "object"
     },
     "SemanticRendering": {
@@ -8972,6 +11001,64 @@
         "semantic_coverage"
       ],
       "title": "SemanticRendering",
+      "type": "object"
+    },
+    "SemanticRenderingV2": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "2.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "renderer_id": {
+          "const": "jewelai.semantic-text",
+          "default": "jewelai.semantic-text",
+          "title": "Renderer Id",
+          "type": "string"
+        },
+        "renderer_version": {
+          "const": "2.0.0",
+          "title": "Renderer Version",
+          "type": "string"
+        },
+        "rendering_text": {
+          "title": "Rendering Text",
+          "type": "string"
+        },
+        "rendering_characters": {
+          "minimum": 1,
+          "title": "Rendering Characters",
+          "type": "integer"
+        },
+        "rendering_utf8_bytes": {
+          "minimum": 1,
+          "title": "Rendering Utf8 Bytes",
+          "type": "integer"
+        },
+        "rendering_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Rendering Hash",
+          "type": "string"
+        },
+        "semantic_coverage": {
+          "items": {
+            "$ref": "#/$defs/SemanticCoverageV2"
+          },
+          "title": "Semantic Coverage",
+          "type": "array"
+        }
+      },
+      "required": [
+        "schema_version",
+        "renderer_version",
+        "rendering_text",
+        "rendering_characters",
+        "rendering_utf8_bytes",
+        "rendering_hash",
+        "semantic_coverage"
+      ],
+      "title": "SemanticRenderingV2",
       "type": "object"
     },
     "SideStoneGroup": {
@@ -9948,6 +12035,232 @@
       "title": "StructuredPromptEnrichmentResult",
       "type": "object"
     },
+    "StructuredPromptEnrichmentResultV2": {
+      "additionalProperties": false,
+      "description": "Opt-in F04 source with lossless canonical availability; no provider behavior.",
+      "properties": {
+        "enrichment_version": {
+          "const": "2.0.0",
+          "title": "Enrichment Version",
+          "type": "string"
+        },
+        "design_revision_id": {
+          "title": "Design Revision Id",
+          "type": "string"
+        },
+        "knowledge_package_id": {
+          "title": "Knowledge Package Id",
+          "type": "string"
+        },
+        "knowledge_artifact_version": {
+          "title": "Knowledge Artifact Version",
+          "type": "string"
+        },
+        "knowledge_runtime_sha256": {
+          "title": "Knowledge Runtime Sha256",
+          "type": "string"
+        },
+        "knowledge_validation_report_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Knowledge Validation Report Sha256"
+        },
+        "parametric_catalog_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parametric Catalog Id"
+        },
+        "parametric_artifact_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parametric Artifact Version"
+        },
+        "parametric_catalog_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parametric Catalog Sha256"
+        },
+        "parametric_references": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ParametricEnrichmentReference"
+          },
+          "title": "Parametric References",
+          "type": "array"
+        },
+        "initial_matrix": {
+          "items": {
+            "$ref": "#/$defs/EnrichmentMatrixCell"
+          },
+          "title": "Initial Matrix",
+          "type": "array"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/EnrichmentDecision"
+          },
+          "title": "Decisions",
+          "type": "array"
+        },
+        "final_matrix": {
+          "items": {
+            "$ref": "#/$defs/EnrichmentMatrixCell"
+          },
+          "title": "Final Matrix",
+          "type": "array"
+        },
+        "specification_entries": {
+          "items": {
+            "$ref": "#/$defs/SpecificationEntry"
+          },
+          "title": "Specification Entries",
+          "type": "array"
+        },
+        "locked_constraints": {
+          "items": {
+            "$ref": "#/$defs/PromptConstraint"
+          },
+          "title": "Locked Constraints",
+          "type": "array"
+        },
+        "disclosures": {
+          "items": {
+            "$ref": "#/$defs/PromptDisclosure"
+          },
+          "title": "Disclosures",
+          "type": "array"
+        },
+        "prompt_template_artifact_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Prompt Template Artifact Version",
+          "type": "string"
+        },
+        "content_hash": {
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "contract_profile": {
+          "const": "jewelai.prompt-enrichment.f04/2.0.0",
+          "title": "Contract Profile",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/EvidenceScope"
+        },
+        "context": {
+          "$ref": "#/$defs/InputContext"
+        },
+        "availability_overlay": {
+          "$ref": "#/$defs/CanonicalAvailabilityOverlay"
+        }
+      },
+      "required": [
+        "enrichment_version",
+        "design_revision_id",
+        "knowledge_package_id",
+        "knowledge_artifact_version",
+        "knowledge_runtime_sha256",
+        "initial_matrix",
+        "decisions",
+        "final_matrix",
+        "specification_entries",
+        "locked_constraints",
+        "disclosures",
+        "prompt_template_artifact_version",
+        "content_hash",
+        "contract_profile",
+        "scope",
+        "context",
+        "availability_overlay"
+      ],
+      "title": "StructuredPromptEnrichmentResultV2",
+      "type": "object"
+    },
+    "TargetRef": {
+      "additionalProperties": false,
+      "properties": {
+        "concrete_target": {
+          "title": "Concrete Target",
+          "type": "string"
+        },
+        "owner_kind": {
+          "enum": [
+            "product",
+            "product_body",
+            "band",
+            "prongs",
+            "center_stone",
+            "side_stones",
+            "setting",
+            "overall_design"
+          ],
+          "title": "Owner Kind",
+          "type": "string"
+        },
+        "owner_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{0,79}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Owner Id"
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{0,79}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Group Id"
+        }
+      },
+      "required": [
+        "concrete_target",
+        "owner_kind",
+        "owner_id",
+        "group_id"
+      ],
+      "title": "TargetRef",
+      "type": "object"
+    },
     "TwoDimensionalSize": {
       "additionalProperties": false,
       "properties": {
@@ -10061,6 +12374,64 @@
         "content_hash"
       ],
       "title": "UserReadableJewelryDescription",
+      "type": "object"
+    },
+    "UserReadableJewelryDescriptionV2": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "2.0.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "locale": {
+          "enum": [
+            "en",
+            "ru"
+          ],
+          "title": "Locale",
+          "type": "string"
+        },
+        "authoritative_revision_id": {
+          "format": "uuid",
+          "title": "Authoritative Revision Id",
+          "type": "string"
+        },
+        "text": {
+          "maxLength": 20000,
+          "minLength": 1,
+          "pattern": "\\S",
+          "title": "Text",
+          "type": "string"
+        },
+        "unresolved_summary": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Unresolved Summary",
+          "type": "array"
+        },
+        "content_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "effective_frontier_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Effective Frontier Hash",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "locale",
+        "authoritative_revision_id",
+        "text",
+        "unresolved_summary",
+        "content_hash",
+        "effective_frontier_hash"
+      ],
+      "title": "UserReadableJewelryDescriptionV2",
       "type": "object"
     },
     "VisualConstraint": {
@@ -10635,6 +13006,15 @@
     },
     {
       "$ref": "#/$defs/GenerationPreparationPayload"
+    },
+    {
+      "$ref": "#/$defs/StructuredPromptEnrichmentResultV2"
+    },
+    {
+      "$ref": "#/$defs/CanonicalInternalFinalPromptHandoffV3"
+    },
+    {
+      "$ref": "#/$defs/GenerationPreparationPayloadV2"
     }
   ]
 }

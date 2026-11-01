@@ -251,6 +251,10 @@ class RenderedQuestion(ImmutableModel):
 class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
     """Immutable validated catalog for rendering a selected semantic question."""
 
+    _bundle_type = QuestionCatalogBundle
+    _question_id_type = QuestionId
+    _rendered_type = RenderedQuestion
+
     def __init__(
         self,
         bundle: QuestionCatalogBundle,
@@ -258,7 +262,7 @@ class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
         roles: RoleRegistry,
         dictionary: DictionaryRegistry,
     ):
-        bundle = QuestionCatalogBundle.model_validate(bundle)
+        bundle = self._bundle_type.model_validate(bundle)
         if bundle.role_artifact_version != roles.artifact_version:
             raise ValueError("Question Catalog role artifact version does not match the registry")
         if bundle.dictionary_artifact_version != dictionary.artifact_version:
@@ -302,7 +306,7 @@ class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
 
     def get_question(self, question_id: QuestionId | str) -> QuestionEntry:
         try:
-            canonical = QuestionId(question_id)
+            canonical = self._question_id_type(question_id)
         except ValueError as exc:
             raise UnknownQuestionError(f"Unknown semantic question: {question_id}") from exc
         return self._entries[canonical]
@@ -317,7 +321,7 @@ class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
         profile = self._roles.get_profile(role_id)
         resolved_locale = QuestionLocale(self._roles.resolve_locale(profile.role_id, locale))
         wording = next(item for item in entry.wording if item.role_id == profile.role_id)
-        return RenderedQuestion(
+        return self._rendered_type(
             question_id=entry.question_id,
             wording=wording.text.for_locale(resolved_locale),
             target=entry.target,
@@ -336,6 +340,12 @@ def load_question_catalog(
 ) -> QuestionCatalog:
     """Load and cross-validate a catalog against explicit pinned registries."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("schema_version") == "2.0.0":
+        from .questions_v2 import QuestionCatalogBundleV2, QuestionCatalogV2
+
+        return QuestionCatalogV2(
+            QuestionCatalogBundleV2.model_validate(data), roles=roles, dictionary=dictionary
+        )
     return QuestionCatalog(
         QuestionCatalogBundle.model_validate(data), roles=roles, dictionary=dictionary
     )

@@ -8,10 +8,13 @@ without changing any public route or invoking an external provider.
 import hashlib
 import json
 from collections.abc import Callable
+from copy import copy
 from datetime import UTC, datetime
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
+from jewelai_domain.clarification_state import CauseState, Sha256
 from jewelai_domain.knowledge_runtime import (
     AnyActiveKnowledge,
     AnyKnowledgeStore,
@@ -65,8 +68,9 @@ from jewelai_prompts.downstream_preparation import (
     preparation_hash,
     render_semantic_source,
 )
+from jewelai_prompts.final_prompt_v3 import CanonicalFinalPromptAssemblyV3
 
-from .artifacts import RuntimeArtifacts
+from .artifacts import ArtifactConfigurationError, RuntimeArtifacts, session_runtime_artifacts
 from .clarification import (
     ClarificationImportance,
     ClarificationPlan,
@@ -81,6 +85,11 @@ from .clarification_answers import (
     ClarificationAnswerResult,
     ClarificationDecision,
     process_clarification_answer,
+)
+from .clarification_v2 import (
+    ClarificationAnswerRequestV2,
+    ClarificationPlanV2,
+    CorrectionRequestV2,
 )
 from .constraint_evidence import ConstraintEvidenceIntegrityError, merge_constraint_evidence
 from .correction_enrichment import (
@@ -103,10 +112,11 @@ from .parsed_enrichment import (
     CandidateDispositionOutcome,
     CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
+    ParsedCandidateEnrichmentResultV2,
     enrich_parsed_candidates_with_active_release,
     proposed_design_for_transition,
 )
-from .preparation_contracts import GenerationPreparationRequest
+from .preparation_contracts import GenerationPreparationRequest, GenerationPreparationRequestV2
 
 
 class PromptEnrichmentRuntimeErrorCode(StrEnum):
@@ -194,6 +204,35 @@ class InitialEnrichmentRuntimeResult(ImmutableModel):
     workflow: PromptEnrichmentWorkflowState
 
 
+class InitialEnrichmentRequestV2(InitialEnrichmentRequest):
+    schema_version: Literal["2.0.0"]
+
+
+class PersistedClarificationAnswerRequestV2(ClarificationAnswerRequestV2):
+    session_id: UUID
+
+
+class PersistedUserCorrectionRequestV2(CorrectionRequestV2):
+    session_id: UUID
+
+
+class PromptEnrichmentWorkflowStateV2(PromptEnrichmentWorkflowState):
+    schema_version: Literal["2.0.0"]
+    contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
+    current_plan_version: Literal["2.0.0"]
+    clarification_plan: ClarificationPlanV2
+    final_output: CanonicalFinalPromptAssemblyV3
+    preparation_expectations: GenerationPreparationRequestV2 | None
+    availability_overlay_hash: Sha256
+    effective_unresolved_frontier_hash: Sha256
+    current_unresolved_causal_summaries: tuple[CauseState, ...]
+
+
+class InitialEnrichmentRuntimeResultV2(InitialEnrichmentRuntimeResult):
+    enrichment: ParsedCandidateEnrichmentResultV2
+    workflow: PromptEnrichmentWorkflowStateV2
+
+
 class PromptEnrichmentRuntimeService:
     """Session-aware internal facade over the existing approved module primitives."""
 
@@ -220,10 +259,54 @@ class PromptEnrichmentRuntimeService:
         self._clock = clock
         self._uuid = uuid_factory
 
+    def _for_session(self, session_id, organization_id, *, repository=None):
+        repository = repository or self.repository
+        try:
+            session = repository.get_design_session(session_id, organization_id)
+            artifacts = session_runtime_artifacts(self.artifacts, session)
+        except (NotFoundError, OwnershipMismatchError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
+                "Session was not found in organization scope",
+            ) from exc
+        except ArtifactConfigurationError as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.ARTIFACT_MISMATCH,
+                "Pinned session artifacts are unavailable or inconsistent",
+            ) from exc
+        if artifacts is self.artifacts:
+            return self
+        bound = copy(self)
+        bound.artifacts = artifacts
+        return bound
+
+    @property
+    def _is_f04(self):
+        return (self.artifacts.versions.questions, self.artifacts.versions.rules) == (
+            "2.0.0",
+            "2.0.0",
+        )
+
+    def _require_request_profile(self, request):
+        if (getattr(request, "schema_version", None) == "2.0.0") != self._is_f04:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.ARTIFACT_MISMATCH,
+                "Request version does not match the retained session profile",
+            )
+
     def start_initial_message(
         self, request: InitialEnrichmentRequest
     ) -> InitialEnrichmentRuntimeResult:
         """Parse a persisted message first, then atomically commit revision + first cycle."""
+
+        bound = self._for_session(request.session_id, request.organization_id)
+        if bound is not self:
+            return bound.start_initial_message(request)
+        self._require_request_profile(request)
+        if self._is_f04:
+            from .prompt_enrichment_runtime_v2 import start_initial_message
+
+            return start_initial_message(self, request)
 
         request = InitialEnrichmentRequest.model_validate(request)
         try:
@@ -360,6 +443,13 @@ class PromptEnrichmentRuntimeService:
 
     def build_preparation_source(self, repository, session_id, organization_id):
         """Restore the sole current source using the caller's already locked transaction reader."""
+        bound = self._for_session(session_id, organization_id, repository=repository)
+        if bound is not self:
+            return bound.build_preparation_source(repository, session_id, organization_id)
+        if self._is_f04:
+            from .prompt_enrichment_runtime_v2 import build_preparation_source
+
+            return build_preparation_source(self, repository, session_id, organization_id)
         snapshot = build_final_prompt_snapshot(
             repository,
             session_id=session_id,
@@ -438,6 +528,13 @@ class PromptEnrichmentRuntimeService:
         self, session_id: UUID, organization_id: UUID
     ) -> PromptEnrichmentWorkflowState:
         """Restore and verify the latest durable module state without changing it."""
+        bound = self._for_session(session_id, organization_id)
+        if bound is not self:
+            return bound.get_current_state(session_id, organization_id)
+        if self._is_f04:
+            from .prompt_enrichment_runtime_v2 import get_current_state
+
+            return get_current_state(self, session_id, organization_id)
 
         try:
             cycles = self.repository.list_enrichment_cycles(session_id, organization_id)
@@ -630,6 +727,14 @@ class PromptEnrichmentRuntimeService:
     ) -> tuple[CorrectionReenrichmentResult, PromptEnrichmentWorkflowState]:
         """Build a correction only from an organization-scoped persisted message."""
 
+        bound = self._for_session(request.session_id, organization_id)
+        if bound is not self:
+            return bound.apply_persisted_user_correction(organization_id, request)
+        self._require_request_profile(request)
+        if self._is_f04:
+            from .prompt_enrichment_runtime_v2 import apply_persisted_user_correction
+
+            return apply_persisted_user_correction(self, organization_id, request)
         request = PersistedUserCorrectionRequest.model_validate(request)
         try:
             session = self.repository.get_design_session(request.session_id, organization_id)
@@ -861,6 +966,14 @@ class PromptEnrichmentRuntimeService:
     ) -> tuple[ClarificationAnswerResult, PromptEnrichmentWorkflowState]:
         """Restore the authoritative plan and process a bounded client decision."""
 
+        bound = self._for_session(request.session_id, organization_id)
+        if bound is not self:
+            return bound.record_persisted_clarification_answer(organization_id, request)
+        self._require_request_profile(request)
+        if self._is_f04:
+            from .prompt_enrichment_runtime_v2 import record_persisted_clarification_answer
+
+            return record_persisted_clarification_answer(self, organization_id, request)
         request = PersistedClarificationAnswerRequest.model_validate(request)
         try:
             plan = self.restore_clarification_plan(
@@ -939,7 +1052,22 @@ class PromptEnrichmentRuntimeService:
         *,
         require_current: bool,
     ) -> ClarificationPlan:
-        """Restore and verify an immutable plan without rerunning clarification planning."""
+        """Restore and verify an immutable plan without rerunning planning."""
+        bound = self._for_session(session_id, organization_id)
+        if bound is not self:
+            return bound.restore_clarification_plan(
+                session_id, organization_id, clarification_plan_id, require_current=require_current
+            )
+        if self._is_f04:
+            from .prompt_enrichment_runtime_v2 import restore_clarification_plan
+
+            return restore_clarification_plan(
+                self,
+                session_id,
+                organization_id,
+                clarification_plan_id,
+                require_current=require_current,
+            )
 
         try:
             session = self.repository.get_design_session(session_id, organization_id)
@@ -1069,7 +1197,18 @@ class PromptEnrichmentRuntimeService:
         )
         return record.clarification_plan_id, plan
 
-    def _evaluate(self, revision, parsed, source):
+    def resume_clarification(self, session_id, organization_id, cause_id, request):
+        bound = self._for_session(session_id, organization_id)
+        if not bound._is_f04:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.CLARIFICATION_CONFLICT,
+                "Resume is unavailable for the retained session profile",
+            )
+        from .prompt_enrichment_runtime_v2 import resume_clarification
+
+        return resume_clarification(bound, session_id, organization_id, cause_id, request)
+
+    def _evaluate(self, revision, parsed, source, *, equivalent_candidate_ids=()):
         return enrich_parsed_candidates_with_active_release(
             revision,
             parse_result=parsed,
@@ -1081,6 +1220,7 @@ class PromptEnrichmentRuntimeService:
             knowledge_artifact_version=self.knowledge_artifact_version,
             active_release=self.active_release,
             validation_report=self.validation_report,
+            equivalent_candidate_ids=equivalent_candidate_ids,
             **self._parametric_kwargs(revision),
         )
 

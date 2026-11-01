@@ -48,6 +48,7 @@ from jewelai_prompts import (
     PromptTemplateBundle,
     enrich_prompt_with_active_release,
 )
+from jewelai_prompts.enrichment import StructuredPromptEnrichmentResultV2
 from pydantic import BaseModel, model_validator
 
 
@@ -134,6 +135,12 @@ class ParsedCandidateEnrichmentResult(ImmutableModel):
         return self
 
 
+class ParsedCandidateEnrichmentResultV2(ParsedCandidateEnrichmentResult):
+    """F04 retains the same Parser/Matrix evidence under an exact Enrichment2 reader."""
+
+    enrichment_result: StructuredPromptEnrichmentResultV2
+
+
 def enrich_parsed_candidates_with_active_release(
     revision: AnyDesignRevision | object,
     *,
@@ -151,6 +158,7 @@ def enrich_parsed_candidates_with_active_release(
     parametric_catalog_sha256: str | None = None,
     parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
+    equivalent_candidate_ids: tuple[str, ...] = (),
 ) -> ParsedCandidateEnrichmentResult:
     """Evaluate safe parsed candidates without mutating the authoritative revision."""
 
@@ -205,10 +213,51 @@ def enrich_parsed_candidates_with_active_release(
             prepared[candidate.candidate_id] = update
 
     by_target: dict[str, list[str]] = {}
+    if equivalent_candidate_ids and (
+        len(equivalent_candidate_ids) < 2
+        or len(set(equivalent_candidate_ids)) != len(equivalent_candidate_ids)
+        or not set(equivalent_candidate_ids).issubset(prepared)
+        or {prepared[cid].concrete_target for cid in equivalent_candidate_ids if cid in prepared}
+        != {"metal.material"}
+    ):
+        raise ParsedEnrichmentInputError(
+            "Equivalent source group is not an eligible material group"
+        )
     for candidate_id, update in prepared.items():
         by_target.setdefault(update.concrete_target, []).append(candidate_id)
     for target, candidate_ids in by_target.items():
         if len(candidate_ids) < 2:
+            continue
+        if equivalent_candidate_ids and set(candidate_ids) == set(equivalent_candidate_ids):
+            equivalent = [_candidate_by_id(parsed, cid) for cid in candidate_ids]
+            valid = (
+                all(
+                    c.subject == CandidateSubject.PRODUCT_BODY
+                    and c.target == StructuredTarget.METAL_MATERIAL
+                    and c.classification == CandidateClassification.REQUIREMENT
+                    and c.certainty == CandidateCertainty.EXPLICIT
+                    and c.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+                    and len(c.normalized_values) == 1
+                    for c in equivalent
+                )
+                and len({c.normalized_values for c in equivalent}) == 1
+            )
+            if not valid:
+                raise ParsedEnrichmentInputError(
+                    "Equivalent evidence does not prove one explicit value"
+                )
+            representative = min(
+                equivalent, key=lambda c: (c.evidence.start, c.evidence.end, c.candidate_id)
+            )
+            for c in equivalent:
+                if c.candidate_id != representative.candidate_id:
+                    dispositions[c.candidate_id] = CandidateDisposition(
+                        candidate=c,
+                        outcome=CandidateDispositionOutcome.NO_CHANGE,
+                        reason=CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES,
+                        concrete_target=target,
+                    )
+                    prepared.pop(c.candidate_id)
             continue
         for candidate_id in candidate_ids:
             candidate = _candidate_by_id(parsed, candidate_id)

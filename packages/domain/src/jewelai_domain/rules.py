@@ -481,6 +481,14 @@ def analyze_gaps(
 class RuleRegistry(Mapping[str, Rule]):
     """Validated immutable rules plus the bounded deterministic interpreter."""
 
+    _bundle_type = RulesBundle
+    _trace_type = RuleTrace
+    _ask_type = AskDecision
+    _block_type = BlockDecision
+    _derive_type = DeriveDecision
+    _assume_type = AssumeDecision
+    _ready_type = ReadyDecision
+
     def __init__(
         self,
         bundle: RulesBundle,
@@ -489,7 +497,7 @@ class RuleRegistry(Mapping[str, Rule]):
         dictionary: DictionaryRegistry,
         questions: QuestionCatalog,
     ):
-        bundle = RulesBundle.model_validate(bundle)
+        bundle = self._bundle_type.model_validate(bundle)
         expected_versions = (
             ("role", bundle.role_artifact_version, roles.artifact_version),
             ("dictionary", bundle.dictionary_artifact_version, dictionary.artifact_version),
@@ -619,6 +627,7 @@ class RuleRegistry(Mapping[str, Rule]):
         *,
         knowledge_facts: tuple[AvailableKnowledgeFact, ...] = (),
         proposed_update: ProposedDomainUpdate | None = None,
+        unresolved_context=None,
     ) -> RuleDecision:
         revision = validate_design_revision(revision)
         profile = self._roles.get_profile(role_id)
@@ -646,6 +655,7 @@ class RuleRegistry(Mapping[str, Rule]):
                     gaps_by_target=gaps_by_target,
                     matching_facts=matching_facts,
                     locked_conflict=locked_conflict,
+                    unresolved_context=unresolved_context,
                 )
                 for condition in rule.conditions
             )
@@ -664,7 +674,7 @@ class RuleRegistry(Mapping[str, Rule]):
             trace = self._build_trace(
                 condition_traces, applicable, selected=(), gaps_by_target=gaps_by_target
             )
-            return BlockDecision(
+            return self._block_type(
                 rule_id="engine_no_decision",
                 rule_version=RULES_SCHEMA_VERSION,
                 rules_artifact_version=self.artifact_version,
@@ -687,7 +697,7 @@ class RuleRegistry(Mapping[str, Rule]):
             trace = self._build_trace(
                 condition_traces, applicable, selected=(), gaps_by_target=gaps_by_target
             )
-            return BlockDecision(
+            return self._block_type(
                 rule_id="engine_rule_conflict",
                 rule_version=RULES_SCHEMA_VERSION,
                 rules_artifact_version=self.artifact_version,
@@ -723,7 +733,7 @@ class RuleRegistry(Mapping[str, Rule]):
             bool(getattr(state, "locked", False))
             for _, state, _ in _state_for_target(revision, selected.target)
         ):
-            return BlockDecision(
+            return self._block_type(
                 rule_id=selected.rule_id,
                 rule_version=selected.rule_version,
                 rules_artifact_version=self.artifact_version,
@@ -736,7 +746,7 @@ class RuleRegistry(Mapping[str, Rule]):
                 trace=trace,
             )
         if isinstance(selected.action, AskAction):
-            return AskDecision(
+            return self._ask_type(
                 **common,
                 target=selected.target,
                 concrete_target=concrete,
@@ -756,7 +766,7 @@ class RuleRegistry(Mapping[str, Rule]):
                 concrete_target="center_stone.dimensions",
                 state=state,
             )
-            return DeriveDecision(
+            return self._derive_type(
                 **common,
                 target=SchemaTarget.CENTER_STONE_DIMENSIONS,
                 concrete_target="center_stone.dimensions",
@@ -778,19 +788,19 @@ class RuleRegistry(Mapping[str, Rule]):
             proposal = ProposedAssumedChange(
                 target=selected.target, concrete_target=concrete, state=state
             )
-            return AssumeDecision(
+            return self._assume_type(
                 **common,
                 target=selected.target,
                 concrete_target=concrete,
                 proposed_change=proposal,
             )
         if isinstance(selected.action, BlockAction):
-            return BlockDecision(
+            return self._block_type(
                 **common,
                 target=selected.target,
                 concrete_target=concrete,
             )
-        return ReadyDecision(**common)
+        return self._ready_type(**common)
 
     def _evaluate_condition(
         self,
@@ -802,6 +812,7 @@ class RuleRegistry(Mapping[str, Rule]):
         gaps_by_target,
         matching_facts,
         locked_conflict,
+        unresolved_context=None,
     ) -> ConditionTrace:
         if isinstance(condition, TargetStateCondition):
             matched = tuple(
@@ -865,7 +876,7 @@ class RuleRegistry(Mapping[str, Rule]):
     def _concrete_target(self, rule, gaps_by_target) -> str | None:
         if rule.target is None:
             return None
-        candidates = gaps_by_target[rule.target]
+        candidates = gaps_by_target.get(rule.target, ())
         for condition in rule.conditions:
             if isinstance(condition, TargetStateCondition):
                 matching = tuple(gap for gap in candidates if gap.state in condition.states)
@@ -902,7 +913,7 @@ class RuleRegistry(Mapping[str, Rule]):
     ) -> tuple[RuleTrace, ...]:
         gaps_by_target = gaps_by_target or {target: () for target in SchemaTarget}
         return tuple(
-            RuleTrace(
+            self._trace_type(
                 rule_id=rule.rule_id,
                 priority=rule.priority,
                 tie_order=rule.tie_order,
@@ -926,6 +937,15 @@ def load_rules(
 ) -> RuleRegistry:
     """Load one explicit rules artifact and validate every pinned cross-reference."""
     data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("schema_version") == "2.0.0":
+        from .rules_v2 import RuleRegistryV2, RulesBundleV2
+
+        return RuleRegistryV2(
+            RulesBundleV2.model_validate(data),
+            roles=roles,
+            dictionary=dictionary,
+            questions=questions,
+        )
     return RuleRegistry(
         RulesBundle.model_validate(data),
         roles=roles,

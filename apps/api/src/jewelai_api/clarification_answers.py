@@ -494,9 +494,11 @@ def _resolve_decision(question, answer):
     return None
 
 
-def _parser_proposal(question, option, answer, revision, dictionary):
-    parser_target = _PARSER_TARGET.get(question.semantic_question_id)
-    category = _CATEGORY_BY_QUESTION.get(question.semantic_question_id)
+def _parser_proposal(
+    question, option, answer, revision, dictionary, *, _target=None, _category=None
+):
+    parser_target = _target or _PARSER_TARGET.get(question.semantic_question_id)
+    category = _category or _CATEGORY_BY_QUESTION.get(question.semantic_question_id)
     if parser_target is None or category is None or option is None:
         return None
     try:

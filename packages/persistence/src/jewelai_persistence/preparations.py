@@ -4,8 +4,8 @@ import hashlib
 from contextlib import nullcontext
 
 from jewelai_auth import MembershipNotFoundError
-from jewelai_prompts import GenerationPreparation
 from jewelai_prompts.downstream_preparation import canonical_bytes
+from jewelai_prompts.downstream_preparation_v2 import decode_generation_preparation
 from jewelai_prompts.enrichment import enrichment_template_version
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -78,7 +78,7 @@ def _summary(preparation):
     payload = preparation.payload
     source = payload.source_handoff
     return {
-        "schema_version": "1.0.0",
+        "schema_version": payload.schema_version,
         "preparation_id": str(payload.preparation_id),
         "session_id": str(payload.session_id),
         "product_state_revision_id": str(payload.product_state_revision_id),
@@ -96,7 +96,7 @@ def _summary(preparation):
 def _validate_row(repository, db, session, row):
     """Validate both exact frozen bytes and their real historical relational bindings."""
     try:
-        preparation = GenerationPreparation(row.artifact_bytes)
+        preparation = decode_generation_preparation(row.artifact_bytes)
         p = preparation.payload
         mirrored = (
             "preparation_id",
@@ -136,7 +136,7 @@ def _validate_row(repository, db, session, row):
         ):
             raise ValueError("source binding mismatch")
         verified_cycle = repository._enrichment_cycle_record(
-            cycle, repository._knowledge_release_pin(session, db=db)
+            cycle, repository._knowledge_release_pin(session, db=db), db=db, session=session
         )
         if verified_cycle.result.content_hash != p.enrichment_result_hash:
             raise ValueError("cycle hash mismatch")
@@ -176,6 +176,20 @@ def _validate_row(repository, db, session, row):
             or versions.rules_artifact_version != plan.rules_artifact_version
         ):
             raise ValueError("historical artifact versions mismatch")
+        if p.schema_version == "2.0.0":
+            f04 = prompt.effective_unresolved_frontier
+            if (
+                p.schema_version != "2.0.0"
+                or (session.question_artifact_version, session.rules_artifact_version)
+                != ("2.0.0", "2.0.0")
+                or canonical_bytes(f04.frontier_core)
+                != canonical_bytes(verified_plan.plan_payload["frontier_core"])
+                or f04.current_plan_ref.plan_id != plan.clarification_plan_id
+                or f04.current_plan_ref.content_hash != verified_plan.content_hash
+                or canonical_bytes(prompt.availability_overlay)
+                != canonical_bytes(verified_cycle.result.availability_overlay)
+            ):
+                raise ValueError("Historical F frontier/availability mismatch")
         if verified_plan.content_hash != p.gate_evidence.clarification_plan_hash or canonical_bytes(
             verified_plan.plan_payload["constraint_evidence"]
         ) != canonical_bytes(
@@ -219,7 +233,13 @@ def commit_preparation(
     try:
         with repository._session_factory.begin() as db:
             session = _authorize_and_lock(repository, db, organization_id, session_id, principal_id)
-            key = (organization_id, session_id, "prepare_generation", idempotency_key)
+            profile = (session.question_artifact_version, session.rules_artifact_version)
+            if profile not in {("1.0.0", "1.0.0"), ("2.0.0", "2.0.0")}:
+                raise PreparationIntegrityError("Unsupported session profile")
+            command_name = (
+                "prepare_generation_v2" if profile == ("2.0.0", "2.0.0") else "prepare_generation"
+            )
+            key = (organization_id, session_id, command_name, idempotency_key)
             command = db.get(GenerationCommandRow, key)
             if command is not None:
                 if command.request_hash != request_hash:
@@ -297,7 +317,7 @@ def commit_preparation(
                 GenerationCommandRow(
                     organization_id=organization_id,
                     session_id=session_id,
-                    command="prepare_generation",
+                    command=command_name,
                     idempotency_key=idempotency_key,
                     request_hash=request_hash,
                     preparation_id=p.preparation_id,

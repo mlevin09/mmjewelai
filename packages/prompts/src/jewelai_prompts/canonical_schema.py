@@ -10,7 +10,9 @@ from .downstream_preparation import (
     AnyCanonicalInternalFinalPromptHandoff,
     GenerationPreparationPayload,
 )
-from .enrichment import AnyPromptEnrichmentResult
+from .downstream_preparation_v2 import GenerationPreparationPayloadV2
+from .enrichment import AnyPromptEnrichmentResult, StructuredPromptEnrichmentResultV2
+from .final_prompt_v3 import CanonicalInternalFinalPromptHandoffV3
 
 
 def canonical_json_schema() -> dict:
@@ -18,6 +20,9 @@ def canonical_json_schema() -> dict:
         AnyPromptEnrichmentResult
         | AnyCanonicalInternalFinalPromptHandoff
         | GenerationPreparationPayload
+        | StructuredPromptEnrichmentResultV2
+        | CanonicalInternalFinalPromptHandoffV3
+        | GenerationPreparationPayloadV2
     ).json_schema(ref_template="#/$defs/{model}")
 
 

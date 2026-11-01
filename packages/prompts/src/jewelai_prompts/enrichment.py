@@ -4,6 +4,12 @@ import hashlib
 import json
 from typing import Annotated, Literal
 
+from jewelai_domain.clarification_state import (
+    CanonicalAvailabilityOverlay,
+    EvidenceScope,
+    InputContext,
+    StrictEvidenceModel,
+)
 from jewelai_domain.knowledge_activation import Sha256
 from jewelai_domain.knowledge_policy import (
     KnowledgePolicyEngine,
@@ -224,6 +230,32 @@ class StructuredPromptEnrichmentResult(ImmutableModel):
         return PromptEnrichmentResult.validate_hash(self)
 
 
+class StructuredPromptEnrichmentResultV2(StructuredPromptEnrichmentResult, StrictEvidenceModel):
+    """Opt-in F04 source with lossless canonical availability; no provider behavior."""
+
+    enrichment_version: Literal["2.0.0"]
+    contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
+    scope: EvidenceScope
+    context: InputContext
+    availability_overlay: CanonicalAvailabilityOverlay
+
+    @model_validator(mode="after")
+    def validate_f04_context(self):
+        if (
+            self.scope != self.context.scope
+            or self.scope != self.availability_overlay.scope
+            or self.design_revision_id != str(self.availability_overlay.canonical_revision_id)
+            or self.contract_profile != self.context.contract_profile
+            or self.knowledge_package_id != self.context.release_pin.package_id
+            or self.knowledge_artifact_version != self.context.release_pin.artifact_version
+            or self.knowledge_runtime_sha256 != self.context.release_pin.runtime_sha256
+            or self.knowledge_validation_report_sha256
+            != self.context.release_pin.validation_report_sha256
+        ):
+            raise ValueError("F04 enrichment context mismatch")
+        return self
+
+
 AnyPromptEnrichmentResult = Annotated[
     PromptEnrichmentResult | StructuredPromptEnrichmentResult,
     Field(discriminator="enrichment_version"),
@@ -238,8 +270,19 @@ def decode_prompt_enrichment_result(value: object) -> AnyPromptEnrichmentResult:
     return _ENRICHMENT_DECODER.validate_python(value)
 
 
+def decode_f04_prompt_enrichment_result(value: object) -> StructuredPromptEnrichmentResultV2:
+    """Isolated F codec; do not widen legacy durable readers before scoped dispatch exists."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    return StructuredPromptEnrichmentResultV2.model_validate(value)
+
+
 def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjection:
-    result = decode_prompt_enrichment_result(value)
+    result = (
+        decode_f04_prompt_enrichment_result(value)
+        if isinstance(value, StructuredPromptEnrichmentResultV2)
+        else decode_prompt_enrichment_result(value)
+    )
     source = result.compiled_prompt if isinstance(result, PromptEnrichmentResult) else result
     return RevisionProjection(
         specification_entries=source.specification_entries,
@@ -249,7 +292,11 @@ def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjectio
 
 
 def enrichment_template_version(value: AnyPromptEnrichmentResult) -> str:
-    result = decode_prompt_enrichment_result(value)
+    result = (
+        decode_f04_prompt_enrichment_result(value)
+        if isinstance(value, StructuredPromptEnrichmentResultV2)
+        else decode_prompt_enrichment_result(value)
+    )
     return (
         result.compiled_prompt.template_artifact_version
         if isinstance(result, PromptEnrichmentResult)

@@ -13,6 +13,7 @@ from enum import StrEnum
 from typing import Literal
 from uuid import UUID
 
+from jewelai_domain.clarification_state import EvidenceScope, StrictEvidenceModel
 from jewelai_domain.dictionary import DictionaryRegistry
 from jewelai_domain.knowledge_activation import Sha256
 from jewelai_domain.knowledge_base import ParametricKnowledgeBundle
@@ -38,14 +39,21 @@ from jewelai_prompts import (
     decode_prompt_enrichment_result,
     enrichment_template_version,
 )
+from jewelai_prompts.enrichment import StructuredPromptEnrichmentResultV2
 from pydantic import Field, model_validator
 
 from .clarification_answers import ClarificationAnswerResult
+from .clarification_v2 import (
+    AcceptedTargetEvidence,
+    ClarificationAnswerResultV2,
+    ResolutionAssertion,
+)
 from .parametric_enrichment import select_parametric_references
 from .parsed_enrichment import (
     CandidateDispositionOutcome,
     CandidateDispositionReason,
     ParsedCandidateEnrichmentResult,
+    ParsedCandidateEnrichmentResultV2,
     enrich_parsed_candidates_with_active_release,
     proposed_design_for_transition,
 )
@@ -172,6 +180,41 @@ class CorrectionReenrichmentResult(ImmutableModel):
         return self
 
 
+class CorrectionReenrichmentResultV2(CorrectionReenrichmentResult, StrictEvidenceModel):
+    correction_version: Literal["2.0.0"]
+    contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
+    scope: EvidenceScope
+    prior_answer_results: tuple[ClarificationAnswerResultV2, ...]
+    correction_evaluation: ParsedCandidateEnrichmentResultV2
+    post_transition_evaluation: ParsedCandidateEnrichmentResultV2
+    next_enrichment_result: StructuredPromptEnrichmentResultV2
+    accepted_target_evidence: tuple[AcceptedTargetEvidence, ...]
+    resolution_assertions: tuple[ResolutionAssertion, ...]
+
+    @model_validator(mode="after")
+    def validate_f04_scope(self):
+        if self.session_id != self.scope.session_id:
+            raise ValueError("Correction scope mismatch")
+        for assertion in self.resolution_assertions:
+            index = assertion.accepted_target_evidence_index
+            if index is None or index >= len(self.accepted_target_evidence):
+                raise ValueError("Correction assertion lacks accepted canonical evidence")
+            accepted = self.accepted_target_evidence[index]
+            if (
+                accepted.target != assertion.target
+                or accepted.source_message_id != assertion.source_message_id
+            ):
+                raise ValueError("Correction assertion target/source mismatch")
+        return self
+
+
+def decode_correction_result(value):
+    payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+    if isinstance(payload, dict) and payload.get("correction_version") == "2.0.0":
+        return CorrectionReenrichmentResultV2.model_validate(payload)
+    return CorrectionReenrichmentResult.model_validate(payload)
+
+
 def process_user_correction(
     correction: UserCorrection,
     *,
@@ -187,14 +230,19 @@ def process_user_correction(
     parametric_knowledge: ParametricKnowledgeBundle,
     created_at: datetime,
     template_id: str = "jewelry_visualization",
+    _evaluation_builder=None,
+    _result_type=CorrectionReenrichmentResult,
+    _answer_reader=ClarificationAnswerResult,
+    _finalize_payload=None,
 ) -> CorrectionReenrichmentResult:
     """Apply one safe correction and prepare the next immutable enrichment-cycle payload."""
 
+    evaluate = _evaluation_builder or _evaluate
     request = UserCorrection.model_validate(correction)
     revision = validate_design_revision(current_revision)
     templates = PromptTemplateBundle.model_validate(templates)
     parametric_knowledge = ParametricKnowledgeBundle.model_validate(parametric_knowledge)
-    answers = tuple(ClarificationAnswerResult.model_validate(item) for item in prior_answer_results)
+    answers = tuple(_answer_reader.model_validate(item) for item in prior_answer_results)
 
     if request.session_id != authoritative_session_id:
         raise CorrectionInputError(
@@ -224,7 +272,7 @@ def process_user_correction(
         dictionary=dictionary,
         knowledge_runtime=verified.compiled_runtime,
     )
-    evaluation = _evaluate(
+    evaluation = evaluate(
         revision,
         parsed,
         request,
@@ -259,7 +307,7 @@ def process_user_correction(
         outcome, reason = _nonmutating_outcome(evaluation)
 
     post_transition = (
-        _evaluate(
+        evaluate(
             authoritative,
             parsed,
             request,
@@ -301,9 +349,11 @@ def process_user_correction(
         "outcome": outcome,
         "reason": reason,
     }
+    if _finalize_payload is not None:
+        payload = _finalize_payload(payload)
     semantic_hash = _hash(_semantic_payload(payload))
     content_payload = _json({**payload, "semantic_hash": semantic_hash})
-    return CorrectionReenrichmentResult(
+    return _result_type(
         **payload,
         semantic_hash=semantic_hash,
         content_hash=_hash(content_payload),
@@ -353,6 +403,14 @@ def _validate_artifacts(request, dictionary, templates):
         )
 
 
+def _decode_correction_enrichment(value):
+    if isinstance(value, StructuredPromptEnrichmentResultV2):
+        from jewelai_prompts.enrichment import decode_f04_prompt_enrichment_result
+
+        return decode_f04_prompt_enrichment_result(value)
+    return decode_prompt_enrichment_result(value)
+
+
 def _validate_previous_cycle(request, cycle):
     if (
         cycle.session_id != request.session_id
@@ -365,7 +423,7 @@ def _validate_previous_cycle(request, cycle):
             "correction does not match the previous append-only enrichment cycle",
         )
     try:
-        result = decode_prompt_enrichment_result(cycle.result)
+        result = _decode_correction_enrichment(cycle.result)
     except ValueError as exc:
         raise CorrectionInputError(
             CorrectionErrorCode.PREVIOUS_CYCLE_MISMATCH,
@@ -379,7 +437,7 @@ def _validate_previous_cycle(request, cycle):
 
 
 def _validate_parametric_lineage(result, catalog):
-    result = decode_prompt_enrichment_result(result)
+    result = _decode_correction_enrichment(result)
     expected = (catalog.catalog_id, str(catalog.artifact_version), catalog.sha256)
     actual = (
         result.parametric_catalog_id,

@@ -741,7 +741,7 @@ def _readiness(snapshot, unresolved):
     return FinalPromptReadiness.READY, snapshot.rule_decision.reason
 
 
-def _description(snapshot, dictionary, facts, constraints, unresolved):
+def _description(snapshot, dictionary, facts, constraints, unresolved, *, _empty_text=None):
     locale = DictionaryLocale(snapshot.locale)
     fact_map = {item.target: item for item in facts if item.applicability == "value"}
     sentences = []
@@ -876,7 +876,7 @@ def _description(snapshot, dictionary, facts, constraints, unresolved):
             + "; ".join(unresolved_summary)
             + "."
         )
-    text = " ".join(sentences)
+    text = " ".join(sentences) or _empty_text or ""
     _check_current_text_capacity(text)
     payload = {
         "schema_version": DESCRIPTION_SCHEMA_VERSION,

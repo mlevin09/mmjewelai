@@ -313,7 +313,7 @@ class GenerationPreparationRow(Base):
             ],
             ondelete="RESTRICT",
         ),
-        CheckConstraint("schema_version = '1.0.0'", name="ck_preparation_version"),
+        CheckConstraint("schema_version IN ('1.0.0', '2.0.0')", name="ck_preparation_version"),
         CheckConstraint("length(artifact_bytes) <= 2097152", name="ck_preparation_artifact_size"),
         Index("ix_preparation_session_created", "session_id", "created_at"),
     )

@@ -222,7 +222,7 @@ def _explicit_canonical_version(value: object) -> str:
     if not isinstance(value, Mapping):
         raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
     version = value.get("schema_version")
-    if not isinstance(version, str) or version not in ("2.0.0", "2.1.0"):
+    if not isinstance(version, str) or version not in ("2.0.0", "2.1.0", "3.0.0"):
         raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
     return version
 
@@ -232,7 +232,11 @@ def decode_canonical_internal_final_prompt(value: object) -> AnyCanonicalInterna
         value = _strict_json(value)
     elif hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
-    _explicit_canonical_version(value)
+    version = _explicit_canonical_version(value)
+    if version == "3.0.0":
+        from .final_prompt_v3 import CanonicalInternalFinalPromptV3
+
+        return CanonicalInternalFinalPromptV3.model_validate(value)
     return _IFP_DECODER.validate_python(value)
 
 
@@ -247,6 +251,10 @@ def decode_canonical_handoff(value: object) -> AnyCanonicalInternalFinalPromptHa
         or _explicit_canonical_version(value.get("internal_final_prompt")) != version
     ):
         raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
+    if version == "3.0.0":
+        from .final_prompt_v3 import CanonicalInternalFinalPromptHandoffV3
+
+        return CanonicalInternalFinalPromptHandoffV3.model_validate(value)
     return _HANDOFF_DECODER.validate_python(value)
 
 
@@ -326,7 +334,12 @@ class SemanticRendering(ImmutableModel):
     semantic_coverage: tuple[SemanticCoverage, ...]
 
 
-def _check_source(source: CanonicalInternalFinalPromptHandoff, gate: PreparationGateEvidence):
+def _check_source(
+    source: CanonicalInternalFinalPromptHandoff,
+    gate: PreparationGateEvidence,
+    *,
+    _validated_f04=False,
+):
     prompt = source.internal_final_prompt
     revision = gate.revision
     for item in (*prompt.design_facts, *prompt.constraints, *prompt.unresolved_details):
@@ -354,7 +367,7 @@ def _check_source(source: CanonicalInternalFinalPromptHandoff, gate: Preparation
         or gate.blocking_clarification_ids
         or gate.workflow_status in {"blocking_clarification_unresolved", "final_output_blocked"}
         or any(item.blocking for item in prompt.unresolved_details)
-        or any(item.blocks_progression for item in prompt.decision_lineage)
+        or (not _validated_f04 and any(item.blocks_progression for item in prompt.decision_lineage))
     ):
         raise GenerationPreparationError(PreparationErrorCode.NOT_READY)
     if gate.workflow_status in {"final_output_ready", "final_output_ready_with_unresolved"} and (
@@ -467,11 +480,15 @@ def _check_source(source: CanonicalInternalFinalPromptHandoff, gate: Preparation
                     item.normalized_instruction,
                 )
             )
-        if item.status == "unresolved" and not any(
-            u.target == (item.semantic_subject or "constraint.unresolved")
-            and u.classification == "ambiguous"
-            and item.evidence_id in u.source_ids
-            for u in prompt.unresolved_details
+        if (
+            not _validated_f04
+            and item.status == "unresolved"
+            and not any(
+                u.target == (item.semantic_subject or "constraint.unresolved")
+                and u.classification == "ambiguous"
+                and item.evidence_id in u.source_ids
+                for u in prompt.unresolved_details
+            )
         ):
             raise GenerationPreparationError(PreparationErrorCode.UNSUPPORTED_SEMANTICS)
     constraints = [(c.kind, c.target, c.instruction) for c in prompt.constraints]
@@ -607,10 +624,23 @@ def render_semantic_source(
     source = decode_canonical_handoff(source)
     gate = PreparationGateEvidence.model_validate_json(canonical_bytes(gate))
     _check_source(source, gate)
+    return _render_semantic_sections(source, gate)
+
+
+def _render_semantic_sections(
+    source,
+    gate,
+    *,
+    version="1.0.0",
+    model_type=SemanticRendering,
+    coverage_type=SemanticCoverage,
+    extra_sections=None,
+    unresolved_formatter=None,
+):
     prompt = source.internal_final_prompt
     aliases = _aliases(gate.revision)
     lines = [
-        "JEWELAI DESIGN INPUT 1.0.0",
+        f"JEWELAI DESIGN INPUT {version}",
         "Preserve requirements, prohibitions, KEEP and LOCKED values. "
         "Do not invent dimensions or promote references/unresolved items to requirements.",
     ]
@@ -623,7 +653,7 @@ def render_semantic_source(
         for pointer, text in items:
             lines.append(text)
             coverage.append(
-                SemanticCoverage(
+                coverage_type(
                     source_pointer=pointer, rendered_section=name, rendered_ordinal=len(lines)
                 )
             )
@@ -695,7 +725,11 @@ def render_semantic_source(
         [
             (
                 f"/internal_final_prompt/unresolved_details/{i}",
-                f"{_alias(u.target, aliases)}: {u.classification}; not an accepted requirement",
+                unresolved_formatter(u, aliases)
+                if unresolved_formatter
+                else (
+                    f"{_alias(u.target, aliases)}: {u.classification}; not an accepted requirement"
+                ),
             )
             for i, u in sorted(
                 enumerate(prompt.unresolved_details),
@@ -703,16 +737,23 @@ def render_semantic_source(
             )
         ],
     )
+    if extra_sections is not None:
+        extra_sections(section, lines, coverage)
     text = "\n".join(lines)
     raw = text.encode("utf-8")
     if len(text) > RENDER_MAX_CHARACTERS or len(raw) > RENDER_MAX_BYTES:
         raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
-    return SemanticRendering(
+    return model_type(
+        **(
+            {"schema_version": version, "renderer_id": RENDERER_ID, "renderer_version": version}
+            if version != "1.0.0"
+            else {}
+        ),
         rendering_text=text,
         rendering_characters=len(text),
         rendering_utf8_bytes=len(raw),
         rendering_hash=hashlib.sha256(
-            b"jewelai.preparation.render/jewelai.semantic-text/1.0.0\0" + raw
+            f"jewelai.preparation.render/jewelai.semantic-text/{version}\0".encode("ascii") + raw
         ).hexdigest(),
         semantic_coverage=tuple(coverage),
     )
@@ -745,42 +786,46 @@ class GenerationPreparationPayload(ImmutableModel):
 
     @model_validator(mode="after")
     def validate_preparation(self):
-        prompt = self.source_handoff.internal_final_prompt
-        if (
-            any(
-                getattr(self, key) != getattr(prompt, key)
-                for key in (
-                    "organization_id",
-                    "session_id",
-                    "design_id",
-                    "product_state_revision_id",
-                    "enrichment_cycle_id",
-                    "enrichment_cycle_number",
-                )
+        return _validate_preparation_payload(self, version="1.0.0", renderer=render_semantic_source)
+
+
+def _validate_preparation_payload(self, *, version, renderer):
+    prompt = self.source_handoff.internal_final_prompt
+    if (
+        any(
+            getattr(self, key) != getattr(prompt, key)
+            for key in (
+                "organization_id",
+                "session_id",
+                "design_id",
+                "product_state_revision_id",
+                "enrichment_cycle_id",
+                "enrichment_cycle_number",
             )
-            or self.enrichment_result_hash != prompt.enrichment_result_content_hash
-        ):
-            raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
-        source_bytes = canonical_bytes(self.source_handoff)
-        if len(source_bytes) + len(canonical_bytes(self.gate_evidence)) > SOURCE_MAX_BYTES:
-            raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
-        if (
-            self.source_handoff_hash != self.source_handoff.content_hash
-            or self.source_bytes_sha256 != hashlib.sha256(source_bytes).hexdigest()
-            or self.gate_evidence_hash
-            != preparation_hash("jewelai.preparation.gate/1.0.0", self.gate_evidence)
-        ):
-            raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
-        if self.execution != render_semantic_source(self.source_handoff, self.gate_evidence):
-            raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
-        if self.artifact_hash != preparation_hash(
-            "jewelai.preparation.artifact/1.0.0",
-            self.model_dump(mode="json", exclude={"artifact_hash"}),
-        ):
-            raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
-        if len(canonical_bytes(self)) > ARTIFACT_MAX_BYTES:
-            raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
-        return self
+        )
+        or self.enrichment_result_hash != prompt.enrichment_result_content_hash
+    ):
+        raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
+    source_bytes = canonical_bytes(self.source_handoff)
+    if len(source_bytes) + len(canonical_bytes(self.gate_evidence)) > SOURCE_MAX_BYTES:
+        raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
+    if (
+        self.source_handoff_hash != self.source_handoff.content_hash
+        or self.source_bytes_sha256 != hashlib.sha256(source_bytes).hexdigest()
+        or self.gate_evidence_hash
+        != preparation_hash(f"jewelai.preparation.gate/{version}", self.gate_evidence)
+    ):
+        raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
+    if self.execution != renderer(self.source_handoff, self.gate_evidence):
+        raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
+    if self.artifact_hash != preparation_hash(
+        f"jewelai.preparation.artifact/{version}",
+        self.model_dump(mode="json", exclude={"artifact_hash"}),
+    ):
+        raise GenerationPreparationError(PreparationErrorCode.INTEGRITY)
+    if len(canonical_bytes(self)) > ARTIFACT_MAX_BYTES:
+        raise GenerationPreparationError(PreparationErrorCode.CAPACITY)
+    return self
 
 
 @dataclass(frozen=True, slots=True)
@@ -827,6 +872,17 @@ def build_generation_preparation(
     created_at: datetime,
 ) -> GenerationPreparation:
     """Pure preparation. B2 must supply transaction-scoped, authenticated, verified evidence."""
+    source_version = (
+        source_handoff.get("schema_version")
+        if isinstance(source_handoff, dict)
+        else getattr(source_handoff, "schema_version", None)
+    )
+    if source_version == "3.0.0":
+        from .downstream_preparation_v2 import build_generation_preparation_v2
+
+        return build_generation_preparation_v2(
+            source_handoff, gate_evidence, preparation_id=preparation_id, created_at=created_at
+        )
     original_source = canonical_bytes(source_handoff)
     original_gate = canonical_bytes(gate_evidence)
     try:

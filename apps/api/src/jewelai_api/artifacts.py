@@ -1,5 +1,7 @@
 """Deterministic loading of one explicitly versioned runtime artifact bundle."""
 
+import hashlib
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -33,9 +35,17 @@ class RuntimeArtifacts:
     prompts: PromptTemplateBundle
     parametric_knowledge: ParametricKnowledgeBundle
     versions: ArtifactVersions
+    source_root: Path | None = None
+    artifact_hashes: tuple[tuple[str, str], ...] = ()
 
 
 def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArtifacts:
+    # A version is a trusted server pin, never an arbitrary path supplied by a client.
+    if any(
+        not isinstance(version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version)
+        for version in vars(versions).values()
+    ):
+        raise ArtifactConfigurationError("Artifact pins must be exact semantic versions")
     paths = {
         "roles": root / "data" / "roles" / f"v{versions.roles}.json",
         "dictionary": root / "data" / "dictionary" / f"v{versions.dictionary}.json",
@@ -47,6 +57,14 @@ def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArt
     missing = tuple(str(path) for path in paths.values() if not path.is_file())
     if missing:
         raise ArtifactConfigurationError(f"Configured artifact files are missing: {missing}")
+    if (versions.questions, versions.rules) not in {
+        ("1.0.0", "1.0.0"),
+        ("2.0.0", "2.0.0"),
+    }:
+        raise ArtifactConfigurationError("Unsupported Question/Rules profile tuple")
+    hashes = tuple(
+        sorted((key, hashlib.sha256(path.read_bytes()).hexdigest()) for key, path in paths.items())
+    )
     try:
         roles = load_role_profiles(paths["roles"])
         dictionary = load_domain_dictionary(paths["dictionary"])
@@ -68,6 +86,10 @@ def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArt
         raise ArtifactConfigurationError(
             f"Configured artifact versions {versions} do not match loaded versions {actual}"
         )
+    if hashes != tuple(
+        sorted((key, hashlib.sha256(path.read_bytes()).hexdigest()) for key, path in paths.items())
+    ):
+        raise ArtifactConfigurationError("Artifact bytes changed while loading")
     return RuntimeArtifacts(
         roles,
         dictionary,
@@ -76,4 +98,31 @@ def load_runtime_artifacts(root: Path, versions: ArtifactVersions) -> RuntimeArt
         prompts,
         parametric_knowledge,
         versions,
+        root.resolve(),
+        hashes,
     )
+
+
+def session_runtime_artifacts(defaults: RuntimeArtifacts, session) -> RuntimeArtifacts:
+    """Resolve a retained server-side session tuple without changing creation defaults.
+
+    The session has already been fetched in authenticated organization scope. No request
+    field, filename, current release or implicit 'latest' is an artifact authority.
+    Each return value is immutable and request-local; concurrent L/F requests cannot
+    change a shared service's artifacts.
+    """
+    versions = ArtifactVersions(
+        roles=session.role_artifact_version,
+        dictionary=session.dictionary_artifact_version,
+        questions=session.question_artifact_version,
+        rules=session.rules_artifact_version,
+        prompts=session.prompt_artifact_version,
+        knowledge_base=defaults.versions.knowledge_base,
+    )
+    if (versions.questions, versions.rules) not in {("1.0.0", "1.0.0"), ("2.0.0", "2.0.0")}:
+        raise ArtifactConfigurationError("Unsupported retained session profile")
+    if versions == defaults.versions:
+        return defaults
+    if defaults.source_root is None:
+        raise ArtifactConfigurationError("Pinned session artifact source is unavailable")
+    return load_runtime_artifacts(defaults.source_root, versions)

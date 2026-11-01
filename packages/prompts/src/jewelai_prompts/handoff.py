@@ -103,12 +103,17 @@ def build_internal_final_prompt_handoff(
             CanonicalInternalFinalPromptHandoff,
             CanonicalInternalFinalPromptHandoffV2_1,
         )
+        from .final_prompt_v3 import (
+            CanonicalFinalPromptAssemblyV3,
+            CanonicalInternalFinalPromptHandoffV3,
+        )
 
         # Exact version dispatch; no latest/default or validation-fallback probing.
         version = final_output.get("internal_final_prompt", {}).get("schema_version")
         assembly_type, handoff_type = {
             "2.0.0": (CanonicalFinalPromptAssembly, CanonicalInternalFinalPromptHandoff),
             "2.1.0": (CanonicalFinalPromptAssemblyV2_1, CanonicalInternalFinalPromptHandoffV2_1),
+            "3.0.0": (CanonicalFinalPromptAssemblyV3, CanonicalInternalFinalPromptHandoffV3),
         }[version]
         assembly = assembly_type.model_validate(final_output)
     except (ValidationError, TypeError, ValueError, KeyError, AttributeError) as exc:

@@ -1,12 +1,13 @@
 """FastAPI app factory and thin HTTP routing boundary."""
 
+import json
 import os
 from collections.abc import Callable
 from datetime import datetime
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, File, Header, Request, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -76,6 +77,12 @@ from pydantic import ValidationError
 from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
+from .clarification_v2 import (
+    ClarificationAnswerRequestV2,
+    CorrectionRequestV2,
+    InitialRequestV2,
+    ResumeRequest,
+)
 from .generation import (
     GenerationProfileRegistry,
     NoVisualizationProfilesError,
@@ -87,12 +94,20 @@ from .middleware import (
     RequestObservabilityMiddleware,
     configure_json_logger,
 )
-from .preparation_contracts import GenerationPreparationRequest, GenerationPreparationSummary
+from .preparation_contracts import (
+    GenerationPreparationRequest,
+    GenerationPreparationRequestV2,
+    GenerationPreparationSummary,
+    GenerationPreparationSummaryV2,
+)
 from .prompt_enrichment_composition import compose_prompt_enrichment_runtime
 from .prompt_enrichment_runtime import (
     InitialEnrichmentRequest,
+    InitialEnrichmentRequestV2,
     PersistedClarificationAnswerRequest,
+    PersistedClarificationAnswerRequestV2,
     PersistedUserCorrectionRequest,
+    PersistedUserCorrectionRequestV2,
     PromptEnrichmentRuntimeError,
     PromptEnrichmentRuntimeErrorCode,
     PromptEnrichmentRuntimeService,
@@ -126,13 +141,18 @@ from .schemas import (
     ProjectResponse,
     PromptEnrichmentAnswerRequest,
     PromptEnrichmentAnswerResponse,
+    PromptEnrichmentAnswerResponseV2,
     PromptEnrichmentCorrectionRequest,
     PromptEnrichmentCorrectionResponse,
+    PromptEnrichmentCorrectionResponseV2,
     PromptEnrichmentFinalOutputResponse,
+    PromptEnrichmentFinalOutputResponseV3,
     PromptEnrichmentInitialRequest,
     PromptEnrichmentOptionResponse,
     PromptEnrichmentQuestionResponse,
+    PromptEnrichmentResumeResponse,
     PromptEnrichmentStateResponse,
+    PromptEnrichmentStateResponseV2,
     PromptRevisionListResponse,
     PromptRevisionResponse,
     ReferenceBindingListResponse,
@@ -172,6 +192,35 @@ class UnsupportedAssetMediaTypeError(ValueError):
 
 class AssetTooLargeError(ValueError):
     pass
+
+
+async def _strict_f04_request_body(request: Request):
+    """Keep new evidence unambiguous without changing retained L wire handling."""
+    duplicates = []
+    constants = []
+
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                duplicates.append(key)
+            result[key] = value
+        return result
+
+    try:
+        value = json.loads(
+            await request.body(),
+            object_pairs_hook=pairs,
+            parse_constant=lambda item: constants.append(item),
+        )
+    except (ValueError, UnicodeError):
+        return  # Existing FastAPI syntax validation remains authoritative.
+    if (
+        isinstance(value, dict)
+        and (value.get("schema_version") == "2.0.0" or request.url.path.endswith("/resume"))
+        and (duplicates or constants)
+    ):
+        raise HTTPException(status_code=422, detail="Invalid typed F04 JSON evidence")
 
 
 def create_app(
@@ -555,6 +604,10 @@ def create_app(
 
     AuthorizedOrganization = Annotated[UUID, Depends(require_header_organization)]
 
+    async def validate_f04_request_body(request: Request, organization_id: AuthorizedOrganization):
+        # Authorization remains ahead of new wire validation and duplicate handling.
+        await _strict_f04_request_body(request)
+
     @app.get("/me", response_model=MeResponse)
     def get_me(principal: Authenticated):
         return service.get_me(principal)
@@ -569,11 +622,12 @@ def create_app(
 
     @app.post(
         "/sessions/{session_id}/generation-preparations",
-        response_model=GenerationPreparationSummary,
+        dependencies=[Depends(validate_f04_request_body)],
+        response_model=GenerationPreparationSummary | GenerationPreparationSummaryV2,
     )
     def create_generation_preparation(
         session_id: UUID,
-        request: GenerationPreparationRequest,
+        request: GenerationPreparationRequest | GenerationPreparationRequestV2,
         principal: Authenticated,
         organization_id: AuthorizedOrganization,
         response: Response,
@@ -595,7 +649,7 @@ def create_app(
 
     @app.get(
         "/sessions/{session_id}/generation-preparations/{preparation_id}",
-        response_model=GenerationPreparationSummary,
+        response_model=GenerationPreparationSummary | GenerationPreparationSummaryV2,
     )
     def get_generation_preparation(
         session_id: UUID,
@@ -1052,16 +1106,24 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/initial",
-            response_model=PromptEnrichmentStateResponse,
+            dependencies=[Depends(validate_f04_request_body)],
+            response_model=PromptEnrichmentStateResponse | PromptEnrichmentStateResponseV2,
             status_code=201,
         )
         def start_prompt_enrichment(
             session_id: UUID,
-            request: PromptEnrichmentInitialRequest,
+            request: PromptEnrichmentInitialRequest | InitialRequestV2,
             organization_id: AuthorizedOrganization,
         ):
             result = prompt_enrichment_service.start_initial_message(
-                InitialEnrichmentRequest(
+                (
+                    InitialEnrichmentRequestV2
+                    if isinstance(request, InitialRequestV2)
+                    else InitialEnrichmentRequest
+                )(
+                    **(
+                        {"schema_version": "2.0.0"} if isinstance(request, InitialRequestV2) else {}
+                    ),
                     session_id=session_id,
                     organization_id=organization_id,
                     expected_revision_id=request.expected_revision_id,
@@ -1072,7 +1134,7 @@ def create_app(
 
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/state",
-            response_model=PromptEnrichmentStateResponse,
+            response_model=PromptEnrichmentStateResponse | PromptEnrichmentStateResponseV2,
         )
         def get_prompt_enrichment_state(
             session_id: UUID,
@@ -1084,16 +1146,30 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarification-answers",
-            response_model=PromptEnrichmentAnswerResponse,
+            dependencies=[Depends(validate_f04_request_body)],
+            response_model=PromptEnrichmentAnswerResponse | PromptEnrichmentAnswerResponseV2,
         )
         def answer_prompt_enrichment_clarification(
             session_id: UUID,
-            request: PromptEnrichmentAnswerRequest,
+            request: PromptEnrichmentAnswerRequest | ClarificationAnswerRequestV2,
             organization_id: AuthorizedOrganization,
         ):
             result, state = prompt_enrichment_service.record_persisted_clarification_answer(
                 organization_id,
-                PersistedClarificationAnswerRequest(
+                (
+                    PersistedClarificationAnswerRequestV2
+                    if isinstance(request, ClarificationAnswerRequestV2)
+                    else PersistedClarificationAnswerRequest
+                )(
+                    **(
+                        {
+                            "schema_version": "2.0.0",
+                            "plan_content_hash": request.plan_content_hash,
+                            "selected_option_id": request.selected_option_id,
+                        }
+                        if isinstance(request, ClarificationAnswerRequestV2)
+                        else {}
+                    ),
                     session_id=session_id,
                     clarification_plan_id=request.clarification_plan_id,
                     clarification_id=request.clarification_id,
@@ -1104,7 +1180,16 @@ def create_app(
                     message_id=request.message_id,
                 ),
             )
-            return PromptEnrichmentAnswerResponse(
+            return (
+                PromptEnrichmentAnswerResponseV2
+                if getattr(state, "schema_version", None) == "2.0.0"
+                else PromptEnrichmentAnswerResponse
+            )(
+                **(
+                    {"schema_version": "2.0.0"}
+                    if getattr(state, "schema_version", None) == "2.0.0"
+                    else {}
+                ),
                 answer_content_hash=result.content_hash,
                 outcome=result.outcome.value,
                 state=_prompt_enrichment_state(state),
@@ -1112,30 +1197,79 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/corrections",
-            response_model=PromptEnrichmentCorrectionResponse,
+            dependencies=[Depends(validate_f04_request_body)],
+            response_model=PromptEnrichmentCorrectionResponse
+            | PromptEnrichmentCorrectionResponseV2,
         )
         def correct_prompt_enrichment(
             session_id: UUID,
-            request: PromptEnrichmentCorrectionRequest,
+            request: PromptEnrichmentCorrectionRequest | CorrectionRequestV2,
             organization_id: AuthorizedOrganization,
         ):
             result, state = prompt_enrichment_service.apply_persisted_user_correction(
                 organization_id,
-                PersistedUserCorrectionRequest(
+                (
+                    PersistedUserCorrectionRequestV2
+                    if isinstance(request, CorrectionRequestV2)
+                    else PersistedUserCorrectionRequest
+                )(
+                    **(
+                        {
+                            "schema_version": "2.0.0",
+                            "expected_enrichment_cycle_id": (request.expected_enrichment_cycle_id),
+                            "expected_enrichment_result_hash": (
+                                request.expected_enrichment_result_hash
+                            ),
+                            "expected_clarification_plan_hash": (
+                                request.expected_clarification_plan_hash
+                            ),
+                        }
+                        if isinstance(request, CorrectionRequestV2)
+                        else {}
+                    ),
                     session_id=session_id,
                     expected_revision_id=request.expected_revision_id,
                     message_id=request.message_id,
                 ),
             )
-            return PromptEnrichmentCorrectionResponse(
+            return (
+                PromptEnrichmentCorrectionResponseV2
+                if getattr(state, "schema_version", None) == "2.0.0"
+                else PromptEnrichmentCorrectionResponse
+            )(
+                **(
+                    {"schema_version": "2.0.0"}
+                    if getattr(state, "schema_version", None) == "2.0.0"
+                    else {}
+                ),
                 correction_content_hash=result.content_hash,
                 outcome=result.outcome.value,
                 state=_prompt_enrichment_state(state),
             )
 
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/clarifications/{cause_id}/resume",
+            dependencies=[Depends(validate_f04_request_body)],
+            response_model=PromptEnrichmentResumeResponse,
+        )
+        def resume_prompt_enrichment_clarification(
+            session_id: UUID,
+            cause_id: str,
+            request: ResumeRequest,
+            organization_id: AuthorizedOrganization,
+        ):
+            result, state = prompt_enrichment_service.resume_clarification(
+                session_id, organization_id, cause_id, request
+            )
+            return {
+                "result": result.model_dump(mode="json"),
+                "state": _prompt_enrichment_state(state).model_dump(mode="json"),
+            }
+
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/final-output",
-            response_model=PromptEnrichmentFinalOutputResponse,
+            response_model=PromptEnrichmentFinalOutputResponse
+            | PromptEnrichmentFinalOutputResponseV3,
         )
         def get_prompt_enrichment_final_output(
             session_id: UUID,
@@ -1147,7 +1281,16 @@ def create_app(
                     PromptEnrichmentRuntimeErrorCode.FINAL_OUTPUT_BLOCKED,
                     "Provider-neutral final output is not ready",
                 )
-            return PromptEnrichmentFinalOutputResponse(
+            return (
+                PromptEnrichmentFinalOutputResponseV3
+                if getattr(state, "schema_version", None) == "2.0.0"
+                else PromptEnrichmentFinalOutputResponse
+            )(
+                **(
+                    {"schema_version": "3.0.0"}
+                    if getattr(state, "schema_version", None) == "2.0.0"
+                    else {}
+                ),
                 description=state.final_output.description,
                 internal_final_prompt=state.final_output.internal_final_prompt,
             )
@@ -1172,6 +1315,29 @@ def _prompt_enrichment_state(
 ) -> PromptEnrichmentStateResponse:
     plan = state.clarification_plan
     final = state.final_output
+    if getattr(state, "schema_version", None) == "2.0.0":
+        return PromptEnrichmentStateResponseV2(
+            schema_version="2.0.0",
+            contract_profile=state.contract_profile,
+            current_plan_version="2.0.0",
+            authoritative_revision_id=state.authoritative_revision_id,
+            enrichment_cycle_id=state.enrichment_cycle_id,
+            enrichment_cycle_number=state.enrichment_cycle_number,
+            knowledge_release=state.knowledge_release,
+            status=state.status.value,
+            clarification_plan_id=state.clarification_plan_id,
+            clarification_plan_content_hash=plan.content_hash,
+            clarification_questions=plan.questions,
+            can_continue_without_answers=plan.can_continue_without_answers,
+            description=final.description,
+            internal_final_prompt_content_hash=final.internal_final_prompt.content_hash,
+            internal_final_prompt_readiness=final.internal_final_prompt.readiness.value,
+            preparation_expectations=state.preparation_expectations,
+            can_prepare=state.can_prepare,
+            availability_overlay_hash=state.availability_overlay_hash,
+            effective_unresolved_frontier_hash=state.effective_unresolved_frontier_hash,
+            current_unresolved_causal_summaries=state.current_unresolved_causal_summaries,
+        )
     return PromptEnrichmentStateResponse(
         authoritative_revision_id=state.authoritative_revision_id,
         enrichment_cycle_id=state.enrichment_cycle_id,
