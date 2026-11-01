@@ -20,7 +20,6 @@ from jewelai_domain.preservation_release import (
 )
 from jewelai_domain.revisions import RevisionConflict, revise_design
 from jewelai_parser import ParserTarget
-from jewelai_prompts import enrich_prompt_with_active_release
 from jewelai_prompts.continuation import continuation_cycle
 
 from .clarification_answers import ClarificationAnswerError, _parser_proposal, _resolve_decision
@@ -29,7 +28,7 @@ from .continuation_planning import native_plan_view
 from .continuation_preview import ContinuationReadError
 from .continuation_results import KeepAnswerResultV3, NativeAnswerResultV3
 from .f04_frontier import accepted_target, correction_accepted_targets, resolving_assertions
-from .f04_planning import f04_enrichment, input_context
+from .f04_planning import input_context
 
 
 def _source(message):
@@ -57,20 +56,10 @@ def _next_native(service, repo, native, plan, after, *, cycle_id):
         )
     )
     bound.repository = repo
-    current = native.snapshot.enrichment_result.native
-    enriched = enrich_prompt_with_active_release(
-        after,
-        bound.artifacts.prompts,
-        bound.artifact_store,
-        knowledge_package_id=plan.context.release_pin.package_id,
-        knowledge_artifact_version=plan.context.release_pin.artifact_version,
-        active_release=bound.active_release,
-        validation_report=bound.validation_report,
-        proposals=tuple(d.proposal for d in current.decisions),
-        **bound._parametric_kwargs(after),
-    )
-    if plan.context.retained_base == "F":
-        context = input_context(
+    from .continuation_evaluation import canonical_native_result
+
+    source_context = (
+        input_context(
             plan.context.scope,
             native.snapshot.revision,
             cycle_id,
@@ -78,8 +67,10 @@ def _next_native(service, repo, native, plan, after, *, cycle_id):
             bound.artifacts,
             plan.context.release_pin,
         )
-        enriched = f04_enrichment(enriched, revision=after, context=context)
-    return enriched
+        if plan.context.retained_base == "F"
+        else None
+    )
+    return canonical_native_result(bound, after, plan.context, native_context=source_context)
 
 
 def prepare_answer(

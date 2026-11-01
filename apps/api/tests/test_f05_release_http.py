@@ -341,3 +341,100 @@ def test_two_same_field_intents_survive_accept_until_explicit_reject_closure(
             ctx.runtime.continuation_enabled = True
             assert state(ctx) == current
             assert output(ctx, current, projection=base == "L").json() == final.json()
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize(
+    "availability",
+    ["missing", "required", "optional", "undetermined", "not_applicable", "explicit"],
+)
+def test_schema11_all_additive_wrappers_survive_actual_release(
+    engine, tmp_path, base, availability
+):
+    from uuid import UUID
+
+    from jewelai_domain.models import MessageSource
+    from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
+    from jewelai_domain.revisions import revise_design
+    from test_f05_preview import state
+
+    with f04_session(engine, tmp_path) as ctx:
+        if base == "L":
+            ctx.sid = UUID(ctx.legacy["session_id"])
+        old = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        msg = _message(
+            ctx.client,
+            str(ctx.sid),
+            str(ctx.org),
+            "Explicit synthetic schema/state fixture; not professional Knowledge.",
+        )
+        source = MessageSource(message_id=msg["message_id"], recorded_at=old.created_at)
+        migrated = migrate_design_revision_v1_to_v1_1(
+            old,
+            revision_id=uuid4(),
+            created_at=old.created_at,
+            source=source,
+            reason="Explicit synthetic schema fixture",
+        )
+        ctx.repo.upgrade_design_session_schema_v1_1(ctx.sid, ctx.org, old.revision_id, migrated)
+        extra = (
+            "variety_or_type",
+            "material_origin_status",
+            "geographic_origin",
+            "treatment_status",
+            "treatments",
+            "cut_style_class",
+        )
+        data = migrated.design.model_dump(mode="json")
+        for field in extra:
+            if availability == "missing":
+                value = None
+            elif availability in {"required", "optional", "undetermined"}:
+                value = dict(availability="unknown", requirement=availability)
+            elif availability == "not_applicable":
+                value = dict(
+                    availability="not_applicable",
+                    reason="Explicit synthetic applicability fixture",
+                    source=source.model_dump(mode="json"),
+                )
+            else:
+                value = dict(
+                    availability="value",
+                    origin="explicit",
+                    value=["synthetic_fixture"] if field == "treatments" else "synthetic_fixture",
+                    source=source.model_dump(mode="json"),
+                    confirmed=False,
+                    locked=False,
+                )
+            data["center_stone"][field] = value
+        if availability != "missing":
+            seeded = revise_design(
+                migrated,
+                data,
+                expected_revision_id=migrated.revision_id,
+                source=source,
+                reason="Explicit synthetic canonical extra wrappers",
+                created_at=migrated.created_at,
+            )
+            ctx.repo.append_revision_cas(ctx.sid, ctx.org, migrated.revision_id, seeded)
+        initial(ctx, base)
+        ctx.runtime.continuation_enabled = True
+        response, _ = admit(ctx)
+        assert response.status_code == 201, response.json()
+        before = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        current = correct3(ctx, response.json()["current_state"], "Emerald cut center stone.")
+        offer = next(
+            q["offer"] for q in current["questions"] if q["question_kind"] == "KEEP_RELEASE"
+        )
+        current = answer3(ctx, current, offer, "ACCEPT")
+        after = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        assert after.design.center_stone.shape.value == "emerald_cut"
+        assert len(current["protection_projection"]["anchors"]) == 14
+        for field in type(before.design.center_stone).model_fields:
+            if field != "shape":
+                assert getattr(after.design.center_stone, field) == getattr(
+                    before.design.center_stone, field
+                )
+        with restart(ctx, engine):
+            assert state(ctx)["current_frame"] == current["current_frame"]
+            assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == after

@@ -162,3 +162,19 @@ canonical mutation or network call. Unsupported, negative and uncertain input
 cannot become affirmative updates. Correction3 persistence and typed release are
 separate authenticated runtime responsibilities; a parser/Matrix match is never
 consent.
+
+
+### Canonical Matrix versus candidate evidence
+
+The version3 correction keeps the actual Parse1.2 / ParserProposal / Matrix
+candidate evaluations before and after the canonical transition as immutable
+evidence. Matrix eligibility is not commit authority: an explicit numeric
+candidate can be APPLIED by Matrix policy while its canonical update is still
+withheld for KEEP consent or whole-batch deferral. Cycle3 therefore projects its
+current native Matrix from the actual committed canonical revision through the
+existing enrichment compiler, without replaying uncommitted candidate proposals
+as current facts. No Matrix cell or historical policy decision is relabelled.
+Current constraints, pending requests and the native question plan retain their
+separate sourced evidence. Answer3 likewise derives the next current projection
+from its actual committed canonical child. This preserves the approved authority
+boundary for scalar, dimensional and other supported values equally.

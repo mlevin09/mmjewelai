@@ -112,8 +112,6 @@ class ContinuationCorrectionResult(StrictEvidenceModel):
             or self.correction_evaluation.context != self.context
             or self.post_transition_evaluation.context != self.context
             or self.next_enrichment_result.context != self.context
-            or self.next_enrichment_result.native
-            != self.post_transition_evaluation.enrichment_result
             or self.next_enrichment_result.design_revision_id
             != str(self.authoritative_revision.revision_id)
             or self.next_enrichment_cycle_number != self.previous_head.enrichment_cycle_number + 1
@@ -281,9 +279,7 @@ class _AnswerResultV3(StrictEvidenceModel):
             or self.session_id != self.context.scope.session_id
             or self.previous_head != request.expected_head
             or self.previous_revision_id != self.previous_head.revision_id
-            or self.clarification_plan_id
-            != request.clarification_plan_id
-            != self.previous_head.plan_id
+            or self.clarification_plan_id != request.clarification_plan_id
             or self.clarification_plan_id != self.previous_head.plan_id
             or self.clarification_id != request.clarification_id
             or self.plan_content_hash != self.previous_head.plan_hash
@@ -365,6 +361,8 @@ class KeepAnswerResultV3(_AnswerResultV3):
             or self.decision != d.decision
             or self.outcome != d.outcome
             or self.new_revision_id != d.resulting_revision_id
+            or self.reason
+            != ("keep_release_authorized" if d.decision == "ACCEPT" else "keep_release_rejected")
         ):
             raise ValueError("Answer3 is not its exact typed KEEP decision")
         return self
@@ -384,6 +382,7 @@ class NativeAnswerResultV3(_AnswerResultV3):
             p.retained_base != self.context.retained_base
             or self.request.native.retained_base != p.retained_base
             or self.decision != self.request.native.decision
+            or self.reason not in {r.value for r in ClarificationAnswerReason}
         ):
             raise ValueError("Answer3 native profile/decision mismatch")
         if (

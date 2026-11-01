@@ -129,6 +129,16 @@ def test_r2_persisted_language_journey(engine, tmp_path, language, family, base)
             elif family == 7:
                 current = correct3(ctx, current, text["dimensions"])
                 assert len(current["protection_projection"]["pending_requests"]) == 2
+                actual_cycle = ctx.repo.list_enrichment_cycles(ctx.sid, ctx.org)[-1].result
+                cell = next(
+                    c
+                    for c in actual_cycle.native.final_matrix
+                    if c.target == "center_stone.dimensions"
+                )
+                assert (
+                    cell.value
+                    == before.design.center_stone.dimensions.model_dump(mode="json")["value"]
+                )
                 current = answer3(ctx, current, current_offer(current), "ACCEPT")
                 assert len(current["protection_projection"]["pending_requests"]) == 1
                 assert (

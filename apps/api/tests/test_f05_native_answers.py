@@ -60,6 +60,23 @@ def test_native_answer_cannot_bypass_current_keep(engine, tmp_path, base, decisi
         if decision in {"SELECT_OPTION", "ACCEPT"}:
             assert rows(ctx) == before
         else:
+            from copy import deepcopy
+
+            from jewelai_domain.preservation import contract_hash
+            from pydantic import TypeAdapter, ValidationError
+
+            from jewelai_api.continuation_results import ContinuationAnswerResult
+
+            payload3 = deepcopy(
+                ctx.repo.list_clarification_answers(ctx.sid, ctx.org)[-1].result_payload
+            )
+            payload3["reason"] = "keep_release_authorized"
+            payload3["content_hash"] = contract_hash(
+                "jewelai.AnswerResult/3.0.0",
+                {k: v for k, v in payload3.items() if k != "content_hash"},
+            )
+            with pytest.raises(ValidationError):
+                TypeAdapter(ContinuationAnswerResult).validate_python(payload3)
             with restart(ctx, engine):
                 ctx.runtime.continuation_enabled = True
                 result = ctx.client.get(

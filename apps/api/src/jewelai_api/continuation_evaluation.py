@@ -149,3 +149,31 @@ def evaluate_continuation_message(
         _parse_reader=FullMessageParseResultV1_2,
         _result_builder=build,
     )
+
+
+def canonical_native_result(service, revision, context, *, native_context=None):
+    """Current Matrix projects committed facts; candidate evaluations remain evidence.
+
+    An EXPLICIT numeric proposal may be Matrix-eligible while scoped consent is
+    still pending. It must not replace a fact in the current Cycle3 projection.
+    The existing compiler/Policy still owns Matrix construction; no cell is
+    patched or assigned a fabricated acceptance/KEEP disposition here.
+    """
+    from jewelai_prompts import enrich_prompt_with_active_release
+
+    native = enrich_prompt_with_active_release(
+        revision,
+        service.artifacts.prompts,
+        service.artifact_store,
+        knowledge_package_id=context.release_pin.package_id,
+        knowledge_artifact_version=context.release_pin.artifact_version,
+        active_release=service.active_release,
+        validation_report=service.validation_report,
+        proposals=(),
+        **service._parametric_kwargs(revision),
+    )
+    if context.retained_base == "F":
+        if native_context is None:
+            raise ValueError("Canonical F Matrix requires actual native source context")
+        return f04_enrichment(native, revision=revision, context=native_context)
+    return native

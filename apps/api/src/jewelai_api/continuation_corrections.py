@@ -27,7 +27,7 @@ from jewelai_domain.revisions import revise_design
 from jewelai_parser import CandidateCertainty, CandidateClassification
 from jewelai_prompts.continuation import continuation_cycle
 
-from .continuation_evaluation import evaluate_continuation_message
+from .continuation_evaluation import canonical_native_result, evaluate_continuation_message
 from .continuation_results import ContinuationCorrectionResult, correction_semantic_hash
 from .correction_enrichment import _nonmutating_outcome
 from .f04_frontier import correction_accepted_targets, resolving_assertions
@@ -243,7 +243,11 @@ def prepare_correction(
 
     constraints = correction_constraints(plan, post, source, authoritative, cycle_id, repo)
     carried = extend_protection(carried, authoritative, constraints, cycle_id)
-    enriched = continuation_cycle(context, post.enrichment_result, carried)
+    enriched = continuation_cycle(
+        context,
+        canonical_native_result(bound, authoritative, context, native_context=native_context),
+        carried,
+    )
     accepted, assertions = (), ()
     if context.retained_base == "F":
         accepted = correction_accepted_targets(
