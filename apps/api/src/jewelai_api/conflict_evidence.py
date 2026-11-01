@@ -130,6 +130,16 @@ def product_body_material_conflict(parsed, *, message, context, dictionary, know
         raise ValueError("Conflict input must match the persisted Message")
     if dictionary.artifact_version != context.artifact_pins.dictionary_artifact_version:
         raise ValueError("Conflict Dictionary pin mismatch")
+    if parsed.knowledge_package_id is not None and (
+        parsed.knowledge_package_id,
+        parsed.knowledge_artifact_version,
+        parsed.knowledge_runtime_sha256,
+    ) != (
+        context.release_pin.package_id,
+        context.release_pin.artifact_version,
+        context.release_pin.runtime_sha256,
+    ):
+        raise ValueError("Conflict Knowledge release pin mismatch")
     verified_parse = parse_full_message(
         message.content,
         locale=parsed.requested_locale,

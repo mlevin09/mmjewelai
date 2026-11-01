@@ -18,6 +18,7 @@ from test_enrichment import templates as templates
 from jewelai_prompts import enrich_prompt
 from jewelai_prompts.enrichment import (
     StructuredPromptEnrichmentResultV2,
+    decode_f04_prompt_enrichment_result,
     decode_prompt_enrichment_result,
 )
 
@@ -67,10 +68,12 @@ def payload(ring, templates, runtime):
 def test_f04_source_exact_reader_and_legacy_bytes(ring, templates, runtime):
     original, data = payload(ring, templates, runtime)
     before = original.model_dump_json()
-    parsed = decode_prompt_enrichment_result(data)
+    parsed = decode_f04_prompt_enrichment_result(data)
     assert isinstance(parsed, StructuredPromptEnrichmentResultV2)
     assert parsed.model_dump(mode="json") == data
     assert decode_prompt_enrichment_result(original).model_dump_json() == before
+    with pytest.raises(ValidationError):
+        decode_prompt_enrichment_result(data)
     assert ring.revision_id == parsed.availability_overlay.canonical_revision_id
 
 
@@ -81,7 +84,7 @@ def test_f04_missing_explicit_fields_rejected(ring, templates, runtime, field):
     _, data = payload(ring, templates, runtime)
     data.pop(field)
     with pytest.raises(ValidationError):
-        decode_prompt_enrichment_result(data)
+        decode_f04_prompt_enrichment_result(data)
 
 
 def test_f04_valid_checksum_cannot_hide_scope_mismatch(ring, templates, runtime):
@@ -90,4 +93,4 @@ def test_f04_valid_checksum_cannot_hide_scope_mismatch(ring, templates, runtime)
     data["scope"]["session_id"] = str(uuid4())
     data["content_hash"] = evidence_hash({k: v for k, v in data.items() if k != "content_hash"})
     with pytest.raises(ValidationError, match="context mismatch"):
-        decode_prompt_enrichment_result(data)
+        decode_f04_prompt_enrichment_result(data)

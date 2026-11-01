@@ -15,6 +15,8 @@ from jewelai_domain.clarification_state import (
     ReleasePin,
 )
 from jewelai_parser import parse_full_message
+from test_parsed_enrichment import collision_release as collision_release
+from test_parsed_enrichment import dictionary as dictionary
 
 from jewelai_api.conflict_evidence import product_body_material_conflict
 
@@ -67,6 +69,8 @@ def context(dictionary):
         ("Gold или платина.", "ru", "alternative"),
         ("Gold body. Platinum body.", "en", "competing"),
         ("A platinum ring. Platinum metal.", "en", "equivalent"),
+        ("Gold or platinum or gold ring.", "en", "alternative"),
+        ("Gold or gold ring.", "en", "equivalent"),
     ),
 )
 def test_actual_source_conflict_evidence(text, locale, kind):
@@ -87,7 +91,7 @@ def test_actual_source_conflict_evidence(text, locale, kind):
         text[o.evidence_start : o.evidence_end] == o.evidence_text for o in actual.occurrences
     )
     assert all(o.message_id == message.message_id for o in actual.occurrences)
-    assert len(actual.occurrences) == 2
+    assert len(actual.occurrences) == (3 if text == "Gold or platinum or gold ring." else 2)
     assert actual.target.concrete_target == "metal.material"
 
 
@@ -138,6 +142,51 @@ def source_message(text, ctx):
     return SimpleNamespace(
         content=text, message_id=uuid4(), session_id=ctx.scope.session_id, actor="user"
     )
+
+
+def test_knowledge_mirror_cannot_add_explicit_material_authority(collision_release):
+    _, _, compiled, _, active = collision_release
+    dictionary = load_domain_dictionary(ROOT / "data/dictionary/v1.0.0.json")
+    text = "Gold or platinum ring."
+    parsed = parse_full_message(
+        text, locale="en", dictionary=dictionary, knowledge_runtime=compiled
+    )
+    raw = context(dictionary).model_dump(mode="json")
+    raw["release_pin"] = dict(
+        package_id=active.package_id,
+        artifact_version=active.artifact_version,
+        runtime_sha256=active.runtime_sha256,
+        validation_report_sha256=active.validation_report_sha256,
+    )
+    ctx = InputContext.model_validate(raw)
+    conflict = product_body_material_conflict(
+        parsed,
+        message=source_message(text, ctx),
+        context=ctx,
+        dictionary=dictionary,
+        knowledge_runtime=compiled,
+    )
+    assert conflict is not None and len(conflict.occurrences) == 2
+    assert all(o.normalization_source == "domain_dictionary" for o in conflict.occurrences)
+    assert len(parsed.candidates) > len(conflict.occurrences)
+
+
+def test_source_knowledge_identity_cannot_be_swapped(collision_release):
+    _, _, compiled, _, _ = collision_release
+    dictionary = load_domain_dictionary(ROOT / "data/dictionary/v1.0.0.json")
+    text = "Gold or platinum ring."
+    parsed = parse_full_message(
+        text, locale="en", dictionary=dictionary, knowledge_runtime=compiled
+    )
+    ctx = context(dictionary)
+    with pytest.raises(ValueError, match="Knowledge release pin"):
+        product_body_material_conflict(
+            parsed,
+            message=source_message(text, ctx),
+            context=ctx,
+            dictionary=dictionary,
+            knowledge_runtime=compiled,
+        )
 
 
 @pytest.mark.parametrize("foreign", ("actor", "session"))

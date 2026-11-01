@@ -266,9 +266,14 @@ def decode_prompt_enrichment_result(value: object) -> AnyPromptEnrichmentResult:
     """Verify the ORIGINAL version/hash, including nested historical payloads; never rewrite."""
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
-    if isinstance(value, dict) and value.get("enrichment_version") == "2.0.0":
-        return StructuredPromptEnrichmentResultV2.model_validate(value)
     return _ENRICHMENT_DECODER.validate_python(value)
+
+
+def decode_f04_prompt_enrichment_result(value: object) -> StructuredPromptEnrichmentResultV2:
+    """Isolated F codec; do not widen legacy durable readers before scoped dispatch exists."""
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    return StructuredPromptEnrichmentResultV2.model_validate(value)
 
 
 def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjection:

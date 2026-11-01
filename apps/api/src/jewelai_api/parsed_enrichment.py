@@ -206,6 +206,16 @@ def enrich_parsed_candidates_with_active_release(
             prepared[candidate.candidate_id] = update
 
     by_target: dict[str, list[str]] = {}
+    if equivalent_candidate_ids and (
+        len(equivalent_candidate_ids) < 2
+        or len(set(equivalent_candidate_ids)) != len(equivalent_candidate_ids)
+        or not set(equivalent_candidate_ids).issubset(prepared)
+        or {prepared[cid].concrete_target for cid in equivalent_candidate_ids if cid in prepared}
+        != {"metal.material"}
+    ):
+        raise ParsedEnrichmentInputError(
+            "Equivalent source group is not an eligible material group"
+        )
     for candidate_id, update in prepared.items():
         by_target.setdefault(update.concrete_target, []).append(candidate_id)
     for target, candidate_ids in by_target.items():
