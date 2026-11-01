@@ -125,6 +125,8 @@ def test_independent_positive_gold_survives(dictionary, text):
         "Не платина, а gold ring with an oval diamond.",
         "Без платины, а кольцо из золота.",
         "Не платина,\nа кольцо из золота.",
+        "Не платина — а кольцо из золота.",
+        "Возможно платина, а кольцо из золота.",
         "A gold ring, but no prongs.",
     ),
 )
@@ -160,6 +162,17 @@ def test_contrast_retains_each_assertions_own_authority(
     assert all(
         text[c.evidence.start : c.evidence.end] == c.evidence.text for c in parsed.candidates
     )
+
+
+@pytest.mark.parametrize(
+    "text",
+    ("Кольцо из золота класса А не нужно.", "Кольцо, без гало а-ля золото."),
+)
+def test_letter_labels_and_hyphenated_words_do_not_end_rejection(dictionary, text):
+    parsed = parse_full_message(text, locale="ru", dictionary=dictionary)
+    gold = [c for c in parsed.candidates if c.normalized_values == ("gold",)]
+    assert gold and all(c.parser_update is None for c in gold)
+    assert all(c.classification == "prohibition" for c in gold)
 
 
 @pytest.mark.parametrize(

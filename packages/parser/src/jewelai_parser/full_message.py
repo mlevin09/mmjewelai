@@ -258,9 +258,10 @@ _TENTATIVE = re.compile(
     re.I,
 )
 # Shared by intent, qualifier, ownership and negative-object scope consumers.
-# RU contrast closes the rejected assertion just as EN "but" does; it does
-# not choose between competing positive facts or accept a later preference.
-_CONTRAST = re.compile(r"\b(?:but|however|но|однако|а)\b", re.I)
+# Delimited RU contrast closes the rejected assertion just as EN "but" does.
+# A grade label or a hyphenated word is not proof of an independent assertion.
+# This neither selects competing positive facts nor accepts a later preference.
+_CONTRAST = re.compile(r"\b(?:but|however|но|однако)\b|(?<=[,—–\n])\s*а(?=\s)", re.I)
 _COORDINATION = re.compile(r",\s*(?:(?:and|и)\b\s*)?|\b(?:and|и)\b|\r?\n", re.I)
 _REQUEST_START = re.compile(
     r"\b(?:(?:I|we|я|мы|мне|нам)\s+)?(?:(?:" + _NEGATED_AUXILIARY + r"|не)\s+)?"

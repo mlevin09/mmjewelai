@@ -51,6 +51,14 @@ CONTRAST_CASES = (
     ("negative-list-control", "Кольцо, без гало, золота или платины.", "ru", {}),
     ("ru-preference-control", "Не платина, а хочу золото.", "ru", {}),
     ("ru-uncertain-control", "Не платина, а возможно золото.", "ru", {}),
+    (
+        "independent-certainty-control",
+        "Возможно платина, а кольцо из золота.",
+        "ru",
+        {"metal.material": "gold"},
+    ),
+    ("letter-label-control", "Золото класса А не нужно.", "ru", {}),
+    ("compound-word-control", "Без гало а-ля золото.", "ru", {}),
 )
 
 

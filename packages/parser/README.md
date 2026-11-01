@@ -134,11 +134,12 @@ negative lists. A bare object after `no halo, ...` does not gain positive author
 merely from a comma or `and`. Postfix rejection remains supported. This is bounded
 deterministic language support, not a general grammar or a conflict winner policy.
 
-RU contrast `а` uses that same assertion boundary as `но` / EN `but`:
+Delimited RU contrast `, а` / `— а` uses that same assertion boundary as `но` / EN `but`:
 `Не платина, а кольцо из золота с овальным алмазом` retains rejected platinum
 without making the independent gold/oval/diamond assertion ambiguous. This
 does not close bare negative lists, accept a following `хочу` preference, or
-choose between competing affirmative requirements. Persisted F03 regressions in
+choose between competing affirmative requirements. A letter label (`класса А`)
+or a hyphenated word (`а-ля`) does not prove a new assertion. Persisted F03 regressions in
 `apps/api/tests/test_f03_applicability.py` reuse the existing fixture/restart
 journey with and without TEST-ONLY P0-10, including the disposable PostgreSQL
 copies in `test_generation_preparations_postgres.py`.
