@@ -81,3 +81,16 @@ from JSON capacity. New readers must remain after disabling new writers.
 Default L, F activation, Knowledge content/releases, provider adapters, workers,
 shared/preproduction/production infrastructure and deployments remain unchanged.
 Source4 is not authorization to bypass existing preparation consumers.
+
+The pure release-evidence layer implements the approved intent, binding, offer and
+decision DTOs and derives current anchors only after an independently verified
+typed command and canonical transition. Requested-value digests use
+`H('jewelai.KeepRequestedValue/1.0.0', canonical_value)`; wrapper anchors separately
+retain the complete sourced canonical wrapper. Accepted facts retain the original
+correction MessageSource while the EDIT event records the typed authorization
+MessageSource. All applicable roots receive the new anchor; other wrappers and
+original roots remain immutable. A later different value requires a fresh binding
+and decision. Rejection closes only its logical request. Independent transitions
+retain anchors and invalidate earlier offers without discarding pending requests.
+These pure checks are not a live consent endpoint or proof of transactional
+durability. Admission/Plan3 writers and strict persisted replay remain unfinished.

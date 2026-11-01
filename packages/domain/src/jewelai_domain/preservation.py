@@ -154,6 +154,10 @@ class ProtectionProjection(StrictEvidenceModel):
 
     @model_validator(mode="after")
     def validate_projection(self):
+        if len({p.intent_id for p in self.pending_requests}) != len(self.pending_requests):
+            raise ValueError("Pending preservation request IDs must be unique")
+        if len({r.id for r in self.applied_decision_refs}) != len(self.applied_decision_refs):
+            raise ValueError("Applied release decision references must be unique")
         allowed = protected_targets(self.design_schema_version)
         for root in self.roots:
             targets = tuple(t.concrete_target for t in root.scope_targets)
