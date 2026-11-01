@@ -716,6 +716,26 @@ def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
     return result
 
 
+def _source_dictionary_material_ids(text, candidate, dictionary):
+    """Recover lexical occurrence identity before OR grouping, using the same surface matcher.
+
+    This private evidence helper neither rewrites a StructuredCandidate nor authorizes an update.
+    RU inflections can retain the grouped choice set in normalized_values; its first value is not
+    the lexical identity of either source occurrence.
+    """
+    return tuple(
+        sorted(
+            {
+                found.surface.normalized_id
+                for found in _find_surfaces(text, _dictionary_surfaces(dictionary))
+                if found.start == candidate.evidence.start
+                and found.end == candidate.evidence.end
+                and found.surface.category == DictionaryCategory.METAL_MATERIAL
+            }
+        )
+    )
+
+
 def _candidate_from_surface(
     text: str,
     item: _Found,

@@ -4,6 +4,11 @@ import hashlib
 import json
 from typing import Annotated, Literal
 
+from jewelai_domain.clarification_state import (
+    CanonicalAvailabilityOverlay,
+    EvidenceScope,
+    InputContext,
+)
 from jewelai_domain.knowledge_activation import Sha256
 from jewelai_domain.knowledge_policy import (
     KnowledgePolicyEngine,
@@ -224,6 +229,32 @@ class StructuredPromptEnrichmentResult(ImmutableModel):
         return PromptEnrichmentResult.validate_hash(self)
 
 
+class StructuredPromptEnrichmentResultV2(StructuredPromptEnrichmentResult):
+    """Opt-in F04 source with lossless canonical availability; no provider behavior."""
+
+    enrichment_version: Literal["2.0.0"]
+    contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
+    scope: EvidenceScope
+    context: InputContext
+    availability_overlay: CanonicalAvailabilityOverlay
+
+    @model_validator(mode="after")
+    def validate_f04_context(self):
+        if (
+            self.scope != self.context.scope
+            or self.scope != self.availability_overlay.scope
+            or self.design_revision_id != str(self.availability_overlay.canonical_revision_id)
+            or self.contract_profile != self.context.contract_profile
+            or self.knowledge_package_id != self.context.release_pin.package_id
+            or self.knowledge_artifact_version != self.context.release_pin.artifact_version
+            or self.knowledge_runtime_sha256 != self.context.release_pin.runtime_sha256
+            or self.knowledge_validation_report_sha256
+            != self.context.release_pin.validation_report_sha256
+        ):
+            raise ValueError("F04 enrichment context mismatch")
+        return self
+
+
 AnyPromptEnrichmentResult = Annotated[
     PromptEnrichmentResult | StructuredPromptEnrichmentResult,
     Field(discriminator="enrichment_version"),
@@ -235,6 +266,8 @@ def decode_prompt_enrichment_result(value: object) -> AnyPromptEnrichmentResult:
     """Verify the ORIGINAL version/hash, including nested historical payloads; never rewrite."""
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
+    if isinstance(value, dict) and value.get("enrichment_version") == "2.0.0":
+        return StructuredPromptEnrichmentResultV2.model_validate(value)
     return _ENRICHMENT_DECODER.validate_python(value)
 
 

@@ -133,7 +133,7 @@ def _observe_postgres(engine, capfd, schedule):
 
 
 def _assert_preserved(before, after):
-    assert before["version"] == after["version"] == "0017_knowledge_release_bindings"
+    assert before["version"] == after["version"] == "0018_f04_preparation_v2"
     assert before["objects"] == after["objects"]  # includes constraints, triggers and functions
     for table, rows in before["rows"].items():
         assert all(row in after["rows"][table] for row in rows)

@@ -151,6 +151,7 @@ def enrich_parsed_candidates_with_active_release(
     parametric_catalog_sha256: str | None = None,
     parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
+    equivalent_candidate_ids: tuple[str, ...] = (),
 ) -> ParsedCandidateEnrichmentResult:
     """Evaluate safe parsed candidates without mutating the authoritative revision."""
 
@@ -209,6 +210,37 @@ def enrich_parsed_candidates_with_active_release(
         by_target.setdefault(update.concrete_target, []).append(candidate_id)
     for target, candidate_ids in by_target.items():
         if len(candidate_ids) < 2:
+            continue
+        if equivalent_candidate_ids and set(candidate_ids) == set(equivalent_candidate_ids):
+            equivalent = [_candidate_by_id(parsed, cid) for cid in candidate_ids]
+            valid = (
+                all(
+                    c.subject == CandidateSubject.PRODUCT_BODY
+                    and c.target == StructuredTarget.METAL_MATERIAL
+                    and c.classification == CandidateClassification.REQUIREMENT
+                    and c.certainty == CandidateCertainty.EXPLICIT
+                    and c.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+                    and len(c.normalized_values) == 1
+                    for c in equivalent
+                )
+                and len({c.normalized_values for c in equivalent}) == 1
+            )
+            if not valid:
+                raise ParsedEnrichmentInputError(
+                    "Equivalent evidence does not prove one explicit value"
+                )
+            representative = min(
+                equivalent, key=lambda c: (c.evidence.start, c.evidence.end, c.candidate_id)
+            )
+            for c in equivalent:
+                if c.candidate_id != representative.candidate_id:
+                    dispositions[c.candidate_id] = CandidateDisposition(
+                        candidate=c,
+                        outcome=CandidateDispositionOutcome.NO_CHANGE,
+                        reason=CandidateDispositionReason.DUPLICATE_TARGET_CANDIDATES,
+                        concrete_target=target,
+                    )
+                    prepared.pop(c.candidate_id)
             continue
         for candidate_id in candidate_ids:
             candidate = _candidate_by_id(parsed, candidate_id)
