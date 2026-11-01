@@ -52,9 +52,17 @@ def test_scoped_frame_ignores_unprocessed_messages_and_reads_issue_no_writes(
         event.listen(engine, "before_cursor_execute", observe)
         try:
             second = frame(ctx)
+            preview = ctx.client.get(
+                f"/v1/sessions/{ctx.sid}/prompt-enrichment/state?workflow_version=3.0.0",
+                headers=ctx.headers,
+            )
         finally:
             event.remove(engine, "before_cursor_execute", observe)
         assert first.frame == second.frame
+        assert preview.status_code == 200, preview.json()
+        assert preview.json()["current_frame"] == first.frame.model_dump(mode="json")
+        assert preview.json()["continuation_enabled"] is False
+        assert preview.json()["retained_base"] == base
         assert first.protection == second.protection
         assert len(first.protection.anchors) == 8
         assert not set(statements).intersection(

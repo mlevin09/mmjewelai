@@ -60,6 +60,18 @@ history bootstrap, and narrow compatibility proof derivation. These are not yet 
 complete continuation admission/correction/answer/resume HTTP workflow. The Draft
 PR must disclose missing integration and tests until that work is complete.
 
+Explicit `GET state?workflow_version=3.0.0` now provides a non-admitting read-only
+preview: retained L/F pins, current causal frame, protection evidence and Description3.
+Explicit `GET final-output?output_version=4.0.0` requires the exact current frame's
+`If-Match`; L additionally requires `projection=jewelai.legacy-l.compat/1.0.0`.
+The projection can discharge only independently proved historical blockers. Original
+UNKNOWN/DEFERRED records remain unchanged, including their blocking flags, and old
+default output routes retain their meanings. No GET creates a plan, offer or event.
+IFP4 and handoff4 retain the current frame/protection/readiness evidence; F also
+retains its sealed frontier, availability and causal definitions. Preparation1/2
+explicitly reject source4 with `unsupported_source_version`; no provider execution
+or legacy source downgrade is added. These previews do not enable continuation.
+
 The approved target additionally requires durable atomic decisions/re-anchoring,
 current versioned outputs, all R2 HTTP scenarios, isolated PostgreSQL proof and
 exact-head CI. No schema migration is introduced here. The existing-row/no-DDL

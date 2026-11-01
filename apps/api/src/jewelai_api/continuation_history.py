@@ -8,6 +8,7 @@ import hashlib
 import re
 from copy import copy
 from dataclasses import dataclass
+from datetime import UTC
 from uuid import UUID
 
 from jewelai_domain.clarification_state import EvidenceScope, evidence_hash
@@ -21,6 +22,7 @@ from jewelai_domain.preservation import (
 from pydantic import BaseModel
 
 from .clarification import ClarificationPlan
+from .clarification_answers import ClarificationAnswer, _hash, process_clarification_answer
 from .prompt_enrichment_runtime import build_final_prompt_snapshot
 
 
@@ -80,6 +82,90 @@ def _native_roots(repo, sid, oid, plan):
     return tuple(roots)
 
 
+def _legacy_answer_source_ids(service, repo, sid, oid, answers, plans):
+    """Verify frozen Answer1 source hashes against actual same-session Messages.
+
+    Non-mutating Answer1 did not serialize Source. Its answer_hash nevertheless
+    commits the exact Message ID/time. Resolve that commitment without reading or
+    interpreting unrelated message text; do not invent a new historical source.
+    """
+    if not answers:
+        return set()
+    sources = repo.list_user_message_source_refs(sid, oid)
+    plan_by_hash = {p.content_hash: ClarificationPlan.model_validate(p.plan_payload) for p in plans}
+    verified = repo.restore_pinned_knowledge_runtime(
+        sid,
+        oid,
+        service.artifact_store,
+        active_release=service.active_release,
+        validation_report=service.validation_report,
+    )
+    consumed = set()
+    for record in answers:
+        result = record.result_payload
+        selected = result["selected_option"]
+        payload = dict(
+            session_id=sid,
+            plan_content_hash=result["plan_content_hash"],
+            clarification_id=result["clarification_id"],
+            decision=result["decision"],
+            selected_option=selected["value"] if selected else None,
+            expected_revision_id=result["previous_revision_id"],
+            knowledge_package_id=result["knowledge_package_id"],
+            knowledge_artifact_version=result["knowledge_artifact_version"],
+            knowledge_runtime_sha256=result["knowledge_runtime_sha256"],
+            knowledge_validation_report_sha256=result["knowledge_validation_report_sha256"],
+        )
+        matches = []
+        for mid, created_at in sources:
+            source = MessageSource(
+                message_id=str(mid),
+                recorded_at=(
+                    created_at.replace(tzinfo=UTC) if created_at.tzinfo is None else created_at
+                ),
+            )
+            candidate = ClarificationAnswer(**payload, source=source)
+            if _hash(candidate.model_dump(mode="json")) == record.answer_hash:
+                matches.append(candidate)
+        if len(matches) != 1:
+            raise ValueError("Legacy answer source commitment has no unique scoped Message")
+        answer = matches[0]
+        consumed.add(answer.source.message_id)
+        plan = plan_by_hash.get(record.plan_content_hash)
+        if plan is None:
+            raise ValueError("Legacy answer has no scoped original plan")
+        before = repo.get_revision(sid, record.previous_revision_id, oid)
+        actual = (
+            repo.get_revision(sid, record.new_revision_id, oid)
+            if record.new_revision_id is not None
+            else None
+        )
+        created_at = actual.created_at if actual is not None else record.created_at
+        replayed = process_clarification_answer(
+            plan,
+            answer,
+            authoritative_session_id=sid,
+            current_revision=before,
+            active_release=verified,
+            dictionary=service.artifacts.dictionary,
+            questions=service.artifacts.questions,
+            rules=service.artifacts.rules,
+            created_at=created_at.replace(tzinfo=UTC) if created_at.tzinfo is None else created_at,
+        )
+        replay = replayed.model_dump(mode="json", exclude={"content_hash"})
+        if record.new_revision_id is not None:
+            generated = replayed.resulting_revision
+            if generated is None or generated.model_dump(
+                exclude={"revision_id"}
+            ) != actual.model_dump(exclude={"revision_id"}):
+                raise ValueError("Legacy accepted answer has a different canonical transition")
+            replay["new_revision_id"] = str(actual.revision_id)
+            replay["resulting_revision"] = actual.model_dump(mode="json")
+        if result != {**replay, "content_hash": _hash(replay)}:
+            raise ValueError("Legacy answer does not match actual source/decision replay")
+    return consumed
+
+
 def read_native_frame(service, repository, session_id, organization_id):
     """Caller supplies one scoped locked_reader; no command transaction is opened."""
     service = copy(service._for_session(session_id, organization_id, repository=repository))
@@ -114,7 +200,13 @@ def read_native_frame(service, repository, session_id, organization_id):
         raise ValueError("Native continuation has a missing cycle plan")
     by_cycle = {p.enrichment_cycle_id: p for p in plans}
     refs = []
-    sources = set()
+    sources = (
+        set()
+        if service._is_f04
+        else _legacy_answer_source_ids(
+            service, repository, session_id, organization_id, answers, plans
+        )
+    )
     for revision in revisions:
         refs.append(
             dict(kind="revision", id=str(revision.revision_id), hash=evidence_hash(revision))
@@ -141,6 +233,9 @@ def read_native_frame(service, repository, session_id, organization_id):
                 record, "answer_record_id", getattr(record, "correction_record_id", None)
             )
             refs.append(dict(kind=kind, id=str(record_id), hash=record.content_hash))
+            source = record.result_payload.get("source")
+            if source and source.get("kind") == "message":
+                sources.add(source["message_id"])
     for evidence in plan.constraint_evidence:
         sources.add(evidence.source.message_id)
     for record in corrections:

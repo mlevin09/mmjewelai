@@ -819,6 +819,19 @@ class PersistenceRepository:
             db.expunge(row)
             return row
 
+    def list_user_message_source_refs(self, session_id: UUID, organization_id: UUID):
+        """Scoped source metadata for legacy hash verification; no message text is scanned."""
+        with self._session_factory() as db:
+            if db.scalar(self._scoped_session_query(session_id, organization_id)) is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            return tuple(
+                db.execute(
+                    select(MessageRow.message_id, MessageRow.created_at)
+                    .where(MessageRow.session_id == session_id, MessageRow.actor == "user")
+                    .order_by(MessageRow.message_id)
+                ).all()
+            )
+
     def add_question_event(self, row: QuestionEventRow, organization_id: UUID) -> QuestionEventRow:
         with self._session_factory.begin() as db:
             scoped = db.scalar(self._scoped_session_query(row.session_id, organization_id))

@@ -154,6 +154,23 @@ class ProtectionProjection(StrictEvidenceModel):
 
     @model_validator(mode="after")
     def validate_projection(self):
+        allowed = protected_targets(self.design_schema_version)
+        for root in self.roots:
+            targets = tuple(t.concrete_target for t in root.scope_targets)
+            if (
+                not targets
+                or targets != tuple(sorted(set(targets)))
+                or not set(targets).issubset(allowed)
+                or (targets != allowed and len(targets) != 1)
+                or root.source_revision_id != root.root_ref.source_revision_id
+                or any(
+                    t.owner_kind != "center_stone"
+                    or t.owner_id is not None
+                    or t.group_id is not None
+                    for t in root.scope_targets
+                )
+            ):
+                raise ValueError("Current preservation root has an invalid schema scope")
         expected = {
             (root.root_ref.evidence_id, target.concrete_target)
             for root in self.roots

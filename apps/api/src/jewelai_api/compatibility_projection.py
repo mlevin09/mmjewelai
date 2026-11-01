@@ -2,6 +2,7 @@
 
 import hashlib
 import re
+from datetime import UTC
 from uuid import UUID
 
 from jewelai_domain.clarification_state import evidence_hash
@@ -57,12 +58,18 @@ def _verified_corrections(service, repo, native, sid, oid):
             knowledge_runtime=verified.compiled_runtime,
         )
         source = MessageSource(
-            message_id=str(message.message_id), recorded_at=correction.source.recorded_at
+            message_id=str(message.message_id),
+            recorded_at=(
+                message.created_at.replace(tzinfo=UTC)
+                if message.created_at.tzinfo is None
+                else message.created_at
+            ),
         )
         if (
             message.actor != "user"
             or message.content != correction.correction_text
             or parsed != correction.parsed_correction
+            or source != correction.source
         ):
             raise ValueError("Retained correction source/parse mismatch")
         first = service._evaluate(before, parsed, source)

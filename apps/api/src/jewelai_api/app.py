@@ -66,6 +66,7 @@ from jewelai_persistence.preparations import (
 )
 from jewelai_persistence.repository import PersistenceRepository
 from jewelai_prompts import GenerationPreparationError
+from jewelai_prompts.final_prompt_v4 import CanonicalFinalPromptAssemblyV4
 from jewelai_text_understanding_google import (
     GoogleTextUnderstandingAdapter,
     TextUnderstandingInvalidResponseError,
@@ -83,6 +84,7 @@ from .clarification_v2 import (
     InitialRequestV2,
     ResumeRequest,
 )
+from .continuation_preview import ContinuationReadError, ContinuationStateV3, read_preview
 from .generation import (
     GenerationProfileRegistry,
     NoVisualizationProfilesError,
@@ -347,7 +349,11 @@ def create_app(
 
     @app.exception_handler(GenerationPreparationError)
     async def preparation_input_handler(_, exc):
-        status = 409 if exc.code.value == "final_output_not_ready" else 422
+        status = (
+            409
+            if exc.code.value in {"final_output_not_ready", "unsupported_source_version"}
+            else 422
+        )
         return JSONResponse(
             status_code=status,
             content={
@@ -577,6 +583,10 @@ def create_app(
     async def prompt_enrichment_handler(_, exc):
         status, code = _prompt_enrichment_error(exc.code)
         return _error_response(status, code, str(exc))
+
+    @app.exception_handler(ContinuationReadError)
+    async def continuation_read_handler(_, exc):
+        return _error_response(exc.status, exc.code, str(exc))
 
     @app.get("/health")
     def health():
@@ -1134,12 +1144,21 @@ def create_app(
 
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/state",
-            response_model=PromptEnrichmentStateResponse | PromptEnrichmentStateResponseV2,
+            response_model=PromptEnrichmentStateResponse
+            | PromptEnrichmentStateResponseV2
+            | ContinuationStateV3,
         )
         def get_prompt_enrichment_state(
             session_id: UUID,
             organization_id: AuthorizedOrganization,
+            workflow_version: str | None = None,
         ):
+            if workflow_version is not None:
+                if workflow_version != "3.0.0":
+                    raise ContinuationReadError(
+                        409, "unsupported_workflow_version", "Unsupported workflow version"
+                    )
+                return read_preview(prompt_enrichment_service, session_id, organization_id)
             return _prompt_enrichment_state(
                 prompt_enrichment_service.get_current_state(session_id, organization_id)
             )
@@ -1269,12 +1288,29 @@ def create_app(
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/final-output",
             response_model=PromptEnrichmentFinalOutputResponse
-            | PromptEnrichmentFinalOutputResponseV3,
+            | PromptEnrichmentFinalOutputResponseV3
+            | CanonicalFinalPromptAssemblyV4,
         )
         def get_prompt_enrichment_final_output(
             session_id: UUID,
             organization_id: AuthorizedOrganization,
+            output_version: str | None = None,
+            projection: str | None = None,
+            if_match: Annotated[str | None, Header(alias="If-Match")] = None,
         ):
+            if output_version is not None:
+                if output_version != "4.0.0":
+                    raise ContinuationReadError(
+                        409, "unsupported_output_version", "Unsupported output version"
+                    )
+                return read_preview(
+                    prompt_enrichment_service,
+                    session_id,
+                    organization_id,
+                    final=True,
+                    if_match=if_match,
+                    projection=projection,
+                )
             state = prompt_enrichment_service.get_current_state(session_id, organization_id)
             if state.final_output is None or state.status.value == "final_output_blocked":
                 raise PromptEnrichmentRuntimeError(

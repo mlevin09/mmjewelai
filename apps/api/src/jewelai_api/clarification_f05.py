@@ -104,6 +104,9 @@ ContinuationResumeRequest = Annotated[
 def decode_continuation_command(request_type, raw_json):
     """Strict root JSON entry point; TypeAdapter alone cannot detect duplicate keys."""
 
+    if len(raw_json.encode("utf-8") if isinstance(raw_json, str) else raw_json) > 1_048_576:
+        raise ValueError("Continuation command exceeds artifact capacity")
+
     def unique_pairs(pairs):
         result = {}
         for key, value in pairs:
