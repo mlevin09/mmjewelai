@@ -1303,6 +1303,10 @@ class PersistenceRepository:
             draft = build(locked_reader(db))
             if draft.get("replayed"):
                 return {**draft, "current_state": verify(locked_reader(db))}
+            # Ordinary scoped readers detach their returned session row. The
+            # verified builder uses those readers, so reacquire the already
+            # locked identity before updating the current canonical pointer.
+            session = db.get(DesignSessionRow, session_id)
             result = _decode_enrichment_payload(draft["cycle_result"])
             if result.enrichment_version != "3.0.0":
                 raise EnrichmentIntegrityError("Continuation requires exact enrichment3")
@@ -1313,6 +1317,7 @@ class PersistenceRepository:
                 db.add(self._revision_row(session_id, revision))
                 db.flush()
                 session.current_revision_id = revision.revision_id
+                session.updated_at = revision.created_at
             self._validate_f04_snapshot(db, session, result, session.current_revision_id)
             latest = db.scalar(
                 select(EnrichmentCycleRow)
@@ -1325,7 +1330,16 @@ class PersistenceRepository:
             payload = draft["plan_payload"]
             from jewelai_domain.clarification_state import evidence_bytes
 
-            if any(len(evidence_bytes(v)) > 1_048_576 for v in (result, payload)):
+            envelopes = (
+                result,
+                payload,
+                *(
+                    draft[k]
+                    for k in ("answer_result", "correction_result")
+                    if draft.get(k) is not None
+                ),
+            )
+            if any(len(evidence_bytes(v)) > 1_048_576 for v in envelopes):
                 raise EnrichmentIntegrityError("Continuation artifact exceeds capacity")
             core = payload["allocated_current_frame_core"]
             if (
@@ -1359,6 +1373,96 @@ class PersistenceRepository:
             )
             db.add(cycle)
             db.flush()
+            correction = draft.get("correction_result")
+            if correction is not None:
+                payload3 = correction.model_dump(mode="json")
+                if (
+                    correction.correction_version != "3.0.0"
+                    or correction.context != result.context
+                    or correction.next_enrichment_result != result
+                    or correction.next_enrichment_cycle_id != cycle.enrichment_cycle_id
+                    or correction.authoritative_revision.revision_id != session.current_revision_id
+                    or correction.previous_head != draft["plan"].previous_head
+                    or correction.source.message_id != str(correction.request.message_id)
+                ):
+                    raise UserCorrectionIntegrityError("Correction3 staging bindings mismatch")
+                self._validate_release_identity(session, payload3)
+                db.add(
+                    UserCorrectionRow(
+                        correction_record_id=draft["record_id"],
+                        session_id=session_id,
+                        source_kind=correction.source.kind,
+                        source_message_id=correction.source.message_id,
+                        source_identity_hash=self._canonical_hash(
+                            dict(
+                                kind=correction.source.kind, message_id=correction.source.message_id
+                            )
+                        ),
+                        correction_text=correction.source_parse.original_text,
+                        previous_revision_id=correction.previous_revision_id,
+                        new_revision_id=correction.new_revision_id,
+                        previous_enrichment_cycle_id=correction.previous_enrichment_cycle_id,
+                        next_enrichment_cycle_id=cycle.enrichment_cycle_id,
+                        outcome=correction.outcome.value,
+                        reason=correction.reason.value
+                        if hasattr(correction.reason, "value")
+                        else correction.reason,
+                        semantic_hash=correction.semantic_hash,
+                        knowledge_package_id=correction.knowledge_package_id,
+                        knowledge_artifact_version=correction.knowledge_artifact_version,
+                        knowledge_runtime_sha256=correction.knowledge_runtime_sha256,
+                        knowledge_validation_report_sha256=correction.knowledge_validation_report_sha256,
+                        dictionary_artifact_version=correction.dictionary_artifact_version,
+                        prompt_template_artifact_version=correction.prompt_template_artifact_version,
+                        result_payload=payload3,
+                        content_hash=correction.content_hash,
+                        created_at=created_at,
+                    )
+                )
+                db.flush()
+            answer = draft.get("answer_result")
+            if answer is not None:
+                payload3 = answer.model_dump(mode="json")
+                source_plan = db.get(ClarificationPlanRow, answer.clarification_plan_id)
+                if (
+                    answer.answer_version != "3.0.0"
+                    or answer.context != result.context
+                    or answer.next_enrichment_result != result
+                    or answer.answer_id != draft["record_id"]
+                    or source_plan is None
+                    or source_plan.session_id != session_id
+                    or source_plan.organization_id != organization_id
+                    or source_plan.content_hash != answer.plan_content_hash
+                    or answer.previous_head != draft["plan"].previous_head
+                    or answer.new_revision_id is not None
+                    and answer.new_revision_id != session.current_revision_id
+                ):
+                    raise ClarificationDecisionIntegrityError("Answer3 staging bindings mismatch")
+                self._validate_release_identity(session, payload3)
+                db.add(
+                    ClarificationAnswerRow(
+                        answer_record_id=answer.answer_id,
+                        clarification_plan_id=answer.clarification_plan_id,
+                        session_id=session_id,
+                        plan_content_hash=answer.plan_content_hash,
+                        clarification_id=answer.clarification_id,
+                        previous_revision_id=answer.previous_revision_id,
+                        new_revision_id=answer.new_revision_id,
+                        decision=answer.decision.value,
+                        outcome=answer.outcome.value,
+                        answer_hash=answer.answer_hash,
+                        knowledge_package_id=answer.knowledge_package_id,
+                        knowledge_artifact_version=answer.knowledge_artifact_version,
+                        knowledge_runtime_sha256=answer.knowledge_runtime_sha256,
+                        knowledge_validation_report_sha256=answer.knowledge_validation_report_sha256,
+                        question_artifact_version=answer.question_artifact_version,
+                        rules_artifact_version=answer.rules_artifact_version,
+                        result_payload=payload3,
+                        content_hash=answer.content_hash,
+                        created_at=created_at,
+                    )
+                )
+                db.flush()
             db.add(
                 ClarificationPlanRow(
                     clarification_plan_id=draft["plan_id"],
@@ -4005,6 +4109,8 @@ class PersistenceRepository:
         row: ClarificationAnswerRow,
         session: DesignSessionRow,
     ) -> ClarificationAnswerRecord:
+        if row.result_payload.get("answer_version") == "3.0.0":
+            return cls._continuation_answer_record(db, row, session)
         payload = cls._verified_payload_hash(
             row.result_payload,
             hash_field="content_hash",
@@ -4071,12 +4177,289 @@ class PersistenceRepository:
             created_at=cls._utc(row.created_at),
         )
 
+    @classmethod
+    def _continuation_answer_record(cls, db, row, session):
+        from jewelai_domain.preservation import contract_hash
+
+        payload = row.result_payload
+        if payload.get("content_hash") != contract_hash(
+            "jewelai.AnswerResult/3.0.0", {k: v for k, v in payload.items() if k != "content_hash"}
+        ):
+            raise ClarificationDecisionIntegrityError("Answer3 integrity mismatch")
+        cls._validate_release_identity(session, payload)
+        try:
+            previous = cls._locked_revision(db, row.session_id, row.previous_revision_id)
+            resulting = (
+                validate_design_revision(payload["resulting_revision"])
+                if payload["resulting_revision"] is not None
+                else None
+            )
+            source = payload["source"]
+            head = payload["previous_head"]
+            message = db.scalar(
+                select(MessageRow).where(
+                    MessageRow.session_id == row.session_id,
+                    MessageRow.message_id == UUID(source["message_id"]),
+                )
+            )
+            source_plan = db.get(ClarificationPlanRow, row.clarification_plan_id)
+            plans = db.scalars(
+                select(ClarificationPlanRow).where(
+                    ClarificationPlanRow.session_id == row.session_id,
+                    ClarificationPlanRow.plan_version == "3.0.0",
+                )
+            ).all()
+            emitted = [
+                p
+                for p in plans
+                if p.plan_payload.get("trigger", {}).get("trigger_kind") == "ANSWER"
+                and p.plan_payload["trigger"].get("record_id") == str(row.answer_record_id)
+            ]
+            next_cycle = (
+                db.get(EnrichmentCycleRow, emitted[0].enrichment_cycle_id)
+                if len(emitted) == 1
+                else None
+            )
+            next_result = _decode_enrichment_payload(payload["next_enrichment_result"])
+            oid = db.scalar(
+                select(ProjectRow.organization_id).where(
+                    ProjectRow.project_id == session.project_id
+                )
+            )
+            valid = (
+                row.session_id
+                == UUID(payload["session_id"])
+                == UUID(payload["context"]["scope"]["session_id"])
+                and UUID(payload["context"]["scope"]["organization_id"]) == oid
+                and payload["context"]["scope"]["design_id"] == str(previous.design_id)
+                and row.answer_record_id
+                == UUID(payload["answer_id"])
+                == UUID(payload["request"]["answer_id"])
+                and row.clarification_plan_id
+                == UUID(payload["clarification_plan_id"])
+                == UUID(head["plan_id"])
+                and source_plan is not None
+                and source_plan.session_id == row.session_id
+                and source_plan.organization_id == oid
+                and source_plan.content_hash
+                == row.plan_content_hash
+                == payload["plan_content_hash"]
+                == head["plan_hash"]
+                and source_plan.enrichment_cycle_id == UUID(head["enrichment_cycle_id"])
+                and row.clarification_id
+                == payload["clarification_id"]
+                == payload["request"]["clarification_id"]
+                and row.previous_revision_id
+                == UUID(payload["previous_revision_id"])
+                == UUID(head["revision_id"])
+                and row.new_revision_id
+                == (UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None)
+                and row.answer_hash == payload["answer_hash"] == payload["request_hash"]
+                and row.decision == payload["decision"]
+                and row.outcome == payload["outcome"]
+                and message is not None
+                and message.actor == "user"
+                and source["kind"] == "message"
+                and source["message_id"] == payload["request"]["message_id"]
+                and cls._utc(message.created_at)
+                == cls._utc(datetime.fromisoformat(source["recorded_at"].replace("Z", "+00:00")))
+                and hashlib.sha256(message.content.encode("utf-8")).hexdigest()
+                == payload["message_sha256"]
+                and next_cycle is not None
+                and next_cycle.session_id == row.session_id
+                and next_cycle.cycle_number == head["enrichment_cycle_number"] + 1
+                and next_cycle.content_hash == next_result.content_hash
+                and next_cycle.specification_revision_id
+                == (row.new_revision_id or row.previous_revision_id)
+                and (
+                    row.knowledge_package_id,
+                    row.knowledge_artifact_version,
+                    row.knowledge_runtime_sha256,
+                    row.knowledge_validation_report_sha256,
+                )
+                == (
+                    session.knowledge_package_id,
+                    session.knowledge_artifact_version,
+                    session.knowledge_runtime_sha256,
+                    session.knowledge_validation_report_sha256,
+                )
+                and row.question_artifact_version
+                == payload["question_artifact_version"]
+                == session.question_artifact_version
+                and row.rules_artifact_version
+                == payload["rules_artifact_version"]
+                == session.rules_artifact_version
+                and row.content_hash == payload["content_hash"]
+            )
+        except (KeyError, ValueError, TypeError) as exc:
+            raise ClarificationDecisionIntegrityError("Answer3 relational data is invalid") from exc
+        if not valid:
+            raise ClarificationDecisionIntegrityError("Answer3 relational mirrors mismatch")
+        cls._validate_f04_snapshot(db, session, next_result, next_cycle.specification_revision_id)
+        if row.new_revision_id is not None:
+            if resulting is None:
+                raise ClarificationDecisionIntegrityError("Answer3 lacks its canonical child")
+            cls._validate_next_revision(previous, resulting)
+            committed = db.get(SpecificationRevisionRow, row.new_revision_id)
+            if committed is None or cls._domain_revision(committed) != resulting:
+                raise ClarificationDecisionIntegrityError("Answer3 canonical child mismatch")
+        elif resulting is not None:
+            raise ClarificationDecisionIntegrityError(
+                "Non-applying Answer3 changed canonical state"
+            )
+        if not cls._revision_reaches_current(
+            db, session, row.new_revision_id or row.previous_revision_id
+        ):
+            raise ClarificationDecisionIntegrityError("Answer3 has no current canonical ancestry")
+        return ClarificationAnswerRecord(
+            answer_record_id=row.answer_record_id,
+            clarification_plan_id=row.clarification_plan_id,
+            session_id=row.session_id,
+            plan_content_hash=row.plan_content_hash,
+            clarification_id=row.clarification_id,
+            previous_revision_id=row.previous_revision_id,
+            new_revision_id=row.new_revision_id,
+            answer_hash=row.answer_hash,
+            result_payload=payload,
+            content_hash=row.content_hash,
+            created_at=cls._utc(row.created_at),
+        )
+
+    def _continuation_correction_record(self, db, row, session):
+        from jewelai_domain.preservation import contract_hash
+
+        payload = row.result_payload
+        if payload.get("content_hash") != contract_hash(
+            "jewelai.CorrectionResult/3.0.0",
+            {k: v for k, v in payload.items() if k != "content_hash"},
+        ):
+            raise UserCorrectionIntegrityError("Correction3 integrity mismatch")
+        self._validate_release_identity(session, payload)
+        try:
+            head = payload["previous_head"]
+            source = payload["source"]
+            previous = self._locked_revision(db, row.session_id, row.previous_revision_id)
+            authoritative = validate_design_revision(payload["authoritative_revision"])
+            before_cycle = db.get(EnrichmentCycleRow, row.previous_enrichment_cycle_id)
+            after_cycle = db.get(EnrichmentCycleRow, row.next_enrichment_cycle_id)
+            next_result = _decode_enrichment_payload(payload["next_enrichment_result"])
+            message = db.scalar(
+                select(MessageRow).where(
+                    MessageRow.session_id == row.session_id,
+                    MessageRow.message_id == UUID(source["message_id"]),
+                )
+            )
+            scope = payload["context"]["scope"]
+            oid = db.scalar(
+                select(ProjectRow.organization_id).where(
+                    ProjectRow.project_id == session.project_id
+                )
+            )
+            valid = (
+                row.session_id == UUID(payload["session_id"]) == UUID(scope["session_id"])
+                and UUID(scope["organization_id"]) == oid
+                and str(previous.design_id) == scope["design_id"]
+                and row.source_kind == source["kind"] == "message"
+                and row.source_message_id
+                == source["message_id"]
+                == payload["request"]["message_id"]
+                and row.source_identity_hash
+                == self._canonical_hash(dict(kind=source["kind"], message_id=source["message_id"]))
+                and message is not None
+                and message.actor == "user"
+                and row.correction_text
+                == payload["source_parse"]["original_text"]
+                == message.content
+                and self._utc(message.created_at).isoformat()
+                == self._utc(
+                    datetime.fromisoformat(source["recorded_at"].replace("Z", "+00:00"))
+                ).isoformat()
+                and hashlib.sha256(message.content.encode("utf-8")).hexdigest()
+                == payload["source_message_sha256"]
+                and row.previous_revision_id
+                == UUID(payload["previous_revision_id"])
+                == UUID(head["revision_id"])
+                and row.new_revision_id
+                == (UUID(payload["new_revision_id"]) if payload["new_revision_id"] else None)
+                and row.previous_enrichment_cycle_id
+                == UUID(payload["previous_enrichment_cycle_id"])
+                == UUID(head["enrichment_cycle_id"])
+                and row.next_enrichment_cycle_id == UUID(payload["next_enrichment_cycle_id"])
+                and before_cycle is not None
+                and before_cycle.session_id == row.session_id
+                and before_cycle.cycle_number == head["enrichment_cycle_number"]
+                and before_cycle.content_hash == head["enrichment_result_hash"]
+                and after_cycle is not None
+                and after_cycle.session_id == row.session_id
+                and after_cycle.cycle_number
+                == before_cycle.cycle_number + 1
+                == payload["next_enrichment_cycle_number"]
+                and after_cycle.specification_revision_id
+                == authoritative.revision_id
+                == (row.new_revision_id or row.previous_revision_id)
+                and after_cycle.content_hash == next_result.content_hash
+                and row.outcome == payload["outcome"]
+                and row.reason == payload["reason"]
+                and row.semantic_hash == payload["semantic_hash"]
+                and row.content_hash == payload["content_hash"]
+                and row.dictionary_artifact_version
+                == payload["dictionary_artifact_version"]
+                == session.dictionary_artifact_version
+                and row.prompt_template_artifact_version
+                == payload["prompt_template_artifact_version"]
+                == session.prompt_artifact_version
+                and (
+                    row.knowledge_package_id,
+                    row.knowledge_artifact_version,
+                    row.knowledge_runtime_sha256,
+                    row.knowledge_validation_report_sha256,
+                )
+                == (
+                    session.knowledge_package_id,
+                    session.knowledge_artifact_version,
+                    session.knowledge_runtime_sha256,
+                    session.knowledge_validation_report_sha256,
+                )
+            )
+        except (ValueError, TypeError, KeyError) as exc:
+            raise UserCorrectionIntegrityError("Correction3 relational data is invalid") from exc
+        if not valid:
+            raise UserCorrectionIntegrityError("Correction3 relational mirrors mismatch")
+        self._enrichment_cycle_record(
+            after_cycle, self._knowledge_release_pin(session, db=db), db=db, session=session
+        )
+        if row.new_revision_id is not None:
+            self._validate_next_revision(previous, authoritative)
+            committed = db.get(SpecificationRevisionRow, row.new_revision_id)
+            if committed is None or self._domain_revision(committed) != authoritative:
+                raise UserCorrectionIntegrityError("Correction3 canonical child mismatch")
+        elif authoritative != self._domain_revision(previous):
+            raise UserCorrectionIntegrityError("Non-applying Correction3 changed canonical state")
+        if not self._revision_reaches_current(db, session, authoritative.revision_id):
+            raise UserCorrectionIntegrityError("Correction3 has no current canonical ancestry")
+        return UserCorrectionRecord(
+            correction_record_id=row.correction_record_id,
+            session_id=row.session_id,
+            source_kind=row.source_kind,
+            source_message_id=row.source_message_id,
+            previous_revision_id=row.previous_revision_id,
+            new_revision_id=row.new_revision_id,
+            previous_enrichment_cycle_id=row.previous_enrichment_cycle_id,
+            next_enrichment_cycle_id=row.next_enrichment_cycle_id,
+            semantic_hash=row.semantic_hash,
+            result_payload=payload,
+            content_hash=row.content_hash,
+            created_at=self._utc(row.created_at),
+        )
+
     def _user_correction_record(
         self,
         db: Session,
         row: UserCorrectionRow,
         session: DesignSessionRow,
     ) -> UserCorrectionRecord:
+        if row.result_payload.get("correction_version") == "3.0.0":
+            return self._continuation_correction_record(db, row, session)
         payload = self._verified_payload_hash(
             row.result_payload,
             hash_field="content_hash",

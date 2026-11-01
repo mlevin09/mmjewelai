@@ -54,11 +54,12 @@ engine or persistence ledger is unnecessary.
 
 ## Consequences and implementation boundary
 
-Current implementation introduces schema-derived preservation primitives, strict
-command/context variants, the separate parser interpreter, scoped read-only native
-history bootstrap, and narrow compatibility proof derivation. These are not yet a
-complete continuation admission/correction/answer/resume HTTP workflow. The Draft
-PR must disclose missing integration and tests until that work is complete.
+The implementation reuses schema-derived preservation primitives, strict
+command/context variants, the separate parser interpreter, scoped native-history
+replay and narrow compatibility proofs. Explicit admission, corrections, native
+answers, typed KEEP release and explicit resume use the same existing rows and
+session-first transaction boundary. Functional acceptance remains independent of
+implementation and CI; the Draft PR records the actual scenario evidence.
 
 Explicit `GET state?workflow_version=3.0.0` now provides a non-admitting read-only
 preview: retained L/F pins, current causal frame, protection evidence and Description3.
@@ -92,10 +93,10 @@ MessageSource. All applicable roots receive the new anchor; other wrappers and
 original roots remain immutable. A later different value requires a fresh binding
 and decision. Rejection closes only its logical request. Independent transitions
 retain anchors and invalidate earlier offers without discarding pending requests.
-These pure checks are not a live consent endpoint or proof of the KEEP_RELEASE
-transaction lifecycle. Explicit admission now persists Cycle3/Plan3 and supports
-strict admission-prefix replay as described below; durable corrections, answers
-and resume remain unfinished.
+The pure checks are used only after the runtime has verified the actual scoped
+source, current frame, original intent and offer. The persisted workflow replays
+the actual correction and authorization against canonical ancestry rather than
+trusting an envelope hash alone.
 
 ### Explicit admission implementation
 
@@ -123,10 +124,33 @@ with `unsupported_workflow_version`; exact historical decoders remain available
 to the replay path. Explicit current reads are non-writing and continue to work
 when new admissions are disabled. No configuration enables F05 in a live runtime.
 
-This admission implementation does not establish the complete F05 workflow:
-Answer3, Correction3, Resume3, bound KEEP_RELEASE HTTP consent, ordinary native
-answer protection and D2 composition with new decisions still require delivery.
-The approved 36+18 matrix cannot be marked complete from admission tests alone.
+### Durable continuation commands
+
+Existing correction and clarification-answer routes select exact request3 variants
+without changing native request1/2 interpretation. A conflicting supported single
+field creates Correction3 plus an immutable intent and current offer, without a
+canonical revision. Several canonical deltas overlapping KEEP defer as one batch.
+An ordinary native ACCEPT/SELECT cannot authorize another preserved value.
+
+KEEP_RELEASE ACCEPT records Answer3, a one-field EDIT, Cycle3 and Plan3 atomically.
+The value cites the original correction; the EDIT cites the distinct typed consent.
+Every applicable root is re-anchored and every other canonical wrapper is retained.
+REJECT closes only its own logical request. Subsequent events stale prior offers
+but retain pending intents; explicit resume3 allocates a new binding. An already
+current requested value is re-offered for REJECT-only closure, never fake APPLIED.
+Native F resume retains the existing OPEN/DORMANT, ownership and re-offer policy.
+
+Every command uses authorization, exact duplicate lookup, full-head CAS, and
+precommit current-output verification inside one transaction. Source/revision/
+cycle/plan insertion failure rolls back the whole unit. Scoped readers may detach
+session rows; the writer reacquires its already locked attached row before updating
+the canonical pointer. No provider publication is performed in the transaction.
+
+The L compatibility projection can cite a verified KEEP-release Answer3 only for
+its actual accepted target and original positive correction. Original UNKNOWN
+flags and hashes remain untouched. GET never creates an event, binding or offer.
+Readers remain available with continuation writers disabled. New writes require
+the explicit server-side capability, which remains disabled by default.
 
 
 The internal Parse1.2 → ParsedEvaluation3 bridge invokes the existing
@@ -135,5 +159,6 @@ Frozen defaults remain Parse1.1 and evaluation1/2. It binds actual Message
 identity/time/session, schema, retained context and release; returns source-backed
 proposal/disposition/native-rule evidence with its own hash; and performs no
 canonical mutation or network call. Unsupported, negative and uncertain input
-cannot become affirmative updates. This bridge is not Correction3 persistence,
-KEEP-release authority or completion of the pending HTTP workflow.
+cannot become affirmative updates. Correction3 persistence and typed release are
+separate authenticated runtime responsibilities; a parser/Matrix match is never
+consent.

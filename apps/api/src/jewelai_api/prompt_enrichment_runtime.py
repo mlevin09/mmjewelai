@@ -291,7 +291,13 @@ class PromptEnrichmentRuntimeService:
 
     def _require_native_workflow(self, session_id, organization_id, *, repository=None):
         repo = repository or self.repository
-        repo.require_native_workflow(session_id, organization_id)
+        try:
+            repo.require_native_workflow(session_id, organization_id)
+        except (NotFoundError, OwnershipMismatchError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
+                "Session was not found in organization scope",
+            ) from exc
 
     def _require_request_profile(self, request):
         if (getattr(request, "schema_version", None) == "2.0.0") != self._is_f04:

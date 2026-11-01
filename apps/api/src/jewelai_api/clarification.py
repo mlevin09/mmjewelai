@@ -175,13 +175,17 @@ def plan_clarifications(
     _plan_builder=None,
     _unresolved_context=None,
     _rule_decision_override=None,
+    _enrichment_reader=None,
+    _canonical_revision_only=False,
 ) -> ClarificationPlan:
     """Build a minimal immutable plan without accepting evidence or changing Product State."""
 
     question_builder = _question_builder or _question
     plan_builder = _plan_builder or ClarificationPlan
     revision = validate_design_revision(revision)
-    if (questions.artifact_version, rules.artifact_version) == ("2.0.0", "2.0.0"):
+    if _enrichment_reader is not None:
+        enrichment = _enrichment_reader.model_validate(enrichment)
+    elif (questions.artifact_version, rules.artifact_version) == ("2.0.0", "2.0.0"):
         from .parsed_enrichment import ParsedCandidateEnrichmentResultV2
 
         enrichment = ParsedCandidateEnrichmentResultV2.model_validate(enrichment)
@@ -221,7 +225,9 @@ def plan_clarifications(
         raise ClarificationPlanInputError("question and rules artifacts must be versioned")
 
     locale = QuestionLocale(enrichment.parse_result.requested_locale)
-    effective_revision = _effective_revision(revision, enrichment)
+    effective_revision = (
+        revision if _canonical_revision_only else _effective_revision(revision, enrichment)
+    )
     rule_decision = rules.evaluate(
         effective_revision,
         role_id,

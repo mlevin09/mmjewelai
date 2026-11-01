@@ -49,6 +49,23 @@ def _message_sources(value):
             yield from _message_sources(item)
 
 
+def preservation_field(wording):
+    # Scope comes from the actual preservation span, never surrounding facts.
+    # The approved v1 grammar binds generic center preservation or shape only;
+    # an unrecognized narrower instruction must not silently acquire whole scope.
+    if re.search(r"\bshape\b|\bформ\w*", wording, re.I):
+        return "shape"
+    if re.fullmatch(
+        r"\s*(?:(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?center[- ]stone"
+        r"(?:\s+unchanged)?|(?:сохранить|не\s+менять)\s+(?:существующ\w+\s+)?"
+        r"центральн\w+\s+кам\w*(?:\s+без\s+изменений)?)\s*[.!]?\s*",
+        wording,
+        re.I,
+    ):
+        return None
+    raise ValueError("Preservation source has no approved exact scope binding")
+
+
 def _native_roots(repo, sid, oid, plan):
     roots = []
     for evidence in plan.constraint_evidence:
@@ -75,9 +92,7 @@ def _native_roots(repo, sid, oid, plan):
         source_cycle = repo.get_enrichment_cycle(sid, evidence.source_enrichment_cycle_id, oid)
         if source_cycle.specification_revision_id != source_revision.revision_id:
             raise ValueError("Preservation source cycle/revision does not match actual history")
-        field = (
-            "shape" if re.search(r"\bshape\b|\bформ\w*", evidence.original_wording, re.I) else None
-        )
+        field = preservation_field(evidence.original_wording)
         roots.append(
             build_preservation_root(
                 evidence_id=evidence.evidence_id,

@@ -172,6 +172,9 @@ class FinalPromptSnapshot(ImmutableModel):
     decision_lineage: tuple[FinalPromptDecisionLineage, ...] = ()
     constraint_evidence: tuple[FinalPromptConstraintEvidence, ...] = ()
 
+    def _coexisting_preservation(self, item):
+        return False
+
     @model_validator(mode="after")
     def validate_stable_lineage_order(self):
         keys = [(item.kind, item.decision_id, item.content_hash) for item in self.decision_lineage]
@@ -190,7 +193,9 @@ class FinalPromptSnapshot(ImmutableModel):
             if item.session_id != self.session_id or item.organization_id != self.organization_id:
                 raise ValueError("constraint evidence belongs to another session scope")
             if item.status == "active":
-                if item.semantic_subject in active_subjects:
+                if item.semantic_subject in active_subjects and not self._coexisting_preservation(
+                    item
+                ):
                     raise ValueError("conflicting active constraint evidence cannot coexist")
                 active_subjects.add(item.semantic_subject)
             if item.status == "superseded":

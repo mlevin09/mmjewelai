@@ -26,7 +26,7 @@ def test_f05_read_projection_postgres(engine, tmp_path, base, locale):
 
 
 def test_f05_unknown_causal_projection_postgres(engine, tmp_path):
-    _unknown(engine, tmp_path)
+    _unknown(engine, tmp_path, "EN")
 
 
 def test_f05_read_frame_cas_postgres(engine, tmp_path):
@@ -104,3 +104,55 @@ def test_f05_competing_admissions_postgres(engine, tmp_path, base):
         assert len(after[2]) == len(before[2]) + 1
         assert after[3:] == before[3:]
         assert len([c for c in after[1] if c.result.enrichment_version == "3.0.0"]) == 1
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize("decision", ["ACCEPT", "REJECT"])
+def test_f05_release_roundtrip_postgres(engine, tmp_path, base, decision):
+    from test_f05_release_http import test_release_http
+
+    test_release_http(engine, tmp_path, base, decision)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_f05_reoffer_postgres(engine, tmp_path, base):
+    from test_f05_release_http import test_resume_rebinds_only_requested_pending_intent
+
+    test_resume_rebinds_only_requested_pending_intent(engine, tmp_path, base)
+
+
+def test_f05_d2_authorized_release_postgres(engine, tmp_path):
+    from test_f05_durable_compatibility import (
+        test_original_unknown_requires_actual_keep_accept_to_discharge,
+    )
+
+    test_original_unknown_requires_actual_keep_accept_to_discharge(engine, tmp_path)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_f05_competing_scoped_decisions_postgres(engine, tmp_path, base):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from test_f04_http import f04_session
+    from test_f05_admission import rows
+    from test_f05_release_http import consent_payload, pending_fixture
+
+    with f04_session(engine, tmp_path) as ctx:
+        current, offer = pending_fixture(ctx, base)
+        requests = [consent_payload(ctx, current, offer, d) for d in ("ACCEPT", "REJECT")]
+        before = rows(ctx)
+        path = f"/v1/sessions/{ctx.sid}/prompt-enrichment/clarification-answers"
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            responses = tuple(
+                pool.map(lambda p: ctx.client.post(path, headers=ctx.headers, json=p), requests)
+            )
+        assert sorted(r.status_code for r in responses) == [200, 409], [r.json() for r in responses]
+        after = rows(ctx)
+        assert len(after[1]) == len(before[1]) + 1
+        assert len(after[2]) == len(before[2]) + 1
+        assert len(after[3]) == len(before[3]) + 1
+        winner = next(r for r in responses if r.status_code == 200)
+        assert after[0].design.center_stone.shape.value in {"oval", "emerald_cut"}
+        assert winner.json()["current_state"]["current_frame"]["revision_id"] == str(
+            after[0].revision_id
+        )

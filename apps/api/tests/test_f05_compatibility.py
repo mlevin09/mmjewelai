@@ -31,7 +31,10 @@ def projection(ctx):
         return project_legacy_readiness(ctx.runtime, reader, frame(ctx), ctx.sid, ctx.org)
 
 
-def test_required_unknown_is_discharged_only_by_actual_same_target_correction(engine, tmp_path):
+@pytest.mark.parametrize("language", ["EN", "RU", "MIXED"])
+def test_required_unknown_is_discharged_only_by_actual_same_target_correction(
+    engine, tmp_path, language
+):
     with f04_session(engine, tmp_path) as ctx:
         ctx.sid = UUID(ctx.legacy["session_id"])
         old = ctx.repo.get_current_revision(ctx.sid, ctx.org)
@@ -80,7 +83,14 @@ def test_required_unknown_is_discharged_only_by_actual_same_target_correction(en
         correction(ctx, "A platinum ring.")
         unrelated = projection(ctx)
         assert not unrelated.proofs and unrelated.remaining_blocker_refs
-        correction(ctx, "Center stone 8 x 6 x 4 mm.")
+        correction(
+            ctx,
+            {
+                "EN": "Center stone 8 x 6 x 4 mm.",
+                "RU": "Центральный камень 8 x 6 x 4 мм.",
+                "MIXED": "Центральный камень 8 x 6 x 4 mm.",
+            }[language],
+        )
         actual = projection(ctx)
         assert len(actual.proofs) == 1 and not actual.remaining_blocker_refs
         assert actual.proofs[0].target.concrete_target == "center_stone.dimensions"
@@ -122,6 +132,7 @@ def test_required_unknown_is_discharged_only_by_actual_same_target_correction(en
         ("ru", "Желтый металл.", "yellow"),
         ("en", "White metal.", "white"),
         ("ru", "Белый металл.", "white"),
+        ("en", "Yellow металл.", "yellow"),
     ],
 )
 @pytest.mark.parametrize("binding", [False, True])

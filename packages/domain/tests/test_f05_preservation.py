@@ -179,3 +179,56 @@ def test_hash_valid_root_cannot_omit_a_declared_scope_anchor():
     )
     with pytest.raises(ValueError, match="scope"):
         PreservationRoot.model_validate(payload)
+
+
+@pytest.mark.parametrize("field", [t.split(".")[1] for t in protected_targets("1.1.0")])
+@pytest.mark.parametrize(
+    "availability",
+    ["missing", "required", "optional", "undetermined", "not_applicable", "explicit"],
+)
+def test_all_fourteen_actual_valid_wrappers_remain_exact_under_generic_keep(field, availability):
+    old = revision()
+    payload = old.model_dump(mode="json")
+    source = old.event.source.model_dump(mode="json")
+    if availability == "missing":
+        value = None
+    elif availability in {"required", "optional", "undetermined"}:
+        value = dict(availability="unknown", requirement=availability)
+    elif availability == "not_applicable":
+        value = dict(
+            availability="not_applicable",
+            reason="Explicit synthetic applicability fixture",
+            source=source,
+        )
+    else:
+        actual = {
+            "weight": dict(value=1.0, unit="ct"),
+            "dimensions": dict(
+                length=dict(value=8, unit="mm"),
+                width=dict(value=6, unit="mm"),
+                depth=dict(value=4, unit="mm"),
+            ),
+            "treatments": ["synthetic_fixture"],
+        }.get(field, "synthetic_fixture")
+        value = dict(
+            availability="value",
+            origin="explicit",
+            value=actual,
+            source=source,
+            confirmed=False,
+            locked=False,
+        )
+    payload["design"]["center_stone"][field] = value
+    old = DesignRevisionV1_1.model_validate(payload)
+    original = old.design.center_stone.model_dump(mode="json")
+    # Swap only an actual valid wrapper state; no invalid cross-field model_copy.
+    proposed = old.design.model_dump(mode="json")
+    proposed["center_stone"][field] = (
+        dict(availability="unknown", requirement="required") if availability != "required" else None
+    )
+    from jewelai_domain.models_v1_1 import DesignV1_1
+
+    proposed = DesignV1_1.model_validate(proposed)
+    with pytest.raises(PreservationConflict):
+        check_preservation_transition(old, proposed, (root(old),))
+    assert old.design.center_stone.model_dump(mode="json") == original

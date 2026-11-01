@@ -18,7 +18,6 @@ from jewelai_domain.continuation import (
     ContinuationRecordReference,
 )
 from jewelai_domain.preservation import ProtectionProjection, contract_hash
-from jewelai_domain.preservation_release import KeepReleaseOffer
 from jewelai_domain.rules import RuleDecision
 from jewelai_domain.rules_v2 import RuleDecisionV2
 from jewelai_prompts.final_prompt import FinalPromptConstraintEvidence, FinalPromptDecisionLineage
@@ -28,7 +27,7 @@ from .clarification import ClarificationQuestion, UnaskedClarificationEvidence
 from .clarification_f05 import ContinuationAdmissionRequest, ContinuationResumeRequest
 from .clarification_v2 import ClarificationQuestionV2
 from .conflict_evidence import ConflictEvidence
-from .continuation_preview import NativePreviewQuestion
+from .continuation_preview import KeepOfferQuestion, NativePreviewQuestion
 
 
 class NativeLPlanEvidence(StrictEvidenceModel):
@@ -46,11 +45,6 @@ class NativeFPlanEvidence(StrictEvidenceModel):
     cause_definitions: tuple[CauseDefinition, ...]
     frontier_core: FrontierCore
     availability_overlay: CanonicalAvailabilityOverlay
-
-
-class KeepOfferQuestion(StrictEvidenceModel):
-    question_kind: Literal["KEEP_RELEASE"]
-    offer: KeepReleaseOffer
 
 
 class AdmissionTrigger(StrictEvidenceModel):

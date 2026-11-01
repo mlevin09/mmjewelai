@@ -108,13 +108,46 @@ def _actual_ancestry(repo, sid, oid, after, current):
     return (after, *reversed(chain))
 
 
-def causal_unknown_proofs(service, repo, native, sid, oid, verified_corrections=None):
+def causal_unknown_proofs(
+    service, repo, native, sid, oid, verified_corrections=None, verified_answers=()
+):
     """Only required UNKNOWN whose exact gap was actually corrected can discharge."""
     corrections = verified_corrections or _verified_corrections(service, repo, native, sid, oid)
     plans = {r.content_hash: r for r in repo.list_clarification_plans(sid, oid)}
+    accepted_events = [
+        ("correction", cr.correction_record_id, cr.content_hash, c, b, a)
+        for cr, c, b, a in corrections
+        if c.outcome == "APPLIED"
+    ]
+    by_intent = {
+        i.intent_id: c for _, c, _, _ in corrections for i in getattr(c, "keep_intents", ())
+    }
+    for ar, answer3, before, after in verified_answers:
+        if answer3.answer_kind != "KEEP_RELEASE" or answer3.outcome != "APPLIED":
+            continue
+        original = by_intent.get(answer3.keep_decision.intent_id)
+        if original is None:
+            raise ValueError("Verified KEEP answer lacks its original positive correction")
+        accepted_events.append(
+            ("keep_release_answer", ar.answer_record_id, ar.content_hash, original, before, after)
+        )
     proofs = []
-    for record in native.answers:
-        answer = record.result_payload
+    unknowns = [(record, record.result_payload) for record in native.answers]
+    unknowns += [
+        (
+            record,
+            {
+                **result.native_result.model_dump(mode="json"),
+                "decision": result.decision.value,
+                "previous_revision_id": str(result.previous_revision_id),
+                "plan_content_hash": result.plan_content_hash,
+                "clarification_id": result.clarification_id,
+            },
+        )
+        for record, result, _, _ in verified_answers
+        if result.answer_kind == "NATIVE"
+    ]
+    for record, answer in unknowns:
         if answer["decision"] != "UNKNOWN" or not answer["blocks_progression"]:
             continue
         plan = plans.get(answer["plan_content_hash"])
@@ -127,18 +160,16 @@ def causal_unknown_proofs(service, repo, native, sid, oid, verified_corrections=
         prior = _state(original, target)
         if not (prior is None or isinstance(prior, Unknown) and prior.requirement == "required"):
             continue
+        questions = plan.plan_payload["questions"]
+        if plan.plan_payload.get("plan_version") == "3.0.0":
+            questions = [q["native_question"] for q in questions if q["question_kind"] == "NATIVE"]
         question = next(
-            (
-                q
-                for q in plan.plan_payload["questions"]
-                if q["clarification_id"] == answer["clarification_id"]
-            ),
-            None,
+            (q for q in questions if q["clarification_id"] == answer["clarification_id"]), None
         )
         if question is None or question["target"] != target or question["importance"] != "blocking":
             continue
-        for cr, correction, before, after in corrections:
-            if correction.outcome != "APPLIED" or before.revision < original.revision:
+        for event_kind, event_id, event_hash, correction, before, after in accepted_events:
+            if before.revision < original.revision:
                 continue
             previous = _state(before, target)
             if previous is not None and not isinstance(previous, Unknown):
@@ -177,9 +208,9 @@ def causal_unknown_proofs(service, repo, native, sid, oid, verified_corrections=
                     native.snapshot.revision, target, scope=native.protection.scope
                 ),
                 accepted_event_ref=AcceptedCompatibilityEvent(
-                    kind="correction",
-                    record_id=cr.correction_record_id,
-                    content_hash=cr.content_hash,
+                    kind=event_kind,
+                    record_id=event_id,
+                    content_hash=event_hash,
                 ),
                 source_message_id=UUID(correction.source.message_id),
                 source_parse_hash=evidence_hash(correction.parsed_correction),
@@ -325,15 +356,17 @@ def context_consumption_proofs(service, repo, native, sid, oid, verified_correct
     return tuple(proofs), frozenset(covered_records)
 
 
-def project_legacy_readiness(service, repo, native, sid, oid):
+def project_legacy_readiness(
+    service, repo, native, sid, oid, *, _verified_extra=(), _verified_answers=(), _legacy_root=None
+):
     if (native.session.question_artifact_version, native.session.rules_artifact_version) != (
         "1.0.0",
         "1.0.0",
     ):
         raise ValueError("Legacy-L compatibility cannot change the retained F profile")
     service = service._for_session(sid, oid, repository=repo)
-    verified = _verified_corrections(service, repo, native, sid, oid)
-    causal = causal_unknown_proofs(service, repo, native, sid, oid, verified)
+    verified = (*_verified_corrections(service, repo, native, sid, oid), *_verified_extra)
+    causal = causal_unknown_proofs(service, repo, native, sid, oid, verified, _verified_answers)
     contextual, covered = context_consumption_proofs(service, repo, native, sid, oid, verified)
     discharged = {p.original_answer_ref.hash for p in causal} | set(covered)
     remaining = tuple(
@@ -365,7 +398,7 @@ def project_legacy_readiness(service, repo, native, sid, oid):
         ),
         evidence_head=native.frame,
         retained_artifact_pins=pins,
-        legacy_history_root_sha256=native.frame.history_root_sha256,
+        legacy_history_root_sha256=_legacy_root or native.frame.history_root_sha256,
         proofs=tuple(sorted((*causal, *contextual), key=lambda p: p.content_hash)),
         remaining_blocker_refs=tuple(sorted(remaining, key=lambda p: (p.kind, p.id, p.hash))),
     )

@@ -78,13 +78,25 @@ from pydantic import ValidationError
 from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
+from .clarification_f05 import (
+    ContinuationCorrectionRequest,
+    KeepReleaseAnswerRequest,
+    KeepReleaseResumeRequest,
+    NativeAnswerRequest,
+    NativeResumeRequest,
+)
 from .clarification_v2 import (
     ClarificationAnswerRequestV2,
     CorrectionRequestV2,
     InitialRequestV2,
     ResumeRequest,
 )
-from .continuation_preview import ContinuationReadError, ContinuationStateV3, read_preview
+from .continuation_preview import (
+    ContinuationCommandResponseV3,
+    ContinuationReadError,
+    ContinuationStateV3,
+    read_preview,
+)
 from .generation import (
     GenerationProfileRegistry,
     NoVisualizationProfilesError,
@@ -217,6 +229,11 @@ async def _strict_f04_request_body(request: Request):
         )
     except (ValueError, UnicodeError):
         return  # Existing FastAPI syntax validation remains authoritative.
+    if isinstance(value, dict) and value.get("schema_version") == "3.0.0":
+        if duplicates or constants or len(await request.body()) > 1_048_576:
+            raise ContinuationReadError(
+                422, "invalid_continuation_request", "Invalid continuation JSON evidence"
+            )
     if (
         isinstance(value, dict)
         and (value.get("schema_version") == "2.0.0" or request.url.path.endswith("/resume"))
@@ -1212,13 +1229,38 @@ def create_app(
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarification-answers",
             dependencies=[Depends(validate_f04_request_body)],
-            response_model=PromptEnrichmentAnswerResponse | PromptEnrichmentAnswerResponseV2,
+            response_model=PromptEnrichmentAnswerResponse
+            | PromptEnrichmentAnswerResponseV2
+            | ContinuationCommandResponseV3,
         )
         def answer_prompt_enrichment_clarification(
             session_id: UUID,
-            request: PromptEnrichmentAnswerRequest | ClarificationAnswerRequestV2,
+            request: PromptEnrichmentAnswerRequest
+            | ClarificationAnswerRequestV2
+            | KeepReleaseAnswerRequest
+            | NativeAnswerRequest,
+            principal: Authenticated,
             organization_id: AuthorizedOrganization,
         ):
+            if isinstance(request, (KeepReleaseAnswerRequest, NativeAnswerRequest)):
+                from .continuation_runtime import answer
+
+                try:
+                    return answer(
+                        prompt_enrichment_service,
+                        session_id,
+                        organization_id,
+                        request,
+                        principal_id=principal.principal_id,
+                    )
+                except ContinuationReadError:
+                    raise
+                except ValueError:
+                    raise ContinuationReadError(
+                        500,
+                        "invalid_durable_history",
+                        "Scoped enrichment history failed validation",
+                    ) from None
             result, state = prompt_enrichment_service.record_persisted_clarification_answer(
                 organization_id,
                 (
@@ -1264,13 +1306,36 @@ def create_app(
             "/v1/sessions/{session_id}/prompt-enrichment/corrections",
             dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentCorrectionResponse
-            | PromptEnrichmentCorrectionResponseV2,
+            | PromptEnrichmentCorrectionResponseV2
+            | ContinuationCommandResponseV3,
         )
         def correct_prompt_enrichment(
             session_id: UUID,
-            request: PromptEnrichmentCorrectionRequest | CorrectionRequestV2,
+            request: PromptEnrichmentCorrectionRequest
+            | CorrectionRequestV2
+            | ContinuationCorrectionRequest,
+            principal: Authenticated,
             organization_id: AuthorizedOrganization,
         ):
+            if isinstance(request, ContinuationCorrectionRequest):
+                from .continuation_runtime import correct
+
+                try:
+                    return correct(
+                        prompt_enrichment_service,
+                        session_id,
+                        organization_id,
+                        request,
+                        principal_id=principal.principal_id,
+                    )
+                except ContinuationReadError:
+                    raise
+                except ValueError:
+                    raise ContinuationReadError(
+                        500,
+                        "invalid_durable_history",
+                        "Scoped enrichment history failed validation",
+                    ) from None
             result, state = prompt_enrichment_service.apply_persisted_user_correction(
                 organization_id,
                 (
@@ -1315,14 +1380,38 @@ def create_app(
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarifications/{cause_id}/resume",
             dependencies=[Depends(validate_f04_request_body)],
-            response_model=PromptEnrichmentResumeResponse,
+            response_model=PromptEnrichmentResumeResponse | ContinuationCommandResponseV3,
         )
         def resume_prompt_enrichment_clarification(
             session_id: UUID,
             cause_id: str,
-            request: ResumeRequest,
+            request: ResumeRequest | KeepReleaseResumeRequest | NativeResumeRequest,
             organization_id: AuthorizedOrganization,
+            principal: Authenticated,
         ):
+            if isinstance(request, (KeepReleaseResumeRequest, NativeResumeRequest)):
+                if (request.resume_kind == "KEEP_RELEASE" and cause_id != request.intent_id) or (
+                    request.resume_kind == "NATIVE" and cause_id != request.cause_id
+                ):
+                    raise ContinuationReadError(
+                        409, "clarification_conflict", "Resume target differs from request"
+                    )
+                from .continuation_runtime import resume
+
+                try:
+                    return resume(
+                        prompt_enrichment_service,
+                        session_id,
+                        organization_id,
+                        request,
+                        principal_id=principal.principal_id,
+                    )
+                except ContinuationReadError:
+                    raise
+                except ValueError:
+                    raise ContinuationReadError(
+                        500, "invalid_history", "Continuation history is invalid"
+                    ) from None
             result, state = prompt_enrichment_service.resume_clarification(
                 session_id, organization_id, cause_id, request
             )

@@ -7,7 +7,6 @@ an atomic append is allowed. No provider or network work belongs in this path.
 
 import hashlib
 from contextlib import contextmanager
-from dataclasses import replace
 from types import SimpleNamespace
 
 from jewelai_domain.continuation import (
@@ -21,6 +20,7 @@ from jewelai_prompts.continuation import continuation_cycle
 from .compatibility_projection import project_legacy_readiness
 from .continuation_history import read_native_frame
 from .continuation_plan import ContinuationPlan
+from .continuation_planning import native_offers
 from .continuation_preview import ContinuationReadError, NativePreviewQuestion
 
 
@@ -82,6 +82,15 @@ class NativePrefixReader:
         )
 
 
+def check_capacity(*artifacts):
+    from jewelai_domain.clarification_state import evidence_bytes
+
+    if any(len(evidence_bytes(a)) > 1_048_576 for a in artifacts):
+        raise ContinuationReadError(
+            422, "artifact_capacity_exceeded", "Continuation artifact exceeds capacity"
+        )
+
+
 def message_source(repo, sid, oid, mid):
     message = repo.get_message(sid, mid, oid)
     if message.actor != "user":
@@ -104,7 +113,6 @@ def request_hash(kind, context, request, sha):
 
 
 def native_context(service, repo, native, sid, oid):
-    from .compatibility_projection import project_legacy_readiness
     from .continuation_plan import NativeFPlanEvidence, NativeLPlanEvidence
 
     if native.session.question_artifact_version == "1.0.0":
@@ -218,7 +226,26 @@ def next_frame(previous, cycle, plan, sha):
                     id=str(plan.allocated_current_frame_core.plan_id),
                     hash=plan.content_hash,
                 ),
-                dict(kind="message", id=str(plan.trigger.request.message_id), hash=sha),
+                *(
+                    ()
+                    if plan.trigger.trigger_kind in {"ADMISSION", "RESUME"}
+                    else (
+                        dict(
+                            kind=plan.trigger.trigger_kind.lower(),
+                            id=str(plan.trigger.record_id),
+                            hash=plan.trigger.result_hash,
+                        ),
+                    )
+                ),
+                dict(
+                    kind="message",
+                    id=str(
+                        plan.trigger.request.message_id
+                        if plan.trigger.trigger_kind in {"ADMISSION", "RESUME"}
+                        else plan.trigger.message_id
+                    ),
+                    hash=sha,
+                ),
             ),
         ),
     )
@@ -252,82 +279,244 @@ def replay_admitted(service, repo, sid, oid):
     native = read_native_frame(service, prefix, sid, oid)
     current = native.frame
     verified = []
+    extras = []
+    extra_answers = []
+    answer_records = {r.answer_record_id: r for r in repo.list_clarification_answers(sid, oid)}
+    correction_records = {r.correction_record_id: r for r in repo.list_user_corrections(sid, oid)}
     for cycle in new:
-        plan = ContinuationPlan.model_validate(records[cycle.enrichment_cycle_id].plan_payload)
-        if plan.previous_head != current or plan.trigger.trigger_kind != "ADMISSION" or verified:
-            raise ValueError("Unsupported or discontinuous continuation event")
-        _, sha = message_source(repo, sid, oid, plan.trigger.request.message_id)
-        expected_cycle, expected_plan = admission_plan(
-            service,
-            prefix,
-            native,
-            sid,
-            oid,
-            plan.trigger.request,
-            sha,
-            cycle_id=cycle.enrichment_cycle_id,
-            plan_id=records[cycle.enrichment_cycle_id].clarification_plan_id,
-        )
-        if (
-            plan.trigger.request.expected_head != current
-            or expected_cycle != cycle.result
-            or expected_plan != plan
-        ):
-            raise ValueError("Continuation admission differs from actual native/source replay")
+        record = records[cycle.enrichment_cycle_id]
+        plan = ContinuationPlan.model_validate(record.plan_payload)
+        if plan.previous_head != current:
+            raise ValueError("Discontinuous continuation event")
+        if plan.trigger.trigger_kind == "ADMISSION":
+            if verified:
+                raise ValueError("Continuation has repeated admission")
+            _, sha = message_source(repo, sid, oid, plan.trigger.request.message_id)
+            expected_cycle, expected_plan = admission_plan(
+                service,
+                prefix,
+                native,
+                sid,
+                oid,
+                plan.trigger.request,
+                sha,
+                cycle_id=cycle.enrichment_cycle_id,
+                plan_id=record.clarification_plan_id,
+            )
+            if plan.trigger.request.expected_head != current:
+                raise ValueError("Admission differs from its source frame")
+        elif plan.trigger.trigger_kind == "CORRECTION":
+            from .continuation_corrections import prepare_correction
+            from .continuation_mutation import correction_plan, current_view
+            from .continuation_results import ContinuationCorrectionResult
+
+            row = correction_records.get(plan.trigger.record_id)
+            if row is None:
+                raise ValueError("Correction3 plan has no actual scoped record")
+            result = ContinuationCorrectionResult.model_validate(row.result_payload)
+            before_view, previous_plan, _ = current_view(
+                service,
+                repo,
+                native,
+                tuple(verified),
+                prefix,
+                extra_corrections=tuple(extras),
+                extra_answers=tuple(extra_answers),
+            )
+            before = before_view.snapshot.revision
+            actual = (
+                repo.get_revision(sid, row.new_revision_id, oid) if row.new_revision_id else None
+            )
+            expected_result, offers = prepare_correction(
+                service,
+                repo,
+                before_view,
+                previous_plan,
+                result.request,
+                record_id=row.correction_record_id,
+                cycle_id=cycle.enrichment_cycle_id,
+                plan_id=record.clarification_plan_id,
+                created_at=actual.created_at if actual else row.created_at,
+                committed_revision=actual,
+            )
+            if result != expected_result or plan.trigger.result_hash != row.content_hash:
+                raise ValueError(
+                    "Correction3 differs from actual Message/proposal/transition replay"
+                )
+            if (
+                plan.trigger.message_id != result.request.message_id
+                or plan.trigger.message_sha256 != result.source_message_sha256
+                or plan.trigger.request_hash != result.request_hash
+                or result.next_enrichment_cycle_id != cycle.enrichment_cycle_id
+            ):
+                raise ValueError("Correction3 trigger/event binding mismatch")
+            extras.append((row, result, before, result.authoritative_revision))
+            expected_cycle = result.next_enrichment_result
+            expected_plan = correction_plan(
+                service,
+                repo,
+                before_view,
+                previous_plan,
+                result,
+                offers,
+                record_id=row.correction_record_id,
+                plan_id=record.clarification_plan_id,
+                verified_extras=tuple(extras),
+                verified_answers=tuple(extra_answers),
+                offer_history=native_offers(
+                    prefix, tuple(verified), sid, oid, plan.context.retained_base
+                ),
+            )
+            sha = result.source_message_sha256
+        elif plan.trigger.trigger_kind == "ANSWER":
+            from pydantic import TypeAdapter
+
+            from .continuation_answers import prepare_answer
+            from .continuation_mutation import answer_plan, current_view
+            from .continuation_results import ContinuationAnswerResult
+
+            row = answer_records.get(plan.trigger.record_id)
+            if row is None:
+                raise ValueError("Answer3 plan has no actual scoped record")
+            result = TypeAdapter(ContinuationAnswerResult).validate_python(row.result_payload)
+            before_view, previous_plan, _ = current_view(
+                service,
+                repo,
+                native,
+                tuple(verified),
+                prefix,
+                extra_corrections=tuple(extras),
+                extra_answers=tuple(extra_answers),
+            )
+            intent_map = {i.intent_id: (i, r) for _, r, _, _ in extras for i in r.keep_intents}
+            actual = (
+                repo.get_revision(sid, row.new_revision_id, oid) if row.new_revision_id else None
+            )
+            expected_result = prepare_answer(
+                service,
+                repo,
+                before_view,
+                previous_plan,
+                result.request,
+                cycle_id=cycle.enrichment_cycle_id,
+                created_at=actual.created_at if actual else row.created_at,
+                intents=intent_map,
+                committed_revision=actual,
+            )
+            if result != expected_result or result.content_hash != plan.trigger.result_hash:
+                raise ValueError(
+                    "Answer3 differs from actual question/intent/source/transition replay"
+                )
+            if (
+                plan.trigger.message_id != result.request.message_id
+                or plan.trigger.message_sha256 != result.message_sha256
+                or plan.trigger.request_hash != result.request_hash
+            ):
+                raise ValueError("Answer3 trigger/source bindings mismatch")
+            expected_cycle = result.next_enrichment_result
+            expected_plan = answer_plan(
+                service,
+                repo,
+                before_view,
+                previous_plan,
+                result,
+                cycle_id=cycle.enrichment_cycle_id,
+                plan_id=record.clarification_plan_id,
+                verified_extras=tuple(extras),
+                verified_answers=tuple(extra_answers),
+                offer_history=native_offers(
+                    prefix, tuple(verified), sid, oid, plan.context.retained_base
+                ),
+            )
+            extra_answers.append(
+                (
+                    row,
+                    result,
+                    before_view.snapshot.revision,
+                    result.resulting_revision or before_view.snapshot.revision,
+                )
+            )
+            sha = result.message_sha256
+        elif plan.trigger.trigger_kind == "RESUME":
+            from .continuation_mutation import current_view
+            from .continuation_resume import prepare_resume
+
+            before_view, previous_plan, _ = current_view(
+                service,
+                repo,
+                native,
+                tuple(verified),
+                prefix,
+                extra_corrections=tuple(extras),
+                extra_answers=tuple(extra_answers),
+            )
+            intent_map = {i.intent_id: (i, r) for _, r, _, _ in extras for i in r.keep_intents}
+            historical_offers = (
+                tuple(
+                    q.offer
+                    for _, p, _ in verified
+                    for q in p.questions
+                    if q.question_kind == "KEEP_RELEASE"
+                )
+                if plan.trigger.request.resume_kind == "KEEP_RELEASE"
+                else native_offers(prefix, tuple(verified), sid, oid, plan.context.retained_base)
+            )
+            expected_cycle, expected_plan = prepare_resume(
+                service,
+                repo,
+                before_view,
+                previous_plan,
+                plan.trigger.request,
+                cycle_id=cycle.enrichment_cycle_id,
+                plan_id=record.clarification_plan_id,
+                intents=intent_map,
+                offers=historical_offers,
+            )
+            _, sha = message_source(repo, sid, oid, plan.trigger.request.message_id)
+        else:
+            raise ValueError("Unsupported continuation event")
+        if expected_cycle != cycle.result or expected_plan != plan:
+            raise ValueError("Continuation differs from actual native/source replay")
         current = next_frame(current, cycle, plan, sha)
         verified.append((cycle, plan, current))
-    if repo.get_current_revision(sid, oid) != native.snapshot.revision:
-        raise ValueError("Admission changed canonical state without an event")
-    return native, tuple(verified), prefix
+    if repo.get_current_revision(sid, oid).revision_id != current.revision_id:
+        raise ValueError("Canonical state changed without a continuation event")
+    referenced = {
+        p.trigger.record_id for _, p, _ in verified if p.trigger.trigger_kind == "CORRECTION"
+    }
+    if referenced != {
+        r.correction_record_id
+        for r in correction_records.values()
+        if r.result_payload.get("correction_version") == "3.0.0"
+    }:
+        raise ValueError("Correction3 interval has an orphan or missing event")
+    referenced_answers = {
+        p.trigger.record_id for _, p, _ in verified if p.trigger.trigger_kind == "ANSWER"
+    }
+    if referenced_answers != {
+        r.answer_record_id
+        for r in answer_records.values()
+        if r.result_payload.get("answer_version") == "3.0.0"
+    }:
+        raise ValueError("Answer3 interval has an orphan or missing event")
+    return native, tuple(verified), prefix, tuple(extras), tuple(extra_answers)
 
 
 def admitted_view(service, repo, sid, oid):
     replay = replay_admitted(service, repo, sid, oid)
     if replay is None:
         return None
-    native, verified, prefix = replay
-    cycle, plan, frame = verified[-1]
-    snapshot = native.snapshot.model_copy(
-        update=dict(
-            enrichment_cycle_id=cycle.enrichment_cycle_id,
-            latest_enrichment_cycle_id=cycle.enrichment_cycle_id,
-            enrichment_cycle_number=cycle.cycle_number,
-            enrichment_result=cycle.result,
-            artifact_versions=native.snapshot.artifact_versions.model_copy(
-                update={"enrichment_version": "3.0.0"}
-            ),
-        )
-    )
-    compat = None
-    if plan.context.retained_base == "L":
-        original = project_legacy_readiness(service, prefix, native, sid, oid)
-        p = original.model_dump(mode="json", exclude={"content_hash"})
-        p.update(evidence_head=frame, current_frame_core=plan.allocated_current_frame_core)
-        compat = type(original)(
-            **p, content_hash=contract_hash("jewelai.CompatibilityReadinessProjection/1.0.0", p)
-        )
-    else:
-        from .clarification_v2 import ClarificationPlanV2, seal_frontier
+    native, verified, prefix, extras, extra_answers = replay
+    from .continuation_mutation import current_view
 
-        adapted = SimpleNamespace(
-            plan_id=frame.plan_id,
-            content_hash=plan.content_hash,
-            enrichment_cycle_number=cycle.cycle_number,
-            questions=plan.native_base.native_questions,
-            frontier_core=plan.native_base.frontier_core,
-            cause_definitions=plan.native_base.cause_definitions,
-        )
-        oldplans = [
-            ClarificationPlanV2.model_validate(p.plan_payload)
-            for p in prefix.list_clarification_plans(sid, oid)
-        ]
-        snapshot = snapshot.model_copy(
-            update={"effective_unresolved_frontier": seal_frontier(adapted, oldplans)}
-        )
-    return (
-        replace(native, frame=frame, snapshot=snapshot, protection=plan.protection_projection),
-        plan,
-        compat,
+    return current_view(
+        service,
+        repo,
+        native,
+        verified,
+        prefix,
+        extra_corrections=extras,
+        extra_answers=extra_answers,
     )
 
 
@@ -341,9 +530,12 @@ def admit(service, sid, oid, request, *, principal_id):
         _, sha = message_source(repo, sid, oid, request.message_id)
         replay = replay_admitted(service, repo, sid, oid)
         if replay is not None:
-            _, verified, _ = replay
+            _, verified, _, _, _ = replay
             for _cycle, plan, frame in verified:
-                if plan.trigger.request.request_id == request.request_id:
+                if (
+                    plan.trigger.trigger_kind == "ADMISSION"
+                    and plan.trigger.request.request_id == request.request_id
+                ):
                     if plan.trigger.request != request or plan.trigger.request_hash != request_hash(
                         "AdmissionRequest", plan.context, request, sha
                     ):
@@ -401,6 +593,351 @@ def admit(service, sid, oid, request, *, principal_id):
         command_kind="ADMISSION",
         committed_result_hash=result_hash,
         committed_frame=frame,
+        current_state=state,
+        replayed=committed["replayed"],
+    )
+
+
+def correct(service, sid, oid, request, *, principal_id):
+    """Scoped Correction3 duplicate lookup, full-frame CAS and one atomic append."""
+    if not getattr(service, "continuation_enabled", False):
+        raise ContinuationReadError(
+            409, "continuation_unavailable", "Explicit continuation capability is unavailable"
+        )
+    from .continuation_corrections import prepare_correction
+    from .continuation_mutation import correction_plan, current_view
+    from .continuation_preview import read_preview
+    from .continuation_results import ContinuationCorrectionResult
+
+    created_at = service._clock()
+
+    def build(repo):
+        _, sha = message_source(repo, sid, oid, request.message_id)
+        replay = replay_admitted(service, repo, sid, oid)
+        if replay is None:
+            raise ContinuationReadError(
+                409, "unsupported_workflow_version", "Explicit continuation admission is required"
+            )
+        origin, verified, prefix, extras, extra_answers = replay
+        view, previous, _ = current_view(
+            service,
+            repo,
+            origin,
+            verified,
+            prefix,
+            extra_corrections=extras,
+            extra_answers=extra_answers,
+        )
+        all_records = repo.list_user_corrections(sid, oid)
+        for row in all_records:
+            if row.result_payload.get("correction_version") != "3.0.0":
+                continue
+            result = ContinuationCorrectionResult.model_validate(row.result_payload)
+            if result.request_id == request.request_id:
+                if result.request != request or result.request_hash != request_hash(
+                    "CorrectionRequest", result.context, request, sha
+                ):
+                    raise ContinuationReadError(
+                        409,
+                        "correction_conflict",
+                        "Correction identity already has another request",
+                    )
+                committed_frame = next(
+                    frame
+                    for _, p, frame in verified
+                    if p.trigger.trigger_kind == "CORRECTION"
+                    and p.trigger.record_id == row.correction_record_id
+                )
+                return dict(
+                    replayed=True, committed_frame=committed_frame, correction_result=result
+                )
+        if any(r.source_message_id == str(request.message_id) for r in all_records):
+            raise ContinuationReadError(
+                409, "source_already_consumed", "Correction source already has a durable result"
+            )
+        if not service.continuation_enabled:
+            raise ContinuationReadError(
+                409, "continuation_unavailable", "Continuation writes are disabled"
+            )
+        if request.expected_head != view.frame:
+            raise ContinuationReadError(
+                409, "stale_clarification_plan", "Current workflow frame changed"
+            )
+        record_id, cycle_id, plan_id = service._uuid(), service._uuid(), service._uuid()
+        result, offers = prepare_correction(
+            service,
+            repo,
+            view,
+            previous,
+            request,
+            record_id=record_id,
+            cycle_id=cycle_id,
+            plan_id=plan_id,
+            created_at=created_at,
+        )
+        staged_ref = SimpleNamespace(
+            correction_record_id=record_id, content_hash=result.content_hash
+        )
+        plan = correction_plan(
+            service,
+            repo,
+            view,
+            previous,
+            result,
+            offers,
+            record_id=record_id,
+            plan_id=plan_id,
+            verified_extras=(
+                *extras,
+                (staged_ref, result, view.snapshot.revision, result.authoritative_revision),
+            ),
+            verified_answers=extra_answers,
+            offer_history=native_offers(prefix, verified, sid, oid, previous.context.retained_base),
+        )
+        check_capacity(result, plan)
+        return dict(
+            replayed=False,
+            cycle_id=cycle_id,
+            cycle_number=result.next_enrichment_cycle_number,
+            cycle_result=result.next_enrichment_result,
+            plan_id=plan_id,
+            plan_payload=plan.model_dump(mode="json"),
+            plan=plan,
+            revision=result.authoritative_revision if result.new_revision_id is not None else None,
+            correction_result=result,
+            record_id=record_id,
+        )
+
+    committed = service.repository.commit_continuation(
+        sid,
+        oid,
+        build,
+        principal_id=principal_id,
+        created_at=created_at,
+        verify=lambda repo: read_preview(service, sid, oid, _repository=repo),
+    )
+    state = committed["current_state"]
+    return dict(
+        schema_version="3.0.0",
+        command_kind="CORRECTION",
+        committed_result_hash=committed["correction_result"].content_hash,
+        committed_frame=committed.get("committed_frame") or state.current_frame,
+        current_state=state,
+        replayed=committed["replayed"],
+    )
+
+
+def answer(service, sid, oid, request, *, principal_id):
+    """Answer3 idempotency and consent are resolved under the current tenant lock."""
+    if not getattr(service, "continuation_enabled", False):
+        raise ContinuationReadError(
+            409, "continuation_unavailable", "Explicit continuation capability is unavailable"
+        )
+    from pydantic import TypeAdapter
+
+    from .continuation_answers import prepare_answer
+    from .continuation_mutation import answer_plan, current_view
+    from .continuation_preview import read_preview
+    from .continuation_results import ContinuationAnswerResult
+
+    created_at = service._clock()
+
+    def build(repo):
+        _, sha = message_source(repo, sid, oid, request.message_id)
+        replay = replay_admitted(service, repo, sid, oid)
+        if replay is None:
+            raise ContinuationReadError(
+                409, "unsupported_workflow_version", "Explicit continuation admission is required"
+            )
+        origin, verified, prefix, extras, extra_answers = replay
+        view, previous, _ = current_view(
+            service,
+            repo,
+            origin,
+            verified,
+            prefix,
+            extra_corrections=extras,
+            extra_answers=extra_answers,
+        )
+        for row in repo.list_clarification_answers(sid, oid):
+            matches_id = row.answer_record_id == request.answer_id
+            matches_question = (
+                row.plan_content_hash == request.expected_head.plan_hash
+                and row.clarification_id == request.clarification_id
+            )
+            if not (matches_id or matches_question):
+                continue
+            if row.result_payload.get("answer_version") != "3.0.0":
+                raise ContinuationReadError(
+                    409, "clarification_conflict", "Answer identity belongs to retained history"
+                )
+            result = TypeAdapter(ContinuationAnswerResult).validate_python(row.result_payload)
+            if result.request != request or result.request_hash != request_hash(
+                "AnswerRequest", result.context, request, sha
+            ):
+                raise ContinuationReadError(
+                    409, "clarification_conflict", "Question already has another immutable decision"
+                )
+            committed_frame = next(
+                frame
+                for _, p, frame in verified
+                if p.trigger.trigger_kind == "ANSWER"
+                and p.trigger.record_id == row.answer_record_id
+            )
+            return dict(replayed=True, committed_frame=committed_frame, answer_result=result)
+        if not service.continuation_enabled:
+            raise ContinuationReadError(
+                409, "continuation_unavailable", "Continuation writes are disabled"
+            )
+        if request.expected_head != view.frame:
+            raise ContinuationReadError(
+                409, "stale_clarification_plan", "Current workflow frame changed"
+            )
+        cycle_id, plan_id = service._uuid(), service._uuid()
+        intents = {i.intent_id: (i, r) for _, r, _, _ in extras for i in r.keep_intents}
+        result = prepare_answer(
+            service,
+            repo,
+            view,
+            previous,
+            request,
+            cycle_id=cycle_id,
+            created_at=created_at,
+            intents=intents,
+        )
+        plan = answer_plan(
+            service,
+            repo,
+            view,
+            previous,
+            result,
+            cycle_id=cycle_id,
+            plan_id=plan_id,
+            verified_extras=extras,
+            verified_answers=extra_answers,
+            offer_history=native_offers(prefix, verified, sid, oid, previous.context.retained_base),
+        )
+        check_capacity(result, plan)
+        return dict(
+            replayed=False,
+            record_id=result.answer_id,
+            cycle_id=cycle_id,
+            cycle_number=view.frame.enrichment_cycle_number + 1,
+            cycle_result=result.next_enrichment_result,
+            plan_id=plan_id,
+            plan_payload=plan.model_dump(mode="json"),
+            plan=plan,
+            revision=result.resulting_revision,
+            answer_result=result,
+        )
+
+    committed = service.repository.commit_continuation(
+        sid,
+        oid,
+        build,
+        principal_id=principal_id,
+        created_at=created_at,
+        verify=lambda repo: read_preview(service, sid, oid, _repository=repo),
+    )
+    state = committed["current_state"]
+    return dict(
+        schema_version="3.0.0",
+        command_kind="ANSWER",
+        committed_result_hash=committed["answer_result"].content_hash,
+        committed_frame=committed.get("committed_frame") or state.current_frame,
+        current_state=state,
+        replayed=committed["replayed"],
+    )
+
+
+def resume(service, sid, oid, request, *, principal_id):
+    from .continuation_mutation import current_view
+    from .continuation_preview import read_preview
+    from .continuation_resume import prepare_resume
+
+    def build(repo):
+        _, sha = message_source(repo, sid, oid, request.message_id)
+        replay = replay_admitted(service, repo, sid, oid)
+        if replay is None:
+            raise ContinuationReadError(
+                409, "unsupported_workflow_version", "Explicit admission required"
+            )
+        origin, verified, prefix, extras, extra_answers = replay
+        view, previous, _ = current_view(
+            service,
+            repo,
+            origin,
+            verified,
+            prefix,
+            extra_corrections=extras,
+            extra_answers=extra_answers,
+        )
+        expected_hash = request_hash("ResumeRequest", previous.context, request, sha)
+        for _, p, frame in verified:
+            if (
+                p.trigger.trigger_kind == "RESUME"
+                and p.trigger.request.request_id == request.request_id
+            ):
+                if p.trigger.request != request or p.trigger.request_hash != expected_hash:
+                    raise ContinuationReadError(
+                        409, "clarification_conflict", "Resume identity has another request"
+                    )
+                return dict(replayed=True, committed_frame=frame, plan=p)
+        if not service.continuation_enabled:
+            raise ContinuationReadError(
+                409, "continuation_unavailable", "Continuation writes are disabled"
+            )
+        if request.expected_head != view.frame:
+            raise ContinuationReadError(
+                409, "stale_clarification_plan", "Current workflow frame changed"
+            )
+        cycle_id, plan_id = service._uuid(), service._uuid()
+        intents = {i.intent_id: (i, r) for _, r, _, _ in extras for i in r.keep_intents}
+        offers = (
+            tuple(
+                q.offer
+                for _, p, _ in verified
+                for q in p.questions
+                if q.question_kind == "KEEP_RELEASE"
+            )
+            if request.resume_kind == "KEEP_RELEASE"
+            else native_offers(prefix, verified, sid, oid, previous.context.retained_base)
+        )
+        cycle, plan = prepare_resume(
+            service,
+            repo,
+            view,
+            previous,
+            request,
+            cycle_id=cycle_id,
+            plan_id=plan_id,
+            intents=intents,
+            offers=offers,
+        )
+        return dict(
+            replayed=False,
+            cycle_id=cycle_id,
+            cycle_number=view.frame.enrichment_cycle_number + 1,
+            cycle_result=cycle,
+            plan_id=plan_id,
+            plan_payload=plan.model_dump(mode="json"),
+            plan=plan,
+        )
+
+    committed = service.repository.commit_continuation(
+        sid,
+        oid,
+        build,
+        principal_id=principal_id,
+        created_at=service._clock(),
+        verify=lambda repo: read_preview(service, sid, oid, _repository=repo),
+    )
+    state = committed["current_state"]
+    return dict(
+        schema_version="3.0.0",
+        command_kind="RESUME",
+        committed_result_hash=committed["plan"].content_hash,
+        committed_frame=committed.get("committed_frame") or state.current_frame,
         current_state=state,
         replayed=committed["replayed"],
     )

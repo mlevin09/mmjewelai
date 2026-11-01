@@ -327,3 +327,36 @@ They cannot become active requirements or override the current canonical value.
 Missing/ambiguous side groups retain the existing typed deferred correction
 reason independently of whether parser syntax words produce unresolved tokens.
 There is no migration, provider call, catalog promotion or public schema expansion.
+
+### Explicit F05 retained-profile continuation
+
+F05 is disabled by default and is not a live activation. A server-composed
+`continuation_enabled` capability admits an already valid native L/F session via
+`POST /v1/sessions/{id}/prompt-enrichment/continuation-admissions`. AdmissionRequest1
+binds the complete State3 frame; native profile, schema, Knowledge release and
+artifact pins remain unchanged. The entire historical prefix must verify.
+
+After admission, the existing `/corrections` and `/clarification-answers` routes
+require their exact version3 variants. A supported correction overlapping KEEP
+creates a pending intent, not a canonical change. Only a separate typed
+`KEEP_RELEASE` ACCEPT can apply its single value and re-anchor every applicable
+root. Ordinary native answers cannot release KEEP. REJECT closes only its own
+intent; subsequent commands retain other pending intents and stale their offers.
+An explicit version3 command on `/clarifications/{intent_id}/resume` rebinds that
+pending intent. Native F resume uses the same route with an actual cause ID and
+retains the existing dormancy/re-offer rules. No native L resume is invented.
+
+Cycle3, Plan3, Correction3 and Answer3 are stored atomically in existing tables.
+Admission and resume evidence belongs to Plan3. Restart validates actual source
+Messages, immutable native prefix, request hashes, typed consent, canonical
+ancestry and complete interval; rehashing foreign evidence is insufficient.
+Exact duplicate commands are checked under current authorization before new-work
+CAS and return their original committed frame plus labelled current state.
+
+Explicit State3 and If-Match-bound output4 reads remain non-writing. A pending
+request is disclosed separately from current canonical facts and blocks final
+handoff. L requires `projection=jewelai.legacy-l.compat/1.0.0`; F retains its native
+sealed frontier. IFP4/handoff4 do not permit preparation1/2 downgrades. Disabling
+new continuation writes does not remove the version3/4 readers or old saved
+artifact decoders. No migration, Knowledge activation, provider call or deployment
+is part of this feature.

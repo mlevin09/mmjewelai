@@ -162,6 +162,10 @@ def plan_f04(
     relevant_changes=None,
     offer_history=(),
     answered_ids=(),
+    _plan_builder=None,
+    _enrichment_reader=None,
+    _canonical_revision_only=False,
+    _previous_plan_reader=ClarificationPlanV2,
 ):
     """Versioned plan writer around the shared deterministic planner and Rules2.
 
@@ -601,6 +605,8 @@ def plan_f04(
         payload.pop("content_hash", None)
         if payload["rule_decision"].decision == "block":
             payload["can_continue_without_answers"] = False
+        if _plan_builder is not None:
+            return _plan_builder(**payload)
         return ClarificationPlanV2(**payload, content_hash=evidence_hash(payload))
 
     if not parsed_evaluation:
@@ -624,7 +630,7 @@ def plan_f04(
             answered_clarification_ids=answered_ids,
             questions=artifacts.questions,
             rules=artifacts.rules,
-            _plan_reader=ClarificationPlanV2,
+            _plan_reader=_previous_plan_reader,
             _plan_builder=finish_plan,
             _rebind_builder=rebind,
             _question_builder=partial(_rule_question_from_plan, _model_type=build_question),
@@ -642,4 +648,6 @@ def plan_f04(
         _plan_builder=finish_plan,
         _unresolved_context=current_context(),
         _rule_decision_override=presentation,
+        _enrichment_reader=_enrichment_reader,
+        _canonical_revision_only=_canonical_revision_only,
     )

@@ -83,6 +83,16 @@ def _validate_root_evidence(protection, evidence):
 
 
 class FinalPromptSnapshotV3(FinalPromptSnapshot, StrictEvidenceModel):
+    def _coexisting_preservation(self, item):
+        if not (item.kind == "preservation" and item.semantic_subject == "component.center_stone"):
+            return False
+        protected = {r.root_ref.evidence_id for r in self.protection_projection.roots}
+        return all(
+            e.evidence_id in protected
+            for e in self.constraint_evidence
+            if e.status == "active" and e.semantic_subject == item.semantic_subject
+        )
+
     schema_version: Literal["3.0.0"]
     retained_base: Literal["L", "F"]
     extension_profile: Literal["jewelai.prompt-enrichment.f05/1.0.0"] | None
@@ -384,7 +394,7 @@ def current_constraints(snapshot, facts):
     return tuple(sorted(constraints, key=lambda c: (c.target, c.kind, c.source_ids)))
 
 
-def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates):
+def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates, _pending_descriptions=()):
     snapshot = FinalPromptSnapshotV3.model_validate(snapshot)
     _validate_snapshot(snapshot, dictionary=dictionary, templates=templates)
     facts = _design_facts(snapshot)
@@ -438,6 +448,8 @@ def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates):
             )
             reason = snapshot.rule_decision.reason
         base_description = _description(snapshot, dictionary, facts, constraints, unresolved)
+    if len(_pending_descriptions) != len(snapshot.protection_projection.pending_requests):
+        raise ValueError("Pending output requires every actual sourced logical request")
     if snapshot.protection_projection.pending_requests:
         readiness, reason = (
             FinalPromptReadiness.BLOCKED,
@@ -447,8 +459,9 @@ def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates):
         schema_version="3.0.0",
         locale=snapshot.locale,
         authoritative_revision_id=snapshot.revision.revision_id,
-        text=base_description.text,
-        unresolved_summary=base_description.unresolved_summary,
+        text=base_description.text
+        + (" " + " ".join(_pending_descriptions) if _pending_descriptions else ""),
+        unresolved_summary=(*base_description.unresolved_summary, *_pending_descriptions),
         current_frame=snapshot.current_frame,
         protection_projection_hash=snapshot.protection_projection.content_hash,
         compatibility_projection_hash=(

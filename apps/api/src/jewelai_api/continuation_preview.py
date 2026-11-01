@@ -1,17 +1,19 @@
 """Explicit F05 read-only negotiation; no admission or implicit profile upgrade."""
 
 from contextlib import nullcontext
-from typing import Literal
+from typing import Annotated, Literal
 
 from jewelai_domain.clarification_state import (
     EffectiveUnresolvedFrontier,
     EvidenceScope,
+    Sha256,
     StrictEvidenceModel,
     evidence_bytes,
 )
 from jewelai_domain.compatibility import CompatibilityReadinessProjection
 from jewelai_domain.continuation import ContinuationFrame
 from jewelai_domain.preservation import PreservationConflict, ProtectionProjection
+from jewelai_domain.preservation_release import KeepReleaseOffer
 from jewelai_prompts.downstream_preparation import GenerationPreparationError, PreparationErrorCode
 from jewelai_prompts.final_prompt import FinalPromptReadiness
 from jewelai_prompts.final_prompt_v4 import (
@@ -19,6 +21,7 @@ from jewelai_prompts.final_prompt_v4 import (
     UserReadableJewelryDescriptionV3,
     assemble_internal_final_prompt_v4,
 )
+from pydantic import Field
 
 from .clarification import ClarificationQuestion
 from .clarification_v2 import ClarificationQuestionV2
@@ -38,6 +41,11 @@ class NativePreviewQuestion(StrictEvidenceModel):
     native_question: ClarificationQuestionV2 | ClarificationQuestion
 
 
+class KeepOfferQuestion(StrictEvidenceModel):
+    question_kind: Literal["KEEP_RELEASE"]
+    offer: KeepReleaseOffer
+
+
 class ContinuationStateV3(StrictEvidenceModel):
     schema_version: Literal["3.0.0"]
     scope: EvidenceScope
@@ -45,7 +53,10 @@ class ContinuationStateV3(StrictEvidenceModel):
     extension_profile: Literal["jewelai.prompt-enrichment.f05/1.0.0"] | None
     continuation_enabled: bool
     current_frame: ContinuationFrame
-    questions: tuple[NativePreviewQuestion, ...]
+    questions: tuple[
+        Annotated[NativePreviewQuestion | KeepOfferQuestion, Field(discriminator="question_kind")],
+        ...,
+    ]
     protection_projection: ProtectionProjection
     native_frontier: EffectiveUnresolvedFrontier | None
     compatibility_projection: CompatibilityReadinessProjection | None
@@ -63,6 +74,15 @@ class ContinuationStateV3(StrictEvidenceModel):
     ]
     description: UserReadableJewelryDescriptionV3
     preparation_expectations: None
+
+
+class ContinuationCommandResponseV3(StrictEvidenceModel):
+    schema_version: Literal["3.0.0"]
+    command_kind: Literal["ADMISSION", "CORRECTION", "ANSWER", "RESUME"]
+    committed_result_hash: Sha256
+    committed_frame: ContinuationFrame
+    current_state: ContinuationStateV3
+    replayed: bool
 
 
 def read_preview(
@@ -134,8 +154,16 @@ def read_preview(
                 cause_definitions=getattr(original, "cause_definitions", ()),
             )
             bound = service._for_session(sid, oid, repository=repo)
+            pending_lines = ()
+            if admitted is not None and native.protection.pending_requests:
+                from .continuation_planning import pending_descriptions
+
+                pending_lines = pending_descriptions(repo, admitted[1], bound.artifacts.dictionary)
             output = assemble_internal_final_prompt_v4(
-                snapshot, dictionary=bound.artifacts.dictionary, templates=bound.artifacts.prompts
+                snapshot,
+                dictionary=bound.artifacts.dictionary,
+                templates=bound.artifacts.prompts,
+                _pending_descriptions=pending_lines,
             )
             if len(evidence_bytes(output)) > 1_048_576:
                 raise ContinuationReadError(
@@ -156,7 +184,9 @@ def read_preview(
                 continuation_enabled=admitted is not None
                 and getattr(service, "continuation_enabled", False),
                 current_frame=native.frame,
-                questions=tuple(
+                questions=admitted[1].questions
+                if admitted is not None
+                else tuple(
                     NativePreviewQuestion(
                         question_kind="NATIVE", retained_base=base, native_question=q
                     )
@@ -165,7 +195,9 @@ def read_preview(
                 protection_projection=native.protection,
                 native_frontier=snapshot.native_frontier,
                 compatibility_projection=compat,
-                status="final_output_blocked"
+                status="awaiting_keep_release"
+                if native.protection.pending_requests
+                else "final_output_blocked"
                 if readiness == FinalPromptReadiness.BLOCKED
                 else "final_output_ready_with_unresolved"
                 if readiness == FinalPromptReadiness.READY_WITH_UNRESOLVED
