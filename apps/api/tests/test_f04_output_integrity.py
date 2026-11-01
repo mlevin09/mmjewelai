@@ -103,8 +103,11 @@ def test_f04_stale_frontier_rejected_and_preparation_bytes_retained(engine, tmp_
         assert counts(engine) == (1, 1, 0, 0)
 
 
+@pytest.mark.parametrize("schema", ["1.0.0", "1.1.0"])
 @pytest.mark.parametrize("requirement", ["required", "optional", "undetermined"])
-def test_f04_canonical_unknown_and_sourced_na_survive_http_restart(engine, tmp_path, requirement):
+def test_f04_canonical_unknown_and_sourced_na_survive_http_restart(
+    engine, tmp_path, requirement, schema
+):
     with f04_session(engine, tmp_path) as ctx:
         current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
         message = _message(
@@ -141,6 +144,20 @@ def test_f04_canonical_unknown_and_sourced_na_survive_http_restart(engine, tmp_p
         )
         ctx.repo.append_revision_cas(ctx.sid, ctx.org, seeded.revision_id, locked)
         seeded = locked
+        if schema == "1.1.0":
+            from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
+
+            migrated = migrate_design_revision_v1_to_v1_1(
+                seeded,
+                revision_id=uuid4(),
+                created_at=NOW,
+                source=source,
+                reason="Synthetic approved schema upgrade",
+            )
+            ctx.repo.upgrade_design_session_schema_v1_1(
+                ctx.sid, ctx.org, seeded.revision_id, migrated
+            )
+            seeded = migrated
         state = initial(
             ctx, "A white gold ring with an oval diamond center stone in prong setting."
         )

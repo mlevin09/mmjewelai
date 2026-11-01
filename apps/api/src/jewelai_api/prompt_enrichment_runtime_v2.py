@@ -716,7 +716,11 @@ def _verify_new_causes(service, plan, revision, previous=None):
         expected = open_cause_state(
             cause,
             criticality="BLOCKING"
-            if cause.kind.startswith("material_") or cause.kind == "information_gap"
+            if cause.kind == "information_gap"
+            or (
+                cause.kind.startswith("material_")
+                and not protected_target(revision, cause.target, plan.constraint_evidence)
+            )
             else "NONBLOCKING",
             offer_state="PROTECTED"
             if protected_target(revision, cause.target, plan.constraint_evidence)

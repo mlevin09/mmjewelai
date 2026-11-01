@@ -241,7 +241,9 @@ def plan_f04(
         )
         protected = protected_target(revision, conflict.target, constraint_evidence)
         states[d.cause_id] = open_cause_state(
-            d, criticality="BLOCKING", offer_state="PROTECTED" if protected else "AVAILABLE"
+            d,
+            criticality="NONBLOCKING" if protected else "BLOCKING",
+            offer_state="PROTECTED" if protected else "AVAILABLE",
         )
 
     # Use actual existing gap analysis, not Unknown qualifiers or guessed requirements.

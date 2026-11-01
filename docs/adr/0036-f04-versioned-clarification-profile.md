@@ -45,7 +45,9 @@ Separate V2 catalog/Rules models reuse the existing registry/interpreter. Truste
 session Q/R pins select request-local L or F artifacts; client requests cannot choose the
 profile. F initial parsing, strict equivalence, Plan2, material answers, corrections and thin
 resume commands use the existing scoped revision/CAS transactions. Default session creation
-remains L. Missing/mixed versions, changed source/release/artifact hashes and stale frontiers
+remains L. An incoming protected material conflict is nonblocking relative to the already
+authoritative fact; existing critical gaps remain independently blocking. Missing/mixed versions,
+changed source/release/artifact hashes and stale frontiers
 fail closed.
 
 An F result stores exact accepted-target snapshots and causal assertions. Restoration verifies

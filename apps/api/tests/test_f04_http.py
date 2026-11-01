@@ -84,6 +84,55 @@ def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail
                     provider_calls=len(provider.calls),
                     http=trace,
                 )
+                repo = runtime.repository
+                persisted = repo.get_design_session(sid, UUID(org))
+                payload["revisions"] = [
+                    r.model_dump(mode="json") for r in repo.list_revisions(sid, UUID(org))
+                ]
+                if persisted.knowledge_package_id is not None:
+                    payload["cycles"] = [
+                        dict(
+                            cycle_id=str(c.enrichment_cycle_id),
+                            cycle_number=c.cycle_number,
+                            revision_id=str(c.specification_revision_id),
+                            result=c.result.model_dump(mode="json"),
+                        )
+                        for c in repo.list_enrichment_cycles(sid, UUID(org))
+                    ]
+                    payload["plans"] = [
+                        p.plan_payload for p in repo.list_clarification_plans(sid, UUID(org))
+                    ]
+                    payload["answers"] = [
+                        a.result_payload for a in repo.list_clarification_answers(sid, UUID(org))
+                    ]
+                    payload["corrections"] = [
+                        c.result_payload for c in repo.list_user_corrections(sid, UUID(org))
+                    ]
+                    # Supplemental source reparse is labelled separately; it is not
+                    # claimed to be an HTTP response or a second canonical write.
+                    from jewelai_domain.clarification_state import evidence_hash
+                    from jewelai_parser import parse_full_message
+
+                    bound = runtime._for_session(sid, UUID(org))
+                    verified = bound._load_release()
+                    sources = {p["trigger"]["message_id"] for p in payload["plans"]}
+                    payload["supplemental_reparsed_sources"] = []
+                    for mid in sorted(sources):
+                        message = repo.get_message(sid, UUID(mid), UUID(org))
+                        parsed = parse_full_message(
+                            message.content,
+                            locale=locale,
+                            dictionary=bound.artifacts.dictionary,
+                            knowledge_runtime=verified.compiled_runtime,
+                        )
+                        payload["supplemental_reparsed_sources"].append(
+                            dict(
+                                message_id=mid,
+                                source_sha256=hashlib.sha256(message.content.encode()).hexdigest(),
+                                parse_result=parsed.model_dump(mode="json"),
+                                parse_sha256=evidence_hash(parsed),
+                            )
+                        )
                 raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2).encode()
                 (root / (hashlib.sha256(raw).hexdigest() + ".json")).write_bytes(raw)
 
@@ -390,6 +439,7 @@ def state_get(ctx):
 
 def restart(ctx, engine):
     client, app, provider = _client(engine, ctx.config)
+    client.event_hooks["response"].extend(ctx.client.event_hooks["response"])
     ctx.client = client
     ctx.app = app
     ctx.runtime = app.state.prompt_enrichment_service
@@ -726,7 +776,7 @@ def test_f04_protected_material_cannot_be_overwritten_http(engine, tmp_path, pro
                 ctx.sid, ctx.org, before.revision_id, migrated
             )
             before = migrated
-        state = initial(ctx, "Gold or platinum ring.")
+        state = initial(ctx, READY_TEXT)
         assert (
             ctx.repo.get_current_revision(ctx.sid, ctx.org).design.metal.material
             == before.design.metal.material
@@ -734,6 +784,13 @@ def test_f04_protected_material_cannot_be_overwritten_http(engine, tmp_path, pro
         assert not any(
             q["semantic_question_id"] == "METAL_MATERIAL" for q in state["clarification_questions"]
         )
+        assert state["can_prepare"] is True
+        protected_cause = next(
+            c
+            for c in state["current_unresolved_causal_summaries"]
+            if c["availability_target_ref"]["concrete_target"] == "metal.material"
+        )
+        assert protected_cause["criticality"] == "NONBLOCKING"
         state = correct(ctx, state, "A platinum ring.")
         current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
         if protection == "confirmed":
@@ -866,3 +923,120 @@ def test_f04_resume_stale_plan_after_revision_neutral_answer_http(engine, tmp_pa
         stale, _ = resume(ctx, state, question["cause_id"])
         assert stale.status_code == 409, stale.json()
         assert len(ctx.repo.list_enrichment_cycles(ctx.sid, ctx.org)) == 3
+
+
+def test_f04_actual_ancestor_lock_preserved_in_schema11_http(engine, tmp_path):
+    from conftest import NOW
+    from jewelai_domain.models import MessageSource
+    from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
+    from jewelai_domain.revisions import confirm_field, lock_field, revise_design
+
+    with f04_session(engine, tmp_path, binding=True) as ctx:
+        before = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        msg = _message(
+            ctx.client,
+            str(ctx.sid),
+            str(ctx.org),
+            "Synthetic explicit composition and ancestor LOCK.",
+        )
+        source = MessageSource(message_id=msg["message_id"], recorded_at=NOW)
+        migrated = migrate_design_revision_v1_to_v1_1(
+            before,
+            revision_id=uuid4(),
+            created_at=NOW,
+            source=source,
+            reason="Synthetic schema upgrade",
+        )
+        ctx.repo.upgrade_design_session_schema_v1_1(ctx.sid, ctx.org, before.revision_id, migrated)
+        explicit = dict(
+            availability="value",
+            origin="explicit",
+            source=source.model_dump(mode="json"),
+            confirmed=False,
+            locked=False,
+        )
+        design = migrated.design.model_dump(mode="json")
+        design["composition"] = {
+            **explicit,
+            "value": {"symmetry_mode": {**explicit, "value": "asymmetrical"}},
+        }
+        seeded = revise_design(
+            migrated,
+            design,
+            expected_revision_id=migrated.revision_id,
+            source=source,
+            reason="Synthetic explicit composition",
+            created_at=NOW,
+        )
+        ctx.repo.append_revision_cas(ctx.sid, ctx.org, migrated.revision_id, seeded)
+        confirmed = confirm_field(
+            seeded,
+            "composition",
+            expected_revision_id=seeded.revision_id,
+            source=source,
+            reason="Synthetic confirmation",
+            created_at=NOW,
+        )
+        ctx.repo.append_revision_cas(ctx.sid, ctx.org, seeded.revision_id, confirmed)
+        locked = lock_field(
+            confirmed,
+            "composition",
+            expected_revision_id=confirmed.revision_id,
+            source=source,
+            reason="Synthetic ancestor LOCK",
+            created_at=NOW,
+        )
+        ctx.repo.append_revision_cas(ctx.sid, ctx.org, confirmed.revision_id, locked)
+        state = initial(
+            ctx,
+            "A white gold ring with an oval diamond center stone in prong setting. "
+            "Center stone 9 x 7 x 4 mm.",
+        )
+        state = correct(ctx, state, "A symmetrical ring.")
+        current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        assert current.design.composition == locked.design.composition
+        assert current.design.composition.value.symmetry_mode.value == "asymmetrical"
+        with restart(ctx, engine):
+            assert state_get(ctx) == state
+
+
+def test_f04_keep_compatible_corrections_retain_original_evidence_http(engine, tmp_path):
+    with f04_session(engine, tmp_path, binding=True, locale="ru") as ctx:
+        from conftest import NOW
+        from jewelai_domain.models import MessageSource
+        from jewelai_domain.models_v1_1 import migrate_design_revision_v1_to_v1_1
+
+        old = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        message = _message(
+            ctx.client, str(ctx.sid), str(ctx.org), "Synthetic authorized schema upgrade."
+        )
+        upgraded = migrate_design_revision_v1_to_v1_1(
+            old,
+            revision_id=uuid4(),
+            created_at=NOW,
+            source=MessageSource(message_id=message["message_id"], recorded_at=NOW),
+            reason="Synthetic schema upgrade",
+        )
+        ctx.repo.upgrade_design_session_schema_v1_1(ctx.sid, ctx.org, old.revision_id, upgraded)
+        state = initial(ctx, "Асимметричное кольцо — не выравнивай его.")
+        before = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+        original = ctx.repo.get_clarification_plan(
+            ctx.sid, UUID(state["clarification_plan_id"]), ctx.org
+        ).plan_payload["constraint_evidence"]
+        keep = next(e for e in original if e["kind"] == "preservation" and e["status"] == "active")
+        for text in ("An asymmetric ring.", "Кольцо из золота.", "An oval diamond center stone."):
+            state = correct(ctx, state, text)
+            current = ctx.repo.get_current_revision(ctx.sid, ctx.org)
+            assert (
+                current.design.composition.value.symmetry_mode
+                == before.design.composition.value.symmetry_mode
+            )
+            plan = ctx.repo.get_clarification_plan(
+                ctx.sid, UUID(state["clarification_plan_id"]), ctx.org
+            ).plan_payload
+            preserved = next(
+                e for e in plan["constraint_evidence"] if e["evidence_id"] == keep["evidence_id"]
+            )
+            assert preserved == keep
+            with restart(ctx, engine):
+                assert state_get(ctx) == state
