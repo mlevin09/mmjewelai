@@ -94,6 +94,10 @@ from .models import (
 
 def _decode_enrichment_payload(value):
     payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+    if isinstance(payload, dict) and payload.get("enrichment_version") == "3.0.0":
+        from jewelai_prompts.continuation import ContinuationEnrichmentResult
+
+        return ContinuationEnrichmentResult.model_validate(payload)
     if isinstance(payload, dict) and payload.get("enrichment_version") == "2.0.0":
         return decode_f04_prompt_enrichment_result(payload)
     return _decode_legacy_enrichment(payload)
@@ -136,6 +140,10 @@ class KnowledgeReleasePinConflictError(PersistenceError):
 
 
 class EnrichmentCycleConflictError(PersistenceError):
+    pass
+
+
+class UnsupportedWorkflowVersionError(PersistenceError):
     pass
 
 
@@ -695,6 +703,14 @@ class PersistenceRepository:
             raise ValueError("New revision parent must equal expected revision")
         try:
             with self._session_factory.begin() as db:
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
+                if session is None:
+                    raise StaleRevisionError(
+                        "Current revision changed or session is outside organization scope"
+                    )
+                self._require_native_workflow(db, session_id)
                 parent = db.scalar(
                     select(SpecificationRevisionRow).where(
                         SpecificationRevisionRow.session_id == session_id,
@@ -754,6 +770,7 @@ class PersistenceRepository:
                 )
                 if session is None:
                     raise OwnershipMismatchError("Session not found in organization scope")
+                self._require_native_workflow(db, session_id)
                 if session.current_revision_id != expected_revision_id:
                     raise StaleRevisionError("Current revision changed before schema migration")
                 if session.design_schema_version != "1.0.0":
@@ -1108,6 +1125,7 @@ class PersistenceRepository:
                 )
                 if session is None:
                     raise OwnershipMismatchError("Session not found in organization scope")
+                self._require_native_workflow(db, session_id)
                 if session.current_revision_id != expected_revision_id:
                     raise StaleRevisionError(
                         "Current Product State revision changed before initial enrichment commit"
@@ -1246,6 +1264,123 @@ class PersistenceRepository:
             if row is None:
                 raise NotFoundError("Session not found")
             yield locked_reader(db)
+
+    @staticmethod
+    def _require_native_workflow(db, session_id):
+        if (
+            db.scalar(
+                select(EnrichmentCycleRow.enrichment_cycle_id)
+                .where(
+                    EnrichmentCycleRow.session_id == session_id,
+                    EnrichmentCycleRow.enrichment_version == "3.0.0",
+                )
+                .limit(1)
+            )
+            is not None
+        ):
+            raise UnsupportedWorkflowVersionError("Explicit workflow3 is required")
+
+    def require_native_workflow(self, session_id, organization_id):
+        with self._session_factory() as db:
+            if db.scalar(self._scoped_session_query(session_id, organization_id)) is None:
+                raise NotFoundError("Session not found")
+            self._require_native_workflow(db, session_id)
+
+    def commit_continuation(
+        self, session_id, organization_id, build, *, principal_id, created_at, verify
+    ):
+        """Session-first F05 unit of work over existing rows; builder uses locked reads.
+
+        Source/replay/full-head verification occurs in the version-specific runtime
+        under this lock. No publishing or network/provider work belongs here.
+        """
+        from jewelai_domain.preservation import contract_hash
+
+        from .preparations import _authorize_and_lock, locked_reader
+
+        with self._session_factory.begin() as db:
+            session = _authorize_and_lock(self, db, organization_id, session_id, principal_id)
+            draft = build(locked_reader(db))
+            if draft.get("replayed"):
+                return {**draft, "current_state": verify(locked_reader(db))}
+            result = _decode_enrichment_payload(draft["cycle_result"])
+            if result.enrichment_version != "3.0.0":
+                raise EnrichmentIntegrityError("Continuation requires exact enrichment3")
+            revision = draft.get("revision")
+            if revision is not None:
+                parent = self._locked_revision(db, session_id, session.current_revision_id)
+                self._validate_next_revision(parent, revision)
+                db.add(self._revision_row(session_id, revision))
+                db.flush()
+                session.current_revision_id = revision.revision_id
+            self._validate_f04_snapshot(db, session, result, session.current_revision_id)
+            latest = db.scalar(
+                select(EnrichmentCycleRow)
+                .where(EnrichmentCycleRow.session_id == session_id)
+                .order_by(EnrichmentCycleRow.cycle_number.desc())
+                .limit(1)
+            )
+            if latest is None or draft["cycle_number"] != latest.cycle_number + 1:
+                raise EnrichmentCycleConflictError("Continuation cycle sequence changed")
+            payload = draft["plan_payload"]
+            from jewelai_domain.clarification_state import evidence_bytes
+
+            if any(len(evidence_bytes(v)) > 1_048_576 for v in (result, payload)):
+                raise EnrichmentIntegrityError("Continuation artifact exceeds capacity")
+            core = payload["allocated_current_frame_core"]
+            if (
+                payload["plan_version"] != "3.0.0"
+                or payload["content_hash"]
+                != contract_hash(
+                    "jewelai.ClarificationPlan/3.0.0",
+                    {k: v for k, v in payload.items() if k != "content_hash"},
+                )
+                or payload["context"] != result.context.model_dump(mode="json")
+                or core["plan_id"] != str(draft["plan_id"])
+                or core["enrichment_cycle_id"] != str(draft["cycle_id"])
+                or core["enrichment_cycle_number"] != draft["cycle_number"]
+                or core["enrichment_result_hash"] != result.content_hash
+                or core["revision_id"] != str(session.current_revision_id)
+            ):
+                raise ClarificationPlanIntegrityError("Continuation plan/cycle mismatch")
+            cycle = EnrichmentCycleRow(
+                enrichment_cycle_id=draft["cycle_id"],
+                session_id=session_id,
+                cycle_number=draft["cycle_number"],
+                specification_revision_id=session.current_revision_id,
+                knowledge_package_id=result.knowledge_package_id,
+                knowledge_artifact_version=result.knowledge_artifact_version,
+                knowledge_runtime_sha256=result.knowledge_runtime_sha256,
+                knowledge_validation_report_sha256=result.knowledge_validation_report_sha256,
+                enrichment_version="3.0.0",
+                result_payload=result.model_dump(mode="json"),
+                content_hash=result.content_hash,
+                created_at=created_at,
+            )
+            db.add(cycle)
+            db.flush()
+            db.add(
+                ClarificationPlanRow(
+                    clarification_plan_id=draft["plan_id"],
+                    organization_id=organization_id,
+                    session_id=session_id,
+                    enrichment_cycle_id=cycle.enrichment_cycle_id,
+                    specification_revision_id=session.current_revision_id,
+                    plan_version="3.0.0",
+                    knowledge_package_id=result.knowledge_package_id,
+                    knowledge_artifact_version=result.knowledge_artifact_version,
+                    knowledge_runtime_sha256=result.knowledge_runtime_sha256,
+                    knowledge_validation_report_sha256=result.knowledge_validation_report_sha256,
+                    dictionary_artifact_version=session.dictionary_artifact_version,
+                    question_artifact_version=session.question_artifact_version,
+                    rules_artifact_version=session.rules_artifact_version,
+                    plan_payload=payload,
+                    content_hash=payload["content_hash"],
+                    created_at=created_at,
+                )
+            )
+            db.flush()
+            return {**draft, "current_state": verify(locked_reader(db))}
 
     def get_enrichment_cycle(
         self,
@@ -1450,6 +1585,7 @@ class PersistenceRepository:
                 )
                 if session is None:
                     raise OwnershipMismatchError("Session not found in organization scope")
+                self._require_native_workflow(db, session_id)
                 self._validate_release_identity(session, payload)
                 if (
                     session.question_artifact_version != payload["question_artifact_version"]
@@ -1625,6 +1761,7 @@ class PersistenceRepository:
                 )
                 if session is None:
                     raise OwnershipMismatchError("Session not found in organization scope")
+                self._require_native_workflow(db, session_id)
                 self._validate_release_identity(session, payload)
                 message = db.scalar(
                     select(MessageRow).where(
@@ -1870,6 +2007,7 @@ class PersistenceRepository:
                 )
                 if session is None:
                     raise OwnershipMismatchError("Session not found in organization scope")
+                self._require_native_workflow(db, session_id)
                 self._validate_release_identity(session, payload)
                 if (
                     session.dictionary_artifact_version != payload["dictionary_artifact_version"]
@@ -3503,6 +3641,41 @@ class PersistenceRepository:
 
     @classmethod
     def _validate_f04_snapshot(cls, db, session, result, revision_id):
+        if result.enrichment_version == "3.0.0":
+            current = cls._domain_revision(
+                cls._locked_revision(db, session.session_id, revision_id)
+            )
+            oid = db.scalar(
+                select(ProjectRow.organization_id).where(
+                    ProjectRow.project_id == session.project_id
+                )
+            )
+            pins = result.context.artifact_pins
+            if (
+                result.context.scope
+                != EvidenceScope(
+                    organization_id=oid, session_id=session.session_id, design_id=current.design_id
+                )
+                or result.protection_projection.current_revision_sha256 != evidence_hash(current)
+                or (
+                    pins.design_schema_version,
+                    pins.role_artifact_version,
+                    pins.dictionary_artifact_version,
+                    pins.question_artifact_version,
+                    pins.rules_artifact_version,
+                    pins.prompt_template_artifact_version,
+                )
+                != (
+                    session.design_schema_version,
+                    session.role_artifact_version,
+                    session.dictionary_artifact_version,
+                    session.question_artifact_version,
+                    session.rules_artifact_version,
+                    session.prompt_artifact_version,
+                )
+            ):
+                raise EnrichmentIntegrityError("Continuation scope/artifacts mismatch")
+            return cls._validate_f04_snapshot(db, session, result.native, revision_id)
         f04 = (session.question_artifact_version, session.rules_artifact_version) == (
             "2.0.0",
             "2.0.0",
@@ -3633,19 +3806,28 @@ class PersistenceRepository:
                 "F accepted-target evidence failed transactional validation"
             ) from exc
 
-    @classmethod
     def _clarification_plan_record(
-        cls,
+        self,
         db: Session,
         row: ClarificationPlanRow,
         session: DesignSessionRow,
     ) -> ClarificationPlanRecord:
-        payload = cls._verified_payload_hash(
-            row.plan_payload,
-            hash_field="content_hash",
-            error_type=ClarificationPlanIntegrityError,
-        )
-        cls._validate_release_identity(session, payload)
+        if row.plan_version == "3.0.0":
+            from jewelai_domain.preservation import contract_hash
+
+            payload = row.plan_payload
+            if payload.get("content_hash") != contract_hash(
+                "jewelai.ClarificationPlan/3.0.0",
+                {k: v for k, v in payload.items() if k != "content_hash"},
+            ):
+                raise ClarificationPlanIntegrityError("Continuation plan integrity mismatch")
+        else:
+            payload = self._verified_payload_hash(
+                row.plan_payload,
+                hash_field="content_hash",
+                error_type=ClarificationPlanIntegrityError,
+            )
+        self._validate_release_identity(session, payload)
         cycle = db.scalar(
             select(EnrichmentCycleRow).where(
                 EnrichmentCycleRow.enrichment_cycle_id == row.enrichment_cycle_id,
@@ -3659,6 +3841,19 @@ class PersistenceRepository:
             raise ClarificationPlanIntegrityError(
                 "stored clarification plan has no authoritative enrichment cycle"
             )
+        if row.plan_version == "3.0.0":
+            result = self._enrichment_cycle_record(
+                cycle, self._knowledge_release_pin(session, db=db), db=db, session=session
+            ).result
+            core = payload["allocated_current_frame_core"]
+            if (
+                payload["context"] != result.context.model_dump(mode="json")
+                or core["plan_id"] != str(row.clarification_plan_id)
+                or core["enrichment_cycle_id"] != str(cycle.enrichment_cycle_id)
+                or core["enrichment_cycle_number"] != cycle.cycle_number
+                or core["enrichment_result_hash"] != cycle.content_hash
+            ):
+                raise ClarificationPlanIntegrityError("Continuation row/frame mismatch")
         try:
             mirrors = (
                 row.organization_id == organization_id,
@@ -3694,7 +3889,7 @@ class PersistenceRepository:
             specification_revision_id=row.specification_revision_id,
             plan_payload=payload,
             content_hash=row.content_hash,
-            created_at=cls._utc(row.created_at),
+            created_at=self._utc(row.created_at),
         )
 
     @staticmethod
@@ -3728,10 +3923,27 @@ class PersistenceRepository:
             "1.0.0",
         ):
             raise EnrichmentIntegrityError("Unsupported session profile tuple")
-        for discriminator in ("plan_version", "answer_version", "correction_version"):
-            if discriminator in payload and ((payload[discriminator] == "2.0.0") != f04):
-                raise EnrichmentIntegrityError("Mixed session/durable contract profile")
-        if f04 and payload.get("contract_profile") != "jewelai.prompt-enrichment.f04/2.0.0":
+        new = any(
+            payload.get(d) == "3.0.0"
+            for d in ("plan_version", "answer_version", "correction_version")
+        )
+        if new:
+            context = payload.get("context", {})
+            if (
+                context.get("retained_base") != ("F" if f04 else "L")
+                or context.get("extension_profile") != "jewelai.prompt-enrichment.f05/1.0.0"
+                or context.get("scope", {}).get("session_id") != str(session.session_id)
+            ):
+                raise EnrichmentIntegrityError("Continuation retained profile mismatch")
+        else:
+            for discriminator in ("plan_version", "answer_version", "correction_version"):
+                if discriminator in payload and ((payload[discriminator] == "2.0.0") != f04):
+                    raise EnrichmentIntegrityError("Mixed session/durable contract profile")
+        if (
+            f04
+            and not new
+            and payload.get("contract_profile") != "jewelai.prompt-enrichment.f04/2.0.0"
+        ):
             raise EnrichmentIntegrityError("Missing F contract profile")
         stored = (
             session.knowledge_package_id,

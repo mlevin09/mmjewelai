@@ -413,6 +413,14 @@ def create_app(
     async def last_owner_handler(_, exc):
         return _error_response(409, "last_owner", str(exc))
 
+    from jewelai_persistence import UnsupportedWorkflowVersionError
+
+    @app.exception_handler(UnsupportedWorkflowVersionError)
+    async def unsupported_workflow_version_handler(request, exc):
+        return _error_response(
+            409, "unsupported_workflow_version", "Explicit workflow3 is required"
+        )
+
     @app.exception_handler(StaleRevisionError)
     async def stale_handler(_, exc):
         return _error_response(409, "stale_revision", str(exc))
@@ -1113,6 +1121,44 @@ def create_app(
         return service.evaluate(session_id, organization_id, request)
 
     if prompt_enrichment_service is not None:
+
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/continuation-admissions", status_code=201
+        )
+        async def admit_prompt_enrichment_continuation(
+            session_id: UUID,
+            request: Request,
+            principal: Authenticated,
+            organization_id: AuthorizedOrganization,
+        ):
+            from starlette.concurrency import run_in_threadpool
+
+            from .clarification_f05 import ContinuationAdmissionRequest, decode_continuation_command
+            from .continuation_runtime import admit
+
+            try:
+                command = decode_continuation_command(
+                    ContinuationAdmissionRequest, await request.body()
+                )
+            except (ValueError, TypeError):
+                raise ContinuationReadError(
+                    422, "invalid_continuation_request", "Invalid continuation admission request"
+                ) from None
+            try:
+                return await run_in_threadpool(
+                    admit,
+                    prompt_enrichment_service,
+                    session_id,
+                    organization_id,
+                    command,
+                    principal_id=principal.principal_id,
+                )
+            except ContinuationReadError:
+                raise
+            except ValueError:
+                raise ContinuationReadError(
+                    500, "invalid_durable_history", "Scoped enrichment history failed validation"
+                ) from None
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/initial",

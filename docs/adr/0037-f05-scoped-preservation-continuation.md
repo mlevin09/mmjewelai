@@ -70,7 +70,7 @@ default output routes retain their meanings. No GET creates a plan, offer or eve
 IFP4 and handoff4 retain the current frame/protection/readiness evidence; F also
 retains its sealed frontier, availability and causal definitions. Preparation1/2
 explicitly reject source4 with `unsupported_source_version`; no provider execution
-or legacy source downgrade is added. These previews do not enable continuation.
+or legacy source downgrade is added. These previews do not confer admission.
 
 The approved target additionally requires durable atomic decisions/re-anchoring,
 current versioned outputs, all R2 HTTP scenarios, isolated PostgreSQL proof and
@@ -92,5 +92,38 @@ MessageSource. All applicable roots receive the new anchor; other wrappers and
 original roots remain immutable. A later different value requires a fresh binding
 and decision. Rejection closes only its logical request. Independent transitions
 retain anchors and invalidate earlier offers without discarding pending requests.
-These pure checks are not a live consent endpoint or proof of transactional
-durability. Admission/Plan3 writers and strict persisted replay remain unfinished.
+These pure checks are not a live consent endpoint or proof of the KEEP_RELEASE
+transaction lifecycle. Explicit admission now persists Cycle3/Plan3 and supports
+strict admission-prefix replay as described below; durable corrections, answers
+and resume remain unfinished.
+
+### Explicit admission implementation
+
+`POST /v1/sessions/{session_id}/prompt-enrichment/continuation-admissions` accepts
+only AdmissionRequest1 and requires the server-side continuation capability,
+which defaults to disabled. A membership recheck and session lock precede source
+validation, duplicate lookup and full-frame CAS. Original native L/F history is
+replayed under the unchanged native decoders before a new Cycle3/Plan3 is staged.
+The inner native result is retained under its original version, with no relabelled
+Plan2, Answer2 or IFP3. Canonical state, release and artifact pins are unchanged.
+
+Admission command/source, previous head, parser transition and exact native
+planning evidence are stored in Plan3. The current plan hash is not embedded in
+its own cycle/core. Replay validates actual source text and the frozen native
+prefix, recomputes both envelopes and only then seals the current native frontier
+and frame. It rejects mixed or incomplete post-admission intervals. Prefix reads
+reuse the caller's transaction without widening the historical interval.
+
+Cycle/plan insertion and current output validation occur in one transaction.
+Plan insertion or output/capacity failure rolls back the entire unit. Duplicate
+admission returns the original committed frame before checking freshness; another
+admission identity is rejected. Reused identity with changed payload is rejected.
+Default legacy state/final-output and native writers reject admitted sessions
+with `unsupported_workflow_version`; exact historical decoders remain available
+to the replay path. Explicit current reads are non-writing and continue to work
+when new admissions are disabled. No configuration enables F05 in a live runtime.
+
+This admission implementation does not establish the complete F05 workflow:
+Answer3, Correction3, Resume3, bound KEEP_RELEASE HTTP consent, ordinary native
+answer protection and D2 composition with new decisions still require delivery.
+The approved 36+18 matrix cannot be marked complete from admission tests alone.

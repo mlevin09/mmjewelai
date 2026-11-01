@@ -27,6 +27,7 @@ from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from jewelai_domain.rules_v2 import RuleDecisionV2
 from pydantic import model_validator
 
+from .continuation import ContinuationEnrichmentResult
 from .downstream_preparation import (
     CanonicalInternalFinalPromptV2_1,
     check_ifp_v2_1_capacity,
@@ -53,9 +54,8 @@ from .final_prompt import (
     _validate_snapshot,
 )
 from .final_prompt_v3 import (
-    FinalPromptSnapshotV2,
     FinalPromptUnresolvedDetailV3,
-    assemble_internal_final_prompt_v3,
+    f04_current_components,
 )
 from .handoff import InternalFinalPromptHandoff
 
@@ -87,7 +87,11 @@ class FinalPromptSnapshotV3(FinalPromptSnapshot, StrictEvidenceModel):
     retained_base: Literal["L", "F"]
     extension_profile: Literal["jewelai.prompt-enrichment.f05/1.0.0"] | None
     current_frame: ContinuationFrame
-    enrichment_result: StructuredPromptEnrichmentResult | StructuredPromptEnrichmentResultV2
+    enrichment_result: (
+        StructuredPromptEnrichmentResult
+        | StructuredPromptEnrichmentResultV2
+        | ContinuationEnrichmentResult
+    )
     rule_decision: RuleDecisionV2 | RuleDecision
     protection_projection: ProtectionProjection
     compatibility_projection: CompatibilityReadinessProjection | None
@@ -126,10 +130,13 @@ class FinalPromptSnapshotV3(FinalPromptSnapshot, StrictEvidenceModel):
                 or compat.evidence_head != frame
                 or compat.current_frame_core.model_dump()
                 != frame.model_dump(exclude={"plan_hash", "history_root_sha256"})
-                or compat.legacy_history_root_sha256 != frame.history_root_sha256
+                or (
+                    self.extension_profile is None
+                    and compat.legacy_history_root_sha256 != frame.history_root_sha256
+                )
                 or self.artifact_versions.question_artifact_version != "1.0.0"
                 or self.artifact_versions.rules_artifact_version != "1.0.0"
-                or self.enrichment_result.enrichment_version != "1.3.0"
+                or self.enrichment_result.enrichment_version not in {"1.3.0", "3.0.0"}
             ):
                 raise ValueError("L current output has incompatible native/projection evidence")
             historical = {
@@ -237,7 +244,10 @@ class CanonicalInternalFinalPromptV4(CanonicalInternalFinalPromptV2_1, StrictEvi
                 or compat.scope != protection.scope
                 or compat.current_frame_core.model_dump()
                 != frame.model_dump(exclude={"plan_hash", "history_root_sha256"})
-                or compat.legacy_history_root_sha256 != frame.history_root_sha256
+                or (
+                    self.extension_profile is None
+                    and compat.legacy_history_root_sha256 != frame.history_root_sha256
+                )
                 or self.native_availability_overlay is not None
                 or self.cause_definitions
             ):
@@ -380,32 +390,24 @@ def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates):
     facts = _design_facts(snapshot)
     constraints = current_constraints(snapshot, facts)
     if snapshot.retained_base == "F":
-        native = FinalPromptSnapshotV2(
-            **snapshot.model_dump(
-                exclude={
-                    "schema_version",
-                    "retained_base",
-                    "extension_profile",
-                    "current_frame",
-                    "protection_projection",
-                    "compatibility_projection",
-                    "native_frontier",
-                    "cause_definitions",
-                }
-            ),
-            schema_version="2.0.0",
-            contract_profile="jewelai.prompt-enrichment.f04/2.0.0",
+        from types import SimpleNamespace
+
+        native = snapshot.enrichment_result
+        if getattr(native, "enrichment_version", None) == "3.0.0":
+            native = native.native
+        view = SimpleNamespace(
+            **{
+                name: getattr(snapshot, name)
+                for name in type(snapshot).model_fields
+                if name != "enrichment_result"
+            },
+            enrichment_result=native,
             effective_unresolved_frontier=snapshot.native_frontier,
-            cause_definitions=snapshot.cause_definitions,
         )
-        native_output = assemble_internal_final_prompt_v3(
-            native, dictionary=dictionary, templates=templates
+        base_description, unresolved, readiness = f04_current_components(
+            view, dictionary, facts, constraints
         )
-        unresolved = native_output.internal_final_prompt.unresolved_details
-        readiness = native_output.internal_final_prompt.readiness
-        reason = native_output.internal_final_prompt.readiness_reason
-        # Reuse the native F wording/availability semantics; no causal policy rewrite.
-        base_description = native_output.description
+        reason = snapshot.rule_decision.reason
     else:
         compat = snapshot.compatibility_projection
         discharged_hashes = {

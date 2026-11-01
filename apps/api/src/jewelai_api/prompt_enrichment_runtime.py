@@ -248,6 +248,7 @@ class PromptEnrichmentRuntimeService:
         validation_report: AnyValidationReport | object,
         clock: Callable[[], datetime],
         uuid_factory: Callable[[], UUID],
+        continuation_enabled: bool = False,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -258,6 +259,7 @@ class PromptEnrichmentRuntimeService:
         self.validation_report = validation_report
         self._clock = clock
         self._uuid = uuid_factory
+        self.continuation_enabled = continuation_enabled
 
     def _for_session(self, session_id, organization_id, *, repository=None):
         repository = repository or self.repository
@@ -287,6 +289,10 @@ class PromptEnrichmentRuntimeService:
             "2.0.0",
         )
 
+    def _require_native_workflow(self, session_id, organization_id, *, repository=None):
+        repo = repository or self.repository
+        repo.require_native_workflow(session_id, organization_id)
+
     def _require_request_profile(self, request):
         if (getattr(request, "schema_version", None) == "2.0.0") != self._is_f04:
             raise PromptEnrichmentRuntimeError(
@@ -299,6 +305,7 @@ class PromptEnrichmentRuntimeService:
     ) -> InitialEnrichmentRuntimeResult:
         """Parse a persisted message first, then atomically commit revision + first cycle."""
 
+        self._require_native_workflow(request.session_id, request.organization_id)
         bound = self._for_session(request.session_id, request.organization_id)
         if bound is not self:
             return bound.start_initial_message(request)
@@ -443,6 +450,7 @@ class PromptEnrichmentRuntimeService:
 
     def build_preparation_source(self, repository, session_id, organization_id):
         """Restore the sole current source using the caller's already locked transaction reader."""
+        self._require_native_workflow(session_id, organization_id, repository=repository)
         bound = self._for_session(session_id, organization_id, repository=repository)
         if bound is not self:
             return bound.build_preparation_source(repository, session_id, organization_id)
@@ -528,6 +536,7 @@ class PromptEnrichmentRuntimeService:
         self, session_id: UUID, organization_id: UUID
     ) -> PromptEnrichmentWorkflowState:
         """Restore and verify the latest durable module state without changing it."""
+        self._require_native_workflow(session_id, organization_id)
         bound = self._for_session(session_id, organization_id)
         if bound is not self:
             return bound.get_current_state(session_id, organization_id)
@@ -727,6 +736,7 @@ class PromptEnrichmentRuntimeService:
     ) -> tuple[CorrectionReenrichmentResult, PromptEnrichmentWorkflowState]:
         """Build a correction only from an organization-scoped persisted message."""
 
+        self._require_native_workflow(request.session_id, organization_id)
         bound = self._for_session(request.session_id, organization_id)
         if bound is not self:
             return bound.apply_persisted_user_correction(organization_id, request)
@@ -966,6 +976,7 @@ class PromptEnrichmentRuntimeService:
     ) -> tuple[ClarificationAnswerResult, PromptEnrichmentWorkflowState]:
         """Restore the authoritative plan and process a bounded client decision."""
 
+        self._require_native_workflow(request.session_id, organization_id)
         bound = self._for_session(request.session_id, organization_id)
         if bound is not self:
             return bound.record_persisted_clarification_answer(organization_id, request)
@@ -1198,6 +1209,7 @@ class PromptEnrichmentRuntimeService:
         return record.clarification_plan_id, plan
 
     def resume_clarification(self, session_id, organization_id, cause_id, request):
+        self._require_native_workflow(session_id, organization_id)
         bound = self._for_session(session_id, organization_id)
         if not bound._is_f04:
             raise PromptEnrichmentRuntimeError(

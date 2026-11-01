@@ -180,12 +180,8 @@ class CanonicalInternalFinalPromptHandoffV3(InternalFinalPromptHandoff, StrictEv
     internal_final_prompt: CanonicalInternalFinalPromptV3
 
 
-def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
-    snapshot = FinalPromptSnapshotV2.model_validate(snapshot)
-    _validate_snapshot(snapshot, dictionary=dictionary, templates=templates)
-    facts = _design_facts(snapshot)
-    constraints = _constraints(snapshot, facts)
-    evidence = _enrichment_evidence(snapshot, facts)
+def f04_current_components(snapshot, dictionary, facts, constraints):
+    """Shared native F formatting/readiness; no workflow DTO is relabelled."""
     frontier = snapshot.effective_unresolved_frontier
     definitions = {c.cause_id: c for c in snapshot.cause_definitions}
     unresolved = []
@@ -337,6 +333,18 @@ def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
         if unresolved or unbound_wording
         else FinalPromptReadiness.READY
     )
+    return description, tuple(unresolved), readiness
+
+
+def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
+    snapshot = FinalPromptSnapshotV2.model_validate(snapshot)
+    _validate_snapshot(snapshot, dictionary=dictionary, templates=templates)
+    facts = _design_facts(snapshot)
+    constraints = _constraints(snapshot, facts)
+    evidence = _enrichment_evidence(snapshot, facts)
+    description, unresolved, readiness = f04_current_components(
+        snapshot, dictionary, facts, constraints
+    )
     payload = dict(
         schema_version="3.0.0",
         contract_profile=snapshot.contract_profile,
@@ -363,7 +371,7 @@ def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):
         artifact_versions=snapshot.artifact_versions,
         enrichment_result_content_hash=snapshot.enrichment_result.content_hash,
         availability_overlay=snapshot.enrichment_result.availability_overlay,
-        effective_unresolved_frontier=frontier,
+        effective_unresolved_frontier=snapshot.effective_unresolved_frontier,
     )
     from types import SimpleNamespace
 

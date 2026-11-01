@@ -1,5 +1,6 @@
 """Explicit F05 read-only negotiation; no admission or implicit profile upgrade."""
 
+from contextlib import nullcontext
 from typing import Literal
 
 from jewelai_domain.clarification_state import (
@@ -64,11 +65,22 @@ class ContinuationStateV3(StrictEvidenceModel):
     preparation_expectations: None
 
 
-def read_preview(service, sid, oid, *, final=False, if_match=None, projection=None):
+def read_preview(
+    service, sid, oid, *, final=False, if_match=None, projection=None, _repository=None
+):
     """Validate sources and build current output within the same scoped transaction."""
-    with service.repository.read_enrichment_history(sid, oid) as repo:
+    with (
+        service.repository.read_enrichment_history(sid, oid)
+        if _repository is None
+        else nullcontext(_repository)
+    ) as repo:
         try:
-            native = read_native_frame(service, repo, sid, oid)
+            from .continuation_runtime import admitted_view
+
+            admitted = admitted_view(service, repo, sid, oid)
+            native = (
+                admitted[0] if admitted is not None else read_native_frame(service, repo, sid, oid)
+            )
             base = "F" if native.session.question_artifact_version == "2.0.0" else "L"
             if final:
                 if if_match is None:
@@ -88,7 +100,13 @@ def read_preview(service, sid, oid, *, final=False, if_match=None, projection=No
                         "Projection does not match retained native profile",
                     )
             compat = (
-                project_legacy_readiness(service, repo, native, sid, oid) if base == "L" else None
+                admitted[2]
+                if admitted is not None
+                else (
+                    project_legacy_readiness(service, repo, native, sid, oid)
+                    if base == "L"
+                    else None
+                )
             )
             original = native.snapshot
             snapshot = FinalPromptSnapshotV3(
@@ -98,11 +116,17 @@ def read_preview(service, sid, oid, *, final=False, if_match=None, projection=No
                         "contract_profile",
                         "effective_unresolved_frontier",
                         "cause_definitions",
+                        "enrichment_result",
+                        "artifact_versions",
                     }
                 ),
                 schema_version="3.0.0",
                 retained_base=base,
-                extension_profile=None,
+                extension_profile="jewelai.prompt-enrichment.f05/1.0.0"
+                if admitted is not None
+                else None,
+                enrichment_result=original.enrichment_result,
+                artifact_versions=original.artifact_versions,
                 current_frame=native.frame,
                 protection_projection=native.protection,
                 compatibility_projection=compat,
@@ -128,8 +152,9 @@ def read_preview(service, sid, oid, *, final=False, if_match=None, projection=No
                 schema_version="3.0.0",
                 scope=native.protection.scope,
                 retained_base=base,
-                extension_profile=None,
-                continuation_enabled=False,
+                extension_profile=snapshot.extension_profile,
+                continuation_enabled=admitted is not None
+                and getattr(service, "continuation_enabled", False),
                 current_frame=native.frame,
                 questions=tuple(
                     NativePreviewQuestion(
