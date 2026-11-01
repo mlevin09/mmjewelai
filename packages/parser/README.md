@@ -14,6 +14,17 @@ metal, negative constraints, and preservation intent remain structured evidence 
 integration can bind them safely. The function never changes Product State, creates side-stone
 groups, accepts recommendations, invokes a provider, or requires an ACTIVE production catalog.
 
+For bounded inflection and hyphen matching, ParserProposal receives the matched indexed
+Dictionary surface rather than a substituted canonical label. Existing synonym and deprecated-alias
+match kinds/warnings therefore remain observable; original text and evidence spans are unchanged.
+Shortened RU shape recognition aids still resolve through their owning canonical entry when the
+shortened surface is not itself a Dictionary term. This does not add vocabulary or change entry
+review status: the committed Dictionary seed remains `proposed_pending_domain_review`.
+The API's existing cross-locale projection retains source-language ParserProposal input and match
+metadata only after the same Dictionary/ParserProposal boundary proves an identical canonical value
+(or the same no-change result). This preserves deprecated-alias warnings across mixed-language
+intake without changing proposed state, issues, locks or acceptance authority.
+
 Halo constraints recognize bounded EN/RU and mixed-language prohibitions, including
 "do not add/include/use", "don't want", "never add", "не добавлять" and "без гало".
 The complete negative span protects against an embedded positive match; a separate positive

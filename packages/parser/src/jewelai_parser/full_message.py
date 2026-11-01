@@ -739,8 +739,23 @@ def _candidate_from_surface(
         elif isinstance(match, ResolvedMatch):
             normalized_values = (match.candidate.domain_id,)
         else:
-            entry = dictionary[item.surface.normalized_id]
-            candidate_term = entry.canonical_terms.for_locale(DictionaryLocale(item.surface.locale))
+            # Inflection/hyphen matching found a real indexed surface. Pass that
+            # surface to Dictionary normalization, rather than rewriting it to a
+            # canonical label and losing synonym/deprecated-alias provenance.
+            # A shortened RU shape surface is only a recognition aid; it is not
+            # necessarily a Dictionary lookup term (e.g. "овальная").
+            surface_match = dictionary.normalize(
+                item.surface.text,
+                locale=item.surface.locale,
+                category=item.surface.category,
+            )
+            if isinstance(surface_match, ResolvedMatch):
+                candidate_term = item.surface.text
+            else:
+                entry = dictionary[item.surface.normalized_id]
+                candidate_term = entry.canonical_terms.for_locale(
+                    DictionaryLocale(item.surface.locale)
+                )
     elif runtime is not None:
         match = KnowledgeLibraryMatcher(runtime).match(evidence, locale=item.surface.locale)
         if isinstance(match, AmbiguousKnowledgeMatch):

@@ -241,6 +241,9 @@ def enrich_parsed_candidates_with_active_release(
         dictionary=dictionary,
         candidate=parser_candidate,
     )
+    parser_proposal = _retain_source_normalization(
+        parser_proposal, revision, candidate_for_target, dictionary
+    )
 
     issues_by_target: dict[str, list[ParserIssueCode]] = {}
     for issue in parser_proposal.issues:
@@ -353,6 +356,63 @@ def enrich_parsed_candidates_with_active_release(
         parser_proposal=parser_proposal,
         dispositions=tuple(dispositions[item.candidate_id] for item in parsed.candidates),
         enrichment_result=enrichment_result,
+    )
+
+
+def _retain_source_normalization(proposal, revision, candidates, dictionary):
+    """Retain alias evidence lost by the existing cross-locale value projection.
+
+    Reuse ParserProposal normalization in the source language. Only replace
+    accepted-input metadata when it proves the SAME canonical target/value;
+    never replace the proposed design, issues, authority or application result.
+    """
+    accepted = {u.concrete_target: u for u in proposal.accepted_updates}
+    warnings = list(proposal.warnings)
+    issue_targets = {i.concrete_target for i in proposal.issues}
+    locales = (proposal.locale, "ru" if proposal.locale == "en" else "en")
+    for target, candidate in candidates.items():
+        original = candidate.parser_update
+        update = accepted.get(target)
+        if (
+            original is not None
+            and candidate.normalization_source == NormalizationSource.DOMAIN_DICTIONARY
+            and target not in issue_targets
+            and (update is None or original.value != update.candidate_value)
+        ):
+            for locale in locales:
+                original_proposal = build_parser_proposal(
+                    revision,
+                    expected_revision_id=proposal.expected_revision_id,
+                    source=proposal.source,
+                    locale=locale,
+                    dictionary=dictionary,
+                    candidate=ParserCandidate(updates=(original,)),
+                )
+                if original_proposal.issues:
+                    continue
+                if update is not None:
+                    if len(original_proposal.accepted_updates) != 1:
+                        continue
+                    original_update = original_proposal.accepted_updates[0]
+                    if original_update.canonical_value != update.canonical_value:
+                        continue
+                    accepted[target] = original_update
+                elif original_proposal.accepted_updates:
+                    # Only retain no-change warnings when BOTH normalizations
+                    # leave this target unchanged. Never introduce an update.
+                    continue
+                warnings = [w for w in warnings if w.concrete_target != target]
+                warnings.extend(original_proposal.warnings)
+                break
+    return proposal.model_copy(
+        update={
+            "accepted_updates": tuple(
+                accepted[u.concrete_target] for u in proposal.accepted_updates
+            ),
+            "warnings": tuple(
+                sorted(warnings, key=lambda w: (w.concrete_target, w.normalized_input))
+            ),
+        }
     )
 
 
