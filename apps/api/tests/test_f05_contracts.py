@@ -137,3 +137,19 @@ def test_new_wire_rejects_duplicates_coercion_and_unrecognized_keys():
             decode_continuation_command(ContinuationAnswerRequest, json.dumps(bad))
     with pytest.raises(ValueError, match="finite"):
         decode_continuation_command(ContinuationAnswerRequest, '{"unexpected":NaN}')
+
+
+def test_f05_actual_utf8_envelope_capacity_boundary():
+    from jewelai_api.continuation_preview import ContinuationReadError
+    from jewelai_api.continuation_runtime import check_capacity
+
+    # The same canonical evidence serializer is used by the actual precommit
+    # writer. Two JSON string quotes count toward the one-MiB envelope.
+    limit = 1_048_576
+    check_capacity("A" * (limit - 2))
+    with pytest.raises(ContinuationReadError) as error:
+        check_capacity("A" * (limit - 1))
+    assert error.value.status == 422
+    check_capacity("\U0001f600" * ((limit - 2) // 4))
+    with pytest.raises(ContinuationReadError):
+        check_capacity("\U0001f600" * ((limit - 2) // 4 + 1))

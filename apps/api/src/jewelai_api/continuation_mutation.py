@@ -66,11 +66,27 @@ def correction_plan(
             (result,),
             {result.content_hash: result.outcome == "DEFERRED"},
         )
+        from types import SimpleNamespace
+
+        from .continuation_effects import effective_correction_flags, reproject_correction_audit
+
+        flags = effective_correction_flags(
+            repo,
+            context,
+            verified_extras,
+            verified_answers,
+            native=native,
+            artifacts=bound.artifacts,
+            current_cycle_number=result.next_enrichment_cycle_number,
+            constraint_evidence=constraints,
+            prospective=SimpleNamespace(questions=base.native_questions, unasked_evidence=unasked),
+        )
         base = base.model_copy(
             update={
                 "native_decision_audit": tuple(
                     sorted(
-                        (*old_audit, *added), key=lambda d: (d.kind, d.decision_id, d.content_hash)
+                        reproject_correction_audit((*old_audit, *added), flags),
+                        key=lambda d: (d.kind, d.decision_id, d.content_hash),
                     )
                 )
             }
@@ -324,10 +340,25 @@ def answer_plan(
             d.model_copy(update={"applies_to_revision_id": revision.revision_id})
             for d in native.snapshot.decision_lineage
         ) + (answer_audit(result, revision.revision_id),)
+        from .continuation_effects import effective_correction_flags, reproject_correction_audit
+
+        flags = effective_correction_flags(
+            repo,
+            context,
+            verified_extras,
+            verified_answers,
+            native=native,
+            artifacts=bound.artifacts,
+            current_cycle_number=native.frame.enrichment_cycle_number + 1,
+            constraint_evidence=previous.constraint_evidence,
+        )
         base = base.model_copy(
             update={
                 "native_decision_audit": tuple(
-                    sorted(audit, key=lambda d: (d.kind, d.decision_id, d.content_hash))
+                    sorted(
+                        reproject_correction_audit(audit, flags),
+                        key=lambda d: (d.kind, d.decision_id, d.content_hash),
+                    )
                 )
             }
         )

@@ -1,7 +1,7 @@
 """F05 read paths on the existing independently identified disposable PG service.
 
-This proves the implemented preview/projection subset, not the unfinished F05
-writer transaction/rollback/concurrency requirements.
+Coverage includes the durable version3 writers, current reads, concurrent
+full-head decisions, source-bound native answers and atomic fault rollback.
 """
 
 import pytest
@@ -173,3 +173,13 @@ def test_f05_release_fault_rollback_postgres(engine, tmp_path, base):
     )
 
     test_release_plan_insert_failure_rolls_back_revision_answer_and_cycle(engine, tmp_path, base)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize("origin_version", ["native", "admitted"])
+def test_f05_native_answer_causal_source_postgres(engine, tmp_path, base, origin_version):
+    from test_f05_native_answers import (
+        test_admitted_correction_own_native_answer_discharges_only_its_source as exercise_case,
+    )
+
+    exercise_case(engine, tmp_path, base, origin_version)

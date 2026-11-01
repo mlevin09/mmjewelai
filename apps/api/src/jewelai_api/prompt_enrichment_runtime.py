@@ -1542,6 +1542,63 @@ def _effective_correction_blocks(
     """
     if not any(item.outcome == CorrectionOutcome.DEFERRED for item in corrections):
         return {item.content_hash: False for item in corrections}
+    plans, answer_plans, answer_steps = _verified_native_answer_lineage(
+        repository,
+        session_id=session_id,
+        organization_id=organization_id,
+        cycles=cycles,
+        answers=answers,
+        current_plan=current_plan,
+        artifacts=artifacts,
+    )
+    correction_cycles = {item.next_enrichment_cycle_number for item in corrections}
+    flags = {}
+    for correction in corrections:
+        if correction.outcome != CorrectionOutcome.DEFERRED:
+            flags[correction.content_hash] = False
+            continue
+        origin = next(
+            (
+                item
+                for item in plans.values()
+                if item[0].cycle_number == correction.next_enrichment_cycle_number
+            ),
+            None,
+        )
+        cycle, original_plan = origin if origin is not None else (None, None)
+        resolved_questions = (
+            tuple(
+                question
+                for question in original_plan.questions
+                if any(
+                    _answer_discharges_question(
+                        answer,
+                        question,
+                        origin=cycle.cycle_number,
+                        answer_plan=answer_plans.get(answer.content_hash),
+                        correction_cycles=correction_cycles,
+                        answer_steps=answer_steps,
+                    )
+                    for answer in answers
+                )
+            )
+            if original_plan is not None
+            else ()
+        )
+        flags[correction.content_hash] = _correction_blocks_from_verified_source(
+            correction,
+            cycle=cycle,
+            original_plan=original_plan,
+            current_plan=current_plan,
+            resolved_questions=resolved_questions,
+        )
+    return flags
+
+
+def _verified_native_answer_lineage(
+    repository, *, session_id, organization_id, cycles, answers, current_plan, artifacts
+):
+    """Validate the unchanged native L plan/answer-only continuation graph."""
     by_cycle = {cycle.enrichment_cycle_id: cycle for cycle in cycles}
     plans = {}
     try:
@@ -1575,7 +1632,6 @@ def _effective_correction_blocks(
             PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
             "Effective readiness requires valid durable clarification lineage",
         ) from exc
-    correction_cycles = {item.next_enrichment_cycle_number for item in corrections}
     by_number = {cycle.cycle_number: cycle for cycle in cycles}
     plans_by_number = {cycle.cycle_number: plan for cycle, plan in plans.values()}
     answer_steps = set()
@@ -1604,92 +1660,77 @@ def _effective_correction_blocks(
             # Exact existing continuation semantics also prove nonmutating
             # SKIP/UNKNOWN/REJECT steps; a coincidentally newer revision cannot.
             answer_steps.add(source_cycle.cycle_number)
-    flags = {}
-    for correction in corrections:
-        blocks = correction.outcome == CorrectionOutcome.DEFERRED
-        if blocks and correction.reason != CorrectionReason.REVISION_TRANSITION_DEFERRED:
-            origin = next(
-                (
-                    item
-                    for item in plans.values()
-                    if item[0].cycle_number == correction.next_enrichment_cycle_number
-                ),
-                None,
+    return plans, answer_plans, answer_steps
+
+
+def _correction_blocks_from_verified_source(
+    correction, *, cycle, original_plan, current_plan, resolved_questions=()
+):
+    """Existing L policy over already verified source/plan evidence, without I/O."""
+    blocks = correction.outcome == CorrectionOutcome.DEFERRED
+    if (
+        blocks
+        and correction.reason != CorrectionReason.REVISION_TRANSITION_DEFERRED
+        and cycle is not None
+    ):
+        resolved = {
+            evidence.source_candidate_id
+            for evidence in current_plan.constraint_evidence
+            if evidence.source == correction.source
+            and evidence.source_enrichment_cycle_id == cycle.enrichment_cycle_id
+            and evidence.source_revision_id == cycle.specification_revision_id
+            and evidence.status in {"active", "superseded"}
+            and any(
+                candidate.candidate_id == evidence.source_candidate_id
+                and candidate.semantic_subject == evidence.semantic_subject
+                and candidate.classification.value == evidence.kind
+                and candidate.evidence.start == evidence.source_span_start
+                and candidate.evidence.end == evidence.source_span_end
+                for candidate in correction.parsed_correction.candidates
             )
-            if origin is not None:
-                cycle, original_plan = origin
-                resolved = {
-                    evidence.source_candidate_id
-                    for evidence in current_plan.constraint_evidence
-                    if evidence.source == correction.source
-                    and evidence.source_enrichment_cycle_id == cycle.enrichment_cycle_id
-                    and evidence.source_revision_id == cycle.specification_revision_id
-                    and evidence.status in {"active", "superseded"}
-                    and any(
-                        candidate.candidate_id == evidence.source_candidate_id
-                        and candidate.semantic_subject == evidence.semantic_subject
-                        and candidate.classification.value == evidence.kind
-                        and candidate.evidence.start == evidence.source_span_start
-                        and candidate.evidence.end == evidence.source_span_end
-                        for candidate in correction.parsed_correction.candidates
-                    )
-                }
-                for question in original_plan.questions:
-                    if any(
-                        _answer_discharges_question(
-                            answer,
-                            question,
-                            origin=cycle.cycle_number,
-                            answer_plan=answer_plans.get(answer.content_hash),
-                            correction_cycles=correction_cycles,
-                            answer_steps=answer_steps,
-                        )
-                        for answer in answers
-                    ):
-                        resolved.update(question.source_candidate_ids)
-                dispositions = correction.correction_evaluation.dispositions
-                noncritical = {
-                    item.candidate_id
-                    for item in original_plan.unasked_evidence
-                    if item.reason == UnaskedReason.NONCRITICAL_UNKNOWN
-                }
-                pending = {
-                    item.candidate.candidate_id
-                    for item in dispositions
-                    if item.outcome == CandidateDispositionOutcome.DEFERRED
-                }
-                # Ignore only source-overlap mirrors of a separately discharged or
-                # already-current Dictionary fact, not arbitrary Knowledge-only terms.
-                for item in dispositions:
-                    candidate = item.candidate
-                    if candidate.normalization_source.value != "knowledge_library":
-                        continue
-                    if any(
-                        other.candidate.normalization_source.value == "domain_dictionary"
-                        and other.candidate.evidence == candidate.evidence
-                        and other.candidate.target == candidate.target
-                        and other.candidate.subject == candidate.subject
-                        and other.candidate.normalized_values == candidate.normalized_values
-                        and (
-                            other.candidate.candidate_id in resolved
-                            or other.reason == CandidateDispositionReason.ALREADY_CURRENT
-                        )
-                        for other in dispositions
-                    ):
-                        resolved.add(candidate.candidate_id)
-                has_nonmutating_fact = any(
-                    item.reason
-                    in {
-                        CandidateDispositionReason.ALREADY_CURRENT,
-                        CandidateDispositionReason.PRESERVATION_RETAINED,
-                    }
-                    for item in dispositions
+        }
+        for question in resolved_questions:
+            resolved.update(question.source_candidate_ids)
+        dispositions = correction.correction_evaluation.dispositions
+        noncritical = {
+            item.candidate_id
+            for item in original_plan.unasked_evidence
+            if item.reason == UnaskedReason.NONCRITICAL_UNKNOWN
+        }
+        pending = {
+            item.candidate.candidate_id
+            for item in dispositions
+            if item.outcome == CandidateDispositionOutcome.DEFERRED
+        }
+        # Ignore only source-overlap mirrors of a separately discharged or
+        # already-current Dictionary fact, not arbitrary Knowledge-only terms.
+        for item in dispositions:
+            candidate = item.candidate
+            if candidate.normalization_source.value != "knowledge_library":
+                continue
+            if any(
+                other.candidate.normalization_source.value == "domain_dictionary"
+                and other.candidate.evidence == candidate.evidence
+                and other.candidate.target == candidate.target
+                and other.candidate.subject == candidate.subject
+                and other.candidate.normalized_values == candidate.normalized_values
+                and (
+                    other.candidate.candidate_id in resolved
+                    or other.reason == CandidateDispositionReason.ALREADY_CURRENT
                 )
-                blocks = bool(pending - resolved - noncritical) or not (
-                    resolved or has_nonmutating_fact
-                )
-        flags[correction.content_hash] = blocks
-    return flags
+                for other in dispositions
+            ):
+                resolved.add(candidate.candidate_id)
+        has_nonmutating_fact = any(
+            item.reason
+            in {
+                CandidateDispositionReason.ALREADY_CURRENT,
+                CandidateDispositionReason.PRESERVATION_RETAINED,
+            }
+            for item in dispositions
+        )
+        blocks = bool(pending - resolved - noncritical) or not (resolved or has_nonmutating_fact)
+    return blocks
 
 
 def _answer_discharges_question(

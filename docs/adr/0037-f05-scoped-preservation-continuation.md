@@ -190,3 +190,19 @@ new continuation writes are disabled; new work still fails the capability gate.
 A historical parser1.1 span truncated before an explicit center-shape qualifier
 is scoped using that actual governed source phrase, without rewriting the saved
 span/parse or inspecting a later independent assertion.
+
+### Native L obligations across admission and Answer3
+
+Current L decision audit reuses the existing source-bound effective-correction
+policy over the fully verified native prefix and version3 events. A neutral
+admission bridges only the exact retained native questions and unasked evidence
+at the same canonical revision. Native Answer3 can resolve its own original
+question; candidate IDs, target/value coincidence or a later revision alone are
+insufficient. A new correction interrupts the answer-only causal chain. The
+original correction outcome, blocking evidence and hashes remain immutable;
+only the current derived audit changes. F retains its existing frontier policy.
+
+This does not broaden L2 contextual coverage: a Knowledge-only residual without
+an approved exact binding, such as the unbound `white` mirror in a full repeated
+S0 clause with the optional TEST-ONLY binding, remains unresolved. No new catalog
+mapping or professional applicability decision is introduced by F05.
