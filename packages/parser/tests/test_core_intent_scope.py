@@ -121,6 +121,10 @@ def test_independent_positive_gold_survives(dictionary, text):
     (
         "No platinum, but a gold ring.",
         "Без платины, но кольцо из золота.",
+        "Не платина, а кольцо из золота с овальным алмазом.",
+        "Не платина, а gold ring with an oval diamond.",
+        "Без платины, а кольцо из золота.",
+        "Не платина,\nа кольцо из золота.",
         "A gold ring, but no prongs.",
     ),
 )
@@ -128,6 +132,34 @@ def test_contrast_separates_independent_assertions(dictionary, text):
     parsed = parse_full_message(text, locale="en", dictionary=dictionary)
     gold = [c for c in parsed.candidates if c.normalized_values == ("gold",)]
     assert gold and all(c.parser_update is not None for c in gold)
+
+
+@pytest.mark.parametrize(
+    "text,positive,rejected,classification",
+    (
+        ("Не платина, а кольцо из золота.", "золота", "платина", "requirement"),
+        ("Кольцо из золота, а не платины.", "золота", "платины", "requirement"),
+        ("Не золото, а кольцо из платины.", "платины", "золото", "requirement"),
+        ("Не платина, а хочу золото.", "золото", "платина", "preference"),
+        ("Не платина, а возможно золото.", "золото", "платина", "requirement"),
+    ),
+)
+def test_contrast_retains_each_assertions_own_authority(
+    dictionary, text, positive, rejected, classification
+):
+    parsed = parse_full_message(text, locale="ru", dictionary=dictionary)
+    yes = next(c for c in parsed.candidates if c.evidence.text == positive)
+    no = next(c for c in parsed.candidates if c.evidence.text == rejected)
+    assert no.classification == "prohibition" and no.parser_update is None
+    assert yes.classification == classification
+    if "возможно" in text or classification == "preference":
+        assert yes.certainty == ("ambiguous" if "возможно" in text else "explicit")
+    else:
+        assert yes.certainty == "explicit" and yes.parser_update is not None
+    assert parsed == parse_full_message(text, locale="ru", dictionary=dictionary)
+    assert all(
+        text[c.evidence.start : c.evidence.end] == c.evidence.text for c in parsed.candidates
+    )
 
 
 @pytest.mark.parametrize(

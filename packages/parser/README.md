@@ -134,6 +134,22 @@ negative lists. A bare object after `no halo, ...` does not gain positive author
 merely from a comma or `and`. Postfix rejection remains supported. This is bounded
 deterministic language support, not a general grammar or a conflict winner policy.
 
+RU contrast `а` uses that same assertion boundary as `но` / EN `but`:
+`Не платина, а кольцо из золота с овальным алмазом` retains rejected platinum
+without making the independent gold/oval/diamond assertion ambiguous. This
+does not close bare negative lists, accept a following `хочу` preference, or
+choose between competing affirmative requirements. Persisted F03 regressions in
+`apps/api/tests/test_f03_applicability.py` reuse the existing fixture/restart
+journey with and without TEST-ONLY P0-10, including the disposable PostgreSQL
+copies in `test_generation_preparations_postgres.py`.
+
+Matrix results remain advisory: a normalized proposal can be `KEPT / lower_precedence`
+against an explicit canonical fact while a separately authorized user correction
+can change that unlocked fact through EDIT/CAS. Neither an advisory `APPLIED`
+nor a Rules `READY` result substitutes for the revision gate or the final
+handoff's causal clarification checks. Policy prose introduces no professional
+halo, pavé or treatment dependency rule.
+
 Existing Russian `хочу` remains a preference. Material preferences are retained
 as evidence; the current Question Catalog has no `metal.material` acceptance
 question. An explicit supported correction such as `Кольцо из золота` can apply

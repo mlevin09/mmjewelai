@@ -49,6 +49,16 @@ from test_f02_binding import (
     exercise_f02_knowledge_lineage,
     exercise_f02_lineage,
 )
+from test_f03_applicability import CONTRAST_CASES
+from test_f03_applicability import (
+    test_authorized_edit_is_distinct_from_advisory_precedence as _f03_correction,
+)
+from test_f03_applicability import (
+    test_contrast_cannot_bypass_current_lock as _f03_lock,
+)
+from test_f03_applicability import (
+    test_contrast_preserves_independent_keep_lineage as _f03_keep,
+)
 from test_generation_preparations import counts, expected, post
 from test_generation_preparations import (
     test_persistence_fault_rolls_back_artifact_and_command as _rollback,
@@ -147,6 +157,26 @@ def test_f02_correction_clarification_postgres(engine, tmp_path, monkeypatch, bi
 @pytest.mark.parametrize("binding", (False, True))
 def test_f02_knowledge_only_pinned_graph_postgres(engine, tmp_path, monkeypatch, binding):
     exercise_f02_knowledge_lineage(engine, tmp_path, monkeypatch, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+@pytest.mark.parametrize("case", CONTRAST_CASES, ids=[c[0] for c in CONTRAST_CASES])
+def test_f03_contrast_http_postgres(engine, tmp_path, monkeypatch, case, binding):
+    exercise_f01_case(engine, tmp_path, monkeypatch, case, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_f03_correction_http_postgres(engine, tmp_path, monkeypatch, binding):
+    _f03_correction(engine, tmp_path, monkeypatch, binding)
+
+
+@pytest.mark.parametrize("binding", (False, True))
+def test_f03_lock_http_postgres(engine, tmp_path, monkeypatch, binding):
+    _f03_lock(engine, tmp_path, monkeypatch, binding)
+
+
+def test_f03_keep_http_postgres(engine, tmp_path, monkeypatch):
+    _f03_keep(engine, tmp_path, monkeypatch)
 
 
 def test_p010_original_raw_message_lifecycle_postgres(engine, tmp_path, monkeypatch):
