@@ -418,7 +418,7 @@
       ],
       "provenance": {
         "source_kind": "repository_spec",
-        "source_ref": "docs/product/issues/04-questions.md",
+        "source_ref": "docs/adr/0036-f04-versioned-clarification-profile.md",
         "review_status": "proposed_pending_domain_review"
       }
     }

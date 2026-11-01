@@ -18,6 +18,33 @@ from jewelai_domain.questions_v2 import (
 
 ROOT = Path(__file__).resolve().parents[3]
 
+APPROVED_WORDING = {
+    "retail_client": (
+        "Which metal would you like for the product body: {options}?",
+        "Какой металл вы выбираете для основы изделия: {options}?",
+    ),
+    "sales_manager": (
+        "Which metal should be recorded for the product body: {options}?",
+        "Какой металл указать для основы изделия: {options}?",
+    ),
+    "buyer": (
+        "Which metal is required for the product body: {options}?",
+        "Какой металл требуется для основы изделия: {options}?",
+    ),
+    "marketing": (
+        "Which metal should the product description specify for the body: {options}?",
+        "Какой металл основы изделия указать в описании: {options}?",
+    ),
+    "jewelry_designer": (
+        "Select the product-body metal: {options}.",
+        "Выберите металл основы изделия: {options}.",
+    ),
+    "industrial_designer": (
+        "Specify the material of the product body: {options}.",
+        "Укажите материал основы изделия: {options}.",
+    ),
+}
+
 
 def data():
     return json.loads((ROOT / "data/questions/v2.0.0.json").read_text())
@@ -50,6 +77,7 @@ def test_f04_exact_six_role_wording(locale):
     for role in data()["entries"][-1]["wording"]:
         actual = catalog.render("METAL_MATERIAL", role["role_id"], locale)
         assert actual.wording == role["text"][locale]
+        assert actual.wording == APPROVED_WORDING[role["role_id"]][0 if locale == "en" else 1]
         assert actual.target == SchemaTargetV2.METAL_MATERIAL
         assert actual.answer_contract.dictionary_category == "metal_material"
 
@@ -65,5 +93,12 @@ def test_material_target_cannot_be_substituted(bad):
 def test_material_answer_cannot_use_color_dictionary():
     payload = data()
     payload["entries"][-1]["answer_contract"]["dictionary_category"] = "metal_color"
+    with pytest.raises(ValidationError):
+        QuestionCatalogBundleV2.model_validate(payload)
+
+
+def test_material_provenance_cannot_claim_the_old_five_question_spec():
+    payload = data()
+    payload["entries"][-1]["provenance"]["source_ref"] = "docs/product/issues/04-questions.md"
     with pytest.raises(ValidationError):
         QuestionCatalogBundleV2.model_validate(payload)

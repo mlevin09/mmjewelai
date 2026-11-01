@@ -157,7 +157,7 @@
           "type": "array"
         },
         "provenance": {
-          "$ref": "#/$defs/QuestionProvenance"
+          "$ref": "#/$defs/QuestionProvenanceV2"
         }
       },
       "required": [
@@ -217,7 +217,7 @@
       "title": "QuestionLocale",
       "type": "string"
     },
-    "QuestionProvenance": {
+    "QuestionProvenanceV2": {
       "additionalProperties": false,
       "properties": {
         "source_kind": {
@@ -227,7 +227,10 @@
           "type": "string"
         },
         "source_ref": {
-          "const": "docs/product/issues/04-questions.md",
+          "enum": [
+            "docs/product/issues/04-questions.md",
+            "docs/adr/0036-f04-versioned-clarification-profile.md"
+          ],
           "title": "Source Ref",
           "type": "string"
         },
@@ -239,7 +242,7 @@
         "source_ref",
         "review_status"
       ],
-      "title": "QuestionProvenance",
+      "title": "QuestionProvenanceV2",
       "type": "object"
     },
     "ReviewStatus": {

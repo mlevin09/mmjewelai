@@ -19,6 +19,7 @@ from .rules import (
     Rule,
     RuleAction,
     RuleCondition,
+    RuleProvenance,
     RuleRegistry,
     RulesBundle,
     RuleTrace,
@@ -33,12 +34,20 @@ class AskActionV2(AskAction):
     question_id: QuestionIdV2
 
 
+class RuleProvenanceV2(RuleProvenance):
+    source_ref: Literal[
+        "docs/product/issues/05-rules.md",
+        "docs/adr/0036-f04-versioned-clarification-profile.md",
+    ]
+
+
 class RuleV2(Rule):
     target: SchemaTargetV2 | None
     conditions: tuple[
         Annotated[RuleCondition | ActiveScopedConflictCondition, Field(discriminator="kind")], ...
     ] = Field(min_length=1)
     action: AskActionV2 | RuleAction
+    provenance: RuleProvenanceV2
 
 
 class RulesBundleV2(RulesBundle):
@@ -61,6 +70,7 @@ class RulesBundleV2(RulesBundle):
             or rule.action.question_id != QuestionIdV2.METAL_MATERIAL
             or rule.conditions != (ActiveScopedConflictCondition(kind="active_scoped_conflict"),)
             or rule.depends_on
+            or rule.provenance.source_ref != "docs/adr/0036-f04-versioned-clarification-profile.md"
         ):
             raise ValueError("Rules2 material rule differs from the approved bounded condition")
         if any(

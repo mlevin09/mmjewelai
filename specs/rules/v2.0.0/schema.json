@@ -356,7 +356,7 @@
       "title": "RoleId",
       "type": "string"
     },
-    "RuleProvenance": {
+    "RuleProvenanceV2": {
       "additionalProperties": false,
       "properties": {
         "source_kind": {
@@ -366,7 +366,10 @@
           "type": "string"
         },
         "source_ref": {
-          "const": "docs/product/issues/05-rules.md",
+          "enum": [
+            "docs/product/issues/05-rules.md",
+            "docs/adr/0036-f04-versioned-clarification-profile.md"
+          ],
           "title": "Source Ref",
           "type": "string"
         },
@@ -378,7 +381,7 @@
         "source_ref",
         "review_status"
       ],
-      "title": "RuleProvenance",
+      "title": "RuleProvenanceV2",
       "type": "object"
     },
     "RuleV2": {
@@ -519,7 +522,7 @@
           "type": "array"
         },
         "provenance": {
-          "$ref": "#/$defs/RuleProvenance"
+          "$ref": "#/$defs/RuleProvenanceV2"
         }
       },
       "required": [

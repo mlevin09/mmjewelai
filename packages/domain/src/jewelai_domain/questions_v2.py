@@ -13,6 +13,7 @@ from .questions import (
     QuestionCatalogBundle,
     QuestionEntry,
     QuestionLocale,
+    QuestionProvenance,
     RenderedQuestion,
     _validate_schema_target,
 )
@@ -36,9 +37,17 @@ class SchemaTargetV2(StrEnum):
     METAL_MATERIAL = "metal.material"
 
 
+class QuestionProvenanceV2(QuestionProvenance):
+    source_ref: Literal[
+        "docs/product/issues/04-questions.md",
+        "docs/adr/0036-f04-versioned-clarification-profile.md",
+    ]
+
+
 class QuestionEntryV2(QuestionEntry):
     question_id: QuestionIdV2
     target: SchemaTargetV2
+    provenance: QuestionProvenanceV2
 
 
 class QuestionCatalogBundleV2(QuestionCatalogBundle):
@@ -59,6 +68,8 @@ class QuestionCatalogBundleV2(QuestionCatalogBundle):
                     or not isinstance(entry.answer_contract, DictionaryAnswerContract)
                     or entry.answer_contract.dictionary_category
                     != DictionaryCategory.METAL_MATERIAL
+                    or entry.provenance.source_ref
+                    != "docs/adr/0036-f04-versioned-clarification-profile.md"
                 ):
                     raise ValueError("F04 material question must use the material Dictionary")
             else:

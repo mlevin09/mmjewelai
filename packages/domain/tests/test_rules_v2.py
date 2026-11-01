@@ -167,3 +167,10 @@ def test_f04_rule_cannot_silently_expand_approved_policy(field, value):
     payload["rules"][-1][field] = value
     with pytest.raises(ValidationError):
         RulesBundleV2.model_validate(payload)
+
+
+def test_f04_rule_provenance_cannot_claim_the_old_nine_rule_spec():
+    payload = json.loads((ROOT / "data/rules/v2.0.0.json").read_text())
+    payload["rules"][-1]["provenance"]["source_ref"] = "docs/product/issues/05-rules.md"
+    with pytest.raises(ValidationError):
+        RulesBundleV2.model_validate(payload)
