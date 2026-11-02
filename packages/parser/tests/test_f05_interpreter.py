@@ -81,6 +81,8 @@ def test_preservation_authority_requires_affirmative_certain_assertion(dictionar
     [
         ("Do not change the center stone shape.", "en"),
         ("Не менять центральный камень.", "ru"),
+        ("Хочу сохранить центральный камень без изменений.", "ru"),
+        ("I would like to keep the center stone shape unchanged.", "en"),
         ("Maybe a gold ring. Keep the center stone shape unchanged.", "en"),
         ("Do not add side stones, but keep the center stone shape unchanged.", "en"),
     ],

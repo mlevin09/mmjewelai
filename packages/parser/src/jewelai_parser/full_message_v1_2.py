@@ -54,7 +54,9 @@ def _govern_preservation(text, candidate):
     certainty = _certainty_for(text, start, end, candidate.certainty)
     if _AMBIGUITY.search(text[left:right]):
         certainty = CandidateCertainty.AMBIGUOUS
-    if polarity != CandidateClassification.REQUIREMENT:
+    # Existing affirmative request phrasing is not itself uncertainty. Only
+    # rejection changes polarity; qualifiers/disjunction are checked separately.
+    if polarity == CandidateClassification.PROHIBITION:
         certainty = CandidateCertainty.UNRESOLVED
     if certainty == CandidateCertainty.EXPLICIT:
         return candidate

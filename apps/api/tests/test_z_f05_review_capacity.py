@@ -103,6 +103,18 @@ def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, gl
             assert len(text) == limit
             assert len(text.encode("utf-8")) <= 128000
             assert glyph * 100 in text
+            from jewelai_prompts.downstream_preparation import (
+                GenerationPreparationError,
+                build_generation_preparation,
+            )
+            from jewelai_prompts.downstream_preparation_v2 import build_generation_preparation_v2
+            from jewelai_prompts.handoff import build_internal_final_prompt_handoff
+
+            handoff = build_internal_final_prompt_handoff(result.json())
+            for prepare in (build_generation_preparation, build_generation_preparation_v2):
+                with pytest.raises(GenerationPreparationError) as rejected:
+                    prepare(handoff, {}, preparation_id=uuid4(), created_at=None)
+                assert rejected.value.code.value == "unsupported_source_version"
             assert not {"INSERT", "UPDATE", "DELETE", "CREATE", "ALTER"}.intersection(statements)
         finally:
             event.remove(engine, "before_cursor_execute", observe)
@@ -148,21 +160,21 @@ def test_actual_description_guard_from_canonical_history(engine, tmp_path, limit
         ctx.runtime.continuation_enabled = True
         admission, _ = admit(ctx)
         assert admission.status_code == 201, admission.json()
-        baseline = len(state(ctx)["description"]["text"])
-        submit(ctx, "qx" + "q" * 98)
-        current = state(ctx)
-        # Source-backed unresolved text is disclosed, never canonicalized.
+        current = admission.json()["current_state"]
+        current = submit(ctx, "Center stone qx" + "q" * 85, current=current)["current_state"]
+        baseline = len(current["description"]["text"])
+        current = submit(ctx, "Center stone qy" + "q" * 85, current=current)["current_state"]
+        # Source-backed unresolved wording is disclosed, never canonicalized.
         overhead = len(current["description"]["text"]) - baseline - 100
         index = 0
         while limit - len(current["description"]["text"]) - overhead > 1900:
-            text = "qz" + chr(97 + index) + "q" * 1897
-            submit(ctx, text)
+            text = "Center stone qz" + chr(97 + index) + "q" * 1884
+            current = submit(ctx, text, current=current)["current_state"]
             index += 1
             assert index < 20
-            current = state(ctx)
         size = limit - len(current["description"]["text"]) - overhead
-        assert 3 <= size <= 2000
-        text = "qzz" + "q" * (size - 3)
+        assert 16 <= size <= 2000
+        text = "Center stone qzz" + "q" * (size - 16)
         message = _message(ctx.client, str(ctx.sid), str(ctx.org), text)
         before = rows(ctx)
         r = ctx.client.post(

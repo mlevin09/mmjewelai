@@ -10,8 +10,8 @@ from test_f05_preview import output, state
 from test_prompt_enrichment_http import _message
 
 
-def submit(ctx, text):
-    current = state(ctx)
+def submit(ctx, text, *, current=None):
+    current = state(ctx) if current is None else current
     message = _message(ctx.client, str(ctx.sid), str(ctx.org), text)
     response = ctx.client.post(
         f"/v1/sessions/{ctx.sid}/prompt-enrichment/corrections",
@@ -93,6 +93,8 @@ def test_uncertain_or_negated_preservation_cannot_create_authority(
     [
         ("Keep the center stone shape unchanged.", "en", 1),
         ("Сохранить центральный камень без изменений.", "ru", 8),
+        ("Хочу сохранить центральный камень без изменений.", "ru", 8),
+        ("I would like to keep the center stone shape unchanged.", "en", 1),
         ("A platinum ring. Сохранить центральный камень без изменений.", "en", 8),
     ],
 )

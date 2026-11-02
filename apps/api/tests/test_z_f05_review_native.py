@@ -78,11 +78,16 @@ def _exercise_native(
             if scope == "generic"
             else "Keep the center stone shape unchanged.",
         )
-        pending = submit(ctx, "Emerald cut center stone.")["current_state"]
+        correction = submit(ctx, "Emerald cut center stone.")
+        pending = correction["current_state"]
         if lock_shape:
             assert not pending["protection_projection"]["pending_requests"]
             assert (
-                ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1].result_payload["reason"]
+                next(
+                    r
+                    for r in ctx.repo.list_user_corrections(ctx.sid, ctx.org)
+                    if r.content_hash == correction["committed_result_hash"]
+                ).result_payload["reason"]
                 == "parser_rejected"
             )
         if stage == "reanchored":
@@ -153,6 +158,27 @@ def _exercise_native(
         assert (
             ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value == value
         )
+        if r.status_code == 200:
+            answer = next(
+                a
+                for a in ctx.repo.list_clarification_answers(ctx.sid, ctx.org)
+                if a.content_hash == r.json()["committed_result_hash"]
+            )
+            if relation == "same" and action in {"ACCEPT", "SELECT_OPTION"}:
+                assert answer.result_payload["outcome"] == "NO_CHANGE"
+                assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == before[0]
+            elif relation == "unrelated" and action in {"ACCEPT", "SELECT_OPTION"}:
+                assert answer.result_payload["outcome"] == "APPLIED"
+                assert (
+                    ctx.repo.get_current_revision(ctx.sid, ctx.org).design.metal.color.value
+                    == "yellow"
+                )
+            elif action in {"REJECT", "SKIP", "UNKNOWN"}:
+                assert (
+                    answer.result_payload["outcome"]
+                    == {"REJECT": "REJECTED", "SKIP": "SKIPPED", "UNKNOWN": "UNKNOWN"}[action]
+                )
+                assert ctx.repo.get_current_revision(ctx.sid, ctx.org) == before[0]
         if lock_shape:
             locked_shape = ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape
             assert locked_shape.locked and locked_shape == before[0].design.center_stone.shape
@@ -194,3 +220,13 @@ def test_native_guard_retains_independent_locked_wrapper(
 def test_native_actions_cannot_release_locked_target(engine, tmp_path, base, scope, action):
     # A locked target cannot reach a legitimate re-anchored release stage.
     _exercise_native(engine, tmp_path, base, scope, "pending", action, "different", lock_shape=True)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize("scope", ["generic", "shape"])
+@pytest.mark.parametrize("action", ["ACCEPT", "SELECT_OPTION"])
+@pytest.mark.parametrize("relation", ["same", "unrelated"])
+def test_compatible_native_actions_with_locked_target(
+    engine, tmp_path, base, scope, action, relation
+):
+    _exercise_native(engine, tmp_path, base, scope, "pending", action, relation, lock_shape=True)
