@@ -224,3 +224,11 @@ persisted-history output boundaries. Capacity evidence must distinguish real
 IFP4/Description3 construction from isolated DTO or renderer-substitution tests;
 independently unreachable byte-only boundaries must be disclosed rather than
 reported as executed HTTP success.
+
+The same source-authority check also treats a fresh preservation imperative after
+an independent rejected assertion as its own predicate. Shared hedges and
+coordinated repeated preservation predicates remain conservative; a fresh line
+closes the previous assertion. Interrogative/conditional preservation wording is
+retained as unresolved evidence rather than an affirmative instruction. These
+checks are confined to the new preservation interpreter and do not change the
+frozen fact parser, question selection or domain conflict/cancellation policy.

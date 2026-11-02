@@ -92,6 +92,8 @@ def test_uncertain_or_negated_preservation_cannot_create_authority(
     "text,locale,count",
     [
         ("Keep the center stone shape unchanged.", "en", 1),
+        ("I do not want a halo and keep the center stone shape unchanged.", "en", 1),
+        ("Не хочу гало и сохранить центральный камень без изменений.", "ru", 8),
         ("Сохранить центральный камень без изменений.", "ru", 8),
         ("Хочу сохранить центральный камень без изменений.", "ru", 8),
         ("I would like to keep the center stone shape unchanged.", "en", 1),
@@ -150,3 +152,51 @@ def test_unresolved_preservation_is_not_cancellation_of_existing_keep(engine, tm
         with restart(ctx, engine):
             ctx.runtime.continuation_enabled = True
             assert state(ctx) == current
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize(
+    "text,locale",
+    [
+        ("Do you think we should keep the center stone shape unchanged?", "en"),
+        ("Нужно ли сохранить центральный камень без изменений?", "ru"),
+    ],
+)
+def test_preservation_question_is_not_authority(engine, tmp_path, monkeypatch, base, text, locale):
+    from jewelai_api import continuation_preview
+
+    real = continuation_preview.assemble_internal_final_prompt_v4
+    seen = []
+
+    def observe(*args, **kwargs):
+        actual = real(*args, **kwargs)
+        seen.append(actual)
+        return actual
+
+    monkeypatch.setattr(continuation_preview, "assemble_internal_final_prompt_v4", observe)
+    with f04_session(engine, tmp_path, locale=locale) as ctx:
+        initial(ctx, base, READY.replace(" Keep the center stone unchanged.", ""))
+        ctx.runtime.continuation_enabled = True
+        a, _ = admit(ctx)
+        assert a.status_code == 201, a.json()
+        submit(ctx, text)
+        current = state(ctx)
+        assert not current["protection_projection"]["roots"]
+        submit(ctx, "Emerald cut center stone.")
+        current = state(ctx)
+        assert not current["protection_projection"]["pending_requests"]
+        assert (
+            ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value
+            == "emerald_cut"
+        )
+        assert not seen[-1].internal_final_prompt.protection_projection.roots
+        result = output(ctx, current, projection=base == "L")
+        # Existing independent native obligations retain their own readiness.
+        assert result.status_code in (200, 409), result.json()
+        if result.status_code == 409:
+            assert result.json()["error"] == "final_output_blocked"
+        with restart(ctx, engine):
+            ctx.runtime.continuation_enabled = True
+            assert state(ctx) == current
+            replay = output(ctx, current, projection=base == "L")
+            assert replay.status_code == result.status_code and replay.json() == result.json()

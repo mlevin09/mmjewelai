@@ -20,6 +20,7 @@ from .full_message import (
     _certainty_for,
     _classification_for,
     _intent_bounds,
+    _sentence_bounds,
 )
 from .full_message import (
     parse_full_message as parse_legacy,
@@ -39,6 +40,17 @@ _CENTER_KEEP = re.compile(
 )
 
 
+# A fresh closed preservation predicate can govern its own assertion. Bare
+# object lists and a repeated preservation predicate retain their shared scope.
+_PRESERVATION_COORDINATION = re.compile(
+    r"(?:\b(?:and|и)\b|\r?\n)\s*(?:(?:please|пожалуйста)\s+)?$", re.I
+)
+_PRESERVATION_VERB = re.compile(r"\b(?:keep|preserve|change|сохран\w*|меня\w*)\b", re.I)
+_PRESERVATION_QUESTION = re.compile(
+    r"\b(?:whether|if|wonder|should\s+(?:I|we)|если|(?:нужно|стоит)\s+ли)\b", re.I
+)
+
+
 def _govern_preservation(text, candidate):
     """Preservation words are evidence, not proof of affirmative authority.
 
@@ -50,13 +62,33 @@ def _govern_preservation(text, candidate):
     start, end = candidate.evidence.start, candidate.evidence.end
     left, right = _intent_bounds(text, start, end)
     masked = text[:start] + " " * (end - start) + text[end:]
+    qualifier_context = text
+    initial_certainty = candidate.certainty
+    prefix = text[left:start]
+    boundary = _PRESERVATION_COORDINATION.search(prefix)
+    if boundary and candidate.semantic_subject is not None:
+        newline = "\n" in boundary.group()
+        if newline or not _PRESERVATION_VERB.search(prefix[: boundary.start()]):
+            # 'No halo and keep the shape' contains a new imperative, not
+            # another object in the rejected list. Do not erase a shared hedge
+            # across 'maybe keep A and keep B'. A new line closes the assertion.
+            masked = text[:left] + " " * (end - left) + text[end:]
+            if newline:
+                qualifier_context = text[:left] + " " * (start - left) + text[start:]
+                initial_certainty = CandidateCertainty.EXPLICIT
+                left = start
     polarity = _classification_for(masked, start, end)
-    certainty = _certainty_for(text, start, end, candidate.certainty)
+    certainty = _certainty_for(qualifier_context, start, end, initial_certainty)
     if _AMBIGUITY.search(text[left:right]):
         certainty = CandidateCertainty.AMBIGUOUS
     # Existing affirmative request phrasing is not itself uncertainty. Only
     # rejection changes polarity; qualifiers/disjunction are checked separately.
     if polarity == CandidateClassification.PROHIBITION:
+        certainty = CandidateCertainty.UNRESOLVED
+    _, sentence_end = _sentence_bounds(text, start, end)
+    if text[sentence_end : sentence_end + 1] == "?" or _PRESERVATION_QUESTION.search(
+        text[left:start]
+    ):
         certainty = CandidateCertainty.UNRESOLVED
     if certainty == CandidateCertainty.EXPLICIT:
         return candidate

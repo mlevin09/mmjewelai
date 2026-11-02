@@ -52,6 +52,9 @@ def test_independent_positive_fact_survives_new_preservation_grammar(dictionary)
     "text,locale",
     [
         ("Maybe keep the center stone shape unchanged.", "en"),
+        ("Do you think we should keep the center stone shape unchanged?", "en"),
+        ("Нужно ли сохранить центральный камень без изменений?", "ru"),
+        ("Do not keep the center stone material and keep the center stone shape unchanged.", "en"),
         ("Возможно сохранить центральный камень без изменений.", "ru"),
         ("Не нужно сохранить центральный камень без изменений.", "ru"),
         ("Maybe preserve the center stone shape unchanged. A platinum ring.", "en"),
@@ -80,6 +83,9 @@ def test_preservation_authority_requires_affirmative_certain_assertion(dictionar
     "text,locale",
     [
         ("Do not change the center stone shape.", "en"),
+        ("I do not want a halo and keep the center stone shape unchanged.", "en"),
+        ("Не хочу гало и сохранить центральный камень без изменений.", "ru"),
+        ("Maybe a gold ring\nKeep the center stone shape unchanged.", "en"),
         ("Не менять центральный камень.", "ru"),
         ("Хочу сохранить центральный камень без изменений.", "ru"),
         ("I would like to keep the center stone shape unchanged.", "en"),
