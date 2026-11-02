@@ -13,7 +13,7 @@ from test_prompt_enrichment_http import _message
 
 
 def _exercise_native(
-    engine, tmp_path, base, scope, stage, action, relation, *, lock_material=False
+    engine, tmp_path, base, scope, stage, action, relation, *, lock_material=False, lock_shape=False
 ):
     value = "oval" if stage == "pending" else "emerald_cut"
     preference = (
@@ -27,7 +27,7 @@ def _exercise_native(
         + " center stone"
     )
     with f04_session(engine, tmp_path) as ctx:
-        if lock_material:
+        if lock_material or lock_shape:
             from uuid import UUID
 
             from jewelai_domain.models import MessageSource
@@ -37,12 +37,16 @@ def _exercise_native(
                 ctx.sid = UUID(ctx.legacy["session_id"])
             old = ctx.repo.get_current_revision(ctx.sid, ctx.org)
             msg = _message(
-                ctx.client, str(ctx.sid), str(ctx.org), "Synthetic explicit diamond LOCK."
+                ctx.client, str(ctx.sid), str(ctx.org), "Synthetic explicit center-stone LOCK."
             )
             src = MessageSource(message_id=msg["message_id"], recorded_at=old.created_at)
             design = old.design.model_dump(mode="json")
-            design["center_stone"]["material"] = dict(
-                value="diamond", source=src.model_dump(mode="json"), confirmed=False, locked=False
+            field = "shape" if lock_shape else "material"
+            design["center_stone"][field] = dict(
+                value="oval" if lock_shape else "diamond",
+                source=src.model_dump(mode="json"),
+                confirmed=False,
+                locked=False,
             )
             child = revise_design(
                 old,
@@ -56,7 +60,7 @@ def _exercise_native(
             for transition in (confirm_field, lock_field):
                 next_rev = transition(
                     child,
-                    "center_stone.material",
+                    "center_stone." + field,
                     expected_revision_id=child.revision_id,
                     source=src,
                     reason="Synthetic LOCK authority",
@@ -75,6 +79,12 @@ def _exercise_native(
             else "Keep the center stone shape unchanged.",
         )
         pending = submit(ctx, "Emerald cut center stone.")["current_state"]
+        if lock_shape:
+            assert not pending["protection_projection"]["pending_requests"]
+            assert (
+                ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1].result_payload["reason"]
+                == "parser_rejected"
+            )
         if stage == "reanchored":
             offer = next(
                 q["offer"] for q in pending["questions"] if q["question_kind"] == "KEEP_RELEASE"
@@ -96,7 +106,7 @@ def _exercise_native(
         if not questions:
             # L has no preference question for an already satisfied source.
             # Prove absence from the actual sealed plan; do not forge an offer.
-            assert base == "L" and relation == "same"
+            assert (base == "L" and relation == "same") or lock_shape
             assert (
                 ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value
                 == value
@@ -134,13 +144,18 @@ def _exercise_native(
                 native=native,
             ),
         )
-        assert r.status_code == (409 if relation == "different" else 200), r.json()
-        if relation == "different":
+        assert r.status_code == (
+            409 if relation == "different" and action in {"ACCEPT", "SELECT_OPTION"} else 200
+        ), r.json()
+        if relation == "different" and action in {"ACCEPT", "SELECT_OPTION"}:
             assert r.json()["error"] == "keep_release_confirmation_required"
             assert rows(ctx) == before
         assert (
             ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value == value
         )
+        if lock_shape:
+            locked_shape = ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape
+            assert locked_shape.locked and locked_shape == before[0].design.center_stone.shape
         if lock_material:
             locked = ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.material
             assert locked.locked and locked == before[0].design.center_stone.material
@@ -171,3 +186,11 @@ def test_native_guard_retains_independent_locked_wrapper(
     engine, tmp_path, base, scope, stage, action
 ):
     _exercise_native(engine, tmp_path, base, scope, stage, action, "different", lock_material=True)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize("scope", ["generic", "shape"])
+@pytest.mark.parametrize("action", ["ACCEPT", "SELECT_OPTION", "REJECT", "SKIP", "UNKNOWN"])
+def test_native_actions_cannot_release_locked_target(engine, tmp_path, base, scope, action):
+    # A locked target cannot reach a legitimate re-anchored release stage.
+    _exercise_native(engine, tmp_path, base, scope, "pending", action, "different", lock_shape=True)
