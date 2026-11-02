@@ -46,3 +46,47 @@ def test_independent_positive_fact_survives_new_preservation_grammar(dictionary)
         c.target == "metal.material" and c.classification == "requirement"
         for c in parsed.candidates
     )
+
+
+@pytest.mark.parametrize(
+    "text,locale",
+    [
+        ("Maybe keep the center stone shape unchanged.", "en"),
+        ("Возможно сохранить центральный камень без изменений.", "ru"),
+        ("Не нужно сохранить центральный камень без изменений.", "ru"),
+        ("Maybe preserve the center stone shape unchanged. A platinum ring.", "en"),
+        ("Either keep the center stone shape unchanged or change it.", "en"),
+        ("Сохранить центральный камень без изменений или изменить его.", "ru"),
+        ("Do not preserve the center stone shape unchanged.", "en"),
+        ("A gold ring. Perhaps preserve the center stone shape unchanged.", "en"),
+    ],
+)
+def test_preservation_authority_requires_affirmative_certain_assertion(dictionary, text, locale):
+    parsed = parse_full_message(text, locale=locale, dictionary=dictionary)
+    assert not any(
+        c.classification == "preservation" and c.certainty == "explicit" for c in parsed.candidates
+    )
+    assert parsed.candidates  # unresolved/rejected evidence is retained
+    for c in parsed.candidates:
+        assert text[c.evidence.start : c.evidence.end] == c.evidence.text
+    if "platinum" in text:
+        assert any(
+            c.target == "metal.material" and c.classification == "requirement"
+            for c in parsed.candidates
+        )
+
+
+@pytest.mark.parametrize(
+    "text,locale",
+    [
+        ("Do not change the center stone shape.", "en"),
+        ("Не менять центральный камень.", "ru"),
+        ("Maybe a gold ring. Keep the center stone shape unchanged.", "en"),
+        ("Do not add side stones, but keep the center stone shape unchanged.", "en"),
+    ],
+)
+def test_preservation_idiom_and_independent_affirmation_keep_authority(dictionary, text, locale):
+    parsed = parse_full_message(text, locale=locale, dictionary=dictionary)
+    assert any(
+        c.classification == "preservation" and c.certainty == "explicit" for c in parsed.candidates
+    )

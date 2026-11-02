@@ -184,3 +184,23 @@ def test_f05_native_answer_causal_source_postgres(engine, tmp_path, base, origin
     )
 
     exercise_case(engine, tmp_path, base, origin_version)
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
+@pytest.mark.parametrize(
+    "text,locale",
+    [
+        ("Maybe keep the center stone shape unchanged.", "en"),
+        ("Не нужно сохранить центральный камень без изменений.", "ru"),
+    ],
+)
+def test_f05_preservation_polarity_actual_postgres(
+    engine, tmp_path, monkeypatch, base, text, locale
+):
+    from test_f05_preservation_polarity import (
+        test_uncertain_or_negated_preservation_cannot_create_authority,
+    )
+
+    test_uncertain_or_negated_preservation_cannot_create_authority(
+        engine, tmp_path, base, text, locale, monkeypatch
+    )

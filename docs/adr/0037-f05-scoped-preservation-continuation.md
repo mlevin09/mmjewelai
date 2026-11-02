@@ -206,3 +206,21 @@ This does not broaden L2 contextual coverage: a Knowledge-only residual without
 an approved exact binding, such as the unbound `white` mirror in a full repeated
 S0 clause with the optional TEST-ONLY binding, remains unresolved. No new catalog
 mapping or professional applicability decision is introduced by F05.
+
+### F05-FA-01 remediation: source authority before protection
+
+The version1.2 preservation extension must apply the existing statement polarity,
+certainty and assertion-boundary evidence before granting explicit KEEP authority.
+Preservation idioms (`do not change`, `без изменений`) are evaluated as complete
+predicates; an external rejection, tentative qualifier or unsupported disjunction
+cannot become an affirmative preservation root. Such source wording remains
+unresolved evidence with its governing source span, and cannot cancel an existing
+KEEP. Independent affirmative facts remain eligible through the existing parser
+proposal. This corrects implementation of the approved R2 authority boundary;
+parser1.1 and historical L/F interpreter behavior remain unchanged.
+
+The review regression tests exercise native-answer combinations and actual
+persisted-history output boundaries. Capacity evidence must distinguish real
+IFP4/Description3 construction from isolated DTO or renderer-substitution tests;
+independently unreachable byte-only boundaries must be disclosed rather than
+reported as executed HTTP success.

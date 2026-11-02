@@ -8,6 +8,7 @@ import re
 from typing import Literal
 
 from .full_message import (
+    _AMBIGUITY,
     CandidateApplication,
     CandidateCertainty,
     CandidateClassification,
@@ -16,6 +17,9 @@ from .full_message import (
     FullMessageParseResult,
     NormalizationSource,
     StructuredCandidate,
+    _certainty_for,
+    _classification_for,
+    _intent_bounds,
 )
 from .full_message import (
     parse_full_message as parse_legacy,
@@ -33,6 +37,39 @@ _CENTER_KEEP = re.compile(
     r"(?:\s+unchanged)?\b",
     re.I,
 )
+
+
+def _govern_preservation(text, candidate):
+    """Preservation words are evidence, not proof of affirmative authority.
+
+    Mask only the preservation predicate itself: 'do not change' and 'без
+    изменений' are positive preservation idioms, while an external rejection
+    still governs the assertion. Reuse the frozen offset/scope primitives,
+    without changing the historical interpreter or inventing cancellation.
+    """
+    start, end = candidate.evidence.start, candidate.evidence.end
+    left, right = _intent_bounds(text, start, end)
+    masked = text[:start] + " " * (end - start) + text[end:]
+    polarity = _classification_for(masked, start, end)
+    certainty = _certainty_for(text, start, end, candidate.certainty)
+    if _AMBIGUITY.search(text[left:right]):
+        certainty = CandidateCertainty.AMBIGUOUS
+    if polarity != CandidateClassification.REQUIREMENT:
+        certainty = CandidateCertainty.UNRESOLVED
+    if certainty == CandidateCertainty.EXPLICIT:
+        return candidate
+    # Keep the governing qualifier/rejection in the quoted unresolved evidence.
+    while left < right and text[left].isspace():
+        left += 1
+    while right > left and text[right - 1].isspace():
+        right -= 1
+    return candidate.model_copy(
+        update=dict(
+            certainty=certainty,
+            evidence=EvidenceSpan(start=left, end=right, text=text[left:right]),
+            detail="Uncertain or rejected preservation wording is not KEEP authority.",
+        )
+    )
 
 
 def parse_full_message(text, *, locale, dictionary, knowledge_runtime=None):
@@ -70,6 +107,12 @@ def parse_full_message(text, *, locale, dictionary, knowledge_runtime=None):
         if not any(start <= c.evidence.start and c.evidence.end <= end for start, end in protected)
     ) + tuple(additions)
     payload = legacy.model_dump(mode="python", exclude={"parse_version", "candidates"})
+    candidates = tuple(
+        _govern_preservation(text, c)
+        if c.classification == CandidateClassification.PRESERVATION
+        else c
+        for c in candidates
+    )
     return FullMessageParseResultV1_2(
         **payload,
         candidates=tuple(
