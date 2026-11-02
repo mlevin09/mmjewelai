@@ -166,9 +166,13 @@ def test_actual_description_guard_from_canonical_history(engine, tmp_path, limit
         current = submit(ctx, "Center stone qy" + "q" * 85, current=current)["current_state"]
         # Source-backed unresolved wording is disclosed, never canonicalized.
         overhead = len(current["description"]["text"]) - baseline - 100
+        assert 0 < overhead < 500
+        assert "Center stone qy" in current["description"]["text"]
         index = 0
         while limit - len(current["description"]["text"]) - overhead > 1900:
-            text = "Center stone qz" + chr(97 + index) + "q" * 1884
+            bulk = min(1900, limit - len(current["description"]["text"]) - 2 * overhead - 100)
+            assert bulk >= 16
+            text = "Center stone qz" + chr(97 + index) + "q" * (bulk - 16)
             current = submit(ctx, text, current=current)["current_state"]
             index += 1
             assert index < 20
