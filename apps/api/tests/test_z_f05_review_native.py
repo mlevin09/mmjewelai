@@ -72,13 +72,14 @@ def _exercise_native(
         ctx.runtime.continuation_enabled = True
         a, _ = admit(ctx)
         assert a.status_code == 201, a.json()
-        submit(
+        current = submit(
             ctx,
             "Keep the center stone unchanged."
             if scope == "generic"
             else "Keep the center stone shape unchanged.",
-        )
-        correction = submit(ctx, "Emerald cut center stone.")
+            current=a.json()["current_state"],
+        )["current_state"]
+        correction = submit(ctx, "Emerald cut center stone.", current=current)
         pending = correction["current_state"]
         if lock_shape:
             assert not pending["protection_projection"]["pending_requests"]
@@ -100,7 +101,8 @@ def _exercise_native(
                 json=consent_payload(ctx, pending, offer, "ACCEPT"),
             )
             assert r.status_code == 200, r.json()
-        submit(ctx, "I prefer " + preference + ".")
+        current = r.json()["current_state"] if stage == "reanchored" else pending
+        submit(ctx, "I prefer " + preference + ".", current=current)
         current = state(ctx)
         questions = [
             q["native_question"]

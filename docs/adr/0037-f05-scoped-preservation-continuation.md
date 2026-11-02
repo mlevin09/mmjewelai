@@ -232,3 +232,10 @@ closes the previous assertion. Interrogative/conditional preservation wording is
 retained as unresolved evidence rather than an affirmative instruction. These
 checks are confined to the new preservation interpreter and do not change the
 frozen fact parser, question selection or domain conflict/cancellation policy.
+
+Preservation-only probability and optional-rejection markers supplement the frozen
+fact lexicon (for example `probably`, `наверное`, `вероятно`, `необязательно`).
+They are evaluated in the governing prefix or as a standalone trailing qualifier;
+a later independent property's qualifier does not become KEEP authority or
+silently negate a preceding supported directive. These markers retain source
+wording and cannot revoke a previously accepted preservation root.

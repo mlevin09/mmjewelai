@@ -50,6 +50,17 @@ _PRESERVATION_QUESTION = re.compile(
     r"\b(?:whether|if|wonder|should\s+(?:I|we)|если|(?:нужно|стоит)\s+ли)\b", re.I
 )
 
+# Supplement the frozen fact interpreter only for preservation authority. These
+# are lexical uncertainty/optional-rejection families, never canonical facts.
+_PRESERVATION_TENTATIVE = re.compile(
+    r"\b(?:probably|potentially|tentatively|consider\w*|наверно|наверное|вероятно|"
+    r"предположительно|пожалуй|скорее\s+всего)\b",
+    re.I,
+)
+_PRESERVATION_NEGATIVE = re.compile(
+    r"\b(?:refus\w*|unneeded|необязательно|незачем|запрещ\w*|отказыва\w*)\b", re.I
+)
+
 
 def _govern_preservation(text, candidate):
     """Preservation words are evidence, not proof of affirmative authority.
@@ -86,6 +97,17 @@ def _govern_preservation(text, candidate):
     if polarity == CandidateClassification.PROHIBITION:
         certainty = CandidateCertainty.UNRESOLVED
     _, sentence_end = _sentence_bounds(text, start, end)
+    suffix = text[end:sentence_end].strip(" ,—–")
+    suffix = re.sub(r"^(?:unchanged|без\s+изменений)\s*[,—–]?\s*", "", suffix, flags=re.I)
+    if _PRESERVATION_TENTATIVE.search(text[left:start]) or _PRESERVATION_TENTATIVE.fullmatch(
+        suffix
+    ):
+        certainty = CandidateCertainty.AMBIGUOUS
+    negative_suffix = re.sub(r"^(?:is|are|was|were)\s+", "", suffix, flags=re.I)
+    if _PRESERVATION_NEGATIVE.search(masked[left:start]) or _PRESERVATION_NEGATIVE.fullmatch(
+        negative_suffix
+    ):
+        certainty = CandidateCertainty.UNRESOLVED
     if text[sentence_end : sentence_end + 1] == "?" or _PRESERVATION_QUESTION.search(
         text[left:start]
     ):

@@ -19,8 +19,9 @@ from test_f05_preview import output, state
 from test_prompt_enrichment_http import _message
 
 
-def seed(ctx, total, glyph, *, count=5, id_extra=0):
-    ctx.sid = UUID(ctx.legacy["session_id"])
+def seed(ctx, total, glyph, *, count=5, id_extra=0, base="L"):
+    if base == "L":
+        ctx.sid = UUID(ctx.legacy["session_id"])
     old = ctx.repo.get_current_revision(ctx.sid, ctx.org)
     msg = _message(
         ctx.client,
@@ -50,19 +51,48 @@ def seed(ctx, total, glyph, *, count=5, id_extra=0):
         created_at=NOW,
     )
     ctx.repo.append_revision_cas(ctx.sid, ctx.org, old.revision_id, child)
-    initial(ctx, "L", "A white gold ring with an oval diamond center stone in prong setting.")
+    initial(
+        ctx,
+        base,
+        "A ring."
+        if base == "F"
+        else "A white gold ring with an oval diamond center stone in prong setting.",
+    )
     ctx.runtime.continuation_enabled = True
 
 
+def resolution_text(base):
+    return (
+        "A white gold ring with an oval diamond center stone in prong setting. "
+        "Center stone 8 x 6 x 4 mm."
+        if base == "F"
+        else "Center stone 8 x 6 x 4 mm."
+    )
+
+
+@pytest.mark.parametrize("base", ["L", "F"])
 @pytest.mark.parametrize("glyph", ["A", "Ж", "😀"])
 @pytest.mark.parametrize("limit", [32000, 32001])
-def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, glyph, limit):
-    # Measured actual five-field baseline: 3395 fixed characters + 3 per
-    # instruction character; one extra ID character contributes two JSON chars.
-    extra = 0 if limit == 32000 else 2
-    total = 9535 if limit == 32000 else 9534
+def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, glyph, limit, base):
+    # L is an independently measured golden renderer baseline. Calibrate the
+    # separate F renderer through an actual small persisted HTTP journey.
+    fixed = 3395
+    if base == "F":
+        from test_f05_preservation_polarity import submit
+
+        with f04_session(engine, tmp_path / "calibration") as calibrate:
+            seed(calibrate, 1000, "A", base=base)
+            admission, _ = admit(calibrate)
+            assert admission.status_code == 201, admission.json()
+            submit(calibrate, resolution_text(base))
+            result = output(calibrate, state(calibrate), projection=False)
+            assert result.status_code == 200, result.json()
+            fixed = len(result.json()["internal_final_prompt"]["prompt_text"]) - 3000
+    extra = next(x for x in range(3) if (limit - fixed - 2 * x) % 3 == 0)
+    total = (limit - fixed - 2 * extra) // 3
+    assert 5 <= total <= 10000
     with f04_session(engine, tmp_path) as ctx:
-        seed(ctx, total, glyph, id_extra=extra)
+        seed(ctx, total, glyph, id_extra=extra, base=base)
         before = rows(ctx)
         admission, _ = admit(ctx)
         assert admission.status_code == 201, admission.json()
@@ -72,7 +102,7 @@ def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, gl
         if limit > 32000:
             # The ordinary submitted correction reaches the actual precommit
             # output builder and must roll back, not store an oversized IFP.
-            message = _message(ctx.client, str(ctx.sid), str(ctx.org), "Center stone 8 x 6 x 4 mm.")
+            message = _message(ctx.client, str(ctx.sid), str(ctx.org), resolution_text(base))
             current = state(ctx)
             r = ctx.client.post(
                 f"/v1/sessions/{ctx.sid}/prompt-enrichment/corrections",
@@ -88,7 +118,7 @@ def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, gl
             assert r.json()["error"] == "artifact_capacity_exceeded"
             assert rows(ctx) == before
             return
-        submit(ctx, "Center stone 8 x 6 x 4 mm.")
+        submit(ctx, resolution_text(base))
         current = state(ctx)
         statements = []
 
@@ -97,7 +127,7 @@ def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, gl
 
         event.listen(engine, "before_cursor_execute", observe)
         try:
-            result = output(ctx, current)
+            result = output(ctx, current, projection=base == "L")
             assert result.status_code == 200, result.json()
             text = result.json()["internal_final_prompt"]["prompt_text"]
             assert len(text) == limit
@@ -120,12 +150,15 @@ def test_actual_ifp4_boundary_without_renderer_substitution(engine, tmp_path, gl
             event.remove(engine, "before_cursor_execute", observe)
         with restart(ctx, engine):
             ctx.runtime.continuation_enabled = True
-            assert output(ctx, state(ctx)).json() == result.json()
+            assert output(ctx, state(ctx), projection=base == "L").json() == result.json()
 
 
-def test_actual_admitted_transport_capacity_and_malformed_version_are_atomic(engine, tmp_path):
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_actual_admitted_transport_capacity_and_malformed_version_are_atomic(
+    engine, tmp_path, base
+):
     with f04_session(engine, tmp_path) as ctx:
-        initial(ctx, "L")
+        initial(ctx, base)
         ctx.runtime.continuation_enabled = True
         response, command = admit(ctx)
         assert response.status_code == 201, response.json()
@@ -151,12 +184,13 @@ def test_actual_admitted_transport_capacity_and_malformed_version_are_atomic(eng
             assert rows(ctx) == before
 
 
+@pytest.mark.parametrize("base", ["L", "F"])
 @pytest.mark.parametrize("limit", [20000, 20001])
-def test_actual_description_guard_from_canonical_history(engine, tmp_path, limit):
+def test_actual_description_guard_from_canonical_history(engine, tmp_path, limit, base):
     from test_f05_preservation_polarity import submit
 
     with f04_session(engine, tmp_path) as ctx:
-        initial(ctx, "L")
+        initial(ctx, base)
         ctx.runtime.continuation_enabled = True
         admission, _ = admit(ctx)
         assert admission.status_code == 201, admission.json()

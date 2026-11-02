@@ -160,9 +160,19 @@ def test_unresolved_preservation_is_not_cancellation_of_existing_keep(engine, tm
     [
         ("Do you think we should keep the center stone shape unchanged?", "en"),
         ("Нужно ли сохранить центральный камень без изменений?", "ru"),
+        ("Probably keep the center stone shape unchanged.", "en"),
+        ("Наверное сохранить центральный камень без изменений.", "ru"),
+        ("Вероятно сохранить центральный камень без изменений.", "ru"),
+        ("Необязательно сохранить центральный камень без изменений.", "ru"),
+        ("Незачем сохранить центральный камень без изменений.", "ru"),
+        ("I refuse to keep the center stone shape unchanged.", "en"),
+        ("Keep the center stone unchanged, probably.", "en"),
+        ("Сохранить центральный камень без изменений необязательно.", "ru"),
     ],
 )
-def test_preservation_question_is_not_authority(engine, tmp_path, monkeypatch, base, text, locale):
+def test_nonaffirmative_preservation_is_not_authority(
+    engine, tmp_path, monkeypatch, base, text, locale
+):
     from jewelai_api import continuation_preview
 
     real = continuation_preview.assemble_internal_final_prompt_v4
