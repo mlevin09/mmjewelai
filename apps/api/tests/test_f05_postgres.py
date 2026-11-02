@@ -25,8 +25,9 @@ def test_f05_read_projection_postgres(engine, tmp_path, base, locale):
     _read_only(engine, tmp_path, base, locale)
 
 
-def test_f05_unknown_causal_projection_postgres(engine, tmp_path):
-    _unknown(engine, tmp_path, "EN")
+@pytest.mark.parametrize("base", ["L", "F"])
+def test_f05_unknown_causal_projection_postgres(engine, tmp_path, base):
+    _unknown(engine, tmp_path, "EN", base)
 
 
 def test_f05_read_frame_cas_postgres(engine, tmp_path):
