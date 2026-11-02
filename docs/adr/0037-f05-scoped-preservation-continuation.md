@@ -239,3 +239,12 @@ They are evaluated in the governing prefix or as a standalone trailing qualifier
 a later independent property's qualifier does not become KEEP authority or
 silently negate a preceding supported directive. These markers retain source
 wording and cannot revoke a previously accepted preservation root.
+
+The F05 current-output boundary also translates the frozen F renderer's sole
+`UserReadableJewelryDescriptionV2.text` maximum-length validation failure into
+its existing typed capacity error. That intermediate model can reject a newly
+rendered description before Description3's own capacity check runs. The
+translation is limited to that model, field, error family and existing limit;
+source-integrity, other-model and compound validation failures still fail closed.
+Historical F rendering is unchanged, valid output bytes are unchanged, and the
+existing precommit verification rolls back an oversized continuation atomically.

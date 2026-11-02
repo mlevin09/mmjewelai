@@ -25,11 +25,14 @@ from jewelai_domain.preservation import (
 )
 from jewelai_domain.rules import BlockDecision, ReadyDecision, RuleDecision
 from jewelai_domain.rules_v2 import RuleDecisionV2
-from pydantic import model_validator
+from pydantic import ValidationError, model_validator
 
 from .continuation import ContinuationEnrichmentResult
 from .downstream_preparation import (
+    RENDER_MAX_CHARACTERS,
     CanonicalInternalFinalPromptV2_1,
+    GenerationPreparationError,
+    PreparationErrorCode,
     check_ifp_v2_1_capacity,
     render_canonical_source_text,
 )
@@ -395,6 +398,28 @@ def current_constraints(snapshot, facts):
     return tuple(sorted(constraints, key=lambda c: (c.target, c.kind, c.source_ids)))
 
 
+def _current_f_components(*args):
+    """Map only freshly rendered F description overflow to F05's capacity error.
+
+    The frozen F renderer constructs its bounded Description2 before F05 can
+    check Description3. Preserve every other integrity/validation failure and
+    the historical F entry point; never serialize the rejected source text.
+    """
+    try:
+        return f04_current_components(*args)
+    except ValidationError as exc:
+        errors = exc.errors(include_input=False, include_url=False)
+        if (
+            exc.title == "UserReadableJewelryDescriptionV2"
+            and len(errors) == 1
+            and errors[0]["type"] == "string_too_long"
+            and errors[0]["loc"] == ("text",)
+            and errors[0].get("ctx", {}).get("max_length") == RENDER_MAX_CHARACTERS
+        ):
+            raise GenerationPreparationError(PreparationErrorCode.CAPACITY) from None
+        raise
+
+
 def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates, _pending_descriptions=()):
     snapshot = FinalPromptSnapshotV3.model_validate(snapshot)
     _validate_snapshot(snapshot, dictionary=dictionary, templates=templates)
@@ -415,7 +440,7 @@ def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates, _pendi
             enrichment_result=native,
             effective_unresolved_frontier=snapshot.native_frontier,
         )
-        base_description, unresolved, readiness = f04_current_components(
+        base_description, unresolved, readiness = _current_f_components(
             view, dictionary, facts, constraints
         )
         reason = snapshot.rule_decision.reason
