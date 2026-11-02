@@ -111,7 +111,7 @@ def _exercise_native(
         if not questions:
             # L has no preference question for an already satisfied source.
             # Prove absence from the actual sealed plan; do not forge an offer.
-            assert (base == "L" and relation == "same") or lock_shape
+            assert (base == "L" and relation == "same") or (lock_shape and relation == "different")
             assert (
                 ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value
                 == value
