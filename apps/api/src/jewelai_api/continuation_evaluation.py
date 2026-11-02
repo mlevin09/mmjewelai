@@ -1,8 +1,7 @@
-"""Exact F05 parse/evaluation reader; native parser/proposal/Matrix remain owners.
+"""Correction evaluation using the same current Parser as initial intake.
 
-This is evidence for a command, never canonical mutation or KEEP consent. Frozen
-Parse1.1/evaluation readers stay unchanged; only an explicitly admitted caller
-supplies the new interpreter/context to the shared deterministic evaluator.
+Versions identify immutable evidence formats, not separate extraction engines.
+Canonical mutation and scoped KEEP consent remain downstream responsibilities.
 """
 
 from datetime import UTC
@@ -13,7 +12,7 @@ from jewelai_domain.continuation import ContinuationContext
 from jewelai_domain.preservation import contract_hash
 from jewelai_domain.rules import RuleDecision
 from jewelai_domain.rules_v2 import RuleDecisionV2
-from jewelai_parser.full_message_v1_2 import FullMessageParseResultV1_2, parse_full_message
+from jewelai_parser.full_message import FullMessageParseResultV1_2, parse_full_message
 from jewelai_prompts.enrichment import (
     StructuredPromptEnrichmentResult,
     StructuredPromptEnrichmentResultV2,
@@ -110,6 +109,7 @@ def evaluate_continuation_message(
         locale=locale,
         dictionary=service.artifacts.dictionary,
         knowledge_runtime=verified_release.compiled_runtime,
+        _result_type=FullMessageParseResultV1_2,
     )
 
     def build(**payload):

@@ -180,7 +180,7 @@ class CanonicalInternalFinalPromptHandoffV3(InternalFinalPromptHandoff, StrictEv
     internal_final_prompt: CanonicalInternalFinalPromptV3
 
 
-def f04_current_components(snapshot, dictionary, facts, constraints):
+def f04_current_components(snapshot, dictionary, facts, constraints, *, _source_facts=None):
     """Shared native F formatting/readiness; no workflow DTO is relabelled."""
     frontier = snapshot.effective_unresolved_frontier
     definitions = {c.cause_id: c for c in snapshot.cause_definitions}
@@ -260,17 +260,72 @@ def f04_current_components(snapshot, dictionary, facts, constraints):
             e.original_wording for e in snapshot.constraint_evidence if e.status == "unresolved"
         )
     )
-    summaries.extend(
-        (
-            "Unaccepted source request: "
-            if snapshot.locale == "en"
-            else "Непринятый исходный запрос: "
+    # Acceptance belongs to concrete facts, not an entire Message. A deferred
+    # extra interpretation cannot revoke facts accepted from the same source.
+    # This is presentation only: unresolved evidence/frontier/readiness remains
+    # unchanged, including all original spans and hashes in the IFP audit.
+    source_facts = _source_facts or {}
+    for wording in unbound_wording:
+        messages = {
+            e.source.message_id
+            for e in snapshot.constraint_evidence
+            if e.status == "unresolved" and e.original_wording == wording
+        }
+        current = set()
+        historical = set()
+        for message_id in messages:
+            accepted, superseded = source_facts.get(message_id, ((), ()))
+            current.update(accepted)
+            historical.update(superseded)
+        for fact in facts:
+            if messages.intersection(fact.source_ids):
+                current.add(fact.target)
+        accepted_keep = any(
+            e.source.message_id in messages
+            and e.kind == "preservation"
+            and e.acceptance in {"user_explicit", "user_accepted"}
+            for e in snapshot.constraint_evidence
         )
-        + "«"
-        + wording
-        + "»"
-        for wording in unbound_wording
-    )
+        labels = ", ".join(_target_label(t, snapshot.locale) for t in sorted(current))
+        old_labels = ", ".join(
+            _target_label(t, snapshot.locale) for t in sorted(historical - current)
+        )
+        if snapshot.locale == "en":
+            pieces = []
+            if labels:
+                pieces.append(f"Accepted current facts from this message: {labels}")
+            if old_labels:
+                pieces.append(
+                    f"Previously accepted facts from this message are superseded: {old_labels}"
+                )
+            if accepted_keep:
+                pieces.append(
+                    "Preservation from this message was accepted; "
+                    "its current authority is shown above"
+                )
+            prefix = "; ".join(pieces)
+            prefix = (
+                (prefix + "; unresolved additional interpretation: ")
+                if prefix
+                else "Unaccepted source request: "
+            )
+        else:
+            pieces = []
+            if labels:
+                pieces.append(f"Принятые текущие факты из этого сообщения: {labels}")
+            if old_labels:
+                pieces.append(f"Ранее принятые факты из этого сообщения заменены: {old_labels}")
+            if accepted_keep:
+                pieces.append(
+                    "Сохранение из этого сообщения было принято; его текущая сила указана выше"
+                )
+            prefix = "; ".join(pieces)
+            prefix = (
+                (prefix + "; дополнительная неуточнённая интерпретация: ")
+                if prefix
+                else "Непринятый исходный запрос: "
+            )
+        summaries.append(prefix + "«" + wording + "»")
     base_description = _description(
         snapshot,
         dictionary,

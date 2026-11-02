@@ -1,12 +1,11 @@
-"""Parser1.2 recognition cannot silently change retained parser1.1 evidence."""
+"""One current extraction algorithm with retained immutable wire formats."""
 
 from pathlib import Path
 
 import pytest
 from jewelai_domain import load_domain_dictionary
 
-from jewelai_parser.full_message import parse_full_message as legacy_parse
-from jewelai_parser.full_message_v1_2 import parse_full_message
+from jewelai_parser.full_message import FullMessageParseResultV1_2, parse_full_message
 
 
 @pytest.fixture(scope="module")
@@ -24,13 +23,16 @@ def dictionary():
         ("A gold ring. Сохранить центральный камень без изменений.", "ru"),
     ],
 )
-def test_new_preservation_grammar_has_a_distinct_interpreter(dictionary, text, locale):
-    old = legacy_parse(text, locale=locale, dictionary=dictionary)
+def test_wire_formats_use_identical_current_extraction(dictionary, text, locale):
+    old = parse_full_message(text, locale=locale, dictionary=dictionary)
     saved = old.model_dump_json()
-    new = parse_full_message(text, locale=locale, dictionary=dictionary)
+    new = parse_full_message(
+        text, locale=locale, dictionary=dictionary, _result_type=FullMessageParseResultV1_2
+    )
     assert new.parse_version == "1.2.0"
     assert any(c.classification == "preservation" for c in new.candidates)
-    assert legacy_parse(text, locale=locale, dictionary=dictionary).model_dump_json() == saved
+    assert parse_full_message(text, locale=locale, dictionary=dictionary).model_dump_json() == saved
+    assert new.candidates == old.candidates
     assert old.parse_version == "1.1.0"
     for candidate in new.candidates:
         assert text[candidate.evidence.start : candidate.evidence.end] == candidate.evidence.text
@@ -106,3 +108,24 @@ def test_preservation_idiom_and_independent_affirmation_keep_authority(dictionar
     assert any(
         c.classification == "preservation" and c.certainty == "explicit" for c in parsed.candidates
     )
+
+
+@pytest.mark.parametrize(
+    "text,expected,certainty",
+    [
+        ("Овальный центральный алмаз в крапановой закрепке.", "center_stone", "explicit"),
+        ("Возможно овальный центральный алмаз в крапановой закрепке.", "center_stone", "ambiguous"),
+        ("Не хочу центральный алмаз в крапановой закрепке.", "center_stone", "explicit"),
+        ("Oval центральный алмаз в крапановой закрепке.", "center_stone", "explicit"),
+        ("Боковые алмазы в крапановой закрепке.", "side_stones", "explicit"),
+    ],
+)
+def test_explicit_owner_precedes_neighboring_setting(dictionary, text, expected, certainty):
+    parsed = parse_full_message(text, locale="ru", dictionary=dictionary)
+    stones = [c for c in parsed.candidates if c.normalized_values == ("diamond",)]
+    assert stones
+    assert all(c.subject == expected and c.certainty == certainty for c in stones)
+    if "Не хочу" in text:
+        assert all(c.classification == "prohibition" and c.parser_update is None for c in stones)
+    if expected in {"side_stones", "unknown"}:
+        assert all(c.parser_update is None for c in stones)

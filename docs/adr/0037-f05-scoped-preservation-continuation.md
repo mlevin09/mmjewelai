@@ -248,3 +248,27 @@ translation is limited to that model, field, error family and existing limit;
 source-integrity, other-model and compound validation failures still fail closed.
 Historical F rendering is unchanged, valid output bytes are unchanged, and the
 existing precommit verification rolls back an oversized continuation atomically.
+
+### Owner correction: one current Parser and current-session integrity
+
+The subsequent Owner consolidation decision supersedes the earlier requirement
+to retain executable parser1.1 behavior. Initial input and corrections now use
+one full-message extraction implementation, including scoped KEEP authority.
+Parse1.1/1.2 remain evidence wire formats only; they do not select engines.
+The old `full_message_v1_2` module retains only its data-type import.
+
+The Owner explicitly excludes compatibility with disposable sessions created by
+earlier development Parsers from F05 acceptance. The diagnostic SQLite database
+copied from the local pytest capacity fixture is such a session, not shared or
+required user data. It is retained untouched as historical diagnostic evidence;
+its replay failure is OUT OF SCOPE, not PASS. No legacy execution fallback,
+historical interpretation adapter or data rewrite is introduced.
+
+New sessions are created and restored using the same current Parser. Their
+source text/spans, evidence hashes, pinned artifacts, canonical transitions,
+authority, scoped history, CAS and idempotency validations remain in force.
+Tests that distinguished two parser engines are replaced by identical current
+extraction across the retained wire formats. Fresh persisted HTTP tests cover
+initial/correction parity, source attribution and restart. Existing current-
+session tampering checks are retained. No migration or live activation follows
+from this decision.

@@ -164,6 +164,7 @@ def read_preview(
                 dictionary=bound.artifacts.dictionary,
                 templates=bound.artifacts.prompts,
                 _pending_descriptions=pending_lines,
+                _source_facts=_accepted_source_facts(repo, sid, oid, snapshot.revision),
             )
             if len(evidence_bytes(output)) > 1_048_576:
                 raise ContinuationReadError(
@@ -230,3 +231,33 @@ def read_preview(
             raise ContinuationReadError(
                 500, "invalid_durable_history", "Scoped enrichment history failed validation"
             ) from None
+
+
+def _accepted_source_facts(repo, sid, oid, current):
+    """Read canonical provenance only; deferred proposals cannot grant acceptance.
+
+    History is scoped/immutable and is never replayed as a replacement Product
+    State. Labels distinguish current source facts from superseded source facts.
+    """
+    from jewelai_domain.lock_protection import state_fields
+    from jewelai_domain.models import Explicit, NotApplicable
+
+    current_fields = state_fields(current.design)
+    accepted = {}
+    historical = {}
+    for revision in repo.list_revisions(sid, oid):
+        if revision.revision > current.revision:
+            continue
+        for path, value in state_fields(revision.design).items():
+            if not isinstance(value, (Explicit, NotApplicable)):
+                continue
+            message_id, target = value.source.message_id, ".".join(path)
+            bucket = accepted if current_fields.get(path) == value else historical
+            bucket.setdefault(message_id, set()).add(target)
+    return {
+        message_id: (
+            tuple(sorted(accepted.get(message_id, ()))),
+            tuple(sorted(historical.get(message_id, ()))),
+        )
+        for message_id in accepted.keys() | historical.keys()
+    }

@@ -14,7 +14,7 @@ from jewelai_domain.preservation_release import KeepReleaseDecision, KeepRelease
 from jewelai_domain.questions import QuestionId
 from jewelai_domain.questions_v2 import QuestionIdV2
 from jewelai_parser import AnyParserProposal
-from jewelai_parser.full_message_v1_2 import FullMessageParseResultV1_2
+from jewelai_parser.full_message import FullMessageParseResultV1_2
 from jewelai_prompts.continuation import ContinuationEnrichmentResult
 from pydantic import Field, model_validator
 

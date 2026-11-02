@@ -111,16 +111,25 @@ def _exercise_native(
             and q["native_question"]["category"] == "preference_acceptance"
         ]
         if not questions:
-            # L has no preference question for an already satisfied source.
-            # Prove absence from the actual sealed plan; do not forge an offer.
-            assert (base == "L" and relation == "same") or (lock_shape and relation == "different")
+            # Both native profiles suppress offers for confirmed/locked targets
+            # (clarification._is_confirmed / f04_planning.protected_target).
+            # Prove absence in the actual plan, never forge an actionable offer.
+            assert (relation == "same" and (base == "L" or lock_shape)) or (
+                lock_shape and relation == "different"
+            )
             assert (
                 ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape.value
                 == value
             )
+            if lock_shape:
+                shape = ctx.repo.get_current_revision(ctx.sid, ctx.org).design.center_stone.shape
+                assert shape == child.design.center_stone.shape and shape.locked and shape.confirmed
+            before_restart = output(ctx, current, projection=base == "L")
+            assert before_restart.status_code in (200, 409), before_restart.json()
             with restart(ctx, engine):
                 ctx.runtime.continuation_enabled = True
                 assert state(ctx) == current
+                assert output(ctx, current, projection=base == "L").json() == before_restart.json()
             return
         q = questions[0]
         option = q["options"][0]

@@ -398,7 +398,7 @@ def current_constraints(snapshot, facts):
     return tuple(sorted(constraints, key=lambda c: (c.target, c.kind, c.source_ids)))
 
 
-def _current_f_components(*args):
+def _current_f_components(*args, **kwargs):
     """Map only freshly rendered F description overflow to F05's capacity error.
 
     The frozen F renderer constructs its bounded Description2 before F05 can
@@ -406,7 +406,7 @@ def _current_f_components(*args):
     the historical F entry point; never serialize the rejected source text.
     """
     try:
-        return f04_current_components(*args)
+        return f04_current_components(*args, **kwargs)
     except ValidationError as exc:
         errors = exc.errors(include_input=False, include_url=False)
         if (
@@ -420,7 +420,9 @@ def _current_f_components(*args):
         raise
 
 
-def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates, _pending_descriptions=()):
+def assemble_internal_final_prompt_v4(
+    snapshot, *, dictionary, templates, _pending_descriptions=(), _source_facts=None
+):
     snapshot = FinalPromptSnapshotV3.model_validate(snapshot)
     _validate_snapshot(snapshot, dictionary=dictionary, templates=templates)
     facts = _design_facts(snapshot)
@@ -441,7 +443,7 @@ def assemble_internal_final_prompt_v4(snapshot, *, dictionary, templates, _pendi
             effective_unresolved_frontier=snapshot.native_frontier,
         )
         base_description, unresolved, readiness = _current_f_components(
-            view, dictionary, facts, constraints
+            view, dictionary, facts, constraints, _source_facts=_source_facts
         )
         reason = snapshot.rule_decision.reason
     else:

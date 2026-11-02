@@ -107,9 +107,7 @@ def test_schema11_read_frame_covers_all_fourteen_fields(engine, tmp_path):
         "Не менять форму центрального камня.",
     ],
 )
-def test_historical_generic_span_does_not_widen_explicit_shape_scope(
-    engine, tmp_path, base, wording
-):
+def test_current_explicit_shape_preservation_does_not_widen_scope(engine, tmp_path, base, wording):
     with f04_session(engine, tmp_path) as ctx:
         initial(ctx, base, READY.replace("Keep the center stone unchanged.", wording))
         native = frame(ctx)
