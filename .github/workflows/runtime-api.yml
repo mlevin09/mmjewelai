@@ -43,6 +43,7 @@ on:
       - .github/workflows/deploy-production.yml
       - .github/workflows/deploy-preprod.yml
       - .github/workflows/runtime-api.yml
+      - tools/ci/**
   push:
     branches: [jewelai-v2]
     paths:
@@ -85,13 +86,111 @@ on:
       - .github/workflows/deploy-production.yml
       - .github/workflows/deploy-preprod.yml
       - .github/workflows/runtime-api.yml
+      - tools/ci/**
 
 permissions:
   contents: read
 
 jobs:
-  runtime:
+  prepare:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      plan_sha256: ${{ steps.plan.outputs.plan_sha256 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: '**/pyproject.toml'
+      - run: bash tools/ci/install_runtime.sh
+      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests tools/ci
+      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests tools/ci
+      - name: Verify timing, partitioning and aggregate failure controls
+        run: python -m pytest -c apps/api/pyproject.toml tools/ci/tests -q
+      - run: python -m pytest -c packages/domain/pyproject.toml packages/domain/tests -q
+      - run: python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
+      - run: python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
+      - run: python -m pytest -c packages/auth_identity_platform/pyproject.toml packages/auth_identity_platform/tests -q
+      - run: python -m pytest -c packages/generation_queue/pyproject.toml packages/generation_queue/tests -q
+      - run: python -m pytest -c packages/generation_queue_gcp/pyproject.toml packages/generation_queue_gcp/tests -q
+      - run: python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
+      - run: python -m pytest -c packages/text_understanding_google/pyproject.toml packages/text_understanding_google/tests -q
+      - run: python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
+      - run: python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
+      - run: python -m pytest -c packages/model_gateway_google/pyproject.toml packages/model_gateway_google/tests -q
+      - run: python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
+      - run: python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
+      - run: python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
+      - run: python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
+      - run: python -m pytest -c workers/generation/pyproject.toml tests/test_openai_generation_pipeline.py -q
+      - run: python -m pytest tests/test_knowledge_library_behavioral_regression.py tests/test_knowledge_library_three_stone_vertical_slice.py -q
+      - name: Collect complete API inventory (no fixture setup or test calls)
+        run: >-
+          python tools/ci/api_timings.py --output "${{ runner.temp }}/api-collection"
+          --timeout-seconds 120
+          -- -c apps/api/pyproject.toml apps/api/tests --collect-only
+      - name: Plan all required partitions
+        id: plan
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/api-plan"
+          python tools/ci/api_partitions.py plan \
+            --collection "${RUNNER_TEMP}/api-collection/collection.json" \
+            --output "${RUNNER_TEMP}/api-plan/plan.json" | tee "${RUNNER_TEMP}/plan-output"
+          grep '^plan_sha256=' "${RUNNER_TEMP}/plan-output" >> "${GITHUB_OUTPUT}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-plan/
+          retention-days: 3
+          if-no-files-found: error
+
+  api_isolated:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        partition: [isolated-0, isolated-1, isolated-2, isolated-3]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: '**/pyproject.toml'
+      - run: bash tools/ci/install_runtime.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-plan
+      - name: Run one reviewed isolated partition
+        run: >-
+          python tools/ci/api_timings.py --output "${{ runner.temp }}/api-report"
+          --plan "${{ runner.temp }}/api-plan/plan.json"
+          --partition "${{ matrix.partition }}"
+          --plan-sha256 "${{ needs.prepare.outputs.plan_sha256 }}"
+          --timeout-seconds 3000
+          -- -c apps/api/pyproject.toml apps/api/tests
+      - name: Upload safe partition evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-report-${{ github.run_attempt }}-${{ matrix.partition }}
+          path: ${{ runner.temp }}/api-report/
+          retention-days: 3
+          if-no-files-found: error
+
+  # Keep this exact check/job identity, including for the disposable-PG safety gate.
+  # Its service is created AFTER isolated jobs end, not while waiting for them.
+  runtime:
+    needs: [prepare, api_isolated]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:16
@@ -110,47 +209,62 @@ jobs:
       DATABASE_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
       TEST_POSTGRES_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
     steps:
+      - name: Require valid inventory; preserve failed isolated results for final gate
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          ISOLATED_RESULT: ${{ needs.api_isolated.result }}
+        run: |
+          test "${PREPARE_RESULT}" = success
+          test "${ISOLATED_RESULT}" = success || test "${ISOLATED_RESULT}" = failure
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e './packages/domain[test]'
-      - run: python -m pip install -e './packages/auth[test]'
-      - run: python -m pip install -e './packages/auth_oidc[test]'
-      - run: python -m pip install -e './packages/auth_identity_platform[test]'
-      - run: python -m pip install -e './packages/generation_queue[test]'
-      - run: python -m pip install -e './packages/generation_queue_gcp[test]'
-      - run: python -m pip install -e './packages/prompts[test]'
-      - run: python -m pip install -e './packages/model_gateway[test]'
-      - run: python -m pip install -e './packages/assets[test]'
-      - run: python -m pip install -e './packages/assets_gcs[test]'
-      - run: python -m pip install -e './packages/persistence'
-      - run: python -m pip install -e './packages/model_gateway_google[test]'
-      - run: python -m pip install -e './packages/model_gateway_openai[test]'
-      - run: python -m pip install -e './workers/generation[test]'
-      - run: python -m pip install -e './packages/parser[test]'
-      - run: python -m pip install -e './packages/text_understanding_google[test]'
-      - run: python -m pip install -e './apps/api[test]'
+          cache: pip
+          cache-dependency-path: '**/pyproject.toml'
+      - run: bash tools/ci/install_runtime.sh
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-plan-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-plan
+      - name: Independently verify disposable PostgreSQL BEFORE any DDL
+        run: >-
+          python -c "import sys; sys.path.insert(0, 'apps/api/tests');
+          from disposable_postgres import verified_ci_postgres; verified_ci_postgres()"
       - run: alembic -c packages/persistence/alembic.ini upgrade head
       - run: alembic -c packages/persistence/alembic.ini check
       - run: alembic -c packages/persistence/alembic.ini current
-      - run: python -m pytest -c packages/domain/pyproject.toml packages/domain/tests -q
-      - run: python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
-      - run: python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
-      - run: python -m pytest -c packages/auth_identity_platform/pyproject.toml packages/auth_identity_platform/tests -q
-      - run: python -m pytest -c packages/generation_queue/pyproject.toml packages/generation_queue/tests -q
-      - run: python -m pytest -c packages/generation_queue_gcp/pyproject.toml packages/generation_queue_gcp/tests -q
-      - run: python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
-      - run: python -m pytest -c packages/text_understanding_google/pyproject.toml packages/text_understanding_google/tests -q
-      - run: python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
-      - run: python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
-      - run: python -m pytest -c packages/model_gateway_google/pyproject.toml packages/model_gateway_google/tests -q
-      - run: python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
-      - run: python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
-      - run: python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
-      - run: python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
-      - run: python -m pytest -c workers/generation/pyproject.toml tests/test_openai_generation_pipeline.py -q
-      - run: python -m pytest tests/test_knowledge_library_behavioral_regression.py tests/test_knowledge_library_three_stone_vertical_slice.py -q
-      - run: python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
-      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
+      - name: Run all PostgreSQL and unresolved-isolation cases serially
+        id: serial
+        run: >-
+          python tools/ci/api_timings.py --output "${{ runner.temp }}/api-reports/serial"
+          --plan "${{ runner.temp }}/api-plan/plan.json" --partition serial
+          --plan-sha256 "${{ needs.prepare.outputs.plan_sha256 }}"
+          --timeout-seconds 4800
+          -- -c apps/api/pyproject.toml apps/api/tests
+      - uses: actions/download-artifact@v4
+        if: always() && steps.serial.outcome != 'skipped'
+        with:
+          pattern: api-report-${{ github.run_attempt }}-isolated-*
+          path: ${{ runner.temp }}/api-reports
+      - name: Aggregate required complete coverage (never pass on skipped/cancelled jobs)
+        if: always()
+        env:
+          PREPARE_RESULT: ${{ needs.prepare.result }}
+          ISOLATED_RESULT: ${{ needs.api_isolated.result }}
+          SERIAL_RESULT: ${{ steps.serial.outcome }}
+        run: >-
+          python tools/ci/api_partitions.py gate
+          --plan-sha256 "${{ needs.prepare.outputs.plan_sha256 }}"
+          --plan "${{ runner.temp }}/api-plan/plan.json"
+          --reports "${{ runner.temp }}/api-reports"
+          --output "${{ runner.temp }}/api-reports/gate.json"
+          --upstream "${PREPARE_RESULT}" --upstream "${ISOLATED_RESULT}" --upstream "${SERIAL_RESULT}"
+      - name: Upload serial timings and aggregate receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-aggregate-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/api-reports/
+          retention-days: 3
+          if-no-files-found: error

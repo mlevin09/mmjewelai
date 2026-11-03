@@ -1,0 +1,150 @@
+{
+  "apps/api/tests/conftest.py": [
+    "0901df5f138b780b0b051285ab24de32f9cb032a622043bf91310a06d9191eed"
+  ],
+  "apps/api/tests/test_api.py": [
+    "f66c45ad152bd71eff9fc8c7c4072edf163f20dd20f1410f0ec3815e304575fa"
+  ],
+  "apps/api/tests/test_asset_access_api.py": [
+    "ca9f57c1cff5ead489bb05e52900175bec72d80f887e027ef1e96b9f32e0009a"
+  ],
+  "apps/api/tests/test_auth_settings.py": [
+    "e49fc2aa6429c2dbda2ede692fdc0d031c03c04651e98885dfbabe7d4fb0bb5c"
+  ],
+  "apps/api/tests/test_core_intent.py": [
+    "eb4350caea440dfa0bc41e3aea10c43a3f90e26f6666563a3fe74372bd3a6aca"
+  ],
+  "apps/api/tests/test_durable_enrichment_decisions.py": [
+    "7d39bd28d4c2fbf26bb63357ee74a1a8c6a5c2f6f8a27fefaf49e50fcba7cf0e"
+  ],
+  "apps/api/tests/test_effective_readiness.py": [
+    "95a18a78f3cd61746b8a537b9e25ab1ab65fb2830b412d09b7c2811d565dff0a"
+  ],
+  "apps/api/tests/test_enrichment_persistence.py": [
+    "f07e763537311169a1268726f23e8b667302417fa0df2196ca123b41bfc38e26"
+  ],
+  "apps/api/tests/test_enrichment_versioned_history.py": [
+    "66a56ad65c4d700e4f626097c0967e2ff0594e5b43f14dc7d4aac1408733f699"
+  ],
+  "apps/api/tests/test_f01_ownership.py": [
+    "f77e851e8aebcb2b4eae942a72fb2813f67d00bb78e92c6743518735debcc077"
+  ],
+  "apps/api/tests/test_f02_binding.py": [
+    "36570d8fff758d866f4f164ff03d0e8d1f6e7cf71511e0ad33169e4ddfe4a92b"
+  ],
+  "apps/api/tests/test_f03_applicability.py": [
+    "42dba42f74f9934c7885f926d404047448d1b627a31ca7bbc70b90428c3edabf"
+  ],
+  "apps/api/tests/test_f04_equivalent_proposals.py": [
+    "be317c9a94cd3a0f2c9c58368590db4b8b05fde545b988805e5890fe7b82fbd9"
+  ],
+  "apps/api/tests/test_f04_http.py": [
+    "18f309bffa24ce6c44b83f06afa80030fd66e925a19e5e29da2f5915f2795e53",
+    "d8666a92e1754ba2e84c95f27d0e2a83675c3a0b1c7646feb97520cb65aee857"
+  ],
+  "apps/api/tests/test_f04_output_integrity.py": [
+    "2eb47c74f4a4e6ccae91353e5960bacaea71bcf9329f4478c5ff043b3f369924"
+  ],
+  "apps/api/tests/test_f05_admission.py": [
+    "c191762d890cb5ec7d8d958c99fe02d902e9864903d6330cd1407529d2b7f790"
+  ],
+  "apps/api/tests/test_f05_answer_preparation.py": [
+    "c73a97c78337e72ba38fc471837fdf57f7840713c63275cd6cd3825f1bf188bb"
+  ],
+  "apps/api/tests/test_f05_compatibility.py": [
+    "fcc2bf9af94c5559a2987979cda9a7a025e86bbee83f9e4d2001479a11525ac5"
+  ],
+  "apps/api/tests/test_f05_contracts.py": [
+    "ad3459bb878783fc7d74b822bd0138aaf5459b314c3e27c01a7c1f96bc3db976"
+  ],
+  "apps/api/tests/test_f05_correction_preparation.py": [
+    "6117b4f0ffcc0744eb39b1404a277c4383bbdbd61a46320912364ac79b116204"
+  ],
+  "apps/api/tests/test_f05_durable_compatibility.py": [
+    "bf8932783b6b5ea7694cc4fa43568caa8b474b394a9e1da0570cd927b3c229fa"
+  ],
+  "apps/api/tests/test_f05_evaluation.py": [
+    "9c70a1dadaebde7c0fa25708ecf7a97a7d4a4ff408df5ec092398ebd296888cf"
+  ],
+  "apps/api/tests/test_f05_history.py": [
+    "c751f1ad71ead434c8aab64088ecc44a604a6d46ecec3ddde0b94bd76d158d78"
+  ],
+  "apps/api/tests/test_f05_matrix.py": [
+    "1b931ed5725a175c3f4f82ebe24f48f79a2c2f57db0f1ec7845027bacc6b76d9"
+  ],
+  "apps/api/tests/test_f05_mixed_commands.py": [
+    "4d7e2882ea8eb1cfd4f5f993bf5b159a25fca9f2c893efed21b932157bd79411"
+  ],
+  "apps/api/tests/test_f05_mutation_safety.py": [
+    "19decbd01f0a14bc6118d4381c22c12d872437d208a3038e02b77f2605dee65c"
+  ],
+  "apps/api/tests/test_f05_native_answers.py": [
+    "44f5ccde72fc7873818a03794dfe4922d333b23b3aa89965e23bc77c8022b76d"
+  ],
+  "apps/api/tests/test_f05_positive_completion.py": [
+    "18444867cda9904356d56f0a06c5eeaffa12698b78b04358495842b7697e6ce4"
+  ],
+  "apps/api/tests/test_f05_preservation_polarity.py": [
+    "12adca4a9db02a55d598830afeae9e8b149eafb58874ed63c5bbb092decdf652"
+  ],
+  "apps/api/tests/test_f05_preview.py": [
+    "d48208e55235fc2c640cb0feb90510fac387dc41c60c724121f871a455ab3226"
+  ],
+  "apps/api/tests/test_f05_release_http.py": [
+    "d5ea586635830950de6a355289899ae628d3f813d55f73d0066e8becfa63c050"
+  ],
+  "apps/api/tests/test_generation_preparations.py": [
+    "8dd30b9184c10b224a5e472576ab80ecd6e4cd5c7ef8413444e36e2e07412faf"
+  ],
+  "apps/api/tests/test_ifp_capacity_runtime.py": [
+    "f28da9d7c815773ea6154f3075414f064e6019d87f8d7af1d83e651a3a07d059"
+  ],
+  "apps/api/tests/test_knowledge_session_binding.py": [
+    "e68a0c72950f648a6eb53686947a867af19b775689564fc387995efcd768d78c"
+  ],
+  "apps/api/tests/test_p010_symmetry_runtime.py": [
+    "12c0c69a4da7b4744a85474a5888687caf3be3a943803afc88351a5a494f7dca"
+  ],
+  "apps/api/tests/test_p0_18_runtime_adoption.py": [
+    "3226d144b8dcaf4e8d66873c38205c404cdd41e135cfc63292e67f3e5cacd465"
+  ],
+  "apps/api/tests/test_parsed_enrichment.py": [
+    "46b6bf59663952a593e9dbda92aab3beeca0d475199938be6e155ee92e5adb39"
+  ],
+  "apps/api/tests/test_persistence.py": [
+    "d0e645770c622c7f12ebb3e5b7c9480f632d74f83dc8cb789da7e9ab5f70e0e3"
+  ],
+  "apps/api/tests/test_preparation_retained_identity.py": [
+    "6bdf318370457456cac37888f6e33215c5a1f64c9c397d34a95555b4baedfe9f"
+  ],
+  "apps/api/tests/test_prompt_enrichment_composition.py": [
+    "c9ec71f49d2286a00d76826b522f0cdbb47eab8c01a30ed1a0d8f3f7ab1c3908"
+  ],
+  "apps/api/tests/test_prompt_enrichment_http.py": [
+    "79d2c481cea038981e0b1c6e7ee7de95c2a38e1a75cd54f4e49d93df7dc67619"
+  ],
+  "apps/api/tests/test_prompt_enrichment_integration.py": [
+    "f165b31a585beece49110067678dd58fb2834d8b73bb916db973272fdbe7b444"
+  ],
+  "apps/api/tests/test_prompt_enrichment_runtime.py": [
+    "3f09d69387a755c143eea014e1e81af2c109ac10b4141fc3399f09448adc71ee"
+  ],
+  "apps/api/tests/test_reference_asset_upload.py": [
+    "8e188b00c53f24e1b14afa0b0e438a81bbab29dd0b0a33b2c608e4caa304e25e"
+  ],
+  "apps/api/tests/test_runtime_hardening.py": [
+    "5884f2858761bd2f8207e844976915bc1d28383e0422c85ba38c9a4692e9acaf"
+  ],
+  "apps/api/tests/test_style_input.py": [
+    "42f5b95ae2661a234b2c0a6c9f3ec0a02736bfd3bdf5ac7c025bd73273ab88ff"
+  ],
+  "apps/api/tests/test_z_f05_matrix.py": [
+    "feae98153c5c1e6fbc16caf06e31ffd16b41716cd86be2cd76e38c45d954dce7"
+  ],
+  "apps/api/tests/test_z_f05_review_capacity.py": [
+    "3ceca15f2ab3775d0fe8e1fbca2b0728fc7f3691e9cd14c6fab1d3213a244bab"
+  ],
+  "apps/api/tests/test_z_f05_review_native.py": [
+    "6f44980fa30b6e64951e3fc6ccbf6c2fe61d35e25328db14e50a577cbd1d5444"
+  ]
+}
