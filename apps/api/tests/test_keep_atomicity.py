@@ -351,3 +351,115 @@ def _restart_probe(config_path, output_path):
 
 if __name__ == "__main__":
     _restart_probe(sys.argv[1], sys.argv[2])
+
+
+@pytest.mark.parametrize("profile", ["L", "F"])
+def test_compatible_same_subject_keep_http_lifecycle(style_session, engine, tmp_path, profile):
+    with _context(profile, "corrections", engine, tmp_path, style_session) as ctx:
+        text = "Keep the center stone. Preserve the original center stone."
+        payload, previous, message = _request(ctx, profile, "corrections", text)
+        before = _snapshot(engine, ctx.sid)
+        response = _post(ctx, "corrections", payload)
+        _record(
+            f"same-subject-{profile}",
+            dict(
+                input=text,
+                status=response.status_code,
+                response=response.json(),
+                before=before,
+                after=_snapshot(engine, ctx.sid),
+            ),
+        )
+        assert response.status_code == 200, response.json()
+        sid, org = UUID(str(ctx.sid)), UUID(str(ctx.org))
+        current = ctx.runtime.repository.get_current_revision(sid, org)
+        assert current == previous
+        state = ctx.runtime.get_current_state(sid, org)
+        evidence = [
+            c
+            for c in state.clarification_plan.constraint_evidence
+            if c.semantic_subject == "component.center_stone"
+        ]
+        assert len(evidence) == 2
+        assert {(c.source_span_start, c.source_span_end, c.original_wording) for c in evidence} == {
+            (0, 21, "Keep the center stone"),
+            (23, 57, "Preserve the original center stone"),
+        }
+        assert len({c.source_candidate_id for c in evidence}) == 2
+        assert all(c.source.message_id == message["message_id"] for c in evidence)
+        active = next(c for c in evidence if c.status == "active")
+        old = next(c for c in evidence if c.status == "superseded")
+        assert old.superseded_by_evidence_id == active.evidence_id
+        assert (
+            len(
+                [
+                    c
+                    for c in state.final_output.internal_final_prompt.constraints
+                    if c.target == "component.center_stone"
+                ]
+            )
+            == 1
+        )
+        assert "Preserve:" in state.final_output.description.text
+        preview = ctx.client.get(
+            f"/v1/sessions/{ctx.sid}/prompt-enrichment/state?workflow_version=3.0.0",
+            headers=ctx.headers,
+        )
+        assert preview.status_code == 200, preview.json()
+        roots = preview.json()["protection_projection"]["roots"]
+        assert len(roots) == 1 and len(roots[0]["scope_targets"]) in (8, 14)
+        after = _snapshot(engine, ctx.sid)
+        replay = _post(ctx, "corrections", payload)
+        assert replay.status_code in (200, 409)
+        assert _snapshot(engine, ctx.sid) == after
+        payload, _, _ = _request(ctx, profile, "corrections", "Make the design minimalist.")
+        assert _post(ctx, "corrections", payload).status_code == 200
+        state = ctx.runtime.get_current_state(sid, org)
+        assert [
+            c
+            for c in state.clarification_plan.constraint_evidence
+            if c.semantic_subject == "component.center_stone"
+        ] == evidence
+        _restart(ctx, engine, tmp_path, state)
+        payload, _, _ = _request(ctx, profile, "corrections", "Include a halo. Do not add a halo.")
+        before_reject = _snapshot(engine, ctx.sid)
+        rejected = _post(ctx, "corrections", payload)
+        assert rejected.status_code == (422 if profile == "L" else 500)
+        assert _snapshot(engine, ctx.sid) == before_reject
+        restarted = _restart(ctx, engine, tmp_path, state)
+        _record(
+            f"same-subject-{profile}",
+            dict(
+                input=text,
+                status=response.status_code,
+                evidence=[c.model_dump(mode="json") for c in evidence],
+                canonical_unchanged=current == previous,
+                response=response.json(),
+                replay_status=replay.status_code,
+                rejected_status=rejected.status_code,
+                rollback_unchanged=True,
+                restart=restarted,
+            ),
+        )
+
+
+@pytest.mark.parametrize("profile", ["L", "F"])
+def test_distinct_same_subject_scopes_do_not_silently_merge_http(
+    style_session, engine, tmp_path, profile
+):
+    with _context(profile, "corrections", engine, tmp_path, style_session) as ctx:
+        text = "Keep the center stone shape unchanged. Preserve the original center stone."
+        payload, _, _ = _request(ctx, profile, "corrections", text)
+        before = _snapshot(engine, ctx.sid)
+        response = _post(ctx, "corrections", payload)
+        assert response.status_code == (422 if profile == "L" else 500), response.json()
+        assert _snapshot(engine, ctx.sid) == before
+        _record(
+            f"distinct-scopes-{profile}",
+            dict(
+                input=text,
+                status=response.status_code,
+                error=response.json()["error"],
+                rows_unchanged=True,
+            ),
+        )

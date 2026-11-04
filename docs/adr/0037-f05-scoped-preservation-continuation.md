@@ -290,3 +290,17 @@ cycle, plan and correction rows together. The separately persisted user Message
 remains its original source. No conflict is silently accepted, no error contract
 is relaxed, and no schema/migration or new Parser execution path is introduced.
 Existing continuation3 precommit verification remains unchanged.
+
+### Compatible same-snapshot preservation evidence
+
+Separate explicit occurrences of the same KEEP in one Message retain separate
+candidate IDs, source spans, wording and evidence hashes. Reconciliation uses
+existing supersession: the later equivalent occurrence owns the active slot;
+earlier occurrences reference their successor. This is not release or cancellation.
+Compatibility requires the same tenant, Message, canonical revision, release-bound
+cycle, authority, target, normalized instruction and approved protection scope.
+The existing exact F05 scope binder is reused (including the Parser's already
+supported `original center stone` wording). Whole-center and shape-only scope are
+not interchangeable. Unknown scope is not coalesced. Final-output uniqueness and
+conflict validators remain unchanged; different facts/authority are not inferred
+equivalent. No durable/public format or canonical value is changed.

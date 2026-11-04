@@ -54,7 +54,7 @@ def preservation_field(wording, *, source_text=None, span_start=None, span_end=N
     # "keep the center stone shape unchanged". Inspect only the governed source
     # phrase at that exact offset, never a later independent assertion.
     shape = (
-        r"(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?center[- ]stone\s+shape"
+        r"(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?(?:original\s+)?center[- ]stone\s+shape"
         r"(?:\s+unchanged)?|не\s+менять\s+форм\w*\s+центральн\w+\s+кам\w*"
     )
     if re.fullmatch(shape, wording.strip(), re.I):
@@ -64,7 +64,7 @@ def preservation_field(wording, *, source_text=None, span_start=None, span_end=N
         if match is not None and match.end() >= span_end:
             return "shape"
     if re.fullmatch(
-        r"\s*(?:(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?center[- ]stone"
+        r"\s*(?:(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?(?:original\s+)?center[- ]stone"
         r"(?:\s+(?:unchanged|exactly\s+as\s+specified))?|(?:сохранить|не\s+менять)\s+"
         r"(?:существующ\w+\s+)?центральн\w+\s+кам\w*(?:\s+без\s+изменений)?)\s*[.!]?\s*",
         wording,
