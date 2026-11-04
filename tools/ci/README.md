@@ -30,10 +30,16 @@ selection requires manual Full Regression rather than silently launching the
 entire API suite. No selected test is removed to meet a time goal.
 
 Unknown executable/data impact fails explicitly, even when the smoke passes.
-Unknown fixture files cannot silently remove coverage. New source families need
-an explicit route, not guessed filename similarity. Markdown documentation-only
-PRs run diff/selection checks without product tests; Web-only scope delegates to
-the unchanged Web workflow and does not claim its success.
+Text extensions are not documentation exemptions. Only the repository's explicit
+`docs/`, root governance and scoped README conventions qualify; fixture/data/src/
+resource/template/snapshot locations are checked first. A test resource with a
+literal `open`/`read_text`/`read_bytes` reference selects its consuming test file
+and transitive local helper importers. Basenames must be unique within that test
+suite; dynamic, ambiguous or unknown fixture dependencies block explicitly.
+A README used as a known fixture remains behavior, not documentation. Genuine
+documentation-only PRs retain diff/selection checks without product tests.
+Runtime data uses existing component routes or fails as unknown impact. Web-only
+scope delegates to the unchanged Web workflow and does not claim its success.
 
 The smoke combines one real HTTP integration journey (J7: RU input, canonical
 state, a metal-only correction, final description/IFP, persisted restart) with
@@ -92,13 +98,18 @@ must require that receipt in release qualification. No deployment code changed.
 
 ## Required-check rollout / publication stop
 
-Live baseline `029c0d54e1be27aa985de3c0a43fb8f03e3a219b` still contains the
-expensive sequential Runtime API workflow and matches this workflow/tools diff.
-**No push/PR is authorized under that condition.** Prepare a clean committed
-candidate, then obtain explicit publication/rollout approval. Do not exploit a
-feature-push filter or change branch protection to avoid this gate.
+Original candidate `f82aa1a713c9d2689957fb52fc5de934590eeb8e` was reconciled
+with merged F06 target `03bda61ba43f10a2a5aaaaeeb5abe432c3a5c9c8`; its product tree
+is preserved. First-publication trigger inspection finds no automatic workflow
+matching a feature-branch push. A Draft PR's merge-ref workflow uses this targeted
+Runtime API definition, not a second sequential base workflow. Domain/Web/Infra
+filters do not match this CI-only diff; Full stays manual. This is source-based
+routing evidence, **not a hosted execution or publication authorization**.
+No push/PR is performed until the existing Owner publication gate is satisfied.
 
-The checks retain `Runtime API / runtime`; Domain/Web/Infrastructure workflows
+The observed check name is `runtime`; the `Runtime API` label/job spelling is retained.
+Full also has a `runtime` job, so exact required context/app/workflow and duplicate-
+name behavior require admin verification. Domain/Web/Infrastructure workflows
 are unchanged. Branch-protection API inspection returned403, so exact live admin
 required-check configuration is NOT VERIFIED. Before activation the Owner must
 confirm required identity/context and independently review this semantic gate
