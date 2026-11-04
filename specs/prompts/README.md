@@ -73,3 +73,16 @@ unsupported/mixed versions fail. The additive current schema is
 [canonical-preparation-schema.json](canonical-preparation-schema.json); the older schema files
 above remain frozen. No historical record is rewritten. See
 [ADR 0034](../../docs/adr/0034-versioned-ifp-capacity-v2-1.md) for operation boundaries and PCAP tests.
+
+## Additive F06 internal review family (not activated)
+
+Owner-approved F06 adds Description4 `4.0.0`, IFP5 and Handoff5 `5.0.0` in
+`jewelai_prompts.final_prompt_v5`. These extend the F05 source/frame/protection
+contract without adding coverage fields or changing state/readiness semantics.
+New hash domains are `jewelai.UserReadableJewelryDescription/4.0.0`,
+`jewelai.InternalFinalPrompt/5.0.0` and `jewelai.InternalFinalPromptHandoff/5.0.0`.
+Legacy JSON schemas/readers and historical bytes are unchanged. Typed JSON
+validation/construction is explicit; existing HTTP defaults and version filters
+are unchanged. Preparation consumers reject 5 rather than downgrade. This does
+not authorize a new public API, durable store or generation handoff consumer.
+See [ADR 0038](../../docs/adr/0038-f06-versioned-readable-description.md).
