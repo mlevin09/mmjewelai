@@ -33,4 +33,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 - [0028 — Knowledge Library production validation and ACTIVE promotion gate](0028-knowledge-library-production-validation-active-gate.md)
 - [0029 — Knowledge Library durable artifact storage and external mirrors](0029-knowledge-library-durable-storage-external-mirrors.md)
 
+- [0038 — F06 additive readable review outputs](0038-f06-versioned-readable-description.md)
+
 Template: status/date, context, decision, alternatives, consequences, validation.

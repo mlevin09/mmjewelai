@@ -111,6 +111,10 @@ def build_internal_final_prompt_handoff(
             CanonicalFinalPromptAssemblyV4,
             CanonicalInternalFinalPromptHandoffV4,
         )
+        from .final_prompt_v5 import (
+            CanonicalFinalPromptAssemblyV5,
+            CanonicalInternalFinalPromptHandoffV5,
+        )
 
         # Exact version dispatch; no latest/default or validation-fallback probing.
         version = final_output.get("internal_final_prompt", {}).get("schema_version")
@@ -119,8 +123,9 @@ def build_internal_final_prompt_handoff(
             "2.1.0": (CanonicalFinalPromptAssemblyV2_1, CanonicalInternalFinalPromptHandoffV2_1),
             "3.0.0": (CanonicalFinalPromptAssemblyV3, CanonicalInternalFinalPromptHandoffV3),
             "4.0.0": (CanonicalFinalPromptAssemblyV4, CanonicalInternalFinalPromptHandoffV4),
+            "5.0.0": (CanonicalFinalPromptAssemblyV5, CanonicalInternalFinalPromptHandoffV5),
         }[version]
-        if version == "4.0.0":
+        if version in {"4.0.0", "5.0.0"}:
             from .downstream_preparation import canonical_bytes
 
             assembly = assembly_type.model_validate_json(canonical_bytes(final_output))
@@ -147,12 +152,14 @@ def build_internal_final_prompt_handoff(
         in {FinalPromptReadiness.READY, FinalPromptReadiness.READY_WITH_UNRESOLVED},
         "internal_final_prompt": prompt,
     }
-    if prompt.schema_version == "4.0.0":
+    if prompt.schema_version in {"4.0.0", "5.0.0"}:
         from jewelai_domain.preservation import contract_hash
 
         return handoff_type(
             **payload,
-            content_hash=contract_hash("jewelai.InternalFinalPromptHandoff/4.0.0", payload),
+            content_hash=contract_hash(
+                "jewelai.InternalFinalPromptHandoff/" + prompt.schema_version, payload
+            ),
         )
     return handoff_type(**payload, content_hash=_hash(payload))
 
