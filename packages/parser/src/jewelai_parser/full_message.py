@@ -173,6 +173,12 @@ class FullMessageParseResult(ImmutableModel):
         return self
 
 
+class FullMessageParseResultV1_2(FullMessageParseResult):
+    """Existing continuation wire format; not a second interpreter."""
+
+    parse_version: Literal["1.2.0"] = "1.2.0"
+
+
 @dataclass(frozen=True)
 class _Surface:
     text: str
@@ -214,12 +220,12 @@ _KIND_TO_CATEGORY = {
 _SUBJECT_PATTERNS = {
     CandidateSubject.CENTER_STONE: re.compile(
         r"\b(?:center|central|centre)[\s-]*(?:stone|gem|diamond|sapphire)?\b|"
-        r"(?:в\s+центре|централь\w*\s+(?:кам\w*|сапфир\w*|бриллиант\w*))",
+        r"(?:в\s+центре|централь\w*\s+(?:кам\w*|алмаз\w*|сапфир\w*|бриллиант\w*))",
         re.IGNORECASE,
     ),
     CandidateSubject.SIDE_STONES: re.compile(
         r"\b(?:side[\s-]*stones?|stones?\s+on\s+the\s+sides?|diamonds?\s+on\s+the\s+sides?|on\s+(?:each|both)\s+sides?)\b|"
-        r"(?:боков\w*\s+кам\w*|кам\w*\s+по\s+бокам|бриллиант\w*\s+по\s+бокам|по\s+бокам|сбоку)",
+        r"(?:боков\w*\s+(?:кам\w*|алмаз\w*|бриллиант\w*|сапфир\w*)|кам\w*\s+по\s+бокам|бриллиант\w*\s+по\s+бокам|по\s+бокам|сбоку)",
         re.IGNORECASE,
     ),
     CandidateSubject.PRONGS: re.compile(r"\bprongs?\b|крапан\w*", re.IGNORECASE),
@@ -462,12 +468,111 @@ def _special_constraint_candidates(text: str) -> tuple[list[dict], list[tuple[in
     return candidates, protected_spans
 
 
+_CENTER_KEEP = re.compile(
+    r"\b(?:сохранить|не\s+менять)\s+(?:существующ\w+\s+)?центральн\w+\s+кам\w*"
+    r"(?:\s+без\s+изменений)?\b|"
+    r"\b(?:keep|preserve|do\s+not\s+change)\s+(?:the\s+)?(?:original\s+)?"
+    r"center[- ]stone(?:\s+shape)?"
+    r"(?:\s+unchanged)?\b",
+    re.I,
+)
+
+
+# A fresh closed preservation predicate can govern its own assertion. Bare
+# object lists and a repeated preservation predicate retain their shared scope.
+_PRESERVATION_COORDINATION = re.compile(
+    r"(?:\b(?:and|и)\b|\r?\n)\s*(?:(?:please|пожалуйста)\s+)?$", re.I
+)
+_PRESERVATION_VERB = re.compile(r"\b(?:keep|preserve|change|сохран\w*|меня\w*)\b", re.I)
+_PRESERVATION_QUESTION = re.compile(
+    r"\b(?:whether|if|wonder|should\s+(?:I|we)|если|(?:нужно|стоит)\s+ли)\b", re.I
+)
+
+# Preservation authority uses the same source interpreter as ordinary facts. These
+# are lexical uncertainty/optional-rejection families, never canonical facts.
+_PRESERVATION_TENTATIVE = re.compile(
+    r"\b(?:probably|potentially|tentatively|consider\w*|наверно|наверное|вероятно|"
+    r"предположительно|пожалуй|скорее\s+всего)\b",
+    re.I,
+)
+_PRESERVATION_NEGATIVE = re.compile(
+    r"\b(?:refus\w*|unneeded|необязательно|незачем|запрещ\w*|отказыва\w*)\b", re.I
+)
+
+
+def _govern_preservation(text, candidate):
+    """Preservation words are evidence, not proof of affirmative authority.
+
+    Mask only the preservation predicate itself: 'do not change' and 'без
+    изменений' are positive preservation idioms, while an external rejection
+    still governs the assertion. Reuse the shared offset/scope primitives,
+    without inventing cancellation.
+    """
+    start, end = candidate.evidence.start, candidate.evidence.end
+    left, right = _intent_bounds(text, start, end)
+    masked = text[:start] + " " * (end - start) + text[end:]
+    qualifier_context = text
+    initial_certainty = candidate.certainty
+    prefix = text[left:start]
+    boundary = _PRESERVATION_COORDINATION.search(prefix)
+    if boundary and candidate.semantic_subject is not None:
+        newline = "\n" in boundary.group()
+        if newline or not _PRESERVATION_VERB.search(prefix[: boundary.start()]):
+            # 'No halo and keep the shape' contains a new imperative, not
+            # another object in the rejected list. Do not erase a shared hedge
+            # across 'maybe keep A and keep B'. A new line closes the assertion.
+            masked = text[:left] + " " * (end - left) + text[end:]
+            if newline:
+                qualifier_context = text[:left] + " " * (start - left) + text[start:]
+                initial_certainty = CandidateCertainty.EXPLICIT
+                left = start
+    polarity = _classification_for(masked, start, end)
+    certainty = _certainty_for(qualifier_context, start, end, initial_certainty)
+    if _AMBIGUITY.search(qualifier_context[left:right]):
+        certainty = CandidateCertainty.AMBIGUOUS
+    # Existing affirmative request phrasing is not itself uncertainty. Only
+    # rejection changes polarity; qualifiers/disjunction are checked separately.
+    if polarity == CandidateClassification.PROHIBITION:
+        certainty = CandidateCertainty.UNRESOLVED
+    _, sentence_end = _sentence_bounds(text, start, end)
+    suffix = text[end:sentence_end].strip(" ,—–")
+    suffix = re.sub(r"^(?:unchanged|без\s+изменений)\s*[,—–]?\s*", "", suffix, flags=re.I)
+    if _PRESERVATION_TENTATIVE.search(text[left:start]) or _PRESERVATION_TENTATIVE.fullmatch(
+        suffix
+    ):
+        certainty = CandidateCertainty.AMBIGUOUS
+    negative_suffix = re.sub(r"^(?:is|are|was|were)\s+", "", suffix, flags=re.I)
+    if _PRESERVATION_NEGATIVE.search(masked[left:start]) or _PRESERVATION_NEGATIVE.fullmatch(
+        negative_suffix
+    ):
+        certainty = CandidateCertainty.UNRESOLVED
+    if text[sentence_end : sentence_end + 1] == "?" or _PRESERVATION_QUESTION.search(
+        text[left:start]
+    ):
+        certainty = CandidateCertainty.UNRESOLVED
+    if certainty == CandidateCertainty.EXPLICIT:
+        return candidate.model_copy(update={"certainty": certainty})
+    # Keep the governing qualifier/rejection in the quoted unresolved evidence.
+    while left < right and text[left].isspace():
+        left += 1
+    while right > left and text[right - 1].isspace():
+        right -= 1
+    return candidate.model_copy(
+        update=dict(
+            certainty=certainty,
+            evidence=EvidenceSpan(start=left, end=right, text=text[left:right]),
+            detail="Uncertain or rejected preservation wording is not KEEP authority.",
+        )
+    )
+
+
 def parse_full_message(
     text: str,
     *,
     locale: Literal["en", "ru"],
     dictionary: DictionaryRegistry,
     knowledge_runtime: AnyCompiledKnowledge | None = None,
+    _result_type=FullMessageParseResult,
 ) -> FullMessageParseResult:
     """Extract conservative structured evidence without changing canonical Product State."""
 
@@ -486,6 +591,46 @@ def parse_full_message(
     candidates.extend(symmetry_evidence(text, runtime, dictionary=dictionary))
     candidates = defer_shared_negative_candidates(text, runtime, candidates, dictionary=dictionary)
 
+    for match in _CENTER_KEEP.finditer(text):
+        # Recognizers may describe the same instruction at different lengths.
+        # Keep the enclosing source occurrence (including its qualifiers), not
+        # both that occurrence and an embedded prefix. Separate instructions
+        # and preservation subjects remain independent evidence.
+        if any(
+            c["classification"] == CandidateClassification.PRESERVATION
+            and c.get("semantic_subject") == "component.center_stone"
+            and c["evidence"]["start"] <= match.start()
+            and match.end() <= c["evidence"]["end"]
+            and (c["evidence"]["start"] < match.start() or match.end() < c["evidence"]["end"])
+            for c in candidates
+        ):
+            continue
+        candidates = [
+            c
+            for c in candidates
+            if not (
+                c["classification"] == CandidateClassification.PRESERVATION
+                and c.get("semantic_subject") == "component.center_stone"
+                and match.start() <= c["evidence"]["start"]
+                and c["evidence"]["end"] <= match.end()
+            )
+        ]
+        candidates.append(
+            _structured_candidate(
+                text,
+                match.start(),
+                match.end(),
+                target=None,
+                subject=CandidateSubject.CENTER_STONE,
+                classification=CandidateClassification.PRESERVATION,
+                certainty=CandidateCertainty.EXPLICIT,
+                raw_value=match.group(),
+                semantic_subject="component.center_stone",
+                normalization_source=NormalizationSource.DETERMINISTIC_PATTERN,
+                application=CandidateApplication.STRUCTURED_EVIDENCE_ONLY,
+                detail="Sourced preservation is not a canonical value update.",
+            )
+        )
     recognized = [(item["evidence"]["start"], item["evidence"]["end"]) for item in candidates]
     candidates.extend(_unresolved_candidates(text, recognized))
 
@@ -504,6 +649,14 @@ def parse_full_message(
         StructuredCandidate(candidate_id=f"candidate_{index:04d}", **item)
         for index, item in enumerate(candidates, start=1)
     )
+    immutable = tuple(
+        _govern_preservation(text, c)
+        if c.classification == CandidateClassification.PRESERVATION
+        else c
+        for c in immutable
+    )
+    if _result_type not in (FullMessageParseResult, FullMessageParseResultV1_2):
+        raise ValueError("Unsupported parse wire format")
     identity = (
         {
             "knowledge_package_id": runtime.package_id,
@@ -513,7 +666,7 @@ def parse_full_message(
         if runtime is not None
         else {}
     )
-    return FullMessageParseResult(
+    return _result_type(
         original_text=text,
         requested_locale=locale,
         detected_language=_detect_language(text),
@@ -1053,7 +1206,14 @@ def _owner_for(text, start, end, category):
             continue
         if category == DictionaryCategory.STONE_SETTING and subject == CandidateSubject.PRONGS:
             continue  # Explicit setting vocabulary is handled independently.
-        distance = min(abs(a - end), abs(start - b))
+        named = _SUBJECT_PATTERNS.get(subject)
+        # A noun inside its explicitly named component belongs to that owner,
+        # rather than a nearby setting/prong. Bare-noun fallback is unchanged.
+        distance = (
+            0
+            if a <= start and end <= b and named and named.fullmatch(label)
+            else min(abs(a - end), abs(start - b))
+        )
         candidates.append((distance, subject.value, subject, label))
     if candidates:
         _, _, subject, label = min(candidates)

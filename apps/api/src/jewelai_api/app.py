@@ -66,6 +66,7 @@ from jewelai_persistence.preparations import (
 )
 from jewelai_persistence.repository import PersistenceRepository
 from jewelai_prompts import GenerationPreparationError
+from jewelai_prompts.final_prompt_v4 import CanonicalFinalPromptAssemblyV4
 from jewelai_text_understanding_google import (
     GoogleTextUnderstandingAdapter,
     TextUnderstandingInvalidResponseError,
@@ -77,11 +78,24 @@ from pydantic import ValidationError
 from sqlalchemy import Engine
 
 from .artifacts import ArtifactConfigurationError, load_runtime_artifacts
+from .clarification_f05 import (
+    ContinuationCorrectionRequest,
+    KeepReleaseAnswerRequest,
+    KeepReleaseResumeRequest,
+    NativeAnswerRequest,
+    NativeResumeRequest,
+)
 from .clarification_v2 import (
     ClarificationAnswerRequestV2,
     CorrectionRequestV2,
     InitialRequestV2,
     ResumeRequest,
+)
+from .continuation_preview import (
+    ContinuationCommandResponseV3,
+    ContinuationReadError,
+    ContinuationStateV3,
+    read_preview,
 )
 from .generation import (
     GenerationProfileRegistry,
@@ -215,6 +229,11 @@ async def _strict_f04_request_body(request: Request):
         )
     except (ValueError, UnicodeError):
         return  # Existing FastAPI syntax validation remains authoritative.
+    if isinstance(value, dict) and value.get("schema_version") == "3.0.0":
+        if duplicates or constants or len(await request.body()) > 1_048_576:
+            raise ContinuationReadError(
+                422, "invalid_continuation_request", "Invalid continuation JSON evidence"
+            )
     if (
         isinstance(value, dict)
         and (value.get("schema_version") == "2.0.0" or request.url.path.endswith("/resume"))
@@ -347,7 +366,11 @@ def create_app(
 
     @app.exception_handler(GenerationPreparationError)
     async def preparation_input_handler(_, exc):
-        status = 409 if exc.code.value == "final_output_not_ready" else 422
+        status = (
+            409
+            if exc.code.value in {"final_output_not_ready", "unsupported_source_version"}
+            else 422
+        )
         return JSONResponse(
             status_code=status,
             content={
@@ -406,6 +429,14 @@ def create_app(
     @app.exception_handler(LastOwnerError)
     async def last_owner_handler(_, exc):
         return _error_response(409, "last_owner", str(exc))
+
+    from jewelai_persistence import UnsupportedWorkflowVersionError
+
+    @app.exception_handler(UnsupportedWorkflowVersionError)
+    async def unsupported_workflow_version_handler(request, exc):
+        return _error_response(
+            409, "unsupported_workflow_version", "Explicit workflow3 is required"
+        )
 
     @app.exception_handler(StaleRevisionError)
     async def stale_handler(_, exc):
@@ -577,6 +608,10 @@ def create_app(
     async def prompt_enrichment_handler(_, exc):
         status, code = _prompt_enrichment_error(exc.code)
         return _error_response(status, code, str(exc))
+
+    @app.exception_handler(ContinuationReadError)
+    async def continuation_read_handler(_, exc):
+        return _error_response(exc.status, exc.code, str(exc))
 
     @app.get("/health")
     def health():
@@ -1105,6 +1140,44 @@ def create_app(
     if prompt_enrichment_service is not None:
 
         @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/continuation-admissions", status_code=201
+        )
+        async def admit_prompt_enrichment_continuation(
+            session_id: UUID,
+            request: Request,
+            principal: Authenticated,
+            organization_id: AuthorizedOrganization,
+        ):
+            from starlette.concurrency import run_in_threadpool
+
+            from .clarification_f05 import ContinuationAdmissionRequest, decode_continuation_command
+            from .continuation_runtime import admit
+
+            try:
+                command = decode_continuation_command(
+                    ContinuationAdmissionRequest, await request.body()
+                )
+            except (ValueError, TypeError):
+                raise ContinuationReadError(
+                    422, "invalid_continuation_request", "Invalid continuation admission request"
+                ) from None
+            try:
+                return await run_in_threadpool(
+                    admit,
+                    prompt_enrichment_service,
+                    session_id,
+                    organization_id,
+                    command,
+                    principal_id=principal.principal_id,
+                )
+            except ContinuationReadError:
+                raise
+            except ValueError:
+                raise ContinuationReadError(
+                    500, "invalid_durable_history", "Scoped enrichment history failed validation"
+                ) from None
+
+        @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/initial",
             dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentStateResponse | PromptEnrichmentStateResponseV2,
@@ -1134,12 +1207,21 @@ def create_app(
 
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/state",
-            response_model=PromptEnrichmentStateResponse | PromptEnrichmentStateResponseV2,
+            response_model=PromptEnrichmentStateResponse
+            | PromptEnrichmentStateResponseV2
+            | ContinuationStateV3,
         )
         def get_prompt_enrichment_state(
             session_id: UUID,
             organization_id: AuthorizedOrganization,
+            workflow_version: str | None = None,
         ):
+            if workflow_version is not None:
+                if workflow_version != "3.0.0":
+                    raise ContinuationReadError(
+                        409, "unsupported_workflow_version", "Unsupported workflow version"
+                    )
+                return read_preview(prompt_enrichment_service, session_id, organization_id)
             return _prompt_enrichment_state(
                 prompt_enrichment_service.get_current_state(session_id, organization_id)
             )
@@ -1147,13 +1229,38 @@ def create_app(
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarification-answers",
             dependencies=[Depends(validate_f04_request_body)],
-            response_model=PromptEnrichmentAnswerResponse | PromptEnrichmentAnswerResponseV2,
+            response_model=PromptEnrichmentAnswerResponse
+            | PromptEnrichmentAnswerResponseV2
+            | ContinuationCommandResponseV3,
         )
         def answer_prompt_enrichment_clarification(
             session_id: UUID,
-            request: PromptEnrichmentAnswerRequest | ClarificationAnswerRequestV2,
+            request: PromptEnrichmentAnswerRequest
+            | ClarificationAnswerRequestV2
+            | KeepReleaseAnswerRequest
+            | NativeAnswerRequest,
+            principal: Authenticated,
             organization_id: AuthorizedOrganization,
         ):
+            if isinstance(request, (KeepReleaseAnswerRequest, NativeAnswerRequest)):
+                from .continuation_runtime import answer
+
+                try:
+                    return answer(
+                        prompt_enrichment_service,
+                        session_id,
+                        organization_id,
+                        request,
+                        principal_id=principal.principal_id,
+                    )
+                except ContinuationReadError:
+                    raise
+                except ValueError:
+                    raise ContinuationReadError(
+                        500,
+                        "invalid_durable_history",
+                        "Scoped enrichment history failed validation",
+                    ) from None
             result, state = prompt_enrichment_service.record_persisted_clarification_answer(
                 organization_id,
                 (
@@ -1199,13 +1306,36 @@ def create_app(
             "/v1/sessions/{session_id}/prompt-enrichment/corrections",
             dependencies=[Depends(validate_f04_request_body)],
             response_model=PromptEnrichmentCorrectionResponse
-            | PromptEnrichmentCorrectionResponseV2,
+            | PromptEnrichmentCorrectionResponseV2
+            | ContinuationCommandResponseV3,
         )
         def correct_prompt_enrichment(
             session_id: UUID,
-            request: PromptEnrichmentCorrectionRequest | CorrectionRequestV2,
+            request: PromptEnrichmentCorrectionRequest
+            | CorrectionRequestV2
+            | ContinuationCorrectionRequest,
+            principal: Authenticated,
             organization_id: AuthorizedOrganization,
         ):
+            if isinstance(request, ContinuationCorrectionRequest):
+                from .continuation_runtime import correct
+
+                try:
+                    return correct(
+                        prompt_enrichment_service,
+                        session_id,
+                        organization_id,
+                        request,
+                        principal_id=principal.principal_id,
+                    )
+                except ContinuationReadError:
+                    raise
+                except ValueError:
+                    raise ContinuationReadError(
+                        500,
+                        "invalid_durable_history",
+                        "Scoped enrichment history failed validation",
+                    ) from None
             result, state = prompt_enrichment_service.apply_persisted_user_correction(
                 organization_id,
                 (
@@ -1250,14 +1380,38 @@ def create_app(
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/clarifications/{cause_id}/resume",
             dependencies=[Depends(validate_f04_request_body)],
-            response_model=PromptEnrichmentResumeResponse,
+            response_model=PromptEnrichmentResumeResponse | ContinuationCommandResponseV3,
         )
         def resume_prompt_enrichment_clarification(
             session_id: UUID,
             cause_id: str,
-            request: ResumeRequest,
+            request: ResumeRequest | KeepReleaseResumeRequest | NativeResumeRequest,
             organization_id: AuthorizedOrganization,
+            principal: Authenticated,
         ):
+            if isinstance(request, (KeepReleaseResumeRequest, NativeResumeRequest)):
+                if (request.resume_kind == "KEEP_RELEASE" and cause_id != request.intent_id) or (
+                    request.resume_kind == "NATIVE" and cause_id != request.cause_id
+                ):
+                    raise ContinuationReadError(
+                        409, "clarification_conflict", "Resume target differs from request"
+                    )
+                from .continuation_runtime import resume
+
+                try:
+                    return resume(
+                        prompt_enrichment_service,
+                        session_id,
+                        organization_id,
+                        request,
+                        principal_id=principal.principal_id,
+                    )
+                except ContinuationReadError:
+                    raise
+                except ValueError:
+                    raise ContinuationReadError(
+                        500, "invalid_history", "Continuation history is invalid"
+                    ) from None
             result, state = prompt_enrichment_service.resume_clarification(
                 session_id, organization_id, cause_id, request
             )
@@ -1269,12 +1423,29 @@ def create_app(
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/final-output",
             response_model=PromptEnrichmentFinalOutputResponse
-            | PromptEnrichmentFinalOutputResponseV3,
+            | PromptEnrichmentFinalOutputResponseV3
+            | CanonicalFinalPromptAssemblyV4,
         )
         def get_prompt_enrichment_final_output(
             session_id: UUID,
             organization_id: AuthorizedOrganization,
+            output_version: str | None = None,
+            projection: str | None = None,
+            if_match: Annotated[str | None, Header(alias="If-Match")] = None,
         ):
+            if output_version is not None:
+                if output_version != "4.0.0":
+                    raise ContinuationReadError(
+                        409, "unsupported_output_version", "Unsupported output version"
+                    )
+                return read_preview(
+                    prompt_enrichment_service,
+                    session_id,
+                    organization_id,
+                    final=True,
+                    if_match=if_match,
+                    projection=projection,
+                )
             state = prompt_enrichment_service.get_current_state(session_id, organization_id)
             if state.final_output is None or state.status.value == "final_output_blocked":
                 raise PromptEnrichmentRuntimeError(

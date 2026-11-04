@@ -107,6 +107,10 @@ def build_internal_final_prompt_handoff(
             CanonicalFinalPromptAssemblyV3,
             CanonicalInternalFinalPromptHandoffV3,
         )
+        from .final_prompt_v4 import (
+            CanonicalFinalPromptAssemblyV4,
+            CanonicalInternalFinalPromptHandoffV4,
+        )
 
         # Exact version dispatch; no latest/default or validation-fallback probing.
         version = final_output.get("internal_final_prompt", {}).get("schema_version")
@@ -114,8 +118,14 @@ def build_internal_final_prompt_handoff(
             "2.0.0": (CanonicalFinalPromptAssembly, CanonicalInternalFinalPromptHandoff),
             "2.1.0": (CanonicalFinalPromptAssemblyV2_1, CanonicalInternalFinalPromptHandoffV2_1),
             "3.0.0": (CanonicalFinalPromptAssemblyV3, CanonicalInternalFinalPromptHandoffV3),
+            "4.0.0": (CanonicalFinalPromptAssemblyV4, CanonicalInternalFinalPromptHandoffV4),
         }[version]
-        assembly = assembly_type.model_validate(final_output)
+        if version == "4.0.0":
+            from .downstream_preparation import canonical_bytes
+
+            assembly = assembly_type.model_validate_json(canonical_bytes(final_output))
+        else:
+            assembly = assembly_type.model_validate(final_output)
     except (ValidationError, TypeError, ValueError, KeyError, AttributeError) as exc:
         raise InternalFinalPromptHandoffError(
             InternalFinalPromptHandoffErrorCode.INVALID_FINAL_OUTPUT,
@@ -137,6 +147,13 @@ def build_internal_final_prompt_handoff(
         in {FinalPromptReadiness.READY, FinalPromptReadiness.READY_WITH_UNRESOLVED},
         "internal_final_prompt": prompt,
     }
+    if prompt.schema_version == "4.0.0":
+        from jewelai_domain.preservation import contract_hash
+
+        return handoff_type(
+            **payload,
+            content_hash=contract_hash("jewelai.InternalFinalPromptHandoff/4.0.0", payload),
+        )
     return handoff_type(**payload, content_hash=_hash(payload))
 
 

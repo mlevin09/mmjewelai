@@ -26,6 +26,7 @@ from .downstream_preparation import (
     _alias,
     _aliases,
     _check_source,
+    _reject_source_v4,
     _render_semantic_sections,
     _strict_json,
     _validate_preparation_payload,
@@ -62,6 +63,7 @@ class SemanticRenderingV2(SemanticRendering, StrictEvidenceModel):
 
 
 def render_semantic_source_v2(source, gate):
+    _reject_source_v4(source)
     source = CanonicalInternalFinalPromptHandoffV3.model_validate_json(canonical_bytes(source))
     gate = PreparationGateEvidenceV2.model_validate_json(canonical_bytes(gate))
     prompt = source.internal_final_prompt
@@ -185,6 +187,7 @@ class GenerationPreparationV2(GenerationPreparation):
 
 
 def build_generation_preparation_v2(source, gate, *, preparation_id, created_at):
+    _reject_source_v4(source)
     original_source = canonical_bytes(source)
     original_gate = canonical_bytes(gate)
     source = CanonicalInternalFinalPromptHandoffV3.model_validate_json(original_source)

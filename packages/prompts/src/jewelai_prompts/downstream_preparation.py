@@ -64,6 +64,7 @@ class PreparationErrorCode(StrEnum):
     INVALID_GATE = "invalid_preparation_gate"
     NOT_READY = "final_output_not_ready"
     UNSUPPORTED_VERSION = "unsupported_contract_version"
+    UNSUPPORTED_SOURCE_VERSION = "unsupported_source_version"
     UNSUPPORTED_SEMANTICS = "unsupported_source_semantics"
     INTEGRITY = "preparation_integrity_mismatch"
     CAPACITY = "preparation_capacity_exceeded"
@@ -222,7 +223,7 @@ def _explicit_canonical_version(value: object) -> str:
     if not isinstance(value, Mapping):
         raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
     version = value.get("schema_version")
-    if not isinstance(version, str) or version not in ("2.0.0", "2.1.0", "3.0.0"):
+    if not isinstance(version, str) or version not in ("2.0.0", "2.1.0", "3.0.0", "4.0.0"):
         raise GenerationPreparationError(PreparationErrorCode.INVALID_SOURCE)
     return version
 
@@ -233,6 +234,10 @@ def decode_canonical_internal_final_prompt(value: object) -> AnyCanonicalInterna
     elif hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
     version = _explicit_canonical_version(value)
+    if version == "4.0.0":
+        from .final_prompt_v4 import CanonicalInternalFinalPromptV4
+
+        return CanonicalInternalFinalPromptV4.model_validate_json(canonical_bytes(value))
     if version == "3.0.0":
         from .final_prompt_v3 import CanonicalInternalFinalPromptV3
 
@@ -255,6 +260,10 @@ def decode_canonical_handoff(value: object) -> AnyCanonicalInternalFinalPromptHa
         from .final_prompt_v3 import CanonicalInternalFinalPromptHandoffV3
 
         return CanonicalInternalFinalPromptHandoffV3.model_validate(value)
+    if version == "4.0.0":
+        from .final_prompt_v4 import CanonicalInternalFinalPromptHandoffV4
+
+        return CanonicalInternalFinalPromptHandoffV4.model_validate_json(canonical_bytes(value))
     return _HANDOFF_DECODER.validate_python(value)
 
 
@@ -621,6 +630,7 @@ def render_semantic_source(
     source: AnyCanonicalInternalFinalPromptHandoff, gate: PreparationGateEvidence
 ) -> SemanticRendering:
     """Validate and render exact typed semantics, never parse free text or call the compiler."""
+    _reject_source_v4(source)
     source = decode_canonical_handoff(source)
     gate = PreparationGateEvidence.model_validate_json(canonical_bytes(gate))
     _check_source(source, gate)
@@ -864,6 +874,18 @@ class GenerationPreparation:
         return self.payload.model_dump(mode=mode)
 
 
+def _reject_source_v4(source):
+    if isinstance(source, (bytes, str)):
+        source = _strict_json(source)
+    version = (
+        source.get("schema_version")
+        if isinstance(source, Mapping)
+        else getattr(source, "schema_version", None)
+    )
+    if version == "4.0.0":
+        raise GenerationPreparationError(PreparationErrorCode.UNSUPPORTED_SOURCE_VERSION)
+
+
 def build_generation_preparation(
     source_handoff: AnyCanonicalInternalFinalPromptHandoff | object,
     gate_evidence: PreparationGateEvidence | object,
@@ -872,6 +894,7 @@ def build_generation_preparation(
     created_at: datetime,
 ) -> GenerationPreparation:
     """Pure preparation. B2 must supply transaction-scoped, authenticated, verified evidence."""
+    _reject_source_v4(source_handoff)
     source_version = (
         source_handoff.get("schema_version")
         if isinstance(source_handoff, dict)

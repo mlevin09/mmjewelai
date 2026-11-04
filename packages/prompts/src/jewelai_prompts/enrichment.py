@@ -278,6 +278,10 @@ def decode_f04_prompt_enrichment_result(value: object) -> StructuredPromptEnrich
 
 
 def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjection:
+    from .continuation import ContinuationEnrichmentResult
+
+    if isinstance(value, ContinuationEnrichmentResult):
+        return enrichment_projection(value.native)
     result = (
         decode_f04_prompt_enrichment_result(value)
         if isinstance(value, StructuredPromptEnrichmentResultV2)
@@ -292,6 +296,10 @@ def enrichment_projection(value: AnyPromptEnrichmentResult) -> RevisionProjectio
 
 
 def enrichment_template_version(value: AnyPromptEnrichmentResult) -> str:
+    from .continuation import ContinuationEnrichmentResult
+
+    if isinstance(value, ContinuationEnrichmentResult):
+        return enrichment_template_version(value.native)
     result = (
         decode_f04_prompt_enrichment_result(value)
         if isinstance(value, StructuredPromptEnrichmentResultV2)

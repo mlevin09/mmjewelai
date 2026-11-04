@@ -111,10 +111,10 @@ def resolving_assertions(
     return tuple(assertions)
 
 
-def advance_frontier(plan, result, *, record_id, result_kind):
+def advance_frontier(plan, result, *, record_id, result_kind, _native_answer=True):
     """Project one validated event, preserving every unaffected cause byte-for-byte."""
     states = {s.cause_id: s for s in plan.frontier_core.cause_states}
-    if result_kind == "clarification":
+    if result_kind == "clarification" and _native_answer:
         question = next(
             (q for q in plan.questions if q.clarification_id == result.clarification_id), None
         )

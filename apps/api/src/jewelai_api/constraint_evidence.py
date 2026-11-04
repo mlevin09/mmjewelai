@@ -71,16 +71,18 @@ def merge_constraint_evidence(
     previous: tuple[FinalPromptConstraintEvidence, ...] = (),
     load_source_revision: Callable[[UUID], AnyDesignRevision] | None = None,
     _handled_candidate_ids: tuple[str, ...] = (),
+    _enrichment_reader=None,
 ) -> tuple[FinalPromptConstraintEvidence, ...]:
     """Append verified parser evidence and deterministically supersede prior active constraints."""
 
     from .parsed_enrichment import ParsedCandidateEnrichmentResultV2
 
-    parsed = (
-        ParsedCandidateEnrichmentResultV2.model_validate(enrichment)
+    reader = _enrichment_reader or (
+        ParsedCandidateEnrichmentResultV2
         if isinstance(enrichment, ParsedCandidateEnrichmentResultV2)
-        else ParsedCandidateEnrichmentResult.model_validate(enrichment)
+        else ParsedCandidateEnrichmentResult
     )
+    parsed = reader.model_validate(enrichment)
     source = MessageSource.model_validate(source)
     revision = validate_design_revision(authoritative_revision)
     if source != parsed.parser_proposal.source:
@@ -232,6 +234,17 @@ def merge_constraint_evidence(
             payload["acceptance"] = "unresolved"
         additions.append(_evidence(payload))
 
+    # Separate source occurrences can reaffirm the identical preservation in
+    # this one evaluated canonical snapshot. Retain both immutable identities;
+    # the later occurrence owns the active slot via existing supersession.
+    # Do not extend this to different facts/scopes, authority or release cycles.
+    for index, addition in enumerate(additions):
+        for earlier in range(index):
+            if _same_snapshot_preservation(
+                additions[earlier], addition, source_text=parsed.parse_result.original_text
+            ):
+                additions[earlier] = _supersede(additions[earlier], addition.evidence_id)
+
     # The approved KEEP strengthens the same fulfilled canonical requirement.
     # Retain both original spans/IDs; the current preservation instruction owns
     # the active slot, with normal explicit supersession lineage to the fact.
@@ -282,6 +295,48 @@ def merge_constraint_evidence(
         ]
     by_id = {item.evidence_id: item for item in (*retained, *additions)}
     return tuple(by_id[key] for key in sorted(by_id))
+
+
+def _same_snapshot_preservation(first, second, *, source_text=None):
+    if first.semantic_subject == second.semantic_subject == "component.center_stone":
+        # Reuse the approved exact whole-object/field binding. Similar rendered
+        # instructions alone cannot establish equivalent protection scopes.
+        from .continuation_history import preservation_field
+
+        try:
+            scopes = tuple(
+                preservation_field(
+                    item.original_wording,
+                    source_text=source_text,
+                    span_start=item.source_span_start,
+                    span_end=item.source_span_end,
+                )
+                for item in (first, second)
+            )
+        except ValueError:
+            return False
+        if scopes[0] != scopes[1]:
+            return False
+    return (
+        first.status == second.status == "active"
+        and first.kind == second.kind == "preservation"
+        and first.acceptance == second.acceptance == "user_explicit"
+        and first.semantic_subject is not None
+        and first.normalized_instruction is not None
+        and all(
+            getattr(first, key) == getattr(second, key)
+            for key in (
+                "session_id",
+                "organization_id",
+                "source",
+                "source_revision_id",
+                "source_enrichment_cycle_id",
+                "semantic_subject",
+                "canonical_target",
+                "normalized_instruction",
+            )
+        )
+    )
 
 
 def _same_preserved_fact(keeper, requirement, revision, load_source_revision):

@@ -99,6 +99,7 @@ from .correction_enrichment import (
     CorrectionReason,
     CorrectionReenrichmentResult,
     UserCorrection,
+    decode_correction_result,
     process_user_correction,
 )
 from .durable_enrichment import (
@@ -248,6 +249,7 @@ class PromptEnrichmentRuntimeService:
         validation_report: AnyValidationReport | object,
         clock: Callable[[], datetime],
         uuid_factory: Callable[[], UUID],
+        continuation_enabled: bool = False,
     ):
         self.repository = repository
         self.artifacts = artifacts
@@ -258,6 +260,24 @@ class PromptEnrichmentRuntimeService:
         self.validation_report = validation_report
         self._clock = clock
         self._uuid = uuid_factory
+        self.continuation_enabled = continuation_enabled
+
+    def _commit_verified(self, commit, build, **kwargs):
+        """Construct the complete result against staged rows before their commit.
+
+        The repository retains its existing lock/CAS/idempotency checks and
+        supplies a read-only view of that same transaction. Any snapshot or DTO
+        failure propagates through the transaction and rolls back every write.
+        """
+        completed = []
+
+        def verify(repository, record):
+            bound = copy(self)
+            bound.repository = repository
+            completed.append(build(bound, record))
+
+        commit(**kwargs, verify=verify)
+        return completed[0]
 
     def _for_session(self, session_id, organization_id, *, repository=None):
         repository = repository or self.repository
@@ -287,6 +307,16 @@ class PromptEnrichmentRuntimeService:
             "2.0.0",
         )
 
+    def _require_native_workflow(self, session_id, organization_id, *, repository=None):
+        repo = repository or self.repository
+        try:
+            repo.require_native_workflow(session_id, organization_id)
+        except (NotFoundError, OwnershipMismatchError) as exc:
+            raise PromptEnrichmentRuntimeError(
+                PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
+                "Session was not found in organization scope",
+            ) from exc
+
     def _require_request_profile(self, request):
         if (getattr(request, "schema_version", None) == "2.0.0") != self._is_f04:
             raise PromptEnrichmentRuntimeError(
@@ -299,6 +329,7 @@ class PromptEnrichmentRuntimeService:
     ) -> InitialEnrichmentRuntimeResult:
         """Parse a persisted message first, then atomically commit revision + first cycle."""
 
+        self._require_native_workflow(request.session_id, request.organization_id)
         bound = self._for_session(request.session_id, request.organization_id)
         if bound is not self:
             return bound.start_initial_message(request)
@@ -388,7 +419,14 @@ class PromptEnrichmentRuntimeService:
                 rules=self.artifacts.rules,
                 constraint_evidence=constraint_evidence,
             )
-            cycle = self.repository.commit_initial_enrichment(
+            return self._commit_verified(
+                self.repository.commit_initial_enrichment,
+                lambda bound, record: InitialEnrichmentRuntimeResult(
+                    parse_result=parsed,
+                    parser_proposal=first.parser_proposal,
+                    enrichment=enrichment,
+                    workflow=bound.get_current_state(request.session_id, request.organization_id),
+                ),
                 enrichment_cycle_id=cycle_id,
                 session_id=request.session_id,
                 organization_id=request.organization_id,
@@ -399,19 +437,6 @@ class PromptEnrichmentRuntimeService:
                 clarification_plan_id=clarification_plan_id,
                 clarification_plan_payload=clarification.model_dump(mode="json"),
                 release_binding=release_binding,
-            )
-            workflow = self._state_from_cycle(
-                session_id=request.session_id,
-                organization_id=request.organization_id,
-                cycle=cycle,
-                clarification_plan_id=clarification_plan_id,
-                clarification_plan=clarification,
-            )
-            return InitialEnrichmentRuntimeResult(
-                parse_result=parsed,
-                parser_proposal=first.parser_proposal,
-                enrichment=enrichment,
-                workflow=workflow,
             )
         except PromptEnrichmentRuntimeError:
             raise
@@ -443,6 +468,7 @@ class PromptEnrichmentRuntimeService:
 
     def build_preparation_source(self, repository, session_id, organization_id):
         """Restore the sole current source using the caller's already locked transaction reader."""
+        self._require_native_workflow(session_id, organization_id, repository=repository)
         bound = self._for_session(session_id, organization_id, repository=repository)
         if bound is not self:
             return bound.build_preparation_source(repository, session_id, organization_id)
@@ -528,6 +554,7 @@ class PromptEnrichmentRuntimeService:
         self, session_id: UUID, organization_id: UUID
     ) -> PromptEnrichmentWorkflowState:
         """Restore and verify the latest durable module state without changing it."""
+        self._require_native_workflow(session_id, organization_id)
         bound = self._for_session(session_id, organization_id)
         if bound is not self:
             return bound.get_current_state(session_id, organization_id)
@@ -660,8 +687,13 @@ class PromptEnrichmentRuntimeService:
                 rules=self.artifacts.rules,
                 constraint_evidence=constraint_evidence,
             )
-            commit_user_correction_result(
-                self.repository,
+            return self._commit_verified(
+                commit_user_correction_result,
+                lambda bound, record: (
+                    decode_correction_result(record.result_payload),
+                    bound.get_current_state(request.session_id, organization_id),
+                ),
+                repository=self.repository,
                 correction_record_id=self._uuid(),
                 next_enrichment_cycle_id=next_cycle_id,
                 organization_id=organization_id,
@@ -671,7 +703,6 @@ class PromptEnrichmentRuntimeService:
                 next_clarification_plan_id=self._uuid(),
                 next_clarification_plan=next_plan,
             )
-            return result, self.get_current_state(request.session_id, organization_id)
         except PromptEnrichmentRuntimeError:
             raise
         except (OwnershipMismatchError, NotFoundError) as exc:
@@ -727,6 +758,7 @@ class PromptEnrichmentRuntimeService:
     ) -> tuple[CorrectionReenrichmentResult, PromptEnrichmentWorkflowState]:
         """Build a correction only from an organization-scoped persisted message."""
 
+        self._require_native_workflow(request.session_id, organization_id)
         bound = self._for_session(request.session_id, organization_id)
         if bound is not self:
             return bound.apply_persisted_user_correction(organization_id, request)
@@ -966,6 +998,7 @@ class PromptEnrichmentRuntimeService:
     ) -> tuple[ClarificationAnswerResult, PromptEnrichmentWorkflowState]:
         """Restore the authoritative plan and process a bounded client decision."""
 
+        self._require_native_workflow(request.session_id, organization_id)
         bound = self._for_session(request.session_id, organization_id)
         if bound is not self:
             return bound.record_persisted_clarification_answer(organization_id, request)
@@ -1198,6 +1231,7 @@ class PromptEnrichmentRuntimeService:
         return record.clarification_plan_id, plan
 
     def resume_clarification(self, session_id, organization_id, cause_id, request):
+        self._require_native_workflow(session_id, organization_id)
         bound = self._for_session(session_id, organization_id)
         if not bound._is_f04:
             raise PromptEnrichmentRuntimeError(
@@ -1524,6 +1558,63 @@ def _effective_correction_blocks(
     """
     if not any(item.outcome == CorrectionOutcome.DEFERRED for item in corrections):
         return {item.content_hash: False for item in corrections}
+    plans, answer_plans, answer_steps = _verified_native_answer_lineage(
+        repository,
+        session_id=session_id,
+        organization_id=organization_id,
+        cycles=cycles,
+        answers=answers,
+        current_plan=current_plan,
+        artifacts=artifacts,
+    )
+    correction_cycles = {item.next_enrichment_cycle_number for item in corrections}
+    flags = {}
+    for correction in corrections:
+        if correction.outcome != CorrectionOutcome.DEFERRED:
+            flags[correction.content_hash] = False
+            continue
+        origin = next(
+            (
+                item
+                for item in plans.values()
+                if item[0].cycle_number == correction.next_enrichment_cycle_number
+            ),
+            None,
+        )
+        cycle, original_plan = origin if origin is not None else (None, None)
+        resolved_questions = (
+            tuple(
+                question
+                for question in original_plan.questions
+                if any(
+                    _answer_discharges_question(
+                        answer,
+                        question,
+                        origin=cycle.cycle_number,
+                        answer_plan=answer_plans.get(answer.content_hash),
+                        correction_cycles=correction_cycles,
+                        answer_steps=answer_steps,
+                    )
+                    for answer in answers
+                )
+            )
+            if original_plan is not None
+            else ()
+        )
+        flags[correction.content_hash] = _correction_blocks_from_verified_source(
+            correction,
+            cycle=cycle,
+            original_plan=original_plan,
+            current_plan=current_plan,
+            resolved_questions=resolved_questions,
+        )
+    return flags
+
+
+def _verified_native_answer_lineage(
+    repository, *, session_id, organization_id, cycles, answers, current_plan, artifacts
+):
+    """Validate the unchanged native L plan/answer-only continuation graph."""
     by_cycle = {cycle.enrichment_cycle_id: cycle for cycle in cycles}
     plans = {}
     try:
@@ -1557,7 +1648,6 @@ def _effective_correction_blocks(
             PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
             "Effective readiness requires valid durable clarification lineage",
         ) from exc
-    correction_cycles = {item.next_enrichment_cycle_number for item in corrections}
     by_number = {cycle.cycle_number: cycle for cycle in cycles}
     plans_by_number = {cycle.cycle_number: plan for cycle, plan in plans.values()}
     answer_steps = set()
@@ -1586,92 +1676,77 @@ def _effective_correction_blocks(
             # Exact existing continuation semantics also prove nonmutating
             # SKIP/UNKNOWN/REJECT steps; a coincidentally newer revision cannot.
             answer_steps.add(source_cycle.cycle_number)
-    flags = {}
-    for correction in corrections:
-        blocks = correction.outcome == CorrectionOutcome.DEFERRED
-        if blocks and correction.reason != CorrectionReason.REVISION_TRANSITION_DEFERRED:
-            origin = next(
-                (
-                    item
-                    for item in plans.values()
-                    if item[0].cycle_number == correction.next_enrichment_cycle_number
-                ),
-                None,
+    return plans, answer_plans, answer_steps
+
+
+def _correction_blocks_from_verified_source(
+    correction, *, cycle, original_plan, current_plan, resolved_questions=()
+):
+    """Existing L policy over already verified source/plan evidence, without I/O."""
+    blocks = correction.outcome == CorrectionOutcome.DEFERRED
+    if (
+        blocks
+        and correction.reason != CorrectionReason.REVISION_TRANSITION_DEFERRED
+        and cycle is not None
+    ):
+        resolved = {
+            evidence.source_candidate_id
+            for evidence in current_plan.constraint_evidence
+            if evidence.source == correction.source
+            and evidence.source_enrichment_cycle_id == cycle.enrichment_cycle_id
+            and evidence.source_revision_id == cycle.specification_revision_id
+            and evidence.status in {"active", "superseded"}
+            and any(
+                candidate.candidate_id == evidence.source_candidate_id
+                and candidate.semantic_subject == evidence.semantic_subject
+                and candidate.classification.value == evidence.kind
+                and candidate.evidence.start == evidence.source_span_start
+                and candidate.evidence.end == evidence.source_span_end
+                for candidate in correction.parsed_correction.candidates
             )
-            if origin is not None:
-                cycle, original_plan = origin
-                resolved = {
-                    evidence.source_candidate_id
-                    for evidence in current_plan.constraint_evidence
-                    if evidence.source == correction.source
-                    and evidence.source_enrichment_cycle_id == cycle.enrichment_cycle_id
-                    and evidence.source_revision_id == cycle.specification_revision_id
-                    and evidence.status in {"active", "superseded"}
-                    and any(
-                        candidate.candidate_id == evidence.source_candidate_id
-                        and candidate.semantic_subject == evidence.semantic_subject
-                        and candidate.classification.value == evidence.kind
-                        and candidate.evidence.start == evidence.source_span_start
-                        and candidate.evidence.end == evidence.source_span_end
-                        for candidate in correction.parsed_correction.candidates
-                    )
-                }
-                for question in original_plan.questions:
-                    if any(
-                        _answer_discharges_question(
-                            answer,
-                            question,
-                            origin=cycle.cycle_number,
-                            answer_plan=answer_plans.get(answer.content_hash),
-                            correction_cycles=correction_cycles,
-                            answer_steps=answer_steps,
-                        )
-                        for answer in answers
-                    ):
-                        resolved.update(question.source_candidate_ids)
-                dispositions = correction.correction_evaluation.dispositions
-                noncritical = {
-                    item.candidate_id
-                    for item in original_plan.unasked_evidence
-                    if item.reason == UnaskedReason.NONCRITICAL_UNKNOWN
-                }
-                pending = {
-                    item.candidate.candidate_id
-                    for item in dispositions
-                    if item.outcome == CandidateDispositionOutcome.DEFERRED
-                }
-                # Ignore only source-overlap mirrors of a separately discharged or
-                # already-current Dictionary fact, not arbitrary Knowledge-only terms.
-                for item in dispositions:
-                    candidate = item.candidate
-                    if candidate.normalization_source.value != "knowledge_library":
-                        continue
-                    if any(
-                        other.candidate.normalization_source.value == "domain_dictionary"
-                        and other.candidate.evidence == candidate.evidence
-                        and other.candidate.target == candidate.target
-                        and other.candidate.subject == candidate.subject
-                        and other.candidate.normalized_values == candidate.normalized_values
-                        and (
-                            other.candidate.candidate_id in resolved
-                            or other.reason == CandidateDispositionReason.ALREADY_CURRENT
-                        )
-                        for other in dispositions
-                    ):
-                        resolved.add(candidate.candidate_id)
-                has_nonmutating_fact = any(
-                    item.reason
-                    in {
-                        CandidateDispositionReason.ALREADY_CURRENT,
-                        CandidateDispositionReason.PRESERVATION_RETAINED,
-                    }
-                    for item in dispositions
+        }
+        for question in resolved_questions:
+            resolved.update(question.source_candidate_ids)
+        dispositions = correction.correction_evaluation.dispositions
+        noncritical = {
+            item.candidate_id
+            for item in original_plan.unasked_evidence
+            if item.reason == UnaskedReason.NONCRITICAL_UNKNOWN
+        }
+        pending = {
+            item.candidate.candidate_id
+            for item in dispositions
+            if item.outcome == CandidateDispositionOutcome.DEFERRED
+        }
+        # Ignore only source-overlap mirrors of a separately discharged or
+        # already-current Dictionary fact, not arbitrary Knowledge-only terms.
+        for item in dispositions:
+            candidate = item.candidate
+            if candidate.normalization_source.value != "knowledge_library":
+                continue
+            if any(
+                other.candidate.normalization_source.value == "domain_dictionary"
+                and other.candidate.evidence == candidate.evidence
+                and other.candidate.target == candidate.target
+                and other.candidate.subject == candidate.subject
+                and other.candidate.normalized_values == candidate.normalized_values
+                and (
+                    other.candidate.candidate_id in resolved
+                    or other.reason == CandidateDispositionReason.ALREADY_CURRENT
                 )
-                blocks = bool(pending - resolved - noncritical) or not (
-                    resolved or has_nonmutating_fact
-                )
-        flags[correction.content_hash] = blocks
-    return flags
+                for other in dispositions
+            ):
+                resolved.add(candidate.candidate_id)
+        has_nonmutating_fact = any(
+            item.reason
+            in {
+                CandidateDispositionReason.ALREADY_CURRENT,
+                CandidateDispositionReason.PRESERVATION_RETAINED,
+            }
+            for item in dispositions
+        )
+        blocks = bool(pending - resolved - noncritical) or not (resolved or has_nonmutating_fact)
+    return blocks
 
 
 def _answer_discharges_question(

@@ -60,7 +60,7 @@ def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail
         sid = session.session_id
         headers = {"X-Organization-ID": org}
         try:
-            yield SimpleNamespace(
+            ctx = SimpleNamespace(
                 client=client,
                 app=app,
                 runtime=runtime,
@@ -72,7 +72,9 @@ def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail
                 provider=provider,
                 legacy=legacy.json(),
             )
+            yield ctx
         finally:
+            sid = ctx.sid
             destination = os.getenv("F04_EVIDENCE_DIR")
             if destination:
                 root = Path(destination)
@@ -89,50 +91,92 @@ def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail
                 payload["revisions"] = [
                     r.model_dump(mode="json") for r in repo.list_revisions(sid, UUID(org))
                 ]
-                if persisted.knowledge_package_id is not None:
-                    payload["cycles"] = [
-                        dict(
-                            cycle_id=str(c.enrichment_cycle_id),
-                            cycle_number=c.cycle_number,
-                            revision_id=str(c.specification_revision_id),
-                            result=c.result.model_dump(mode="json"),
-                        )
-                        for c in repo.list_enrichment_cycles(sid, UUID(org))
-                    ]
-                    payload["plans"] = [
-                        p.plan_payload for p in repo.list_clarification_plans(sid, UUID(org))
-                    ]
-                    payload["answers"] = [
-                        a.result_payload for a in repo.list_clarification_answers(sid, UUID(org))
-                    ]
-                    payload["corrections"] = [
-                        c.result_payload for c in repo.list_user_corrections(sid, UUID(org))
-                    ]
-                    # Supplemental source reparse is labelled separately; it is not
-                    # claimed to be an HTTP response or a second canonical write.
-                    from jewelai_domain.clarification_state import evidence_hash
-                    from jewelai_parser import parse_full_message
+                from jewelai_persistence import (
+                    ClarificationDecisionIntegrityError,
+                    ClarificationPlanIntegrityError,
+                    EnrichmentIntegrityError,
+                    UserCorrectionIntegrityError,
+                )
 
-                    bound = runtime._for_session(sid, UUID(org))
-                    verified = bound._load_release()
-                    sources = {p["trigger"]["message_id"] for p in payload["plans"]}
-                    payload["supplemental_reparsed_sources"] = []
-                    for mid in sorted(sources):
-                        message = repo.get_message(sid, UUID(mid), UUID(org))
-                        parsed = parse_full_message(
-                            message.content,
-                            locale=locale,
-                            dictionary=bound.artifacts.dictionary,
-                            knowledge_runtime=verified.compiled_runtime,
-                        )
-                        payload["supplemental_reparsed_sources"].append(
+                try:
+                    if persisted.knowledge_package_id is not None:
+                        payload["cycles"] = [
                             dict(
-                                message_id=mid,
-                                source_sha256=hashlib.sha256(message.content.encode()).hexdigest(),
-                                parse_result=parsed.model_dump(mode="json"),
-                                parse_sha256=evidence_hash(parsed),
+                                cycle_id=str(c.enrichment_cycle_id),
+                                cycle_number=c.cycle_number,
+                                revision_id=str(c.specification_revision_id),
+                                result=c.result.model_dump(mode="json"),
                             )
+                            for c in repo.list_enrichment_cycles(sid, UUID(org))
+                        ]
+                        payload["plans"] = [
+                            p.plan_payload for p in repo.list_clarification_plans(sid, UUID(org))
+                        ]
+                        payload["answers"] = [
+                            a.result_payload
+                            for a in repo.list_clarification_answers(sid, UUID(org))
+                        ]
+                        payload["corrections"] = [
+                            c.result_payload for c in repo.list_user_corrections(sid, UUID(org))
+                        ]
+                        # Supplemental source reparse is labelled separately; it is not
+                        # claimed to be an HTTP response or a second canonical write.
+                        from jewelai_domain.clarification_state import evidence_hash
+                        from jewelai_parser import parse_full_message
+
+                        bound = runtime._for_session(sid, UUID(org))
+                        verified = bound._load_release()
+                        # Admission is a control command, not a message parse. Keep
+                        # supplemental native reparsing separate from its saved v3
+                        # evidence and use the actual exercised retained session.
+                        sources = {
+                            p["trigger"]["message_id"]
+                            for p in payload["plans"]
+                            if p.get("plan_version") != "3.0.0"
+                            and p.get("trigger", {}).get("message_id")
+                        }
+                        sources.update(
+                            record["source"]["message_id"]
+                            for record in payload["corrections"] + payload["answers"]
+                            if record.get("source", {}).get("kind") == "message"
+                            and record.get("correction_version") != "3.0.0"
+                            and record.get("answer_version") != "3.0.0"
                         )
+                        payload["supplemental_reparsed_sources_interpreter"] = "legacy-bc34-1.1"
+                        # New3 corrections already contain their actual Parse1.2;
+                        # typed consent/admission/resume are not text parses.
+                        payload["supplemental_reparsed_sources"] = []
+                        for mid in sorted(sources):
+                            message = repo.get_message(sid, UUID(mid), UUID(org))
+                            parsed = parse_full_message(
+                                message.content,
+                                locale=locale,
+                                dictionary=bound.artifacts.dictionary,
+                                knowledge_runtime=verified.compiled_runtime,
+                            )
+                            payload["supplemental_reparsed_sources"].append(
+                                dict(
+                                    message_id=mid,
+                                    source_sha256=hashlib.sha256(
+                                        message.content.encode()
+                                    ).hexdigest(),
+                                    parse_result=parsed.model_dump(mode="json"),
+                                    parse_sha256=evidence_hash(parsed),
+                                )
+                            )
+                    payload["durable_readback_status"] = "verified"
+                except (
+                    EnrichmentIntegrityError,
+                    ClarificationPlanIntegrityError,
+                    ClarificationDecisionIntegrityError,
+                    UserCorrectionIntegrityError,
+                    ValueError,
+                ) as exc:
+                    # Tamper tests deliberately make persisted evidence invalid.
+                    # Preserve that rejection, never present a partial collector
+                    # readback as verified or leak validation payloads/messages.
+                    payload["durable_readback_status"] = "rejected"
+                    payload["durable_readback_failure"] = type(exc).__name__
                 raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2).encode()
                 (root / (hashlib.sha256(raw).hexdigest() + ".json")).write_bytes(raw)
 

@@ -2034,3 +2034,117 @@ def test_canonical_keep_compatibility_uses_exact_authoritative_source(ring, mode
     # The compatibility rule neither mutates canonical values nor introduces LOCK.
     assert not current.design.composition.value.symmetry_mode.locked
     assert original.design.composition.value.symmetry_mode.value == "asymmetrical"
+
+
+@pytest.mark.parametrize(
+    "text,locale",
+    [
+        ("Keep the center stone. Preserve the original center stone.", "en"),
+        ("Preserve the center stone. Keep the original center stone.", "en"),
+        ("Keep the center stone. Preserve the original center stone. Keep the center stone.", "en"),
+        ("Сохранить центральный камень. Preserve the original center stone.", "ru"),
+        ("Сохранить центральный камень. Сохранить центральный камень без изменений.", "ru"),
+    ],
+)
+def test_same_snapshot_keep_occurrences_reconcile_without_losing_sources(
+    ring, dictionary, templates, active_release, text, locale
+):
+    _, parsed = _enrich(
+        text,
+        locale=locale,
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    args = dict(
+        session_id=uuid4(),
+        organization_id=uuid4(),
+        source=parsed.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=uuid4(),
+    )
+    before = ring.model_dump_json()
+    result = merge_constraint_evidence(parsed, **args)
+    assert result == merge_constraint_evidence(parsed, **args)
+    preserves = [c for c in parsed.parse_result.candidates if c.classification == "preservation"]
+    assert len(result) == len(preserves) >= 2
+    assert {c.source_candidate_id for c in result} == {c.candidate_id for c in preserves}
+    assert all(text[c.source_span_start : c.source_span_end] == c.original_wording for c in result)
+    assert all(c.source == args["source"] for c in result)
+    active = [c for c in result if c.status == "active"]
+    assert len(active) == 1
+    by_id = {c.evidence_id: c for c in result}
+    for item in result:
+        seen = set()
+        while item.status == "superseded":
+            assert item.evidence_id not in seen
+            seen.add(item.evidence_id)
+            item = by_id[item.superseded_by_evidence_id]
+        assert item == active[0]
+    assert ring.model_dump_json() == before
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("semantic_subject", "component.band"),
+        ("canonical_target", "center_stone.shape"),
+        ("normalized_instruction", "Preserve a different approved value."),
+        ("acceptance", "user_accepted"),
+        ("status", "unresolved"),
+        ("kind", "requirement"),
+        ("source_revision_id", "different-canonical-fact-snapshot"),
+        ("source_enrichment_cycle_id", "different-release-bound-cycle"),
+        ("source", "different-message"),
+        ("organization_id", "different-tenant"),
+    ],
+)
+def test_same_snapshot_keep_compatibility_is_narrow(
+    ring, dictionary, templates, active_release, field, value
+):
+    from jewelai_api.constraint_evidence import _same_snapshot_preservation
+
+    _, parsed = _enrich(
+        "Keep the center stone.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    first = merge_constraint_evidence(
+        parsed,
+        session_id=uuid4(),
+        organization_id=uuid4(),
+        source=parsed.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=uuid4(),
+    )[0]
+    assert _same_snapshot_preservation(first, first)
+    other = SimpleNamespace(**{key: getattr(first, key) for key in type(first).model_fields})
+    setattr(other, field, value)
+    assert not _same_snapshot_preservation(first, other)
+    assert not _same_snapshot_preservation(other, first)
+
+
+def test_same_snapshot_distinct_keep_scopes_are_not_superseded(
+    ring, dictionary, templates, active_release
+):
+    _, parsed = _enrich(
+        "Keep the center stone shape unchanged. Preserve the original center stone.",
+        locale="en",
+        revision=ring,
+        dictionary=dictionary,
+        templates=templates,
+        active_release=active_release,
+    )
+    result = merge_constraint_evidence(
+        parsed,
+        session_id=uuid4(),
+        organization_id=uuid4(),
+        source=parsed.parser_proposal.source,
+        authoritative_revision=ring,
+        enrichment_cycle_id=uuid4(),
+    )
+    assert len(result) == 2 and all(c.status == "active" for c in result)

@@ -304,7 +304,14 @@ def start_initial_message(service, request):
         conflicts=(conflict,) if conflict else (),
         constraint_evidence=constraints,
     )
-    repo.commit_initial_enrichment(
+    return service._commit_verified(
+        repo.commit_initial_enrichment,
+        lambda bound, record: InitialEnrichmentRuntimeResultV2(
+            parse_result=parsed,
+            parser_proposal=first.parser_proposal,
+            enrichment=evaluated,
+            workflow=get_current_state(bound, request.session_id, request.organization_id),
+        ),
         enrichment_cycle_id=cycle_id,
         session_id=request.session_id,
         organization_id=request.organization_id,
@@ -315,12 +322,6 @@ def start_initial_message(service, request):
         clarification_plan_id=plan_id,
         clarification_plan_payload=plan.model_dump(mode="json"),
         release_binding=binding,
-    )
-    return InitialEnrichmentRuntimeResultV2(
-        parse_result=parsed,
-        parser_proposal=first.parser_proposal,
-        enrichment=evaluated,
-        workflow=get_current_state(service, request.session_id, request.organization_id),
     )
 
 
@@ -1636,7 +1637,12 @@ def apply_persisted_user_correction(service, organization_id, request):
         offer_history=offers,
         relevant_changes=relevant,
     )
-    repo.commit_user_correction(
+    return service._commit_verified(
+        repo.commit_user_correction,
+        lambda bound, record: (
+            decode_correction_result(record.result_payload),
+            get_current_state(bound, request.session_id, organization_id),
+        ),
         correction_record_id=record_id,
         next_enrichment_cycle_id=cycle_id,
         session_id=request.session_id,
@@ -1647,7 +1653,6 @@ def apply_persisted_user_correction(service, organization_id, request):
         next_clarification_plan_id=plan_id,
         next_clarification_plan_payload=next_plan.model_dump(mode="json"),
     )
-    return result, get_current_state(service, request.session_id, organization_id)
 
 
 def _resume_intent_hash(scope, cause_id, request, message):
