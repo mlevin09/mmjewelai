@@ -10,12 +10,15 @@ from jewelai_domain.models import MessageSource, Unknown
 from jewelai_domain.models_v1_1 import DesignV1_1, migrate_design_revision_v1_to_v1_1
 from jewelai_domain.revisions import confirm_field, lock_field, revise_design
 from jewelai_domain.rules import ReadyDecision
+from jewelai_persistence import NotFoundError
 from jewelai_prompts import GenerationPreparationError, build_internal_final_prompt_handoff
 from jewelai_prompts.revision_projection import project_revision
+from test_keep_atomicity import _record, _snapshot
 from test_persistence import NOW, build_service, create_persisted_session
 from test_prompt_enrichment_runtime import _request, _runtime
 
 from jewelai_api.prompt_enrichment_runtime import (
+    PersistedUserCorrectionRequest,
     PromptEnrichmentRuntimeError,
     PromptEnrichmentRuntimeService,
     build_final_prompt_snapshot,
@@ -246,23 +249,116 @@ def test_overflow_retains_valid_earlier_commits_and_read_retries_are_nonmutating
     service, org, session, revision, runtime, *_rest, request = capacity_session(
         engine, tmp_path, 3, True, "en"
     )
-    monkeypatch.setattr(
-        module, "IFP_V2_1_MAX_BYTES", 1
-    )  # Bounded injected failure, not qualification.
-    with pytest.raises(GenerationPreparationError, match="preparation_capacity_exceeded"):
-        runtime.start_initial_message(request)
-    cycles = service.repository.list_enrichment_cycles(session.session_id, org.organization_id)
+    # Establish an actually committed cycle and pin before injecting overflow.
+    accepted = runtime.start_initial_message(request)
+    original_handoff = build_internal_final_prompt_handoff(accepted.workflow.final_output)
+    repository = service.repository
+    cycles = repository.list_enrichment_cycles(session.session_id, org.organization_id)
     assert len(cycles) == 1
-    for _ in range(2):
+    pin = repository.get_knowledge_release_pin(session.session_id, org.organization_id)
+    assert cycles[0].release_pin == pin
+    correction = _request(service, org, session, "Make the design minimalist.")
+    before = _snapshot(engine, session.session_id)  # Message already persisted separately.
+    with monkeypatch.context() as failure:
+        failure.setattr(module, "IFP_V2_1_MAX_BYTES", 1)  # Injected fault, not qualification.
         with pytest.raises(GenerationPreparationError, match="preparation_capacity_exceeded"):
-            runtime.build_current_internal_final_prompt_handoff(
-                session.session_id, org.organization_id
+            runtime.apply_persisted_user_correction(
+                org.organization_id,
+                PersistedUserCorrectionRequest(
+                    session_id=session.session_id,
+                    expected_revision_id=revision.revision_id,
+                    message_id=correction.message_id,
+                ),
             )
-    with pytest.raises(PromptEnrichmentRuntimeError):
-        runtime.start_initial_message(request)  # Existing first-cycle conflict; never a duplicate.
+        assert _snapshot(engine, session.session_id) == before
+        for _ in range(2):
+            with pytest.raises(GenerationPreparationError, match="preparation_capacity_exceeded"):
+                runtime.build_current_internal_final_prompt_handoff(
+                    session.session_id, org.organization_id
+                )
+            assert _snapshot(engine, session.session_id) == before
+        with pytest.raises(PromptEnrichmentRuntimeError):
+            runtime.start_initial_message(request)  # Real first-cycle conflict, no duplicate.
+    assert _snapshot(engine, session.session_id) == before
+    assert repository.list_enrichment_cycles(session.session_id, org.organization_id) == cycles
+    assert repository.get_knowledge_release_pin(session.session_id, org.organization_id) == pin
+    assert repository.get_current_revision(session.session_id, org.organization_id) == revision
+    # Once the injected limit is removed, readback returns the exact original handoff.
     assert (
-        service.repository.list_enrichment_cycles(session.session_id, org.organization_id) == cycles
+        runtime.build_current_internal_final_prompt_handoff(session.session_id, org.organization_id)
+        == original_handoff
     )
-    assert (
-        service.repository.get_current_revision(session.session_id, org.organization_id) == revision
+    assert _snapshot(engine, session.session_id) == before
+    _record(
+        "capacity-prior-commit",
+        dict(
+            before=before,
+            after=_snapshot(engine, session.session_id),
+            committed_cycle_count=len(cycles),
+            pin={
+                key: getattr(pin, key)
+                for key in (
+                    "package_id",
+                    "artifact_version",
+                    "runtime_sha256",
+                    "validation_report_sha256",
+                )
+            },
+            handoff_hash=original_handoff.content_hash,
+            failed_correction_rolled_back=True,
+            read_failures=2,
+            restored_handoff_identical=True,
+        ),
+    )
+
+
+def test_initial_capacity_failure_rolls_back_cycle_pin_and_is_retryable(
+    engine, tmp_path, monkeypatch
+):
+    import jewelai_prompts.downstream_preparation as module
+
+    service, org, session, revision, runtime, *_rest, request = capacity_session(
+        engine, tmp_path, 3, True, "en"
+    )
+    repository = service.repository
+    before = _snapshot(engine, session.session_id)
+    assert before["enrichment_cycle"] == []
+    with pytest.raises(NotFoundError, match="no verified Knowledge release pin"):
+        repository.get_knowledge_release_pin(session.session_id, org.organization_id)
+    with monkeypatch.context() as failure:
+        failure.setattr(module, "IFP_V2_1_MAX_BYTES", 1)
+        for _ in range(2):
+            with pytest.raises(GenerationPreparationError, match="preparation_capacity_exceeded"):
+                runtime.start_initial_message(request)
+            assert _snapshot(engine, session.session_id) == before
+            with pytest.raises(NotFoundError, match="no verified Knowledge release pin"):
+                repository.get_knowledge_release_pin(session.session_id, org.organization_id)
+    assert repository.get_current_revision(session.session_id, org.organization_id) == revision
+    # Failure did not consume the Message or first-cycle slot.
+    result = runtime.start_initial_message(request)
+    cycles = repository.list_enrichment_cycles(session.session_id, org.organization_id)
+    assert len(cycles) == 1
+    assert result.workflow.enrichment_cycle_id == cycles[0].enrichment_cycle_id
+    assert cycles[0].release_pin == repository.get_knowledge_release_pin(
+        session.session_id, org.organization_id
+    )
+    _record(
+        "capacity-initial-rollback",
+        dict(
+            before=before,
+            failed_attempts=2,
+            failed_attempts_unchanged=True,
+            initial_pin_absent=True,
+            successful_retry_cycle_count=len(cycles),
+            pin={
+                key: getattr(cycles[0].release_pin, key)
+                for key in (
+                    "package_id",
+                    "artifact_version",
+                    "runtime_sha256",
+                    "validation_report_sha256",
+                )
+            },
+            after_success=_snapshot(engine, session.session_id),
+        ),
     )
