@@ -3,95 +3,37 @@ name: Runtime API
 on:
   pull_request:
     branches: [jewelai-v2]
-    paths:
-      - apps/api/**
-      - packages/auth/**
-      - packages/auth_oidc/**
-      - packages/auth_identity_platform/**
-      - packages/generation_queue/**
-      - packages/generation_queue_gcp/**
-      - packages/persistence/**
-      - packages/parser/**
-      - packages/text_understanding_google/**
-      - packages/prompts/**
-      - packages/model_gateway/**
-      - packages/model_gateway_google/**
-      - packages/model_gateway_openai/**
-      - packages/assets/**
-      - packages/assets_gcs/**
-      - workers/generation/**
-      - packages/domain/**
-      - specs/knowledge-library/**
-      - specs/knowledge-base/**
-      - specs/parser/**
-      - specs/prompts/**
-      - specs/model-gateway/**
-      - specs/assets/**
-      - specs/asset-access/**
-      - specs/generation-queue/**
-      - tests/test_openai_generation_pipeline.py
-      - tests/test_knowledge_library_behavioral_regression.py
-      - tests/test_knowledge_library_three_stone_vertical_slice.py
-      - data/knowledge/**
-      - data/knowledge-base/**
-      - data/prompts/**
-      - data/roles/**
-      - data/dictionary/**
-      - data/questions/**
-      - data/rules/**
-      - infra/terraform/production/**
-      - .github/workflows/deploy-production.yml
-      - .github/workflows/deploy-preprod.yml
-      - .github/workflows/runtime-api.yml
-  push:
-    branches: [jewelai-v2]
-    paths:
-      - apps/api/**
-      - packages/auth/**
-      - packages/auth_oidc/**
-      - packages/auth_identity_platform/**
-      - packages/generation_queue/**
-      - packages/generation_queue_gcp/**
-      - packages/persistence/**
-      - packages/parser/**
-      - packages/text_understanding_google/**
-      - packages/prompts/**
-      - packages/model_gateway/**
-      - packages/model_gateway_google/**
-      - packages/model_gateway_openai/**
-      - packages/assets/**
-      - packages/assets_gcs/**
-      - workers/generation/**
-      - packages/domain/**
-      - specs/knowledge-library/**
-      - specs/knowledge-base/**
-      - specs/parser/**
-      - specs/prompts/**
-      - specs/model-gateway/**
-      - specs/assets/**
-      - specs/asset-access/**
-      - specs/generation-queue/**
-      - tests/test_openai_generation_pipeline.py
-      - tests/test_knowledge_library_behavioral_regression.py
-      - tests/test_knowledge_library_three_stone_vertical_slice.py
-      - data/knowledge/**
-      - data/knowledge-base/**
-      - data/prompts/**
-      - data/roles/**
-      - data/dictionary/**
-      - data/questions/**
-      - data/rules/**
-      - infra/terraform/production/**
-      - .github/workflows/deploy-production.yml
-      - .github/workflows/deploy-preprod.yml
-      - .github/workflows/runtime-api.yml
+  workflow_dispatch:
+    inputs:
+      confirm_sha:
+        description: Exact authorized source HEAD for a lightweight gate recheck
+        required: true
+        type: string
+      base_sha:
+        description: Original PR target SHA (merge-base is computed, not last-commit diff)
+        required: true
+        type: string
+      full_run_id:
+        description: Successful explicitly authorized Full Regression run on this exact SHA
+        required: true
+        type: string
+      reason:
+        description: Reason for this Owner-authorized lightweight recheck
+        required: true
+        type: string
+      authorization_reference:
+        description: Reference to explicit Owner authorization
+        required: true
+        type: string
 
 permissions:
   contents: read
+  actions: read # Read a supplied full-run receipt; never dispatch or write statuses.
 
 jobs:
   runtime:
     runs-on: ubuntu-latest
+    timeout-minutes: 90 # High-risk targeted checks are not cut to the ordinary 5–15m goal.
     services:
       postgres:
         image: postgres:16
@@ -110,47 +52,91 @@ jobs:
       DATABASE_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
       TEST_POSTGRES_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
     steps:
+      - name: Validate an explicitly authorized manual lightweight recheck
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          CONFIRM_SHA: ${{ inputs.confirm_sha }}
+          SOURCE_SHA: ${{ github.sha }}
+          AUTHORIZATION_REFERENCE: ${{ inputs.authorization_reference }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          [[ "${CONFIRM_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          test "${CONFIRM_SHA}" = "${SOURCE_SHA}"
+          test -n "${AUTHORIZATION_REFERENCE}"
+          test -n "${REASON}"
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || inputs.confirm_sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python -m pip install -e './packages/domain[test]'
-      - run: python -m pip install -e './packages/auth[test]'
-      - run: python -m pip install -e './packages/auth_oidc[test]'
-      - run: python -m pip install -e './packages/auth_identity_platform[test]'
-      - run: python -m pip install -e './packages/generation_queue[test]'
-      - run: python -m pip install -e './packages/generation_queue_gcp[test]'
-      - run: python -m pip install -e './packages/prompts[test]'
-      - run: python -m pip install -e './packages/model_gateway[test]'
-      - run: python -m pip install -e './packages/assets[test]'
-      - run: python -m pip install -e './packages/assets_gcs[test]'
-      - run: python -m pip install -e './packages/persistence'
-      - run: python -m pip install -e './packages/model_gateway_google[test]'
-      - run: python -m pip install -e './packages/model_gateway_openai[test]'
-      - run: python -m pip install -e './workers/generation[test]'
-      - run: python -m pip install -e './packages/parser[test]'
-      - run: python -m pip install -e './packages/text_understanding_google[test]'
-      - run: python -m pip install -e './apps/api[test]'
-      - run: alembic -c packages/persistence/alembic.ini upgrade head
-      - run: alembic -c packages/persistence/alembic.ini check
-      - run: alembic -c packages/persistence/alembic.ini current
-      - run: python -m pytest -c packages/domain/pyproject.toml packages/domain/tests -q
-      - run: python -m pytest -c packages/auth/pyproject.toml packages/auth/tests -q
-      - run: python -m pytest -c packages/auth_oidc/pyproject.toml packages/auth_oidc/tests -q
-      - run: python -m pytest -c packages/auth_identity_platform/pyproject.toml packages/auth_identity_platform/tests -q
-      - run: python -m pytest -c packages/generation_queue/pyproject.toml packages/generation_queue/tests -q
-      - run: python -m pytest -c packages/generation_queue_gcp/pyproject.toml packages/generation_queue_gcp/tests -q
-      - run: python -m pytest -c packages/parser/pyproject.toml packages/parser/tests -q
-      - run: python -m pytest -c packages/text_understanding_google/pyproject.toml packages/text_understanding_google/tests -q
-      - run: python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
-      - run: python -m pytest -c packages/model_gateway/pyproject.toml packages/model_gateway/tests -q
-      - run: python -m pytest -c packages/model_gateway_google/pyproject.toml packages/model_gateway_google/tests -q
-      - run: python -m pytest -c packages/model_gateway_openai/pyproject.toml packages/model_gateway_openai/tests -q
-      - run: python -m pytest -c packages/assets/pyproject.toml packages/assets/tests -q
-      - run: python -m pytest -c packages/assets_gcs/pyproject.toml packages/assets_gcs/tests -q
-      - run: python -m pytest -c workers/generation/pyproject.toml workers/generation/tests -q
-      - run: python -m pytest -c workers/generation/pyproject.toml tests/test_openai_generation_pipeline.py -q
-      - run: python -m pytest tests/test_knowledge_library_behavioral_regression.py tests/test_knowledge_library_three_stone_vertical_slice.py -q
-      - run: python -m pytest -c apps/api/pyproject.toml apps/api/tests -q
-      - run: python -m ruff check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
-      - run: python -m ruff format --check apps/api packages/auth packages/auth_oidc packages/auth_identity_platform packages/generation_queue packages/generation_queue_gcp packages/parser packages/text_understanding_google packages/prompts packages/model_gateway packages/model_gateway_google packages/model_gateway_openai packages/assets packages/assets_gcs packages/persistence workers/generation tests
+          cache: pip
+          cache-dependency-path: '**/pyproject.toml'
+      - name: Select PR tests against the complete PR merge base
+        id: selection
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.confirm_sha }}
+        run: >-
+          python tools/ci/pr_selection.py --base "${BASE_SHA}" --head "${HEAD_SHA}"
+          --output "${{ runner.temp }}/pr-selection.json"
+      - name: Install the unchanged dependency/extras set once
+        if: steps.selection.outputs.needs_tests == 'true'
+        run: bash tools/ci/install_runtime.sh
+      - name: Existing backend lint and format checks
+        if: steps.selection.outputs.needs_tests == 'true'
+        run: |
+          python -m ruff check apps/api packages workers/generation tests tools/ci
+          python -m ruff format --check apps/api packages workers/generation tests tools/ci
+      - name: Verify disposable PostgreSQL before any migration or test DDL
+        if: steps.selection.outputs.needs_tests == 'true'
+        run: >-
+          python -c "import sys; sys.path.insert(0, 'apps/api/tests');
+          from disposable_postgres import verified_ci_postgres; verified_ci_postgres()"
+      - name: Existing migration safety checks on the verified disposable service
+        if: steps.selection.outputs.needs_tests == 'true'
+        run: |
+          alembic -c packages/persistence/alembic.ini upgrade head
+          alembic -c packages/persistence/alembic.ini check
+          alembic -c packages/persistence/alembic.ini current
+      - name: Validate the supplied full-run identity (read-only; no dispatch)
+        id: qualified
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.full_run_id }}
+          SOURCE_SHA: ${{ inputs.confirm_sha }}
+        run: >-
+          python tools/ci/qualification.py metadata --run-id "${RUN_ID}"
+          --sha "${SOURCE_SHA}" --output "${{ runner.temp }}/full-run-metadata.json"
+      - uses: actions/download-artifact@v4
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: ${{ steps.qualified.outputs.artifact_name }}
+          run-id: ${{ inputs.full_run_id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/qualified-full
+      - name: Run all selected checks or verify already-complete exact-SHA full coverage
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          QUALIFICATION=()
+          if test "${EVENT_NAME}" = workflow_dispatch; then
+            QUALIFICATION=(--qualification "${RUNNER_TEMP}/qualified-full/qualification.json" --metadata "${RUNNER_TEMP}/full-run-metadata.json")
+          fi
+          python tools/ci/pr_checks.py --manifest "${RUNNER_TEMP}/pr-selection.json" \
+            --output "${RUNNER_TEMP}/pr-results" "${QUALIFICATION[@]}"
+      - name: Retain bounded selected coverage and failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-risk-results-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pr-selection.json
+            ${{ runner.temp }}/pr-results/
+          retention-days: 3
+          if-no-files-found: error
