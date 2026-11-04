@@ -1067,8 +1067,9 @@ class PersistenceRepository:
         clarification_plan_id: UUID | None = None,
         clarification_plan_payload: dict | None = None,
         release_binding: KnowledgeReleaseBinding | None = None,
+        verify=None,
     ) -> EnrichmentCycleRecord:
-        """Atomically commit the optional first edit, release pin, and first cycle."""
+        """Stage the first edit/pin/cycle; optional read-only verification precedes commit."""
 
         try:
             enrichment = _decode_enrichment_payload(result)
@@ -1118,6 +1119,22 @@ class PersistenceRepository:
         )
         if enrichment.enrichment_version == "2.0.0" and plan_payload is None:
             raise EnrichmentIntegrityError("F04 initial enrichment requires an atomic Plan2")
+        record = EnrichmentCycleRecord(
+            enrichment_cycle_id=enrichment_cycle_id,
+            session_id=session_id,
+            cycle_number=1,
+            specification_revision_id=authoritative_revision_id,
+            release_pin=KnowledgeReleasePinRecord(
+                session_id=session_id,
+                package_id=pin_identity[0],
+                artifact_version=pin_identity[1],
+                runtime_sha256=pin_identity[2],
+                validation_report_sha256=pin_identity[3],
+                binding=release_binding,
+            ),
+            result=enrichment,
+            created_at=created_at,
+        )
         try:
             with self._session_factory.begin() as db:
                 session = db.scalar(
@@ -1205,26 +1222,15 @@ class PersistenceRepository:
                         created_at=created_at,
                     )
                     db.flush()
+                if verify is not None:
+                    from .preparations import locked_reader
+
+                    verify(locked_reader(db), record)
         except IntegrityError as exc:
             raise EnrichmentCycleConflictError(
                 "initial revision or enrichment cycle already exists"
             ) from exc
-        return EnrichmentCycleRecord(
-            enrichment_cycle_id=enrichment_cycle_id,
-            session_id=session_id,
-            cycle_number=1,
-            specification_revision_id=authoritative_revision_id,
-            release_pin=KnowledgeReleasePinRecord(
-                session_id=session_id,
-                package_id=pin_identity[0],
-                artifact_version=pin_identity[1],
-                runtime_sha256=pin_identity[2],
-                validation_report_sha256=pin_identity[3],
-                binding=release_binding,
-            ),
-            result=enrichment,
-            created_at=created_at,
-        )
+        return record
 
     def get_knowledge_release_pin(
         self, session_id: UUID, organization_id: UUID
@@ -2049,8 +2055,9 @@ class PersistenceRepository:
         created_at: datetime,
         next_clarification_plan_id: UUID | None = None,
         next_clarification_plan_payload: dict | None = None,
+        verify=None,
     ) -> UserCorrectionRecord:
-        """Atomically record a correction, optional revision, and next enrichment cycle."""
+        """Stage a correction/revision/cycle and verify the result before atomic commit."""
 
         payload = self._verified_payload_hash(
             result_payload,
@@ -2136,7 +2143,12 @@ class PersistenceRepository:
                         raise UserCorrectionConflictError(
                             "correction source already has a different result"
                         )
-                    return self._user_correction_record(db, existing, session)
+                    record = self._user_correction_record(db, existing, session)
+                    if verify is not None:
+                        from .preparations import locked_reader
+
+                        verify(locked_reader(db), record)
+                    return record
                 if session.current_revision_id != expected_revision_id:
                     raise StaleRevisionError(
                         "Current Product State revision changed before correction commit"
@@ -2256,7 +2268,12 @@ class PersistenceRepository:
                 )
                 db.add(row)
                 db.flush()
-                return self._user_correction_record(db, row, session)
+                record = self._user_correction_record(db, row, session)
+                if verify is not None:
+                    from .preparations import locked_reader
+
+                    verify(locked_reader(db), record)
+                return record
         except IntegrityError as exc:
             raise UserCorrectionConflictError(
                 "correction, revision, or enrichment cycle already exists"

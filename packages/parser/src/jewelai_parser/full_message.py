@@ -592,6 +592,19 @@ def parse_full_message(
     candidates = defer_shared_negative_candidates(text, runtime, candidates, dictionary=dictionary)
 
     for match in _CENTER_KEEP.finditer(text):
+        # Recognizers may describe the same instruction at different lengths.
+        # Keep the enclosing source occurrence (including its qualifiers), not
+        # both that occurrence and an embedded prefix. Separate instructions
+        # and preservation subjects remain independent evidence.
+        if any(
+            c["classification"] == CandidateClassification.PRESERVATION
+            and c.get("semantic_subject") == "component.center_stone"
+            and c["evidence"]["start"] <= match.start()
+            and match.end() <= c["evidence"]["end"]
+            and (c["evidence"]["start"] < match.start() or match.end() < c["evidence"]["end"])
+            for c in candidates
+        ):
+            continue
         candidates = [
             c
             for c in candidates

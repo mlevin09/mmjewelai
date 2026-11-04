@@ -99,6 +99,7 @@ from .correction_enrichment import (
     CorrectionReason,
     CorrectionReenrichmentResult,
     UserCorrection,
+    decode_correction_result,
     process_user_correction,
 )
 from .durable_enrichment import (
@@ -261,6 +262,23 @@ class PromptEnrichmentRuntimeService:
         self._uuid = uuid_factory
         self.continuation_enabled = continuation_enabled
 
+    def _commit_verified(self, commit, build, **kwargs):
+        """Construct the complete result against staged rows before their commit.
+
+        The repository retains its existing lock/CAS/idempotency checks and
+        supplies a read-only view of that same transaction. Any snapshot or DTO
+        failure propagates through the transaction and rolls back every write.
+        """
+        completed = []
+
+        def verify(repository, record):
+            bound = copy(self)
+            bound.repository = repository
+            completed.append(build(bound, record))
+
+        commit(**kwargs, verify=verify)
+        return completed[0]
+
     def _for_session(self, session_id, organization_id, *, repository=None):
         repository = repository or self.repository
         try:
@@ -401,7 +419,14 @@ class PromptEnrichmentRuntimeService:
                 rules=self.artifacts.rules,
                 constraint_evidence=constraint_evidence,
             )
-            cycle = self.repository.commit_initial_enrichment(
+            return self._commit_verified(
+                self.repository.commit_initial_enrichment,
+                lambda bound, record: InitialEnrichmentRuntimeResult(
+                    parse_result=parsed,
+                    parser_proposal=first.parser_proposal,
+                    enrichment=enrichment,
+                    workflow=bound.get_current_state(request.session_id, request.organization_id),
+                ),
                 enrichment_cycle_id=cycle_id,
                 session_id=request.session_id,
                 organization_id=request.organization_id,
@@ -412,19 +437,6 @@ class PromptEnrichmentRuntimeService:
                 clarification_plan_id=clarification_plan_id,
                 clarification_plan_payload=clarification.model_dump(mode="json"),
                 release_binding=release_binding,
-            )
-            workflow = self._state_from_cycle(
-                session_id=request.session_id,
-                organization_id=request.organization_id,
-                cycle=cycle,
-                clarification_plan_id=clarification_plan_id,
-                clarification_plan=clarification,
-            )
-            return InitialEnrichmentRuntimeResult(
-                parse_result=parsed,
-                parser_proposal=first.parser_proposal,
-                enrichment=enrichment,
-                workflow=workflow,
             )
         except PromptEnrichmentRuntimeError:
             raise
@@ -675,8 +687,13 @@ class PromptEnrichmentRuntimeService:
                 rules=self.artifacts.rules,
                 constraint_evidence=constraint_evidence,
             )
-            commit_user_correction_result(
-                self.repository,
+            return self._commit_verified(
+                commit_user_correction_result,
+                lambda bound, record: (
+                    decode_correction_result(record.result_payload),
+                    bound.get_current_state(request.session_id, organization_id),
+                ),
+                repository=self.repository,
                 correction_record_id=self._uuid(),
                 next_enrichment_cycle_id=next_cycle_id,
                 organization_id=organization_id,
@@ -686,7 +703,6 @@ class PromptEnrichmentRuntimeService:
                 next_clarification_plan_id=self._uuid(),
                 next_clarification_plan=next_plan,
             )
-            return result, self.get_current_state(request.session_id, organization_id)
         except PromptEnrichmentRuntimeError:
             raise
         except (OwnershipMismatchError, NotFoundError) as exc:

@@ -1,8 +1,8 @@
 """Internal durable bridge for validated clarification and correction results.
 
-Processing remains outside the database transaction. These entry points validate immutable API
-contracts before persistence; the repository then rechecks authoritative session state under a
-database lock and commits every related record atomically. No public route is wired in this step.
+Parsing and proposal evaluation precede persistence. These entry points validate immutable API
+contracts; the repository rechecks session state under its existing lock. A caller may verify the
+complete final result against a read-only view of the staged rows before committing them.
 """
 
 from datetime import datetime
@@ -97,11 +97,13 @@ def commit_user_correction_result(
     created_at: datetime,
     next_clarification_plan_id: UUID | None = None,
     next_clarification_plan: ClarificationPlan | None = None,
+    verify=None,
 ) -> CorrectionReenrichmentResult:
     """Validate and atomically persist one correction and its prepared next cycle."""
 
     validated = CorrectionReenrichmentResult.model_validate(result)
     record = repository.commit_user_correction(
+        verify=verify,
         correction_record_id=correction_record_id,
         next_enrichment_cycle_id=next_enrichment_cycle_id,
         session_id=validated.session_id,

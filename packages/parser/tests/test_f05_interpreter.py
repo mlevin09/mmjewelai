@@ -129,3 +129,56 @@ def test_explicit_owner_precedes_neighboring_setting(dictionary, text, expected,
         assert all(c.classification == "prohibition" and c.parser_update is None for c in stones)
     if expected in {"side_stones", "unknown"}:
         assert all(c.parser_update is None for c in stones)
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        (
+            "Keep the center stone exactly as specified. Do not change its dimensions. "
+            "Use a refined, minimalist appearance.",
+            ("Keep the center stone exactly as specified",),
+        ),
+        (
+            "Preserve the center stone exactly as specified.",
+            ("Preserve the center stone exactly as specified",),
+        ),
+        ("Do not change the center stone shape.", ("Do not change the center stone shape",)),
+        ("Keep the center-stone shape unchanged.", ("Keep the center-stone shape unchanged",)),
+        (
+            "Сохранить центральный камень без изменений.",
+            ("Сохранить центральный камень без изменений",),
+        ),
+        (
+            "Keep the center stone exactly as specified. Preserve the band.",
+            ("Keep the center stone exactly as specified", "Preserve the band"),
+        ),
+        (
+            "Keep the center stone. Preserve the original center stone.",
+            ("Keep the center stone", "Preserve the original center stone"),
+        ),
+    ],
+)
+def test_preservation_recognizers_keep_enclosing_occurrence_not_its_prefix(
+    dictionary, text, expected
+):
+    result = parse_full_message(
+        text, locale="ru" if text.startswith("Сохранить") else "en", dictionary=dictionary
+    )
+    keeps = [c for c in result.candidates if c.classification == "preservation"]
+    assert tuple(c.evidence.text for c in keeps) == expected
+    assert all(c.certainty == "explicit" and c.parser_update is None for c in keeps)
+    assert all(text[c.evidence.start : c.evidence.end] == c.evidence.text for c in keeps)
+    assert len({c.candidate_id for c in result.candidates}) == len(result.candidates)
+    if text == "Keep the center stone. Preserve the original center stone.":
+        assert keeps[0].detail == "Sourced preservation is not a canonical value update."
+
+
+@pytest.mark.parametrize("prefix", ["Maybe ", "I refuse to ", "Probably "])
+def test_longer_preservation_match_still_requires_affirmative_authority(dictionary, prefix):
+    result = parse_full_message(
+        prefix + "keep the center stone exactly as specified.", locale="en", dictionary=dictionary
+    )
+    keeps = [c for c in result.candidates if c.classification == "preservation"]
+    assert len(keeps) == 1 and keeps[0].certainty != "explicit"
+    assert keeps[0].parser_update is None

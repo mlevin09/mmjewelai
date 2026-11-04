@@ -272,3 +272,21 @@ extraction across the retained wire formats. Fresh persisted HTTP tests cover
 initial/correction parity, source attribution and restart. Existing current-
 session tampering checks are retained. No migration or live activation follows
 from this decision.
+
+### Native KEEP occurrence and final-output atomicity repair
+
+The single current Parser retains the complete enclosing preservation occurrence
+instead of adding an overlapping shorter prefix from a second recognizer. Exact
+matches keep their existing interpretation; independent source occurrences and
+other component constraints remain separate. Governing polarity/certainty, spans,
+Message provenance and the approved correction/KEEP-release rules are unchanged.
+
+Native L/F initial and correction writers now construct the full snapshot, output
+and typed runtime result through a precommit verifier over the existing staged
+transaction. The repository retains its session-first lock, CAS, duplicate and
+source checks; the verifier receives the existing read-only reader and cannot
+start a write transaction. A failure propagates and rolls back revision, pin,
+cycle, plan and correction rows together. The separately persisted user Message
+remains its original source. No conflict is silently accepted, no error contract
+is relaxed, and no schema/migration or new Parser execution path is introduced.
+Existing continuation3 precommit verification remains unchanged.
