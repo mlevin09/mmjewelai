@@ -875,6 +875,7 @@ class GenerationPreparation:
 
 
 def _reject_source_v4(source):
+    """Keep unsupported current families out of frozen preparation consumers."""
     if isinstance(source, (bytes, str)):
         source = _strict_json(source)
     version = (
@@ -882,7 +883,7 @@ def _reject_source_v4(source):
         if isinstance(source, Mapping)
         else getattr(source, "schema_version", None)
     )
-    if version == "4.0.0":
+    if version in {"4.0.0", "5.0.0"}:
         raise GenerationPreparationError(PreparationErrorCode.UNSUPPORTED_SOURCE_VERSION)
 
 

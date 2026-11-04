@@ -180,8 +180,8 @@ class CanonicalInternalFinalPromptHandoffV3(InternalFinalPromptHandoff, StrictEv
     internal_final_prompt: CanonicalInternalFinalPromptV3
 
 
-def f04_current_components(snapshot, dictionary, facts, constraints, *, _source_facts=None):
-    """Shared native F formatting/readiness; no workflow DTO is relabelled."""
+def f04_semantic_components(snapshot, facts, *, _source_facts=None):
+    """Existing native F unresolved/readiness projection, independent of rendering."""
     frontier = snapshot.effective_unresolved_frontier
     definitions = {c.cause_id: c for c in snapshot.cause_definitions}
     unresolved = []
@@ -326,6 +326,22 @@ def f04_current_components(snapshot, dictionary, facts, constraints, *, _source_
                 else "Непринятый исходный запрос: "
             )
         summaries.append(prefix + "«" + wording + "»")
+    readiness = (
+        FinalPromptReadiness.BLOCKED
+        if snapshot.rule_decision.decision != "ready"
+        or any(s.blocks_current for s in frontier.frontier_core.cause_states)
+        else FinalPromptReadiness.READY_WITH_UNRESOLVED
+        if unresolved or unbound_wording
+        else FinalPromptReadiness.READY
+    )
+    return tuple(unresolved), tuple(summaries), readiness
+
+
+def f04_current_components(snapshot, dictionary, facts, constraints, *, _source_facts=None):
+    """Frozen F rendering, using the unchanged semantic projection."""
+    unresolved, summaries, readiness = f04_semantic_components(
+        snapshot, facts, _source_facts=_source_facts
+    )
     base_description = _description(
         snapshot,
         dictionary,
@@ -338,6 +354,7 @@ def f04_current_components(snapshot, dictionary, facts, constraints, *, _source_
             else "Утвердительные факты об изделии пока не приняты."
         ),
     )
+    frontier = snapshot.effective_unresolved_frontier
     text = base_description.text
     # Unknown is a canonical qualifier, not a new professional criticality policy.
     for entry in snapshot.enrichment_result.availability_overlay.entries:
@@ -380,15 +397,7 @@ def f04_current_components(snapshot, dictionary, facts, constraints, *, _source_
     description = UserReadableJewelryDescriptionV2(
         **desc_payload, content_hash=evidence_hash(desc_payload)
     )
-    readiness = (
-        FinalPromptReadiness.BLOCKED
-        if snapshot.rule_decision.decision != "ready"
-        or any(s.blocks_current for s in frontier.frontier_core.cause_states)
-        else FinalPromptReadiness.READY_WITH_UNRESOLVED
-        if unresolved or unbound_wording
-        else FinalPromptReadiness.READY
-    )
-    return description, tuple(unresolved), readiness
+    return description, unresolved, readiness
 
 
 def assemble_internal_final_prompt_v3(snapshot, *, dictionary, templates):

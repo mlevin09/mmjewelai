@@ -145,3 +145,24 @@ python -m jewelai_prompts.handoff_schema specs/prompts/internal-final-prompt-han
 python -m jewelai_prompts.canonical_schema specs/prompts/canonical-preparation-schema.json
 python -m pytest -c packages/prompts/pyproject.toml packages/prompts/tests -q
 ```
+
+## F06 explicitly selected review family
+
+`jewelai_prompts.final_prompt_v5.assemble_internal_final_prompt_v5` builds
+Description4 (`4.0.0`) and IFP5 (`5.0.0`) from the existing validated F05
+`FinalPromptSnapshotV3`. `build_internal_final_prompt_handoff` has exact Handoff5
+dispatch; its dedicated typed model supports strict JSON readback. The input must
+still come from an authorized, source-verified, single scoped read frame; this
+pure builder does not perform authorization or obtain state itself.
+
+The typed EN/RU review renderer preserves facts, ownership, polarity and authority,
+uses existing Dictionary translations and flags unsupported terminology explicitly.
+Its per-fact/per-constraint coverage is internal evidence, not a persisted/public
+field. Private reference values are represented by a count; opaque IDs, source
+wrappers and unsafe URLs are never a readable JSON fallback. Frozen families and
+hashes are unchanged. Description/IFP capacity limits remain unchanged.
+
+This is **not activated** in public HTTP or the UI. Existing F05 default outputs
+remain Description3/IFP4. Public output version 5 remains unsupported; downstream
+preparation rejects Handoff5. See [ADR 0038](../../docs/adr/0038-f06-versioned-readable-description.md)
+for scope, compatibility, and the separate public activation decision.

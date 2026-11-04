@@ -420,6 +420,37 @@ def _current_f_components(*args, **kwargs):
         raise
 
 
+def legacy_current_semantics(snapshot):
+    """Existing L discharge/readiness rules, without rendering historical prose."""
+    compat = snapshot.compatibility_projection
+    discharged_hashes = {
+        p.original_answer_ref.hash
+        for p in compat.proofs
+        if p.kind == "accepted_target_replaces_unknown"
+    }
+    discharged = {
+        d.decision_id
+        for d in snapshot.decision_lineage
+        if d.kind == "clarification" and d.content_hash in discharged_hashes
+    }
+    unresolved = tuple(
+        d for d in _unresolved_details(snapshot) if not discharged.intersection(d.source_ids)
+    )
+    if isinstance(snapshot.rule_decision, BlockDecision):
+        readiness, reason = FinalPromptReadiness.BLOCKED, snapshot.rule_decision.reason
+    elif not isinstance(snapshot.rule_decision, ReadyDecision) or compat.remaining_blocker_refs:
+        readiness, reason = (
+            FinalPromptReadiness.BLOCKED,
+            "Current native obligations remain blocking.",
+        )
+    else:
+        readiness = (
+            FinalPromptReadiness.READY_WITH_UNRESOLVED if unresolved else FinalPromptReadiness.READY
+        )
+        reason = snapshot.rule_decision.reason
+    return unresolved, readiness, reason
+
+
 def assemble_internal_final_prompt_v4(
     snapshot, *, dictionary, templates, _pending_descriptions=(), _source_facts=None
 ):
@@ -447,34 +478,7 @@ def assemble_internal_final_prompt_v4(
         )
         reason = snapshot.rule_decision.reason
     else:
-        compat = snapshot.compatibility_projection
-        discharged_hashes = {
-            p.original_answer_ref.hash
-            for p in compat.proofs
-            if p.kind == "accepted_target_replaces_unknown"
-        }
-        discharged = {
-            d.decision_id
-            for d in snapshot.decision_lineage
-            if d.kind == "clarification" and d.content_hash in discharged_hashes
-        }
-        unresolved = tuple(
-            d for d in _unresolved_details(snapshot) if not discharged.intersection(d.source_ids)
-        )
-        if isinstance(snapshot.rule_decision, BlockDecision):
-            readiness, reason = FinalPromptReadiness.BLOCKED, snapshot.rule_decision.reason
-        elif not isinstance(snapshot.rule_decision, ReadyDecision) or compat.remaining_blocker_refs:
-            readiness, reason = (
-                FinalPromptReadiness.BLOCKED,
-                "Current native obligations remain blocking.",
-            )
-        else:
-            readiness = (
-                FinalPromptReadiness.READY_WITH_UNRESOLVED
-                if unresolved
-                else FinalPromptReadiness.READY
-            )
-            reason = snapshot.rule_decision.reason
+        unresolved, readiness, reason = legacy_current_semantics(snapshot)
         base_description = _description(snapshot, dictionary, facts, constraints, unresolved)
     if len(_pending_descriptions) != len(snapshot.protection_projection.pending_requests):
         raise ValueError("Pending output requires every actual sourced logical request")
