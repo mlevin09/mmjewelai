@@ -70,50 +70,51 @@ def dependent_tests(root, changed):
     return sorted(result)
 
 
-def fixture_consumers(root, path):
-    """Keep confirmed tests and unresolved reader modules independently."""
-    folder = test_root(path)
-    if folder is None:
-        return dict(confirmed=[], unresolved=[])
-    resource = Path(path)
-    references = {path}
-    relative = resource.relative_to(folder).as_posix()
-    if "/" in relative:
-        references.add(relative)
-    # A basename alone cannot resolve two different resources in the same suite.
-    same_names = {p.resolve() for p in (root / folder).rglob(resource.name)}
-    same_names.add((root / path).resolve())  # Also retain deleted resources.
-    if len(same_names) == 1:
-        references.add(resource.name)
-    readers, unresolved = set(), set()
-    for source in (root / folder).rglob("*.py"):
-        if not source.resolve().is_relative_to(root.resolve()):
-            raise ValueError("external_fixture_dependency")
-        tree = ast.parse(source.read_text())
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
-                continue
-            operation = getattr(node.func, "attr", getattr(node.func, "id", None))
-            if operation not in {"open", "read_text", "read_bytes"}:
-                continue
-            literals = {
-                value.value.replace("\\", "/")
-                for value in ast.walk(node)
-                if isinstance(value, ast.Constant) and isinstance(value.value, str)
-            }
-            owner = source.relative_to(root).as_posix()
-            if literals & references:
-                readers.add(owner)
-            # A full-path match elsewhere cannot discharge this possible reader.
-            if len(same_names) > 1 and resource.name in literals:
-                unresolved.add(owner)
-    return dict(
-        confirmed=sorted(
-            {p for p in readers if Path(p).name.startswith("test_")}
-            | set(dependent_tests(root, readers))
-        ),
-        unresolved=sorted(unresolved),
-    )
+def resource_scope(root, path, config):
+    """Only reviewed, complete directory scopes can qualify resource coverage."""
+    scopes = []
+    for mapping in config.get("fixture_scopes", []):
+        prefix, scope = mapping["resources"], mapping["tests"]
+        if not (path == prefix.rstrip("/") or path.startswith(prefix.rstrip("/") + "/")):
+            continue
+        if (
+            any(
+                not value
+                or Path(value).is_absolute()
+                or ".." in Path(value).parts
+                or any(c in value for c in "*?[")
+                for value in (prefix, scope)
+            )
+            or not mapping.get("evidence", "").strip()
+        ):
+            raise ValueError("invalid_fixture_scope_mapping")
+        folder = root / scope
+        if (
+            (test_root(path) is not None and not path.startswith(scope + "/"))
+            or scope == "apps/api/tests"
+            or test_root(scope) is None
+            or not folder.is_dir()
+            or not folder.resolve().is_relative_to(root.resolve())
+            or not any(folder.rglob("test_*.py"))
+        ):
+            raise ValueError("fixture_scope_not_bounded_or_collectable")
+        suite_for(scope + "/test_scope.py")  # Validate a supported native pytest scope.
+        scopes.append(scope)
+    return dict(test_scopes=normalize(scopes), coverage="complete_scope" if scopes else "unmapped")
+
+
+def is_behavior_resource(path):
+    # Existing CI config/workflow routing runs its complete tooling test suite.
+    if path in {
+        "tools/ci/pr_routes.json",
+        "tools/ci/isolation.json",
+        "tools/ci/timing_weights.json",
+    } or (path.startswith(".github/workflows/") and Path(path).suffix in {".yml", ".yaml"}):
+        return False
+    p = Path(path)
+    if set(p.parts[:-1]) & {"data", "fixtures", "resources", "templates", "snapshots"}:
+        return True
+    return p.suffix.lower() not in {".py", ".ts", ".tsx", ".js", ".jsx", ".sh"}
 
 
 def is_documentation(path):
@@ -196,20 +197,22 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
     for path in sorted(set(changed)):
         if Path(path).is_absolute() or ".." in Path(path).parts:
             raise ValueError("invalid_changed_path")
-        is_fixture = test_root(path) is not None and not path.endswith(".py")
-        consumers, unresolved = [], []
-        if is_fixture:
-            dependency = fixture_consumers(root, path)
-            fixture_dependencies[path] = dependency
-            consumers, unresolved = dependency["confirmed"], dependency["unresolved"]
-        if not consumers and not unresolved and is_documentation(path):
+        coverage = resource_scope(root, path, config)
+        if not coverage["test_scopes"] and is_documentation(path):
             continue
-        for consumer in consumers:
-            add(consumer, "fixture_file_dependency")
         docs = False
         if any(path.startswith(p) for p in config["delegated_prefixes"]):
             continue
         relevant = True
+        is_fixture = bool(coverage["test_scopes"]) or (
+            is_behavior_resource(path) and path not in config["build_files"]
+        )
+        scopes = []
+        if is_fixture:
+            fixture_dependencies[path] = coverage
+            scopes = coverage["test_scopes"]
+            for scope in scopes:
+                add(scope, "complete_resource_owning_scope")
         is_test = (
             test_root(path) is not None
             and Path(path).name.startswith("test_")
@@ -217,7 +220,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         )
         if is_test and (root / path).exists():
             add(path, "new_or_modified_test_file")
-        matched = bool(consumers)
+        matched = bool(scopes)
         for route in config["routes"]:
             if any(path.startswith(prefix) for prefix in route["prefixes"]):
                 buckets.update(route["buckets"])
@@ -244,7 +247,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         if path in {"apps/api/src/jewelai_api/app.py", "apps/api/src/jewelai_api/services.py"}:
             full.append("shared_api_dispatch")
             buckets.update({"authorization", "persistence"})
-        if is_fixture and (not consumers or unresolved):
+        if is_fixture and not scopes:
             blocked.append("unmapped_fixture_data")
         if not matched and not is_test and not test_root(path):
             blocked.append("unmapped_impact")

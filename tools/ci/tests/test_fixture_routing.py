@@ -53,12 +53,13 @@ def test_fix03_runtime_resource_is_not_exempted_by_extension(path):
         assert result["blocked_reasons"]
 
 
-def scratch_repo(root):
+def scratch_repo(root, *, owned=False):
     ci = root / "tools/ci"
     ci.mkdir(parents=True)
     for source in (ROOT / "tools/ci").glob("*.py"):
         shutil.copyfile(source, ci / source.name)
-    tests = root / "apps/api/tests"
+    base_tests = root / "apps/api/tests"
+    tests = base_tests / "owned" if owned else base_tests
     tests.mkdir(parents=True)
     (root / "apps/api/pyproject.toml").write_text(
         '[tool.pytest.ini_options]\ntestpaths = ["tests"]\n'
@@ -69,8 +70,8 @@ def scratch_repo(root):
         '    assert Path(__file__).with_name("expected_value.txt").read_text()'
         '.strip() == "approved"\n'
     )
-    (tests / "test_smoke.py").write_text("def test_smoke():\n    assert True\n")
-    (tests / "test_unrelated.py").write_text("def test_unrelated():\n    assert True\n")
+    (base_tests / "test_smoke.py").write_text("def test_smoke():\n    assert True\n")
+    (base_tests / "test_unrelated.py").write_text("def test_unrelated():\n    assert True\n")
     config = dict(
         version=1,
         smoke=["apps/api/tests/test_smoke.py"],
@@ -81,6 +82,17 @@ def scratch_repo(root):
         delegated_prefixes=[],
         delegated_check=None,
     )
+    if owned:
+        config["fixture_scopes"] = [
+            dict(
+                resources="apps/api/tests/owned",
+                tests="apps/api/tests/owned",
+                evidence=(
+                    "Disposable self-contained namespace: every fixture consumer "
+                    "is inside this complete test directory."
+                ),
+            )
+        ]
     (ci / "pr_routes.json").write_text(json.dumps(config))
 
     def git(*args):
@@ -95,15 +107,15 @@ def scratch_repo(root):
 
 
 def test_fix04_06_real_fixture_only_commits_cannot_false_green(tmp_path):
-    config, git = scratch_repo(tmp_path)
-    fixture = tmp_path / "apps/api/tests/expected_value.txt"
+    config, git = scratch_repo(tmp_path, owned=True)
+    fixture = tmp_path / "apps/api/tests/owned/expected_value.txt"
     base = git("rev-parse", "HEAD")
     outcomes = []
     # A compatible fixture-only commit really executes its consumer successfully.
     # A second fixture-only commit breaks the unchanged consumer and must fail CI.
     for label, content in [("compatible", "approved\n"), ("broken", "broken")]:
         fixture.write_text(content)
-        git("add", "apps/api/tests/expected_value.txt")
+        git("add", "apps/api/tests/owned/expected_value.txt")
         git("commit", "-qm", label)
         head = git("rev-parse", "HEAD")
         merge_base, changed = selection.git_changes(tmp_path, base, head)
@@ -114,7 +126,7 @@ def test_fix04_06_real_fixture_only_commits_cannot_false_green(tmp_path):
             tmp_path,
             tmp_path / (label + "-consumer-collection"),
             "apps/api/pyproject.toml",
-            ["apps/api/tests/test_consumer.py"],
+            ["apps/api/tests/owned/test_consumer.py"],
             collect=True,
         )
         # This must precede the assertion that fails on the old selector, so the
@@ -125,7 +137,7 @@ def test_fix04_06_real_fixture_only_commits_cannot_false_green(tmp_path):
                     tmp_path,
                     tmp_path / (label + "-consumer"),
                     "apps/api/pyproject.toml",
-                    ["apps/api/tests/test_consumer.py"],
+                    ["apps/api/tests/owned/test_consumer.py"],
                 )
                 consumer = "passed" if raw["exitcode"] == 0 else "failed"
             except ValueError:
@@ -158,7 +170,7 @@ def test_fix04_06_real_fixture_only_commits_cannot_false_green(tmp_path):
     assert outcomes[0]["gate"] == "success"
     for outcome in outcomes:
         assert not outcome["manifest"]["docs_only"]
-        assert "apps/api/tests/test_consumer.py" in targets(outcome["manifest"])
+        assert "apps/api/tests/owned" in targets(outcome["manifest"])
         assert not outcome["manifest"]["blocked_reasons"]
 
 
@@ -203,8 +215,6 @@ def test_known_fixture_ownership_is_conservative(tmp_path, mode):
         tmp_path, [path], config, source_sha="a" * 40, merge_base="b" * 40
     )
     assert result["relevant"] and not result["docs_only"]
-    if mode == "ambiguous":
-        assert "unmapped_fixture_data" in result["blocked_reasons"]
-    else:
-        assert "apps/api/tests/test_consumer.py" in targets(result)
-        assert not result["blocked_reasons"]
+    # Reader recognition is no longer permission to pass without an owning scope.
+    assert "unmapped_fixture_data" in result["blocked_reasons"]
+    assert result["fixture_dependencies"][path]["coverage"] == "unmapped"

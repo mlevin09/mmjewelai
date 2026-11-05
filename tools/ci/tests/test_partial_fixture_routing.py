@@ -13,12 +13,12 @@ from test_pr_selection import selection, targets
 
 @pytest.mark.parametrize("scenario", ["mixed", "known_only", "multiple"])
 def test_partial_fixture_dependencies_use_actual_cli_gate(tmp_path, scenario):
-    config, git = scratch_repo(tmp_path)
-    tests = tmp_path / "apps/api/tests"
+    config, git = scratch_repo(tmp_path, owned=True)
+    tests = tmp_path / "apps/api/tests/owned"
     (tests / "test_consumer.py").unlink()
     (tests / "test_explicit.py").write_text(
         "from pathlib import Path\ndef test_encoding():\n"
-        '    assert Path("apps/api/tests/expected_value.txt").read_text().isascii()\n'
+        '    assert Path("apps/api/tests/owned/expected_value.txt").read_text().isascii()\n'
     )
     if scenario != "known_only":
         (tests / "test_strict.py").write_text(
@@ -35,11 +35,11 @@ def test_partial_fixture_dependencies_use_actual_cli_gate(tmp_path, scenario):
     # Known-only and multiple-consumer controls stay compatible. The exact mixed
     # reproduction changes only the fixture; encoding still passes, content fails.
     (tests / "expected_value.txt").write_text("broken" if scenario == "mixed" else "approved\n")
-    git("add", "apps/api/tests/expected_value.txt")
+    git("add", "apps/api/tests/owned/expected_value.txt")
     git("commit", "-qm", "fixture-only change")
     head = git("rev-parse", "HEAD")
     merge, changed = selection.git_changes(tmp_path, base, head)
-    assert changed == ["apps/api/tests/expected_value.txt"]
+    assert changed == ["apps/api/tests/owned/expected_value.txt"]
     manifest = selection.build_selection(
         tmp_path, changed, config, source_sha=head, merge_base=merge
     )
@@ -75,7 +75,17 @@ def test_partial_fixture_dependencies_use_actual_cli_gate(tmp_path, scenario):
                     "pytest",
                     "-c",
                     "apps/api/pyproject.toml",
-                    *[str(Path("apps/api/tests") / n) for n in names],
+                    *[
+                        str(
+                            (
+                                Path("apps/api/tests")
+                                if n == "test_smoke.py"
+                                else Path("apps/api/tests/owned")
+                            )
+                            / n
+                        )
+                        for n in names
+                    ],
                     "-q",
                     "-p",
                     "no:cacheprovider",
@@ -91,17 +101,17 @@ def test_partial_fixture_dependencies_use_actual_cli_gate(tmp_path, scenario):
         dest = Path(folder)
         dest.mkdir(parents=True, exist_ok=True)
         (dest / (scenario + ".json")).write_text(json.dumps(observed, indent=2))
-    assert "apps/api/tests/test_explicit.py" in targets(manifest)
+    assert "apps/api/tests/owned" in targets(manifest)
     assert "apps/api/tests/test_unrelated.py" not in targets(manifest)
     if scenario == "mixed":
         assert child.returncode != 0 and result["result"] == "failure"
-        assert "unmapped_fixture_data" in manifest["blocked_reasons"]
+        assert not manifest["blocked_reasons"]
+        assert result["groups"]["api"]["selected"] == 3
         dependency = manifest["fixture_dependencies"][changed[0]]
-        assert dependency["confirmed"] == ["apps/api/tests/test_explicit.py"]
-        assert dependency["unresolved"] == ["apps/api/tests/test_strict.py"]
+        assert dependency == dict(test_scopes=["apps/api/tests/owned"], coverage="complete_scope")
     else:
         assert child.returncode == 0 and result["result"] == "success"
         assert not manifest["blocked_reasons"]
         if scenario == "multiple":
-            assert "apps/api/tests/test_strict.py" in targets(manifest)
+            assert "apps/api/tests/owned" in targets(manifest)
             assert result["groups"]["api"]["selected"] == 3

@@ -79,6 +79,8 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
     )
     started = time.monotonic()
     try:
+        if manifest["blocked_reasons"]:
+            raise ValueError("unmapped_impact_requires_routing_review")
         if manifest["docs_only"] or not manifest["relevant"]:
             subprocess.run(
                 ["git", "diff", "--check", manifest["merge_base"], manifest["source_sha"]],
@@ -152,8 +154,6 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
                 verify_execution(report, collections[suite])
                 validate_artifacts(output / (suite.replace("/", "_") + "-execution"), report)
                 result["groups"][suite]["seconds"] = report["wall_seconds"]
-        if manifest["blocked_reasons"]:
-            raise ValueError("unmapped_impact_requires_routing_review")
         if result["full_regression_required"] and qualification is None:
             raise ValueError("manual_full_qualification_required_before_merge")
         result["result"] = "success"

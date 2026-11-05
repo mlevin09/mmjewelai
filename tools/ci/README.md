@@ -30,19 +30,30 @@ selection requires manual Full Regression rather than silently launching the
 entire API suite. No selected test is removed to meet a time goal.
 
 Unknown executable/data impact fails explicitly, even when the smoke passes.
-Text extensions are not documentation exemptions. Only the repository's explicit
-`docs/`, root governance and scoped README conventions qualify; fixture/data/src/
-resource/template/snapshot locations are checked first. A test resource with a
-literal `open`/`read_text`/`read_bytes` reference selects its consuming test file
-and transitive local helper importers. Basenames must be unique within that test
-suite; dynamic, ambiguous or unknown fixture dependencies block explicitly.
-Confirmed tests and unresolved possible reader modules are retained separately
-in the selection manifest. Any unresolved basename reader blocks even when a
-full-path reader is confirmed; a nonempty partial list is not complete coverage.
-A README used as a known fixture remains behavior, not documentation. Genuine
-documentation-only PRs retain diff/selection checks without product tests.
-Runtime data uses existing component routes or fails as unknown impact. Web-only
-scope delegates to the unchanged Web workflow and does not claim its success.
+Text extensions are not documentation exemptions. Explicit docs/governance/README
+conventions remain lightweight; fixtures, runtime data and resources do not.
+**Reader recognition is not proof of complete dependency coverage.** No fixture
+AST-reader inference is used. Resources require a reviewed `fixture_scopes`
+entry with `resources` (exact path/directory prefix), `tests` (complete owning
+pytest directory) and `evidence` explaining why it covers all consumers. Whole
+directories are collected/executed, never only recognized reader files.
+
+There are deliberately **no live fixture mappings** yet: shared API resources
+have no established safe narrower ownership boundary. Such changes fail with
+`unmapped_fixture_data` before running tests. Do not map shared resources to a
+convenient subset merely to clear CI. A future mapping requires demonstrated
+complete ownership and review; a nonempty justification alone is not evidence.
+Mappings cannot use globs, external/missing directories, file-only targets or the
+whole `apps/api/tests` suite. An unowned resource blocks, never automatically
+launches 2000+ API tests. Runtime data also needs complete ownership, even if an
+ordinary component regression route happens to match it. Existing Web delegation
+is unchanged; its independent full Web gate remains responsible for Web scope.
+
+Synthetic controls declare one self-contained nested test namespace and prove
+that its complete scope executes direct and indirect consumers, including the
+previously omitted Path-variable reader. No professional/runtime fixture mapping
+is activated by those tests. This is an internal CI configuration, not a product
+or durable domain contract.
 
 The smoke combines one real HTTP integration journey (J7: RU input, canonical
 state, a metal-only correction, final description/IFP, persisted restart) with
