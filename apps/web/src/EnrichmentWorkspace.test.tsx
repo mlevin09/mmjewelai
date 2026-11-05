@@ -364,7 +364,10 @@ describe("Prompt Enrichment workspace", () => {
     expect(
       screen.queryByRole("button", { name: "Accept offered change" }),
     ).not.toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText("Parameter / decision"), "option-gold");
+    await userEvent.selectOptions(
+      screen.getByLabelText("Parameter / decision"),
+      "option-gold",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]).toMatchObject({
@@ -408,8 +411,13 @@ describe("Prompt Enrichment workspace", () => {
     await userEvent.click(screen.getByText("Other questions (1)"));
     expect(other.open).toBe(true);
     expect(screen.getByText("Which metal?")).toBeInTheDocument();
-    await userEvent.selectOptions(within(other).getByLabelText("Parameter / decision"), "option-gold");
-    await userEvent.click(within(other).getByRole("button", { name: "Save answer" }));
+    await userEvent.selectOptions(
+      within(other).getByLabelText("Parameter / decision"),
+      "option-gold",
+    );
+    await userEvent.click(
+      within(other).getByRole("button", { name: "Save answer" }),
+    );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]).toMatchObject({
       route: "clarification-answers",
@@ -434,12 +442,26 @@ describe("Prompt Enrichment workspace", () => {
     f.view();
     await screen.findByText("Which metal?");
     expect(screen.getByLabelText("Parameter / decision")).toBeInTheDocument();
-    expect(screen.getByLabelText("Parameter value in your words")).toBeInTheDocument();
-    expect(screen.getByLabelText("Clarification free-text answer")).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText("Parameter / decision"), "gold-id");
-    await userEvent.type(screen.getByLabelText("Clarification free-text answer"), "Matte finish");
+    expect(
+      screen.getByLabelText("Parameter value in your words"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Clarification free-text answer"),
+    ).toBeInTheDocument();
+    await userEvent.selectOptions(
+      screen.getByLabelText("Parameter / decision"),
+      "gold-id",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Clarification free-text answer"),
+      "Matte finish",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    await waitFor(() => expect(f.commands.some((c) => c.route === "clarification-answers")).toBe(true));
+    await waitFor(() =>
+      expect(f.commands.some((c) => c.route === "clarification-answers")).toBe(
+        true,
+      ),
+    );
     expect(f.commands.some((c) => c.route === "corrections")).toBe(true);
   });
   it("hides internal JSON and explains blocked final output in plain language", async () => {

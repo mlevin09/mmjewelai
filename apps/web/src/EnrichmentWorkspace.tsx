@@ -141,12 +141,22 @@ export function EnrichmentWorkspace({
     await perform(async () => {
       const hasDecision = Boolean(decision);
       if (hasDecision) {
-        await client.answer(state, question, decision as "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN", option);
+        await client.answer(
+          state,
+          question,
+          decision as
+            "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
+          option,
+        );
       }
       const written = [
-        value.trim() ? `${question.question_kind === "NATIVE" ? question.native_question.text : question.offer.rendered_question}: ${value.trim()}` : "",
+        value.trim()
+          ? `${question.question_kind === "NATIVE" ? question.native_question.text : question.offer.rendered_question}: ${value.trim()}`
+          : "",
         note.trim(),
-      ].filter(Boolean).join("\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
       if (written) {
         // An answer may advance the server revision. Read the new head before
         // submitting any additional free text through the existing API.
@@ -249,22 +259,46 @@ export function EnrichmentWorkspace({
               {t("Saved automatically", "Сохраняется автоматически")}
             </span>
           </div>
-          <section className="living-design" aria-label={t("Current design text", "Актуальное описание украшения")}>
-            <p className="eyebrow">{t("CURRENT VERSION", "АКТУАЛЬНАЯ ВЕРСИЯ")}</p>
-            <h3>{t("Your design, updated", "Ваше украшение — актуальный текст")}</h3>
+          <section
+            className="living-design"
+            aria-label={t(
+              "Current design text",
+              "Актуальное описание украшения",
+            )}
+          >
+            <p className="eyebrow">
+              {t("CURRENT VERSION", "АКТУАЛЬНАЯ ВЕРСИЯ")}
+            </p>
+            <h3>
+              {t("Your design, updated", "Ваше украшение — актуальный текст")}
+            </h3>
             <p className="living-design-text" aria-live="polite">
-              {s?.description.text || t(
-                "Start by describing your jewelry below. Your saved answers will be reflected here in one current description.",
-                "Опишите своё украшение ниже. Сохранённые ответы будут отражены здесь в одном актуальном описании.",
-              )}
+              {s?.description.text ||
+                t(
+                  "Start by describing your jewelry below. Your saved answers will be reflected here in one current description.",
+                  "Опишите своё украшение ниже. Сохранённые ответы будут отражены здесь в одном актуальном описании.",
+                )}
             </p>
           </section>
           <details className="conversation-history">
-            <summary>{t("Message history", "История сообщений")} ({snapshot.events.length})</summary>
-            <ol ref={log} className="conversation-log" aria-label={t("Saved conversation", "Сохранённая беседа")}>
+            <summary>
+              {t("Message history", "История сообщений")} (
+              {snapshot.events.length})
+            </summary>
+            <ol
+              ref={log}
+              className="conversation-log"
+              aria-label={t("Saved conversation", "Сохранённая беседа")}
+            >
               {snapshot.events.map((e) => (
                 <li key={e.event_id} className={`conversation-${e.kind}`}>
-                  <strong>{e.kind === "user" ? t("Your message", "Ваше сообщение") : e.kind === "question" ? t("Question", "Уточнение") : t("Saved decision", "Сохранённое решение")}</strong>
+                  <strong>
+                    {e.kind === "user"
+                      ? t("Your message", "Ваше сообщение")
+                      : e.kind === "question"
+                        ? t("Question", "Уточнение")
+                        : t("Saved decision", "Сохранённое решение")}
+                  </strong>
                   {e.text !== e.outcome && <p>{e.text}</p>}
                   {e.outcome && <span className="badge">{e.outcome}</span>}
                 </li>
@@ -289,7 +323,14 @@ export function EnrichmentWorkspace({
                 busy={busy}
                 ru={ru}
                 submit={(decision, option, value, note) =>
-                  void submitClarification(s, activeQuestion, decision, option, value, note)
+                  void submitClarification(
+                    s,
+                    activeQuestion,
+                    decision,
+                    option,
+                    value,
+                    note,
+                  )
                 }
               />
               {s.questions.length > 1 && (
@@ -309,7 +350,14 @@ export function EnrichmentWorkspace({
                       busy={busy}
                       ru={ru}
                       submit={(decision, option, value, note) =>
-                        void submitClarification(s, q, decision, option, value, note)
+                        void submitClarification(
+                          s,
+                          q,
+                          decision,
+                          option,
+                          value,
+                          note,
+                        )
                       }
                     />
                   ))}
@@ -408,21 +456,25 @@ export function EnrichmentWorkspace({
               )}
             </p>
           )}
-          <details className="saved-parameters"><summary>{t("Saved parameters", "Сохранённые параметры")} ({known.length})</summary>
-          <dl className="design-facts">
-            {known.map((f) => (
-              <div key={f.path}>
-                <dt>{label(f.path)}</dt>
-                <dd>
-                  {display(f.value)}{" "}
-                  <small>
-                    {f.origin} {f.confirmed ? " · confirmed" : " · unconfirmed"}{" "}
-                    {f.locked ? " · LOCK" : ""}
-                  </small>
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <details className="saved-parameters">
+            <summary>
+              {t("Saved parameters", "Сохранённые параметры")} ({known.length})
+            </summary>
+            <dl className="design-facts">
+              {known.map((f) => (
+                <div key={f.path}>
+                  <dt>{label(f.path)}</dt>
+                  <dd>
+                    {display(f.value)}{" "}
+                    <small>
+                      {f.origin}{" "}
+                      {f.confirmed ? " · confirmed" : " · unconfirmed"}{" "}
+                      {f.locked ? " · LOCK" : ""}
+                    </small>
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </details>
           {s?.protection_projection.roots.length ||
           known.some((f) => f.locked || f.confirmed) ? (
@@ -545,61 +597,118 @@ function QuestionCard({
     : q.question_kind === "KEEP_RELEASE"
       ? q.offer.allowed_decisions
       : [];
-  const options = native && allowed.includes("SELECT_OPTION") ? native.options : [];
+  const options =
+    native && allowed.includes("SELECT_OPTION") ? native.options : [];
   const labels: Record<string, string> = {
     ACCEPT: ru ? "Принять" : "Accept",
     REJECT: ru ? "Отклонить" : "Reject",
     SKIP: ru ? "Пропустить" : "Skip",
     UNKNOWN: ru ? "Не знаю" : "I don't know",
   };
-  const selectedOption = options.find((o) => (o.option_id ?? o.value) === choice);
+  const selectedOption = options.find(
+    (o) => (o.option_id ?? o.value) === choice,
+  );
   const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
-  const canSend = Boolean((selectedDecision && allowed.includes(selectedDecision as "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN")) || value.trim() || note.trim());
+  const canSend = Boolean(
+    (selectedDecision &&
+      allowed.includes(
+        selectedDecision as
+          "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
+      )) ||
+    value.trim() ||
+    note.trim(),
+  );
   return (
     <section className="clarification-card">
-      <h3>{q.question_kind === "KEEP_RELEASE" ? q.offer.rendered_question : q.native_question.text}</h3>
+      <h3>
+        {q.question_kind === "KEEP_RELEASE"
+          ? q.offer.rendered_question
+          : q.native_question.text}
+      </h3>
       <div className="clarification-inputs">
         <label>
           <span>{ru ? "Параметр / решение" : "Parameter / decision"}</span>
-          <select value={choice} disabled={busy} onChange={(e) => setChoice(e.target.value)}>
-            <option value="">{ru ? "Выберите вариант (необязательно)" : "Choose an option (optional)"}</option>
+          <select
+            value={choice}
+            disabled={busy}
+            onChange={(e) => setChoice(e.target.value)}
+          >
+            <option value="">
+              {ru
+                ? "Выберите вариант (необязательно)"
+                : "Choose an option (optional)"}
+            </option>
             {options.map((o) => (
-              <option value={o.option_id ?? o.value} key={o.option_id ?? o.value}>{o.label}</option>
+              <option
+                value={o.option_id ?? o.value}
+                key={o.option_id ?? o.value}
+              >
+                {o.label}
+              </option>
             ))}
-            {allowed.filter((d) => d !== "SELECT_OPTION").map((d) => (
-              <option value={d} key={d}>{labels[d]}</option>
-            ))}
+            {allowed
+              .filter((d) => d !== "SELECT_OPTION")
+              .map((d) => (
+                <option value={d} key={d}>
+                  {labels[d]}
+                </option>
+              ))}
           </select>
         </label>
         <label>
-          <span>{ru ? "Значение параметра своими словами" : "Parameter value in your words"}</span>
+          <span>
+            {ru
+              ? "Значение параметра своими словами"
+              : "Parameter value in your words"}
+          </span>
           <input
             value={value}
             disabled={busy}
             maxLength={500}
-            placeholder={ru ? "Например: ширина кольца 3 мм" : "For example: band width 3 mm"}
+            placeholder={
+              ru
+                ? "Например: ширина кольца 3 мм"
+                : "For example: band width 3 mm"
+            }
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
         <label>
-          <span>{ru ? "Дополнительные пожелания / свободный текст" : "Additional preferences / free text"}</span>
+          <span>
+            {ru
+              ? "Дополнительные пожелания / свободный текст"
+              : "Additional preferences / free text"}
+          </span>
           <textarea
             value={note}
             disabled={busy}
             maxLength={1400}
-            aria-label={ru ? "Свободный ответ на уточнение" : "Clarification free-text answer"}
-            placeholder={ru ? "Добавьте детали, которые важны для вас…" : "Add any details that matter to you…"}
+            aria-label={
+              ru
+                ? "Свободный ответ на уточнение"
+                : "Clarification free-text answer"
+            }
+            placeholder={
+              ru
+                ? "Добавьте детали, которые важны для вас…"
+                : "Add any details that matter to you…"
+            }
             onChange={(e) => setNote(e.target.value)}
           />
         </label>
-        <button type="button" disabled={busy || !canSend} onClick={() => {
-          submit(
-            (selectedDecision || "") as "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
-            selectedOption,
-            value,
-            note,
-          );
-        }}>
+        <button
+          type="button"
+          disabled={busy || !canSend}
+          onClick={() => {
+            submit(
+              (selectedDecision || "") as
+                "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+              selectedOption,
+              value,
+              note,
+            );
+          }}
+        >
           {ru ? "Сохранить ответ" : "Save answer"}
         </button>
         <p className="question-help">
