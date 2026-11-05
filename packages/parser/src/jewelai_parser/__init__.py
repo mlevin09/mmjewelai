@@ -2,17 +2,21 @@
 
 from .full_message import (
     FULL_MESSAGE_PARSE_VERSION,
+    AnyFullMessageParseResult,
     CandidateApplication,
     CandidateCertainty,
     CandidateClassification,
     CandidateSubject,
     EvidenceSpan,
     FullMessageParseResult,
+    FullMessageParseResultV1_2,
     MessageLanguage,
     NormalizationSource,
     StructuredCandidate,
     StructuredTarget,
     parse_full_message,
+    read_full_message_parse_result,
+    same_parse_evidence,
 )
 from .knowledge_matcher import (
     AmbiguousKnowledgeMatch,
@@ -54,7 +58,9 @@ __all__ = [
     "DimensionsScaleCandidate",
     "EvidenceSpan",
     "FULL_MESSAGE_PARSE_VERSION",
+    "AnyFullMessageParseResult",
     "FullMessageParseResult",
+    "FullMessageParseResultV1_2",
     "KnowledgeLibraryMatcher",
     "KnowledgeMatchCandidate",
     "KnowledgeMatchMethod",
@@ -76,5 +82,7 @@ __all__ = [
     "build_parser_proposal",
     "normalize_knowledge_text",
     "parse_full_message",
+    "read_full_message_parse_result",
+    "same_parse_evidence",
     "ru_morphology_key",
 ]

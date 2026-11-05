@@ -22,6 +22,7 @@ from jewelai_parser import (
     NormalizationSource,
     StructuredTarget,
     parse_full_message,
+    read_full_message_parse_result,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -615,7 +616,7 @@ def test_evidence_offsets_are_exact_and_reject_tampering(dictionary):
     payload = result.model_dump(mode="json")
     payload["candidates"][0]["evidence"]["text"] = "tampered"
     with pytest.raises(ValidationError, match="does not match original input"):
-        FullMessageParseResult.model_validate(payload)
+        read_full_message_parse_result(payload)
 
 
 def test_parsing_is_deterministic_and_does_not_mutate_product_state(dictionary, terminology):

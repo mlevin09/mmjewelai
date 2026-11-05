@@ -28,7 +28,7 @@ from jewelai_domain.knowledge_storage import (
 from jewelai_domain.models import ImmutableModel, MessageSource, Text
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_domain.revisions import RevisionConflict, revise_design
-from jewelai_parser import FullMessageParseResult, parse_full_message
+from jewelai_parser import AnyFullMessageParseResult, parse_full_message
 from jewelai_persistence import (
     EnrichmentCycleRecord,
     KnowledgeReleasePinConflictError,
@@ -135,7 +135,7 @@ class CorrectionReenrichmentResult(ImmutableModel):
     dictionary_artifact_version: str
     prompt_template_artifact_version: str
     prior_answer_results: tuple[ClarificationAnswerResult, ...]
-    parsed_correction: FullMessageParseResult
+    parsed_correction: AnyFullMessageParseResult
     correction_evaluation: ParsedCandidateEnrichmentResult
     post_transition_evaluation: ParsedCandidateEnrichmentResult
     next_enrichment_result: AnyPromptEnrichmentResult

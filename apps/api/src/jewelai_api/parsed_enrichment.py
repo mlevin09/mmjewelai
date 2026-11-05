@@ -21,13 +21,13 @@ from jewelai_domain.models_v1_1 import (
     validate_design_revision,
 )
 from jewelai_parser import (
+    AnyFullMessageParseResult,
     AnyParserProposal,
     CandidateApplication,
     CandidateCertainty,
     CandidateClassification,
     CandidateSubject,
     CandidateUpdate,
-    FullMessageParseResult,
     NormalizationSource,
     ParserCandidate,
     ParserIssueCode,
@@ -35,6 +35,7 @@ from jewelai_parser import (
     StructuredCandidate,
     StructuredTarget,
     build_parser_proposal,
+    read_full_message_parse_result,
 )
 from jewelai_parser.models import QuantityCandidate, StyleTermsCandidate, TermCandidate
 from jewelai_parser.p010_symmetry import TARGET as SYMMETRY_TARGET
@@ -116,7 +117,7 @@ class CandidateDisposition(ImmutableModel):
 
 
 class ParsedCandidateEnrichmentResult(ImmutableModel):
-    parse_result: FullMessageParseResult
+    parse_result: AnyFullMessageParseResult
     parse_knowledge_lineage: ParseKnowledgeLineage
     parser_proposal: AnyParserProposal
     dispositions: tuple[CandidateDisposition, ...]
@@ -144,7 +145,7 @@ class ParsedCandidateEnrichmentResultV2(ParsedCandidateEnrichmentResult):
 def enrich_parsed_candidates_with_active_release(
     revision: AnyDesignRevision | object,
     *,
-    parse_result: FullMessageParseResult,
+    parse_result: AnyFullMessageParseResult,
     source: MessageSource,
     dictionary: DictionaryRegistry,
     templates: PromptTemplateBundle,
@@ -159,13 +160,12 @@ def enrich_parsed_candidates_with_active_release(
     parametric_references: tuple[ParametricEnrichmentReference, ...] = (),
     template_id: str = "jewelry_visualization",
     equivalent_candidate_ids: tuple[str, ...] = (),
-    _parse_reader=FullMessageParseResult,
     _result_builder=ParsedCandidateEnrichmentResult,
 ) -> ParsedCandidateEnrichmentResult:
     """Evaluate safe parsed candidates without mutating the authoritative revision."""
 
     revision = validate_design_revision(revision)
-    parsed = _parse_reader.model_validate(parse_result)
+    parsed = read_full_message_parse_result(parse_result)
     source = MessageSource.model_validate(source)
     templates = PromptTemplateBundle.model_validate(templates)
 
@@ -468,7 +468,7 @@ def _retain_source_normalization(proposal, revision, candidates, dictionary):
 
 
 def _verify_parse_release(
-    parsed: FullMessageParseResult,
+    parsed: AnyFullMessageParseResult,
     verified: AnyActiveKnowledge,
 ) -> ParseKnowledgeLineage:
     if parsed.knowledge_package_id is None:
@@ -658,7 +658,7 @@ def _prepare_candidate(
     )
 
 
-def _candidate_by_id(parsed: FullMessageParseResult, candidate_id: str) -> StructuredCandidate:
+def _candidate_by_id(parsed: AnyFullMessageParseResult, candidate_id: str) -> StructuredCandidate:
     return next(item for item in parsed.candidates if item.candidate_id == candidate_id)
 
 

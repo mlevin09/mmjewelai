@@ -87,7 +87,7 @@ def test_new_parse_and_native_matrix_are_sourced_evidence_not_a_revision(
         assert not any("dimensions" in u.concrete_target for u in updates)
         assert rows(ctx) == before
         assert ParsedEvaluationV3.model_validate_json(result.model_dump_json()) == result
-        # Old evaluation codecs are frozen; they cannot coerce the new parse.
+        # Native evaluation readers accept Parse1.2, but never a V3 envelope.
         with pytest.raises(ValueError):
             ParsedCandidateEnrichmentResult.model_validate(result.model_dump(mode="json"))
         # A proposal may not be attributed to another Message or source time.

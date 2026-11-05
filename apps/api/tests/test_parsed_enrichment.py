@@ -21,11 +21,11 @@ from jewelai_domain.models import DesignRevision, MessageSource
 from jewelai_parser import (
     CandidateClassification,
     CandidateSubject,
-    FullMessageParseResult,
     NormalizationSource,
     ParserIssueCode,
     StructuredTarget,
     parse_full_message,
+    read_full_message_parse_result,
 )
 from jewelai_prompts import (
     CanonicalInternalFinalPromptV2_1 as InternalFinalPrompt,
@@ -634,7 +634,7 @@ def test_combined_four_turn_halo_history_uses_collision_release(
         assert revision.design.center_stone.shape.value == "oval"
         assert revision.design.center_stone.material.value == "diamond"
         assert revision.design.center_stone.dimensions.locked
-    initial = FullMessageParseResult.model_validate(trace["turns"][0]["parse_result"])
+    initial = read_full_message_parse_result(trace["turns"][0]["parse_result"])
     assert (
         len(
             [
@@ -918,7 +918,7 @@ def test_exact_parse_release_is_required_and_absence_is_recorded(
     )
     payload = parsed.model_dump(mode="json")
     payload["knowledge_runtime_sha256"] = "0" * 64
-    mismatched = FullMessageParseResult.model_validate(payload)
+    mismatched = read_full_message_parse_result(payload)
 
     with pytest.raises(ParsedEnrichmentReleaseMismatchError, match="does not match"):
         enrich_parsed_candidates_with_active_release(
@@ -958,7 +958,7 @@ def test_duplicate_candidate_ids_fail_before_evidence_can_be_lost(
     )
     payload = parsed.model_dump(mode="json")
     payload["candidates"][1]["candidate_id"] = payload["candidates"][0]["candidate_id"]
-    duplicated = FullMessageParseResult.model_validate(payload)
+    duplicated = read_full_message_parse_result(payload)
 
     with pytest.raises(ParsedEnrichmentInputError, match="must be unique"):
         enrich_parsed_candidates_with_active_release(

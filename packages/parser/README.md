@@ -14,6 +14,16 @@ metal, negative constraints, and preservation intent remain structured evidence 
 integration can bind them safely. The function never changes Product State, creates side-stone
 groups, accepts recommendations, invokes a provider, or requires an ACTIVE production catalog.
 
+Every new full-message parse returns `FullMessageParseResultV1_2` (`parse_version=1.2.0`),
+including native initial input, corrections and admitted/resumed continuations. There is no
+caller-selectable historical interpreter or output version. The frozen `FullMessageParseResult`
+1.1 model exists only to read immutable historical evidence. Native correction and nested
+evaluation readers accept an explicitly tagged 1.1 or 1.2 payload; unsupported or missing tags
+fail closed. `same_parse_evidence()` compares all evidence fields except the wire-version tag
+when verifying historical source text with the one current interpreter. It neither rewrites a
+record nor recalculates its original stored hash; the runtime still verifies the complete
+original correction, evaluation, source, authority and lineage.
+
 For bounded inflection and hyphen matching, ParserProposal receives the matched indexed
 Dictionary surface rather than a substituted canonical label. Existing synonym and deprecated-alias
 match kinds/warnings therefore remain observable; original text and evidence spans are unchanged.

@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass, replace
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
 from jewelai_domain.dictionary import (
     AmbiguousMatch,
@@ -15,7 +15,7 @@ from jewelai_domain.dictionary import (
 from jewelai_domain.knowledge_library import MappingMode
 from jewelai_domain.knowledge_runtime import AnyCompiledKnowledge, validate_compiled_knowledge
 from jewelai_domain.models import ImmutableModel, Text
-from pydantic import Field, JsonValue, model_validator
+from pydantic import Field, JsonValue, TypeAdapter, model_validator
 
 from .knowledge_matcher import (
     AmbiguousKnowledgeMatch,
@@ -33,7 +33,7 @@ from .models import (
     WeightCandidate,
 )
 
-FULL_MESSAGE_PARSE_VERSION = "1.1.0"
+FULL_MESSAGE_PARSE_VERSION = "1.2.0"
 
 
 class MessageLanguage(StrEnum):
@@ -143,7 +143,9 @@ class StructuredCandidate(ImmutableModel):
 
 
 class FullMessageParseResult(ImmutableModel):
-    parse_version: Literal["1.1.0"] = FULL_MESSAGE_PARSE_VERSION
+    """Frozen historical evidence format; never selected by the active parser."""
+
+    parse_version: Literal["1.1.0"] = "1.1.0"
     original_text: Text
     requested_locale: Literal["en", "ru"]
     detected_language: MessageLanguage
@@ -174,9 +176,33 @@ class FullMessageParseResult(ImmutableModel):
 
 
 class FullMessageParseResultV1_2(FullMessageParseResult):
-    """Existing continuation wire format; not a second interpreter."""
+    """The single current parse output; interpretation is shared, not version-dispatched."""
 
-    parse_version: Literal["1.2.0"] = "1.2.0"
+    parse_version: Literal["1.2.0"] = FULL_MESSAGE_PARSE_VERSION
+
+
+AnyFullMessageParseResult = Annotated[
+    FullMessageParseResult | FullMessageParseResultV1_2, Field(discriminator="parse_version")
+]
+_PARSE_EVIDENCE = TypeAdapter(AnyFullMessageParseResult)
+
+
+def read_full_message_parse_result(value: object) -> AnyFullMessageParseResult:
+    """Read exact immutable 1.1/1.2 evidence; this performs no interpretation."""
+    return _PARSE_EVIDENCE.validate_python(value)
+
+
+def same_parse_evidence(recorded: object, current: object) -> bool:
+    """Compare every evidence field, allowing only the approved wire-tag difference.
+
+    Retained payloads and their original content hashes are never converted or
+    rewritten. Callers must still validate those records and their lineage.
+    """
+    old = read_full_message_parse_result(recorded)
+    new = read_full_message_parse_result(current)
+    return old.model_dump(mode="json", exclude={"parse_version"}) == new.model_dump(
+        mode="json", exclude={"parse_version"}
+    )
 
 
 @dataclass(frozen=True)
@@ -572,8 +598,7 @@ def parse_full_message(
     locale: Literal["en", "ru"],
     dictionary: DictionaryRegistry,
     knowledge_runtime: AnyCompiledKnowledge | None = None,
-    _result_type=FullMessageParseResult,
-) -> FullMessageParseResult:
+) -> FullMessageParseResultV1_2:
     """Extract conservative structured evidence without changing canonical Product State."""
 
     if not isinstance(text, str) or not text or not text.strip():
@@ -655,8 +680,6 @@ def parse_full_message(
         else c
         for c in immutable
     )
-    if _result_type not in (FullMessageParseResult, FullMessageParseResultV1_2):
-        raise ValueError("Unsupported parse wire format")
     identity = (
         {
             "knowledge_package_id": runtime.package_id,
@@ -666,7 +689,7 @@ def parse_full_message(
         if runtime is not None
         else {}
     )
-    return _result_type(
+    return FullMessageParseResultV1_2(
         original_text=text,
         requested_locale=locale,
         detected_language=_detect_language(text),

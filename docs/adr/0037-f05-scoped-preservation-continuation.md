@@ -273,6 +273,28 @@ initial/correction parity, source attribution and restart. Existing current-
 session tampering checks are retained. No migration or live activation follows
 from this decision.
 
+#### Owner-approved Parser 1.2 consolidation (2026-11-05)
+
+PARSER-1.2-CONSOLIDATION-002 supersedes the earlier Parse1.1 default and separate
+interpreter descriptions above. Every new parse operation, including initial input,
+native corrections and resumed sessions, now emits Parse1.2 through the same existing
+extraction algorithm. The private output-format selector is removed. Parse1.1 is a
+frozen historical evidence model, not an executable parser or a new-request choice.
+
+The approved additive native read change lets Correction1/2 and nested evaluation
+DTOs read explicitly tagged Parse1.1 or Parse1.2 evidence. Source verification compares
+every evidence field, allowing only the wire-tag difference against the current parse.
+It then uses the original stored DTO to reconstruct and compare its original
+evaluation. Stored payloads, content hashes, source spans and authority remain
+unchanged; missing/unknown parse tags and all other mismatches still fail closed.
+
+Keeping a native Parse1.1 write exception would violate the Owner decision; relabelling
+stored history would invalidate hashes. A second interpreter or migration is unnecessary.
+This changes only the active evidence format and its native readers, not lexical
+semantics, endpoint/command versions, canonical state, persistence schema, providers
+or deployment. Historical evidence whose semantics differ from the current interpreter
+is not silently accepted or repaired; source verification remains fail closed.
+
 ### Native KEEP occurrence and final-output atomicity repair
 
 The single current Parser retains the complete enclosing preservation occurrence

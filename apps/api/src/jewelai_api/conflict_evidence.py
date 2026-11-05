@@ -15,7 +15,7 @@ from jewelai_domain.clarification_state import (
 )
 from jewelai_domain.dictionary import DictionaryCategory, EntryLifecycle
 from jewelai_domain.models import DomainId, ImmutableModel
-from jewelai_parser import FullMessageParseResult, parse_full_message
+from jewelai_parser import parse_full_message, read_full_message_parse_result, same_parse_evidence
 from jewelai_parser.full_message import (
     _assertion_breaks,
     _certainty_for,
@@ -123,7 +123,7 @@ class ConflictEvidence(ImmutableModel):
 
 def product_body_material_conflict(parsed, *, message, context, dictionary, knowledge_runtime=None):
     """Consume actual persisted Message plus existing parser authority/scope, not detail prose."""
-    parsed = FullMessageParseResult.model_validate(parsed)
+    parsed = read_full_message_parse_result(parsed)
     context = InputContext.model_validate(context)
     if message.actor != "user" or message.session_id != context.scope.session_id:
         raise ValueError("Conflict Message actor/session scope mismatch")
@@ -147,7 +147,7 @@ def product_body_material_conflict(parsed, *, message, context, dictionary, know
         dictionary=dictionary,
         knowledge_runtime=knowledge_runtime,
     )
-    if verified_parse != parsed:
+    if not same_parse_evidence(parsed, verified_parse):
         raise ValueError("Conflict evidence does not match deterministic source parsing")
     text = message.content
     source_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()

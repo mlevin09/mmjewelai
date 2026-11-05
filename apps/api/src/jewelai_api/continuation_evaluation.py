@@ -109,7 +109,6 @@ def evaluate_continuation_message(
         locale=locale,
         dictionary=service.artifacts.dictionary,
         knowledge_runtime=verified_release.compiled_runtime,
-        _result_type=FullMessageParseResultV1_2,
     )
 
     def build(**payload):
@@ -146,7 +145,6 @@ def evaluate_continuation_message(
         parametric_artifact_version=str(catalog.artifact_version),
         parametric_catalog_sha256=catalog.sha256,
         parametric_references=select_parametric_references(revision, catalog),
-        _parse_reader=FullMessageParseResultV1_2,
         _result_builder=build,
     )
 
