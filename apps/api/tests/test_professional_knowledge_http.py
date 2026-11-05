@@ -81,6 +81,7 @@ def real_client(engine, config):
             repository_root=ROOT,
             artifacts=ArtifactVersions(questions="2.0.0", rules="2.0.0"),
             prompt_enrichment=config,
+            web_allowed_origins=("https://preprod.jewellai.online",),
         ),
         engine=engine,
         token_verifier=FakeTokenVerifier(),
@@ -155,6 +156,44 @@ def test_real_catalog_initial_output_and_scope(engine, real_config, locale, text
             headers={**ctx.headers, "Authorization": "Bearer test-outsider"},
         )
         assert forbidden.status_code == 404
+        assert provider.calls == []
+
+
+def test_real_catalog_browser_preflight_and_final_output(engine, real_config):
+    with real_client(engine, real_config) as (client, app, provider):
+        org, _, session = create_hierarchy(client)
+        ctx = context(client, app, session.json()["session_id"], org)
+        initial(
+            ctx,
+            "F",
+            "A white gold ring with an oval diamond center stone in prong setting. "
+            "Center stone 8 x 6 x 4 mm.",
+        )
+        snapshot = read(ctx)
+        path = f"/v1/sessions/{ctx.sid}/prompt-enrichment/final-output?output_version=4.0.0"
+        origin = "https://preprod.jewellai.online"
+        preflight = client.options(
+            path,
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "GET",
+                "Access-Control-Request-Headers": "authorization,if-match,x-organization-id",
+            },
+        )
+        assert preflight.status_code == 200
+        result = client.get(
+            path,
+            headers={
+                **ctx.headers,
+                "Origin": origin,
+                "If-Match": snapshot["state"]["current_frame"]["history_root_sha256"],
+            },
+        )
+        assert result.status_code == 200, result.json()
+        assert result.headers["access-control-allow-origin"] == origin
+        assert result.json()["description"]["text"]
+        assert result.json()["internal_final_prompt"]["schema_version"] == "4.0.0"
+        assert result.json()["internal_final_prompt"]["prompt_text"]
         assert provider.calls == []
 
 

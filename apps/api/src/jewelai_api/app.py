@@ -385,7 +385,13 @@ def create_app(
             allow_origins=list(settings.web_allowed_origins),
             allow_credentials=False,
             allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "X-Organization-ID", "Idempotency-Key"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "X-Organization-ID",
+                "Idempotency-Key",
+                "If-Match",
+            ],
         )
     api_logger = configure_json_logger("jewelai.api")
     app.add_middleware(RequestBodyLimitMiddleware, max_bytes=settings.http_max_request_bytes)
