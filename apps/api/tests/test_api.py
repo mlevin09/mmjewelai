@@ -215,6 +215,35 @@ def test_cors_preflight_allows_only_configured_browser_contract(client):
     assert "access-control-allow-origin" not in denied.headers
 
 
+def test_final_output_cors_preflight_supports_if_match_without_broadening_access(client):
+    path = "/v1/sessions/00000000-0000-0000-0000-000000000000/prompt-enrichment/final-output"
+    headers = {
+        "Origin": "http://localhost:5173",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "authorization,if-match,x-organization-id",
+    }
+    response = client.options(path, headers=headers)
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == headers["Origin"]
+    allowed = {
+        name.strip().lower() for name in response.headers["access-control-allow-headers"].split(",")
+    }
+    assert {"authorization", "if-match", "x-organization-id"} <= allowed
+    assert "*" not in allowed
+    assert "access-control-allow-credentials" not in response.headers
+
+    denied_origin = client.options(
+        path, headers={**headers, "Origin": "https://untrusted.example.test"}
+    )
+    assert denied_origin.status_code == 400
+    assert "access-control-allow-origin" not in denied_origin.headers
+    denied_header = client.options(
+        path,
+        headers={**headers, "Access-Control-Request-Headers": "authorization,x-unapproved-header"},
+    )
+    assert denied_header.status_code == 400
+
+
 def test_me_membership_lifecycle_and_cross_tenant_authorization(client):
     organization_id, _, session_response = create_hierarchy(client)
     session_id = session_response.json()["session_id"]
