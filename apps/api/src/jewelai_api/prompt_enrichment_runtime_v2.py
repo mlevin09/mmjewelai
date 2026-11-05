@@ -16,7 +16,7 @@ from jewelai_domain.knowledge_runtime import bind_verified_release, knowledge_st
 from jewelai_domain.knowledge_storage import KnowledgeArtifactStorageError
 from jewelai_domain.models import KnownValue, MessageSource
 from jewelai_domain.revisions import RevisionConflict, revise_design
-from jewelai_parser import ParserTarget, parse_full_message
+from jewelai_parser import ParserTarget, parse_full_message, same_parse_evidence
 from jewelai_persistence import (
     ClarificationDecisionConflictError,
     ClarificationDecisionIntegrityError,
@@ -427,6 +427,12 @@ def _verify_source_evaluation(
         dictionary=service.artifacts.dictionary,
         knowledge_runtime=verified.compiled_runtime,
     )
+    if correction is not None:
+        if not same_parse_evidence(correction.parsed_correction, parsed):
+            raise ValueError("Correction parse does not match its source Message")
+        # Validate the retained evaluation in its original evidence format. Only
+        # the current 1.2 interpreter above reads text; no legacy parse is run.
+        parsed = correction.parsed_correction
     conflict = product_body_material_conflict(
         parsed,
         message=message,

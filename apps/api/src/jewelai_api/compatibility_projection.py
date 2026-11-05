@@ -18,7 +18,7 @@ from jewelai_domain.compatibility import (
 from jewelai_domain.continuation import ContinuationArtifactPins, ContinuationFrameCore
 from jewelai_domain.models import Explicit, KnownValue, MessageSource, Unknown
 from jewelai_domain.preservation import contract_hash
-from jewelai_parser import parse_full_message
+from jewelai_parser import parse_full_message, same_parse_evidence
 
 from .correction_enrichment import CorrectionReenrichmentResult
 from .f04_planning import canonical_target
@@ -37,7 +37,7 @@ def _revision_ref(revision):
 
 
 def _verified_corrections(service, repo, native, sid, oid):
-    """Actual legacy parse/proposal and accepted transition, never parser1.2."""
+    """Verify immutable native evidence with the single current interpreter."""
     if not native.corrections:
         return ()
     verified = repo.restore_pinned_knowledge_runtime(
@@ -70,10 +70,12 @@ def _verified_corrections(service, repo, native, sid, oid):
         if (
             message.actor != "user"
             or message.content != correction.correction_text
-            or parsed != correction.parsed_correction
+            or not same_parse_evidence(correction.parsed_correction, parsed)
             or source != correction.source
         ):
             raise ValueError("Retained correction source/parse mismatch")
+        # Retain the historical wire DTO for exact evaluation/hash comparison.
+        parsed = correction.parsed_correction
         first = service._evaluate(before, parsed, source)
         if first != correction.correction_evaluation:
             raise ValueError("Retained correction ParserProposal/Matrix mismatch")

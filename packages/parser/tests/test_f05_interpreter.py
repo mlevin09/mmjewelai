@@ -5,7 +5,13 @@ from pathlib import Path
 import pytest
 from jewelai_domain import load_domain_dictionary
 
-from jewelai_parser.full_message import FullMessageParseResultV1_2, parse_full_message
+from jewelai_parser.full_message import (
+    FullMessageParseResult,
+    FullMessageParseResultV1_2,
+    parse_full_message,
+    read_full_message_parse_result,
+    same_parse_evidence,
+)
 
 
 @pytest.fixture(scope="module")
@@ -24,15 +30,16 @@ def dictionary():
     ],
 )
 def test_wire_formats_use_identical_current_extraction(dictionary, text, locale):
-    old = parse_full_message(text, locale=locale, dictionary=dictionary)
-    saved = old.model_dump_json()
-    new = parse_full_message(
-        text, locale=locale, dictionary=dictionary, _result_type=FullMessageParseResultV1_2
-    )
+    new = parse_full_message(text, locale=locale, dictionary=dictionary)
+    assert type(new) is FullMessageParseResultV1_2
     assert new.parse_version == "1.2.0"
     assert any(c.classification == "preservation" for c in new.candidates)
-    assert parse_full_message(text, locale=locale, dictionary=dictionary).model_dump_json() == saved
-    assert new.candidates == old.candidates
+    # Frozen historical evidence is a data fixture, not another parsing operation.
+    old = FullMessageParseResult(**new.model_dump(exclude={"parse_version"}))
+    saved = old.model_dump_json()
+    assert same_parse_evidence(old, new)
+    assert read_full_message_parse_result(old.model_dump(mode="json")).model_dump_json() == saved
+    assert parse_full_message(text, locale=locale, dictionary=dictionary) == new
     assert old.parse_version == "1.1.0"
     for candidate in new.candidates:
         assert text[candidate.evidence.start : candidate.evidence.end] == candidate.evidence.text
@@ -48,6 +55,44 @@ def test_independent_positive_fact_survives_new_preservation_grammar(dictionary)
         c.target == "metal.material" and c.classification == "requirement"
         for c in parsed.candidates
     )
+
+
+@pytest.mark.parametrize("version", [None, "1.0.0", "1.3.0"])
+def test_evidence_reader_requires_an_explicit_supported_version(dictionary, version):
+    payload = parse_full_message("A gold ring.", locale="en", dictionary=dictionary).model_dump(
+        mode="json"
+    )
+    if version is None:
+        del payload["parse_version"]
+    else:
+        payload["parse_version"] = version
+    with pytest.raises(ValueError):
+        read_full_message_parse_result(payload)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("original_text", "A gold ring. Extra text."),
+        ("requested_locale", "ru"),
+        ("dictionary_artifact_version", "9.9.9"),
+        ("candidates", []),
+    ],
+)
+def test_wire_comparison_never_ignores_other_evidence(dictionary, field, value):
+    current = parse_full_message("A gold ring.", locale="en", dictionary=dictionary)
+    historical = current.model_dump(mode="json")
+    historical["parse_version"] = "1.1.0"
+    assert same_parse_evidence(historical, current)
+    historical[field] = value
+    assert not same_parse_evidence(historical, current)
+
+
+def test_new_parse_cannot_select_historical_wire_format(dictionary):
+    with pytest.raises(TypeError, match="_result_type"):
+        parse_full_message(
+            "A gold ring.", locale="en", dictionary=dictionary, _result_type=FullMessageParseResult
+        )
 
 
 @pytest.mark.parametrize(
