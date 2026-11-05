@@ -21,6 +21,18 @@ locals {
     TEXT_UNDERSTANDING_PROVIDER               = "google"
     GOOGLE_TEXT_UNDERSTANDING_MODEL           = "gemini-3.1-flash-lite"
     GOOGLE_TEXT_UNDERSTANDING_TIMEOUT_SECONDS = "30"
+    } : {}, var.prompt_enrichment_release_json != "" ? {
+    PROMPT_ENRICHMENT_ENABLED                        = "true"
+    PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_ROOT        = "/app/knowledge-release/knowledge"
+    PROMPT_ENRICHMENT_KNOWLEDGE_PACKAGE_ID           = local.enrichment_release.package_id
+    PROMPT_ENRICHMENT_KNOWLEDGE_ARTIFACT_VERSION     = local.enrichment_release.artifact_version
+    PROMPT_ENRICHMENT_KNOWLEDGE_CONTRACT_VERSION     = "1.1.0"
+    PROMPT_ENRICHMENT_ACTIVE_RELEASE_PATH            = "/app/knowledge-release/active.json"
+    PROMPT_ENRICHMENT_VALIDATION_REPORT_PATH         = "/app/knowledge-release/validation-report.json"
+    PROMPT_ENRICHMENT_QUALIFICATION_CONTRACT_VERSION = "1.0.0"
+    PROMPT_ENRICHMENT_CANDIDATE_KIND                 = "PRODUCTION_INTENDED"
+    QUESTION_ARTIFACT_VERSION                        = "2.0.0"
+    RULES_ARTIFACT_VERSION                           = "2.0.0"
   } : {})
 
   worker_environment = merge(local.database_env, {

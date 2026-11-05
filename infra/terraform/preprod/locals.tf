@@ -1,4 +1,5 @@
 locals {
+  enrichment_release       = var.prompt_enrichment_release_json != "" ? jsondecode(var.prompt_enrichment_release_json) : {}
   prefix                   = "jewelai-preprod"
   web_origin               = "https://${var.web_domain}"
   api_origin               = "https://${var.api_domain}"

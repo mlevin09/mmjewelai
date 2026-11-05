@@ -1,3 +1,28 @@
+variable "prompt_enrichment_release_json" {
+  type        = string
+  description = "Optional exact private Knowledge archive + real qualified release identity; empty preserves disabled runtime."
+  default     = ""
+
+  validation {
+    condition = var.prompt_enrichment_release_json == "" || try(
+      toset(keys(jsondecode(var.prompt_enrichment_release_json))) == toset([
+        "package_id", "artifact_version", "contract_version", "runtime_sha256",
+        "validation_report_sha256", "object", "object_generation", "object_sha256"
+      ]) &&
+      jsondecode(var.prompt_enrichment_release_json).contract_version == "1.1.0" &&
+      can(regex("^[a-z][a-z0-9_.-]+$", jsondecode(var.prompt_enrichment_release_json).package_id)) &&
+      can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", jsondecode(var.prompt_enrichment_release_json).artifact_version)) &&
+      alltrue([for key in ["runtime_sha256", "validation_report_sha256", "object_sha256"] :
+        can(regex("^[0-9a-f]{64}$", jsondecode(var.prompt_enrichment_release_json)[key]))
+      ]) &&
+      can(regex("^[1-9][0-9]*$", jsondecode(var.prompt_enrichment_release_json).object_generation)) &&
+      can(regex("^gs://mmjewellai-preprod-tfstate/knowledge-releases/preprod/[A-Za-z0-9_./-]+\\.zip$", jsondecode(var.prompt_enrichment_release_json).object)),
+      false
+    )
+    error_message = "Knowledge release must bind an exact private preprod archive generation/SHA and real versioned runtime/report."
+  }
+}
+
 variable "deployment_environment" {
   type        = string
   description = "Deployment environment identity used for resource names and runtime configuration."

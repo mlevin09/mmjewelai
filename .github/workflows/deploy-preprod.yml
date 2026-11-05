@@ -61,6 +61,7 @@ jobs:
       TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
       TF_VAR_deployment_environment: preprod
       TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
+      TF_VAR_prompt_enrichment_release_json: ${{ vars.PROMPT_ENRICHMENT_RELEASE_JSON }}
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
       TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
     steps:
@@ -117,10 +118,21 @@ jobs:
           terraform_version: 1.16.4
       - name: Configure Artifact Registry
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+      - name: Fetch the explicitly selected private Knowledge release
+        if: env.TF_VAR_prompt_enrichment_release_json != ''
+        run: |
+          test "${PROJECT_ID}" = "mmjewellai-preprod"
+          python tools/knowledge/fetch_preprod_release.py
+          cp tools/knowledge/verify_preprod_integration.py .preprod-knowledge-release/_verify.py
       - name: Build and push immutable commit images
         run: |
           registry="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}"
           docker build -f infra/docker/api.Dockerfile -t "${registry}/jewelai-api:${GITHUB_SHA}" .
+          if test -n "${TF_VAR_prompt_enrichment_release_json}"; then
+            docker build -f infra/docker/preprod-api-knowledge.Dockerfile \
+              --build-arg "BASE_IMAGE=${registry}/jewelai-api:${GITHUB_SHA}" \
+              -t "${registry}/jewelai-api:${GITHUB_SHA}" .preprod-knowledge-release
+          fi
           docker build -f infra/docker/worker.Dockerfile -t "${registry}/jewelai-generation-worker:${GITHUB_SHA}" .
           docker build -f infra/docker/web.Dockerfile -t "${registry}/jewelai-web:${GITHUB_SHA}" .
           docker push "${registry}/jewelai-api:${GITHUB_SHA}"
@@ -177,6 +189,7 @@ jobs:
             "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
             "${TF_VAR_deployment_environment}" \
             "${TF_VAR_generation_profiles_json}" \
+            "${TF_VAR_prompt_enrichment_release_json}" \
             "${TF_VAR_openai_allowed_models}" \
             "${TF_VAR_google_generative_language_allowed_models}" \
             "${TF_VAR_google_generative_language_secret_id}" "${TF_VAR_api_image}" \
@@ -228,6 +241,7 @@ jobs:
       TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
       TF_VAR_deployment_environment: preprod
       TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
+      TF_VAR_prompt_enrichment_release_json: ${{ vars.PROMPT_ENRICHMENT_RELEASE_JSON }}
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
       TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
       TF_VAR_api_image: ${{ needs.plan.outputs.api_image }}
@@ -272,6 +286,7 @@ jobs:
             "${TF_VAR_web_domain}" "${TF_VAR_api_domain}" "${TF_VAR_dns_managed_zone}" \
             "${TF_VAR_deployment_environment}" \
             "${TF_VAR_generation_profiles_json}" \
+            "${TF_VAR_prompt_enrichment_release_json}" \
             "${TF_VAR_openai_allowed_models}" \
             "${TF_VAR_google_generative_language_allowed_models}" \
             "${TF_VAR_google_generative_language_secret_id}" "${TF_VAR_api_image}" \

@@ -12,3 +12,5 @@ dist/
 !terraform.tfvars.example
 crash.log
 crash.*.log
+.preprod-knowledge-release/
+.preprod-knowledge-release.zip

@@ -1,0 +1,45 @@
+{
+  "contract_version": "1.1.0",
+  "schema_version": "1.1.0",
+  "package_id": "jewelai.preprod.recovered_core",
+  "artifact_version": "1.0.0",
+  "runtime_sha256": "dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57",
+  "checks": [
+    {
+      "name": "compiler_contract",
+      "outcome": "PASS",
+      "evidence_ref": "catalog-validation.xml#test_real_compiler_contract",
+      "details": "Exact source, deterministic compiler, immutable reload and tamper refusal."
+    },
+    {
+      "name": "provenance_integrity",
+      "outcome": "PASS",
+      "evidence_ref": "catalog-two-corrected.xml#test_real_provenance_and_separate_contracts",
+      "details": "997 full recoverable records across their existing contracts; immutable source equality and original statuses retained. Original unrecovered P0-12 is outside this text-only release scope, not replaced or approved."
+    },
+    {
+      "name": "language_matcher",
+      "outcome": "PASS",
+      "evidence_ref": "catalog-validation.xml#test_real_language_matcher",
+      "details": "All 213 real semantic language mappings and aliases resolve to their recorded concept or retained ambiguity. Dictionary review state preserved."
+    },
+    {
+      "name": "runtime_policy",
+      "outcome": "PASS",
+      "evidence_ref": "policy-corrected.xml#test_real_runtime_policy",
+      "details": "Real policy IDs, canonical LOCK and absent repeated-group protection; no effect prose execution."
+    },
+    {
+      "name": "prompt_enrichment_integration",
+      "outcome": "PASS",
+      "evidence_ref": "catalog-validation.xml#test_real_prompt_matrix_and_parametric_integration",
+      "details": "Actual compiled runtime, Matrix/enrich_prompt, exact-context parametric selection, source/units/uncertainty, deterministic nonmutation. This category is lower-level integration; HTTP/browser acceptance is separately required before deployment."
+    },
+    {
+      "name": "behavioral_regression",
+      "outcome": "PASS",
+      "evidence_ref": "catalog-validation.xml#test_real_behavioral_negative_boundary",
+      "details": "Actual Parser1.2 and full real semantic catalog preserve independent gold, prohibit platinum and invent no dimensions. Additional unchanged recovered/P0-10 tests:19PASS on same source catalog."
+    }
+  ]
+}
