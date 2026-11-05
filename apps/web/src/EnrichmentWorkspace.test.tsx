@@ -280,7 +280,9 @@ describe("Prompt Enrichment workspace", () => {
     const panel = screen.getByRole("complementary", { name: "Current design" });
     expect(within(panel).getByText("platinum")).toBeInTheDocument();
     expect(within(panel).getByText("oval")).toBeInTheDocument();
-    expect(within(panel).getByText(/KEEP: 1/)).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/Confirmed and protected choices are preserved/),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Evaluate design")).not.toBeInTheDocument();
     const clipboard = vi
       .spyOn(navigator.clipboard, "writeText")
@@ -301,13 +303,9 @@ describe("Prompt Enrichment workspace", () => {
     await send("One more detail.");
     expect(f.commands).toHaveLength(4);
     expect(
-      screen.getByRole("link", {
-        name: "Open existing visualization workspace",
-      }),
-    ).toHaveAttribute(
-      "href",
-      "/organizations/org/sessions/session/visualization",
-    );
+      screen.getByRole("heading", { name: "Create your jewelry" }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Your message")).toBeInTheDocument();
   });
   it("does not invent output and preserves the draft on stale CAS; sends no duplicate command", async () => {
     const f = fixture(true);
@@ -333,7 +331,7 @@ describe("Prompt Enrichment workspace", () => {
     f.view();
     await screen.findByLabelText("Your message");
     expect(
-      await screen.findByText(/An offered clarification is unresolved/),
+      await screen.findByText(/A few design details still need your input/),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "Copy full prompt" }),
@@ -378,6 +376,62 @@ describe("Prompt Enrichment workspace", () => {
         selected_option_id: "option-gold",
       },
     });
+  });
+
+  it("presents a focused active question and expandable server-authorized choices", async () => {
+    const f = fixture(true);
+    const question = (id: string, value: string) => ({
+      question_kind: "NATIVE" as const,
+      retained_base: "F" as const,
+      native_question: {
+        clarification_id: id,
+        text: id === "q1" ? "Which shape?" : "Which metal?",
+        category: "material_ambiguity",
+        allowed_decisions: ["SELECT_OPTION", "SKIP", "UNKNOWN"] as Array<
+          "SELECT_OPTION" | "SKIP" | "UNKNOWN"
+        >,
+        options: [{ value, option_id: "option-" + value, label: value }],
+      },
+    });
+    f.data.state!.questions = [
+      question("q1", "oval"),
+      question("q2", "gold"),
+    ] as EnrichmentState["questions"];
+    f.view();
+    expect(await screen.findByText("Which shape?")).toBeInTheDocument();
+    const other = screen.getByText("Other questions (1)").closest("details")!;
+    expect(other.open).toBe(false);
+    expect(screen.getByLabelText("Your message")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Other questions (1)"));
+    expect(other.open).toBe(true);
+    expect(screen.getByText("Which metal?")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "gold" }));
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.commands[0]).toMatchObject({
+      route: "clarification-answers",
+      body: { decision: "SELECT_OPTION", selected_option_id: "option-gold" },
+    });
+  });
+  it("hides internal JSON and explains blocked final output in plain language", async () => {
+    const f = fixture(true);
+    server.use(
+      http.get(`${prefix}/final-output`, () =>
+        HttpResponse.json(
+          { error: "final_output_blocked", detail: "Unresolved question" },
+          { status: 409 },
+        ),
+      ),
+    );
+    f.view();
+    expect(
+      await screen.findByText(/A few design details still need your input/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/final_output_blocked/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Why these design details?"));
+    expect(
+      screen.getByText(/These values come from your conversation/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/"revision_sha256"/)).not.toBeInTheDocument();
   });
   it("fails closed on unavailable/unauthorized conversation access", async () => {
     const f = fixture(true);
