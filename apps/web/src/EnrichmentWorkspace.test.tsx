@@ -383,7 +383,7 @@ describe("Prompt Enrichment workspace", () => {
         clarification_id: id,
         text: id === "q1" ? "Which shape?" : "Which metal?",
         category: "material_ambiguity",
-        allowed_decisions: ["SELECT_OPTION", "SKIP", "UNKNOWN"] as const,
+        allowed_decisions: ["SELECT_OPTION", "SKIP", "UNKNOWN"] as Array<"SELECT_OPTION" | "SKIP" | "UNKNOWN">,
         options: [{ value, option_id: "option-" + value, label: value }],
       },
     });
