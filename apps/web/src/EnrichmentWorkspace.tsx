@@ -223,38 +223,28 @@ export function EnrichmentWorkspace({
               {t("Saved automatically", "Сохраняется автоматически")}
             </span>
           </div>
-          <div className="conversation-scroll">
-            <ol
-              ref={log}
-              className="conversation-log"
-              aria-label={t("Saved conversation", "Сохранённая беседа")}
-            >
+          <section className="living-design" aria-label={t("Current design text", "Актуальное описание украшения")}>
+            <p className="eyebrow">{t("CURRENT VERSION", "АКТУАЛЬНАЯ ВЕРСИЯ")}</p>
+            <h3>{t("Your design, updated", "Ваше украшение — актуальный текст")}</h3>
+            <p className="living-design-text" aria-live="polite">
+              {s?.description.text || t(
+                "Start by describing your jewelry below. Your saved answers will be reflected here in one current description.",
+                "Опишите своё украшение ниже. Сохранённые ответы будут отражены здесь в одном актуальном описании.",
+              )}
+            </p>
+          </section>
+          <details className="conversation-history">
+            <summary>{t("Message history", "История сообщений")} ({snapshot.events.length})</summary>
+            <ol ref={log} className="conversation-log" aria-label={t("Saved conversation", "Сохранённая беседа")}>
               {snapshot.events.map((e) => (
                 <li key={e.event_id} className={`conversation-${e.kind}`}>
-                  <strong>
-                    {e.kind === "user"
-                      ? t(
-                          "User · stored message",
-                          "Пользователь · сохранённое сообщение",
-                        )
-                      : e.kind === "question"
-                        ? t("JewelAI · clarification", "JewelAI · уточнение")
-                        : t("Server decision", "Решение сервера")}
-                  </strong>
+                  <strong>{e.kind === "user" ? t("Your message", "Ваше сообщение") : e.kind === "question" ? t("Question", "Уточнение") : t("Saved decision", "Сохранённое решение")}</strong>
                   {e.text !== e.outcome && <p>{e.text}</p>}
                   {e.outcome && <span className="badge">{e.outcome}</span>}
                 </li>
               ))}
             </ol>
-            {!snapshot.events.length && (
-              <p>
-                {t(
-                  "Describe the jewelry you have in mind.",
-                  "Опишите украшение, которое хотите создать.",
-                )}
-              </p>
-            )}
-          </div>
+          </details>
           {s && activeQuestion && (
             <section
               className="clarification-area"
@@ -445,15 +435,7 @@ export function EnrichmentWorkspace({
                 </p>
               ))}
           </details>
-          <h3>{t("Design description", "Описание дизайна")}</h3>
-          <p className="description-text">
-            {s?.description.text ??
-              t(
-                "Available after your first message.",
-                "Появится после первого сообщения.",
-              )}
-          </p>
-          <h3>{t("Ready for visualization?", "Готово к визуализации?")}</h3>
+          <h3>{t("Generated prompt", "Сформированный промпт")}</h3>
           {final ? (
             <>
               <p className="final-readiness">
