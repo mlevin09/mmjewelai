@@ -71,10 +71,10 @@ def dependent_tests(root, changed):
 
 
 def fixture_consumers(root, path):
-    """Narrow literal file-I/O dependencies; unresolved/dynamic fixtures stay blocked."""
+    """Keep confirmed tests and unresolved reader modules independently."""
     folder = test_root(path)
     if folder is None:
-        return []
+        return dict(confirmed=[], unresolved=[])
     resource = Path(path)
     references = {path}
     relative = resource.relative_to(folder).as_posix()
@@ -85,7 +85,7 @@ def fixture_consumers(root, path):
     same_names.add((root / path).resolve())  # Also retain deleted resources.
     if len(same_names) == 1:
         references.add(resource.name)
-    readers = set()
+    readers, unresolved = set(), set()
     for source in (root / folder).rglob("*.py"):
         if not source.resolve().is_relative_to(root.resolve()):
             raise ValueError("external_fixture_dependency")
@@ -96,16 +96,23 @@ def fixture_consumers(root, path):
             operation = getattr(node.func, "attr", getattr(node.func, "id", None))
             if operation not in {"open", "read_text", "read_bytes"}:
                 continue
-            if any(
-                isinstance(value, ast.Constant)
-                and isinstance(value.value, str)
-                and value.value.replace("\\", "/") in references
+            literals = {
+                value.value.replace("\\", "/")
                 for value in ast.walk(node)
-            ):
-                readers.add(source.relative_to(root).as_posix())
-    return sorted(
-        {p for p in readers if Path(p).name.startswith("test_")}
-        | set(dependent_tests(root, readers))
+                if isinstance(value, ast.Constant) and isinstance(value.value, str)
+            }
+            owner = source.relative_to(root).as_posix()
+            if literals & references:
+                readers.add(owner)
+            # A full-path match elsewhere cannot discharge this possible reader.
+            if len(same_names) > 1 and resource.name in literals:
+                unresolved.add(owner)
+    return dict(
+        confirmed=sorted(
+            {p for p in readers if Path(p).name.startswith("test_")}
+            | set(dependent_tests(root, readers))
+        ),
+        unresolved=sorted(unresolved),
     )
 
 
@@ -169,6 +176,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         raise ValueError("unsupported_routing_version")
     targets, reasons, buckets, blocked, full = set(), {}, set(), [], []
     relevant, docs = False, True
+    fixture_dependencies = {}
 
     def add(target, reason):
         # Config may use a handful of file globs, never 2071 hand-classified IDs.
@@ -189,8 +197,12 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         if Path(path).is_absolute() or ".." in Path(path).parts:
             raise ValueError("invalid_changed_path")
         is_fixture = test_root(path) is not None and not path.endswith(".py")
-        consumers = fixture_consumers(root, path) if is_fixture else []
-        if not consumers and is_documentation(path):
+        consumers, unresolved = [], []
+        if is_fixture:
+            dependency = fixture_consumers(root, path)
+            fixture_dependencies[path] = dependency
+            consumers, unresolved = dependency["confirmed"], dependency["unresolved"]
+        if not consumers and not unresolved and is_documentation(path):
             continue
         for consumer in consumers:
             add(consumer, "fixture_file_dependency")
@@ -232,7 +244,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         if path in {"apps/api/src/jewelai_api/app.py", "apps/api/src/jewelai_api/services.py"}:
             full.append("shared_api_dispatch")
             buckets.update({"authorization", "persistence"})
-        if is_fixture and not consumers:
+        if is_fixture and (not consumers or unresolved):
             blocked.append("unmapped_fixture_data")
         if not matched and not is_test and not test_root(path):
             blocked.append("unmapped_impact")
@@ -279,6 +291,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         blocked_reasons=sorted(set(blocked)),
         suites=suites,
         target_reasons={k: sorted(v) for k, v in sorted(reasons.items())},
+        fixture_dependencies=fixture_dependencies,
         config_sha256=digest(config),
         expected_full_api_root="apps/api/tests",
     )

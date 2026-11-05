@@ -36,6 +36,9 @@ resource/template/snapshot locations are checked first. A test resource with a
 literal `open`/`read_text`/`read_bytes` reference selects its consuming test file
 and transitive local helper importers. Basenames must be unique within that test
 suite; dynamic, ambiguous or unknown fixture dependencies block explicitly.
+Confirmed tests and unresolved possible reader modules are retained separately
+in the selection manifest. Any unresolved basename reader blocks even when a
+full-path reader is confirmed; a nonempty partial list is not complete coverage.
 A README used as a known fixture remains behavior, not documentation. Genuine
 documentation-only PRs retain diff/selection checks without product tests.
 Runtime data uses existing component routes or fails as unknown impact. Web-only
