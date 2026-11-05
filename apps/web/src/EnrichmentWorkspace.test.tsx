@@ -280,7 +280,9 @@ describe("Prompt Enrichment workspace", () => {
     const panel = screen.getByRole("complementary", { name: "Current design" });
     expect(within(panel).getByText("platinum")).toBeInTheDocument();
     expect(within(panel).getByText("oval")).toBeInTheDocument();
-    expect(within(panel).getByText(/Confirmed and protected choices are preserved/)).toBeInTheDocument();
+    expect(
+      within(panel).getByText(/Confirmed and protected choices are preserved/),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Evaluate design")).not.toBeInTheDocument();
     const clipboard = vi
       .spyOn(navigator.clipboard, "writeText")
@@ -300,7 +302,9 @@ describe("Prompt Enrichment workspace", () => {
     ).toBeInTheDocument();
     await send("One more detail.");
     expect(f.commands).toHaveLength(4);
-    expect(screen.getByRole("heading", { name: "Create your jewelry" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Create your jewelry" }),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Your message")).toBeInTheDocument();
   });
   it("does not invent output and preserves the draft on stale CAS; sends no duplicate command", async () => {
@@ -383,7 +387,9 @@ describe("Prompt Enrichment workspace", () => {
         clarification_id: id,
         text: id === "q1" ? "Which shape?" : "Which metal?",
         category: "material_ambiguity",
-        allowed_decisions: ["SELECT_OPTION", "SKIP", "UNKNOWN"] as Array<"SELECT_OPTION" | "SKIP" | "UNKNOWN">,
+        allowed_decisions: ["SELECT_OPTION", "SKIP", "UNKNOWN"] as Array<
+          "SELECT_OPTION" | "SKIP" | "UNKNOWN"
+        >,
         options: [{ value, option_id: "option-" + value, label: value }],
       },
     });
@@ -406,14 +412,23 @@ describe("Prompt Enrichment workspace", () => {
   });
   it("hides internal JSON and explains blocked final output in plain language", async () => {
     const f = fixture(true);
-    server.use(http.get(`${prefix}/final-output`, () =>
-      HttpResponse.json({ error: "final_output_blocked", detail: "Unresolved question" }, { status: 409 }),
-    ));
+    server.use(
+      http.get(`${prefix}/final-output`, () =>
+        HttpResponse.json(
+          { error: "final_output_blocked", detail: "Unresolved question" },
+          { status: 409 },
+        ),
+      ),
+    );
     f.view();
-    expect(await screen.findByText(/A few design details still need your input/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/A few design details still need your input/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/final_output_blocked/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByText("Why these design details?"));
-    expect(screen.getByText(/These values come from your conversation/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/These values come from your conversation/),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/"revision_sha256"/)).not.toBeInTheDocument();
   });
   it("fails closed on unavailable/unauthorized conversation access", async () => {

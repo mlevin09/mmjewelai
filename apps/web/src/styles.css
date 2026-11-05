@@ -558,7 +558,11 @@ nav {
   padding: 0.25rem 0 0.6rem;
 }
 .clarification-card h3 {
-  font: 600 1.15rem/1.35 Inter, ui-sans-serif, system-ui, sans-serif;
+  font:
+    600 1.15rem/1.35 Inter,
+    ui-sans-serif,
+    system-ui,
+    sans-serif;
   letter-spacing: -0.01em;
   margin: 0.3rem 0 0.85rem;
 }
