@@ -399,9 +399,11 @@ describe("Prompt Enrichment workspace", () => {
     ] as EnrichmentState["questions"];
     f.view();
     expect(await screen.findByText("Which shape?")).toBeInTheDocument();
-    expect(screen.queryByText("Which metal?")).not.toBeInTheDocument();
+    const other = screen.getByText("Other questions (1)").closest("details")!;
+    expect(other.open).toBe(false);
     expect(screen.getByLabelText("Your message")).toBeInTheDocument();
     await userEvent.click(screen.getByText("Other questions (1)"));
+    expect(other.open).toBe(true);
     expect(screen.getByText("Which metal?")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "gold" }));
     await waitFor(() => expect(f.commands).toHaveLength(1));
