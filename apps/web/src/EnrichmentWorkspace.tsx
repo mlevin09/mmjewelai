@@ -146,7 +146,7 @@ export function EnrichmentWorkspace({
       const written = [
         value.trim() ? `${question.question_kind === "NATIVE" ? question.native_question.text : question.offer.rendered_question}: ${value.trim()}` : "",
         note.trim(),
-      ].filter(Boolean).join("\\n");
+      ].filter(Boolean).join("\n");
       if (written) {
         // An answer may advance the server revision. Read the new head before
         // submitting any additional free text through the existing API.
@@ -408,6 +408,7 @@ export function EnrichmentWorkspace({
               )}
             </p>
           )}
+          <details className="saved-parameters"><summary>{t("Saved parameters", "Сохранённые параметры")} ({known.length})</summary>
           <dl className="design-facts">
             {known.map((f) => (
               <div key={f.path}>
@@ -422,6 +423,7 @@ export function EnrichmentWorkspace({
               </div>
             ))}
           </dl>
+          </details>
           {s?.protection_projection.roots.length ||
           known.some((f) => f.locked || f.confirmed) ? (
             <div className="design-notice">
