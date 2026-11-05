@@ -37,3 +37,31 @@ headers. It does not run Vite or contain a browser client secret.
 The UI implements organization/project/session creation, deterministic question answering, prompt
 creation, queued generation polling/retry, reference upload, and short-lived READY Asset access.
 It does not contain provider credentials, authorization policy, business rules, or offline storage.
+
+## Prompt Enrichment workspace (UI-PE-001)
+
+After selecting an existing project, choose a conversation role and EN/RU language.
+Starting a session now opens the conversation directly; session cards reopen it.
+The main session route uses `/v1/sessions/{id}/prompt-enrichment/` with the existing
+L/F and continuation command versions. It does not call legacy text-understanding,
+evaluate, prompt-revision or generation endpoints. The existing visualization UI is
+unchanged at `/organizations/{org}/sessions/{id}/visualization`, linked from the new
+workspace. It is not required to use Prompt Enrichment.
+
+The Owner-approved read-only `conversation` response contains existing persisted
+messages/questions/decisions, canonical revision and state3 in one scoped snapshot.
+Stored messages are not presented as accepted design facts. Reopening reads the
+server again; there is no browser transcript store. Native F and admitted commands
+carry the exact server-provided frame/hash/option IDs. Rejected requests retain the
+draft, reload current state and require explicit retry rather than automatic replay.
+Offered questions, Unknown/Skip, explicit continuation admission, protected-change
+consent and supported dormant clarification resume use existing server contracts.
+
+The result panel separates canonical values, missing/Unknown/unresolved information,
+KEEP, LOCK and confirmed flags. Description and full copyable IFP are server output;
+blocked/unavailable output shows the actual error. Advanced source/evidence details
+are optional. New messages are bounded to 2,000 characters, within the existing
+continuation request capacity. No client key, model credential, generation or catalog
+activation is added. The API must already have its verified enrichment runtime
+configured; the UI never enables it or substitutes a provider fallback. See
+[ADR 0039](../../docs/adr/0039-prompt-enrichment-conversation-workspace.md).

@@ -593,7 +593,9 @@ describe("text intake", () => {
       ),
     );
 
-    renderApp("/organizations/organization-one/sessions/session-one");
+    renderApp(
+      "/organizations/organization-one/sessions/session-one/visualization",
+    );
     const input = await screen.findByLabelText("Jewelry description");
     await userEvent.type(input, "I want an oval center stone.");
     const submit = screen.getByRole("button", { name: "Understand request" });

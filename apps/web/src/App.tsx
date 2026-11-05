@@ -25,6 +25,7 @@ import {
 } from "react";
 
 import { ApiClient, ApiError } from "./api";
+import { EnrichmentWorkspace } from "./EnrichmentWorkspace";
 import { useAuth } from "./auth";
 import { getWebRuntimeConfig } from "./config";
 import { applyQuestionAnswer, type QuestionAnswer } from "./designUpdates";
@@ -408,6 +409,7 @@ function OrganizationProjects() {
 
 function ProjectSessions() {
   const api = useApi();
+  const navigate = useNavigate();
   const client = useQueryClient();
   const { organizationId = "", projectId = "" } = useParams();
   const catalog = useQuery({
@@ -434,10 +436,13 @@ function ProjectSessions() {
         method: "POST",
         body: JSON.stringify({ role_id: role, locale }),
       }),
-    onSuccess: async () => {
+    onSuccess: async (session) => {
       await client.invalidateQueries({
         queryKey: keys.sessions(organizationId, projectId),
       });
+      void navigate(
+        `/organizations/${organizationId}/sessions/${session.session_id}`,
+      );
     },
   });
   return (
@@ -487,15 +492,33 @@ function ProjectSessions() {
             ))}
           </select>
         </label>
-        <button disabled={!role || !locale} type="submit">
-          Start session
+        <button disabled={!role || !locale || create.isPending} type="submit">
+          {create.isPending ? "Starting session…" : "Start session"}
         </button>
+        {create.isError && (
+          <p role="alert">
+            Unable to start the session. Check access and try again.
+          </p>
+        )}
       </form>
     </main>
   );
 }
 
 function Workspace() {
+  const api = useApi();
+  const { organizationId = "", sessionId = "" } = useParams();
+  return (
+    <EnrichmentWorkspace
+      key={`${organizationId}:${sessionId}`}
+      api={api}
+      organizationId={organizationId}
+      sessionId={sessionId}
+    />
+  );
+}
+
+function VisualizationWorkspace() {
   const api = useApi();
   const client = useQueryClient();
   const { organizationId = "", sessionId = "" } = useParams();
@@ -1359,6 +1382,10 @@ export function App() {
             <Route
               path="organizations/:organizationId/projects/:projectId"
               element={<ProjectSessions />}
+            />
+            <Route
+              path="organizations/:organizationId/sessions/:sessionId/visualization"
+              element={<VisualizationWorkspace />}
             />
             <Route
               path="organizations/:organizationId/sessions/:sessionId"

@@ -1138,6 +1138,17 @@ def create_app(
         return service.evaluate(session_id, organization_id, request)
 
     if prompt_enrichment_service is not None:
+        from .conversation import ConversationResponse, read_conversation
+
+        @app.get(
+            "/v1/sessions/{session_id}/prompt-enrichment/conversation",
+            response_model=ConversationResponse,
+        )
+        def get_prompt_enrichment_conversation(
+            session_id: UUID, organization_id: AuthorizedOrganization, response: Response
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            return read_conversation(prompt_enrichment_service, session_id, organization_id)
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/continuation-admissions", status_code=201
