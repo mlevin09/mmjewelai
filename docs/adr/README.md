@@ -35,4 +35,6 @@ Add a numbered record for changes, keeping superseded records and linking their 
 
 - [0038 — F06 additive readable review outputs](0038-f06-versioned-readable-description.md)
 
+- [0039 — Prompt Enrichment conversation workspace](0039-prompt-enrichment-conversation-workspace.md)
+
 Template: status/date, context, decision, alternatives, consequences, validation.

@@ -329,3 +329,103 @@ nav {
       border-color 0.18s ease;
   }
 }
+
+/* Prompt Enrichment uses the existing workspace shell and visual language. */
+.enrichment-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  align-items: start;
+}
+.enrichment-grid > * {
+  min-width: 0;
+}
+.conversation-panel {
+  position: sticky;
+  top: 88px;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 112px);
+}
+.conversation-log {
+  flex: 1;
+  min-height: 100px;
+  list-style: none;
+  padding: 0;
+  max-height: 55vh;
+  overflow: auto;
+}
+.conversation-log li {
+  border-left: 3px solid var(--line);
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.conversation-log p,
+.description-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.conversation-user {
+  background: #f0f4ed;
+}
+.conversation-decision {
+  font-size: 0.9rem;
+}
+.message-composer {
+  flex-shrink: 0;
+  background: var(--paper);
+  padding-top: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+.message-composer textarea,
+.final-prompt {
+  width: 100%;
+  min-height: 7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  padding: 0.8rem;
+  font: inherit;
+  resize: vertical;
+}
+.final-prompt {
+  min-height: 16rem;
+}
+.clarification-card {
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+}
+.clarification-card button {
+  margin: 0.25rem;
+}
+.design-facts {
+  display: grid;
+  gap: 0.6rem;
+}
+.design-facts dt {
+  color: #667269;
+}
+.design-facts dd {
+  margin: 0.2rem 0;
+  overflow-wrap: anywhere;
+}
+.design-facts small {
+  display: block;
+}
+.design-result details {
+  margin: 1rem 0;
+}
+.legacy-link {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+}
+@media (max-width: 850px) {
+  .enrichment-grid {
+    grid-template-columns: 1fr;
+  }
+  .conversation-panel {
+    position: static;
+    max-height: none;
+  }
+}
