@@ -167,6 +167,7 @@ export function EnrichmentWorkspace({
       </main>
     );
   const s = snapshot.state;
+  const activeQuestion = s?.questions[0];
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -248,18 +249,18 @@ export function EnrichmentWorkspace({
             </p>
           )}
           </div>
-          {s && s.questions.length > 0 && (
+          {s && activeQuestion && (
             <section className="clarification-area" aria-label={t("Design questions", "Вопросы о дизайне")}>
               <div className="clarification-heading">
                 <span className="eyebrow">{t("HELP US REFINE YOUR DESIGN", "ДАВАЙТЕ УТОЧНИМ ДЕТАЛИ")}</span>
                 <span className="question-count">{s.questions.length} {t("open", "открыто")}</span>
               </div>
               <QuestionCard
-                q={s.questions[0]}
+                q={activeQuestion}
                 busy={busy}
                 ru={ru}
                 answer={(decision, option) =>
-                  void perform(() => client.answer(s, s.questions[0], decision, option))
+                  void perform(() => client.answer(s, activeQuestion, decision, option))
                 }
               />
               {s.questions.length > 1 && (
