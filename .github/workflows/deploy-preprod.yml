@@ -61,7 +61,7 @@ jobs:
       TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
       TF_VAR_deployment_environment: preprod
       TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
-      TF_VAR_prompt_enrichment_release_json: ${{ vars.PROMPT_ENRICHMENT_RELEASE_JSON }}
+      TF_VAR_prompt_enrichment_release_json: ${{ vars.PROMPT_ENRICHMENT_RELEASE_JSON || '{"package_id":"jewelai.preprod.recovered_core","artifact_version":"1.0.0","contract_version":"1.1.0","runtime_sha256":"dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57","validation_report_sha256":"c3260a3e86dba45f796fb6db1004fc07384fe9e20310623cbba519fff52da12c","object":"gs://mmjewellai-preprod-tfstate/knowledge-releases/preprod/dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57/240a5d3b4bf8bc55e4e98e0364d06b987c67f4c4956c2102af835b1f2ab0fbfb.zip","object_generation":"1793886431773971","object_sha256":"240a5d3b4bf8bc55e4e98e0364d06b987c67f4c4956c2102af835b1f2ab0fbfb"}' }}
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
       TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
     steps:
@@ -241,7 +241,7 @@ jobs:
       TF_VAR_dns_managed_zone: ${{ vars.DNS_MANAGED_ZONE }}
       TF_VAR_deployment_environment: preprod
       TF_VAR_generation_profiles_json: ${{ vars.GENERATION_PROFILES_JSON }}
-      TF_VAR_prompt_enrichment_release_json: ${{ vars.PROMPT_ENRICHMENT_RELEASE_JSON }}
+      TF_VAR_prompt_enrichment_release_json: ${{ vars.PROMPT_ENRICHMENT_RELEASE_JSON || '{"package_id":"jewelai.preprod.recovered_core","artifact_version":"1.0.0","contract_version":"1.1.0","runtime_sha256":"dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57","validation_report_sha256":"c3260a3e86dba45f796fb6db1004fc07384fe9e20310623cbba519fff52da12c","object":"gs://mmjewellai-preprod-tfstate/knowledge-releases/preprod/dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57/240a5d3b4bf8bc55e4e98e0364d06b987c67f4c4956c2102af835b1f2ab0fbfb.zip","object_generation":"1793886431773971","object_sha256":"240a5d3b4bf8bc55e4e98e0364d06b987c67f4c4956c2102af835b1f2ab0fbfb"}' }}
       TF_VAR_openai_allowed_models: ${{ vars.OPENAI_ALLOWED_MODELS }}
       TF_VAR_google_generative_language_secret_id: jewelai-preprod-google-generative-language-api-key
       TF_VAR_api_image: ${{ needs.plan.outputs.api_image }}
