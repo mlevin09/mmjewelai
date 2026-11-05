@@ -281,7 +281,7 @@ export function EnrichmentWorkspace({
                 </details>
               )}
             </section>
-          )
+          )}
           {dormant.map((c) => (
             <button
               className="quiet"
