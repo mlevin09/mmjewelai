@@ -59,7 +59,7 @@ export function EnrichmentWorkspace({
       } catch (e) {
         if (currentEpoch !== epoch.current) return;
         if (e instanceof ApiError && e.status !== 401 && e.status !== 403)
-          setFinalReason(`${e.code}: ${e.message}`);
+          setFinalReason(e.code);
         else throw e;
       }
     }
@@ -117,7 +117,11 @@ export function EnrichmentWorkspace({
       try {
         await refresh();
       } catch {
-        setSnapshot(null);
+        // Preserve the last good snapshot; a network error must not erase the conversation UI.
+        setError(t(
+          "Could not refresh. Your saved conversation remains available; try again.",
+          "Не удалось обновить. Сохранённая беседа доступна — повторите попытку.",
+        ));
       }
     } finally {
       flight.current = false;
@@ -183,16 +187,19 @@ export function EnrichmentWorkspace({
         / {session.role_id.replaceAll("_", " ")} ·{" "}
         {session.locale.toUpperCase()}
       </nav>
-      <h1>{t("Design conversation", "Беседа о дизайне")}</h1>
-      <Link
-        className="legacy-link"
-        to={`/organizations/${organizationId}/sessions/${sessionId}/visualization`}
-      >
-        {t(
-          "Open existing visualization workspace",
-          "Открыть существующий экран визуализации",
-        )}
-      </Link>
+      <div className="design-hero">
+        <div>
+          <p className="eyebrow">{t("JEWELAI STUDIO", "СТУДИЯ JEWELAI")}</p>
+          <h1>{t("Create your jewelry", "Создайте своё украшение")}</h1>
+          <p className="design-hero-subtitle">
+            {t("Describe your idea. Refine the details together.",
+              "Опишите идею. Вместе уточним детали вашего украшения.")}
+          </p>
+        </div>
+        <span className="studio-state">
+          {s ? t("Design in progress", "Работа над дизайном") : t("Ready to begin", "Можно начинать")}
+        </span>
+      </div>
       {error && (
         <p role="alert" className="alert">
           {error}
@@ -200,13 +207,16 @@ export function EnrichmentWorkspace({
       )}
       <div className="enrichment-grid" aria-busy={busy}>
         <section className="panel conversation-panel">
-          <h2>{t("Conversation", "Беседа")}</h2>
-          <p>
-            {t(
-              "Messages are saved. Only server-accepted changes become design facts.",
-              "Сообщения сохраняются. Только принятые сервером изменения становятся фактами дизайна.",
-            )}
-          </p>
+          <div className="conversation-heading">
+            <div>
+              <p className="eyebrow">{t("YOUR DESIGN", "ВАШ ДИЗАЙН")}</p>
+              <h2>{t("Conversation", "Беседа")}</h2>
+            </div>
+            <span className="conversation-saved">
+              {t("Saved automatically", "Сохраняется автоматически")}
+            </span>
+          </div>
+          <div className="conversation-scroll">
           <ol
             ref={log}
             className="conversation-log"
@@ -237,21 +247,40 @@ export function EnrichmentWorkspace({
               )}
             </p>
           )}
-          {s?.questions.map((q) => (
-            <QuestionCard
-              key={
-                q.question_kind === "NATIVE"
-                  ? q.native_question.clarification_id
-                  : q.offer.offer_id
-              }
-              q={q}
-              busy={busy}
-              ru={ru}
-              answer={(decision, option) =>
-                void perform(() => client.answer(s, q, decision, option))
-              }
-            />
-          ))}
+          </div>
+          {s && s.questions.length > 0 && (
+            <section className="clarification-area" aria-label={t("Design questions", "Вопросы о дизайне")}>
+              <div className="clarification-heading">
+                <span className="eyebrow">{t("HELP US REFINE YOUR DESIGN", "ДАВАЙТЕ УТОЧНИМ ДЕТАЛИ")}</span>
+                <span className="question-count">{s.questions.length} {t("open", "открыто")}</span>
+              </div>
+              <QuestionCard
+                q={s.questions[0]}
+                busy={busy}
+                ru={ru}
+                answer={(decision, option) =>
+                  void perform(() => client.answer(s, s.questions[0], decision, option))
+                }
+              />
+              {s.questions.length > 1 && (
+                <details className="more-questions">
+                  <summary>{t("Other questions", "Другие вопросы")} ({s.questions.length - 1})</summary>
+                  {s.questions.slice(1).map((q) => (
+                    <QuestionCard
+                      key={q.question_kind === "NATIVE"
+                        ? q.native_question.clarification_id : q.offer.offer_id}
+                      q={q}
+                      busy={busy}
+                      ru={ru}
+                      answer={(decision, option) =>
+                        void perform(() => client.answer(s, q, decision, option))
+                      }
+                    />
+                  ))}
+                </details>
+              )}
+            </section>
+          )
           {dormant.map((c) => (
             <button
               className="quiet"
@@ -325,7 +354,8 @@ export function EnrichmentWorkspace({
           className="panel design-result"
           aria-label={t("Current design", "Текущий дизайн")}
         >
-          <h2>{t("Current Product State", "Текущее состояние дизайна")}</h2>
+          <p className="eyebrow">{t("DESIGN PREVIEW", "ОБЗОР ДИЗАЙНА")}</p>
+          <h2>{t("Your design so far", "Ваш текущий дизайн")}</h2>
           <p role="status">
             {s
               ? label(s.status)
@@ -356,13 +386,12 @@ export function EnrichmentWorkspace({
               </div>
             ))}
           </dl>
-          <h3>{t("Preservation and authority", "Сохранение и авторитет")}</h3>
-          <p>
-            KEEP: {s?.protection_projection.roots.length ?? 0} · LOCK:{" "}
-            {known.filter((f) => f.locked).length} ·{" "}
-            {t("Confirmed", "Подтверждено")}:{" "}
-            {known.filter((f) => f.confirmed).length}
-          </p>
+          {(s?.protection_projection.roots.length || known.some((f) => f.locked || f.confirmed)) ? (
+            <div className="design-notice">
+              {t("Confirmed and protected choices are preserved as you continue.",
+                "Подтверждённые и защищённые решения сохраняются при продолжении беседы.")}
+            </div>
+          ) : null}
           <details>
             <summary>
               {t(
@@ -389,7 +418,7 @@ export function EnrichmentWorkspace({
                 </p>
               ))}
           </details>
-          <h3>{t("Readable Description", "Описание украшения")}</h3>
+          <h3>{t("Design description", "Описание дизайна")}</h3>
           <p className="description-text">
             {s?.description.text ??
               t(
@@ -397,10 +426,10 @@ export function EnrichmentWorkspace({
                 "Появится после первого сообщения.",
               )}
           </p>
-          <h3>{t("Internal Final Prompt", "Внутренний финальный промпт")}</h3>
+          <h3>{t("Ready for visualization?", "Готово к визуализации?")}</h3>
           {final ? (
             <>
-              <p>{final.internal_final_prompt.readiness}</p>
+              <p className="final-readiness">{humanReadiness(final.internal_final_prompt.readiness, ru)}</p>
               <textarea
                 aria-label="Internal Final Prompt"
                 className="final-prompt"
@@ -419,27 +448,29 @@ export function EnrichmentWorkspace({
             </>
           ) : (
             <p>
-              {finalReason ||
-                t(
-                  "Not available yet. Continue the conversation or answer an offered clarification.",
-                  "Пока недоступен. Продолжите беседу или ответьте на уточнение.",
-                )}
+              {friendlyFinalStatus(finalReason, ru)}
             </p>
           )}
-          <details>
-            <summary>
-              {t(
-                "Advanced details: sources and evidence",
-                "Подробности: источники и основания",
-              )}
-            </summary>
-            <pre>
-              {JSON.stringify(
-                { revision: snapshot.revision, state: s, final },
-                null,
-                2,
-              )}
-            </pre>
+          <details className="evidence-details">
+            <summary>{t("Why these design details?", "Откуда взялись детали дизайна?")}</summary>
+            <p>{t("These values come from your conversation. Unconfirmed details can still be changed.",
+              "Эти характеристики взяты из беседы. Неподтверждённые детали можно изменить.")}</p>
+            <ul>
+              {known.map((f) => (
+                <li key={f.path}>
+                  <strong>{label(f.path)}</strong>: {display(f.value)} —
+                  {f.confirmed
+                    ? t(" confirmed", " подтверждено")
+                    : t(" not confirmed", " не подтверждено")}
+                  {f.locked ? t(" (protected)", " (защищено)") : ""}
+                </li>
+              ))}
+              {s?.protection_projection.roots.map((r, i) => (
+                <li key={i}>
+                  <strong>{t("Preserved request", "Сохранённое пожелание")}</strong>: {r.source_wording}
+                </li>
+              ))}
+            </ul>
           </details>
         </aside>
       </div>
@@ -482,15 +513,15 @@ function QuestionCard({
           : q.native_question.text}
       </h3>
       {native && !native.options.length && (
-        <p>
-          {ru
-            ? "Можно ответить сообщением ниже."
-            : "You can reply in the message field below."}
+        <p className="question-help">
+          {ru ? "Напишите ответ в поле сообщения ниже."
+              : "Write your answer in the message box below."}
         </p>
       )}
       {allowed.includes("SELECT_OPTION") &&
         native?.options.map((o) => (
           <button
+            className="choice-option"
             key={o.option_id ?? o.value}
             disabled={busy}
             onClick={() => answer("SELECT_OPTION", o)}
@@ -556,4 +587,21 @@ function display(value: unknown): string {
   return typeof value === "string" || typeof value === "number"
     ? String(value).replaceAll("_", " ")
     : JSON.stringify(value);
+}
+
+function friendlyFinalStatus(reason: string, ru: boolean): string {
+  if (!reason || reason === "final_output_blocked")
+    return ru
+      ? "Для итогового промпта нужны ещё некоторые решения. Ответьте на вопросы слева или продолжите описание."
+      : "A few design details still need your input. Answer a question or continue describing your jewelry.";
+  return ru
+    ? "Не удалось загрузить итоговый результат. Ваша беседа сохранена, попробуйте обновить страницу."
+    : "The final result could not be loaded. Your conversation is saved; try refreshing.";
+}
+
+function humanReadiness(readiness: string, ru: boolean): string {
+  if (readiness === "READY" || readiness === "READY_WITH_UNRESOLVED")
+    return ru ? "Промпт сформирован. Можно скопировать результат."
+      : "Your prompt is available. Copy it when you're ready.";
+  return ru ? "Продолжите уточнять дизайн" : "Continue refining your design";
 }
