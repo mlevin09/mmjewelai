@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "smoke": [
+    "apps/api/tests/test_f05_positive_completion.py::test_positive_completion_minimal_http[J7]",
+    "packages/prompts/tests/test_final_prompt.py::test_builds_deterministic_provider_neutral_outputs",
+    "packages/prompts/tests/test_final_prompt.py::test_locked_confirmed_values_and_prohibitions_are_preserved",
+    "packages/prompts/tests/test_final_prompt.py::test_historical_nested_source_integrity_without_recompilation"
+  ],
+  "buckets": {
+    "parser": [
+      "packages/parser/tests",
+      "apps/api/tests/test_parsed_enrichment.py",
+      "apps/api/tests/test_f01_ownership.py",
+      "apps/api/tests/test_style_input.py::test_minimalist_wording_http"
+    ],
+    "domain": [
+      "packages/domain/tests",
+      "packages/parser/tests",
+      "packages/prompts/tests",
+      "apps/api/tests/test_f03_applicability.py",
+      "tests/test_knowledge_library_behavioral_regression.py",
+      "tests/test_knowledge_library_production_catalog.py",
+      "tests/test_knowledge_library_three_stone_vertical_slice.py"
+    ],
+    "prompts": [
+      "packages/prompts/tests"
+    ],
+    "output_integrity": [
+      "packages/prompts/tests/test_canonical_version_presence.py",
+      "apps/api/tests/test_f05_preview.py::test_rehashed_ifp_cannot_change_frame_or_cross_scope",
+      "apps/api/tests/test_f04_output_integrity.py"
+    ],
+    "continuation": [
+      "packages/domain/tests/test_f05_preservation.py",
+      "packages/domain/tests/test_f05_release_projection.py",
+      "packages/domain/tests/test_canonical_lock_policy.py",
+      "packages/domain/tests/test_revisions.py",
+      "apps/api/tests/test_f05_release_http.py::test_release_http",
+      "apps/api/tests/test_f05_release_http.py::test_multiple_delta_batch_is_not_partially_committed",
+      "apps/api/tests/test_f05_mutation_safety.py",
+      "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin",
+      "apps/api/tests/test_style_input.py::test_minimalist_wording_http"
+    ],
+    "evidence": [
+      "packages/prompts/tests/test_final_prompt.py",
+      "apps/api/tests/test_enrichment_versioned_history.py",
+      "apps/api/tests/test_f05_history.py"
+    ],
+    "persistence": [
+      "apps/api/tests/test_persistence.py",
+      "apps/api/tests/test_enrichment_persistence.py",
+      "apps/api/tests/test_generation_preparations_postgres.py",
+      "apps/api/tests/test_preparation_lock_regressions_postgres.py"
+    ],
+    "authorization": [
+      "packages/auth/tests",
+      "packages/auth_oidc/tests",
+      "packages/auth_identity_platform/tests",
+      "apps/api/tests/test_api.py",
+      "apps/api/tests/test_asset_access_api.py",
+      "apps/api/tests/test_prompt_enrichment_http.py::test_controlled_http_routes_enforce_authentication_and_organization_scope"
+    ],
+    "api": [
+      "apps/api/tests/test_api.py",
+      "apps/api/tests/test_prompt_enrichment_http.py",
+      "apps/api/tests/test_runtime_hardening.py"
+    ],
+    "ci": [
+      "tools/ci/tests"
+    ],
+    "gateway": [
+      "packages/model_gateway/tests",
+      "workers/generation/tests",
+      "tests/test_openai_generation_pipeline.py"
+    ],
+    "assets": [
+      "packages/assets/tests",
+      "packages/assets_gcs/tests",
+      "apps/api/tests/test_asset_access_api.py",
+      "apps/api/tests/test_reference_asset_upload.py"
+    ],
+    "queue": [
+      "packages/generation_queue/tests",
+      "packages/generation_queue_gcp/tests",
+      "workers/generation/tests"
+    ],
+    "google": [
+      "packages/model_gateway_google/tests",
+      "packages/model_gateway/tests",
+      "workers/generation/tests",
+      "tests/test_openai_generation_pipeline.py"
+    ],
+    "openai": [
+      "packages/model_gateway_openai/tests",
+      "packages/model_gateway/tests",
+      "workers/generation/tests",
+      "tests/test_openai_generation_pipeline.py"
+    ],
+    "text_provider": [
+      "packages/text_understanding_google/tests",
+      "packages/parser/tests",
+      "apps/api/tests/test_parsed_enrichment.py",
+      "apps/api/tests/test_f01_ownership.py"
+    ]
+  },
+  "routes": [
+    {
+      "prefixes": [
+        "packages/parser/",
+        "specs/parser/"
+      ],
+      "buckets": [
+        "parser"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/domain/",
+        "data/",
+        "specs/jewelry-design-schema/",
+        "specs/knowledge-library/",
+        "specs/knowledge-base/",
+        "specs/dictionary/",
+        "specs/questions/",
+        "specs/rules/",
+        "specs/roles/"
+      ],
+      "buckets": [
+        "domain"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/prompts/",
+        "specs/prompts/"
+      ],
+      "buckets": [
+        "prompts",
+        "output_integrity"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/prompts/src/jewelai_prompts/continuation",
+        "apps/api/src/jewelai_api/continuation",
+        "packages/domain/src/jewelai_domain/preservation",
+        "packages/domain/src/jewelai_domain/revisions",
+        "apps/api/src/jewelai_api/authority"
+      ],
+      "buckets": [
+        "continuation",
+        "evidence"
+      ]
+    },
+    {
+      "prefixes": [
+        "apps/api/src/jewelai_api/clarification",
+        "apps/api/src/jewelai_api/user_correction",
+        "apps/api/src/jewelai_api/prompt_enrichment"
+      ],
+      "buckets": [
+        "parser",
+        "prompts",
+        "continuation",
+        "evidence"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/domain/src/jewelai_domain/clarification_state",
+        "packages/domain/src/jewelai_domain/compatibility",
+        "packages/prompts/src/jewelai_prompts/final_prompt",
+        "packages/prompts/src/jewelai_prompts/handoff",
+        "packages/prompts/src/jewelai_prompts/downstream"
+      ],
+      "buckets": [
+        "evidence",
+        "output_integrity"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/persistence/",
+        "apps/api/tests/disposable_postgres.py"
+      ],
+      "buckets": [
+        "persistence",
+        "continuation",
+        "authorization"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/auth"
+      ],
+      "buckets": [
+        "authorization"
+      ]
+    },
+    {
+      "prefixes": [
+        "apps/api/src/"
+      ],
+      "buckets": [
+        "api"
+      ]
+    },
+    {
+      "prefixes": [
+        ".github/workflows/",
+        "tools/ci/"
+      ],
+      "buckets": [
+        "ci"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/model_gateway/",
+        "workers/generation/",
+        "specs/model-gateway/"
+      ],
+      "buckets": [
+        "gateway"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/assets",
+        "specs/assets/",
+        "specs/asset-access/"
+      ],
+      "buckets": [
+        "assets",
+        "authorization"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/generation_queue",
+        "specs/generation-queue/"
+      ],
+      "buckets": [
+        "queue",
+        "persistence"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/model_gateway_google/"
+      ],
+      "buckets": [
+        "google"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/model_gateway_openai/"
+      ],
+      "buckets": [
+        "openai"
+      ]
+    },
+    {
+      "prefixes": [
+        "packages/text_understanding_google/"
+      ],
+      "buckets": [
+        "text_provider"
+      ]
+    },
+    {
+      "prefixes": [
+        "apps/api/src/jewelai_api/constraint_evidence",
+        "apps/api/src/jewelai_api/conflict_evidence",
+        "apps/api/src/jewelai_api/durable_enrichment",
+        "apps/api/src/jewelai_api/compatibility_projection",
+        "apps/api/src/jewelai_api/preparation_contracts",
+        "packages/prompts/src/jewelai_prompts/historical_validation"
+      ],
+      "buckets": [
+        "evidence",
+        "continuation",
+        "persistence",
+        "output_integrity"
+      ]
+    },
+    {
+      "prefixes": [
+        "apps/api/src/jewelai_api/parsed_enrichment",
+        "apps/api/src/jewelai_api/correction_enrichment",
+        "apps/api/src/jewelai_api/text_understanding",
+        "apps/api/src/jewelai_api/f04_"
+      ],
+      "buckets": [
+        "parser",
+        "prompts",
+        "evidence",
+        "continuation"
+      ]
+    },
+    {
+      "prefixes": [
+        "apps/api/src/jewelai_api/settings",
+        "apps/api/src/jewelai_api/middleware",
+        "apps/api/src/jewelai_api/auth"
+      ],
+      "buckets": [
+        "authorization"
+      ]
+    }
+  ],
+  "full_required_prefixes": [
+    "packages/persistence/alembic/",
+    "packages/persistence/src/jewelai_persistence/models.py",
+    "packages/domain/src/jewelai_domain/models",
+    "packages/domain/src/jewelai_domain/state_paths.py",
+    "packages/domain/src/jewelai_domain/preservation",
+    "apps/api/tests/conftest.py",
+    "apps/api/tests/disposable_postgres.py",
+    "packages/domain/src/jewelai_domain/schema",
+    "packages/domain/src/jewelai_domain/lock_protection",
+    "packages/domain/src/jewelai_domain/revise_v1_1",
+    "apps/api/src/jewelai_api/schemas",
+    "packages/prompts/src/jewelai_prompts/schema",
+    "packages/prompts/src/jewelai_prompts/canonical_schema",
+    "packages/prompts/src/jewelai_prompts/final_schema",
+    "packages/prompts/src/jewelai_prompts/handoff_schema",
+    "packages/prompts/src/jewelai_prompts/models"
+  ],
+  "build_files": [
+    "pyproject.toml",
+    "pytest.ini",
+    "conftest.py",
+    "requirements.txt",
+    "requirements-dev.txt"
+  ],
+  "delegated_prefixes": [
+    "apps/web/",
+    ".github/workflows/web.yml"
+  ],
+  "delegated_check": "Web (existing independent workflow; not certified by Runtime API)"
+}
