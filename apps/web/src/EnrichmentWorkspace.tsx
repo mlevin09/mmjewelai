@@ -130,6 +130,32 @@ export function EnrichmentWorkspace({
       setBusy(false);
     }
   }
+  async function submitClarification(
+    state: NonNullable<Conversation["state"]>,
+    question: Question,
+    decision: "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+    option: { value: string; label: string; option_id?: string } | undefined,
+    value: string,
+    note: string,
+  ) {
+    await perform(async () => {
+      const hasDecision = Boolean(decision);
+      if (hasDecision) {
+        await client.answer(state, question, decision as "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN", option);
+      }
+      const written = [
+        value.trim() ? `${question.question_kind === "NATIVE" ? question.native_question.text : question.offer.rendered_question}: ${value.trim()}` : "",
+        note.trim(),
+      ].filter(Boolean).join("\\n");
+      if (written) {
+        // An answer may advance the server revision. Read the new head before
+        // submitting any additional free text through the existing API.
+        const fresh = hasDecision ? await client.read() : snapshot!;
+        await client.send(session!, fresh, written);
+      }
+    });
+  }
+
   async function copyPrompt() {
     if (!final || flight.current) return;
     try {
@@ -262,10 +288,8 @@ export function EnrichmentWorkspace({
                 q={activeQuestion}
                 busy={busy}
                 ru={ru}
-                answer={(decision, option) =>
-                  void perform(() =>
-                    client.answer(s, activeQuestion, decision, option),
-                  )
+                submit={(decision, option, value, note) =>
+                  void submitClarification(s, activeQuestion, decision, option, value, note)
                 }
               />
               {s.questions.length > 1 && (
@@ -284,10 +308,8 @@ export function EnrichmentWorkspace({
                       q={q}
                       busy={busy}
                       ru={ru}
-                      answer={(decision, option) =>
-                        void perform(() =>
-                          client.answer(s, q, decision, option),
-                        )
+                      submit={(decision, option, value, note) =>
+                        void submitClarification(s, q, decision, option, value, note)
                       }
                     />
                   ))}
@@ -500,66 +522,90 @@ function QuestionCard({
   q,
   busy,
   ru,
-  answer,
+  submit,
 }: {
   q: Question;
   busy: boolean;
   ru: boolean;
-  answer: (
-    d: "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
-    o?: { value: string; label: string; option_id?: string },
+  submit: (
+    decision: "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+    option: { value: string; label: string; option_id?: string } | undefined,
+    value: string,
+    note: string,
   ) => void;
 }) {
+  const [choice, setChoice] = useState("");
+  const [value, setValue] = useState("");
+  const [note, setNote] = useState("");
   const native = q.question_kind === "NATIVE" ? q.native_question : null;
   const allowed = native
     ? decisions(native)
     : q.question_kind === "KEEP_RELEASE"
       ? q.offer.allowed_decisions
       : [];
-  const labels = {
-    ACCEPT: ru ? "Принять предложение" : "Accept offered change",
+  const options = native && allowed.includes("SELECT_OPTION") ? native.options : [];
+  const labels: Record<string, string> = {
+    ACCEPT: ru ? "Принять" : "Accept",
     REJECT: ru ? "Отклонить" : "Reject",
     SKIP: ru ? "Пропустить" : "Skip",
     UNKNOWN: ru ? "Не знаю" : "I don't know",
-    SELECT_OPTION: "",
   };
+  const selectedOption = options.find((o) => (o.option_id ?? o.value) === choice);
+  const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
+  const canSend = Boolean((selectedDecision && allowed.includes(selectedDecision as "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN")) || value.trim() || note.trim());
   return (
     <section className="clarification-card">
-      <h3>
-        {q.question_kind === "KEEP_RELEASE"
-          ? q.offer.rendered_question
-          : q.native_question.text}
-      </h3>
-      {native && !native.options.length && (
+      <h3>{q.question_kind === "KEEP_RELEASE" ? q.offer.rendered_question : q.native_question.text}</h3>
+      <div className="clarification-inputs">
+        <label>
+          <span>{ru ? "Параметр / решение" : "Parameter / decision"}</span>
+          <select value={choice} disabled={busy} onChange={(e) => setChoice(e.target.value)}>
+            <option value="">{ru ? "Выберите вариант (необязательно)" : "Choose an option (optional)"}</option>
+            {options.map((o) => (
+              <option value={o.option_id ?? o.value} key={o.option_id ?? o.value}>{o.label}</option>
+            ))}
+            {allowed.filter((d) => d !== "SELECT_OPTION").map((d) => (
+              <option value={d} key={d}>{labels[d]}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>{ru ? "Значение параметра своими словами" : "Parameter value in your words"}</span>
+          <input
+            value={value}
+            disabled={busy}
+            maxLength={500}
+            placeholder={ru ? "Например: ширина кольца 3 мм" : "For example: band width 3 mm"}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </label>
+        <label>
+          <span>{ru ? "Дополнительные пожелания / свободный текст" : "Additional preferences / free text"}</span>
+          <textarea
+            value={note}
+            disabled={busy}
+            maxLength={1400}
+            aria-label={ru ? "Свободный ответ на уточнение" : "Clarification free-text answer"}
+            placeholder={ru ? "Добавьте детали, которые важны для вас…" : "Add any details that matter to you…"}
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+        <button type="button" disabled={busy || !canSend} onClick={() => {
+          submit(
+            (selectedDecision || "") as "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+            selectedOption,
+            value,
+            note,
+          );
+        }}>
+          {ru ? "Сохранить ответ" : "Save answer"}
+        </button>
         <p className="question-help">
           {ru
-            ? "Напишите ответ в поле сообщения ниже."
-            : "Write your answer in the message box below."}
+            ? "Можно заполнить один или все поля. Значения сохраняются через JewelAI, затем актуальное описание обновляется с сервера."
+            : "Use any or all of these fields. JewelAI saves your answer, then refreshes the current design from the server."}
         </p>
-      )}
-      {allowed.includes("SELECT_OPTION") &&
-        native?.options.map((o) => (
-          <button
-            className="choice-option"
-            key={o.option_id ?? o.value}
-            disabled={busy}
-            onClick={() => answer("SELECT_OPTION", o)}
-          >
-            {o.label}
-          </button>
-        ))}
-      {allowed
-        .filter((d) => d !== "SELECT_OPTION")
-        .map((d) => (
-          <button
-            className="quiet"
-            key={d}
-            disabled={busy}
-            onClick={() => answer(d)}
-          >
-            {labels[d]}
-          </button>
-        ))}
+      </div>
     </section>
   );
 }
