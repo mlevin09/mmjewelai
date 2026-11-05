@@ -262,7 +262,7 @@ describe("Prompt Enrichment workspace", () => {
     await screen.findByLabelText("Your message");
     await send("I want a white gold ring with an oval diamond.");
     await userEvent.click(screen.getByText(/Message history/));
-    expect(screen.getByText("Your message")).toBeInTheDocument();
+    expect(within(screen.getByLabelText("Saved conversation")).getByText("Your message")).toBeInTheDocument();
     expect(screen.queryByText("You · stored message")).not.toBeInTheDocument();
     expect(f.commands[0]).toMatchObject({
       route: "initial",
