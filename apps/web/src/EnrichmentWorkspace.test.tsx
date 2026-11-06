@@ -248,6 +248,9 @@ describe("Prompt Enrichment workspace", () => {
     );
     f.view();
     await userEvent.click(
+      await screen.findByRole("button", { name: "No, I'm finished" }),
+    );
+    await userEvent.click(
       await screen.findByRole("button", { name: "Copy full prompt" }),
     );
     expect(
@@ -584,6 +587,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(screen.getByLabelText("Current design text")).toHaveTextContent(
       "A white gold ring with an oval diamond.",
     );
+    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
     expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
       "The actual server prompt, without client additions.",
     );
