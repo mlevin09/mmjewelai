@@ -137,23 +137,27 @@ def test_f04_concurrent_resume_postgres(engine, tmp_path, conflicting, capfd):
             assert results[0].json()["result"] == results[1].json()["result"]
 
 
+@pytest.mark.parametrize("engine", ["0018_f04_preparation_v2"], indirect=True)
 def test_f04_check_downgrade_retains_actual_preparation1_postgres(engine, ready_session, capfd):
     ctx = ready_session()
     assert post(ctx).status_code == 201
     before = retention_snapshot(engine)
+    assert before["version"] == "0018_f04_preparation_v2"
     config = Config(str(ROOT / "packages/persistence/alembic.ini"))
     command.downgrade(config, "0017_knowledge_release_bindings")
     middle = retention_snapshot(engine)
     assert middle["rows"] == before["rows"]
     assert middle["version"] == "0017_knowledge_release_bindings"
+    command.upgrade(config, "0018_f04_preparation_v2")
+    assert retention_snapshot(engine) == before
     command.upgrade(config, "head")
     command.check(config)
-    assert retention_snapshot(engine) == before
     receipt(
         capfd, "0018-0017-0018-preparation1-retention", result="PASS", retained_rows_unchanged=True
     )
 
 
+@pytest.mark.parametrize("engine", ["0018_f04_preparation_v2"], indirect=True)
 def test_f04_check_downgrade_refuses_actual_preparation2_postgres(engine, tmp_path, capfd):
     with f04_session(engine, tmp_path) as ctx:
         state = initial(ctx, READY_TEXT)
@@ -167,10 +171,12 @@ def test_f04_check_downgrade_refuses_actual_preparation2_postgres(engine, tmp_pa
         assert prepared.status_code == 201, prepared.json()
         assert prepared.json()["schema_version"] == "2.0.0"
         before = retention_snapshot(engine)
+        assert before["version"] == "0018_f04_preparation_v2"
         config = Config(str(ROOT / "packages/persistence/alembic.ini"))
         with pytest.raises(RuntimeError, match="prevent safe downgrade"):
             command.downgrade(config, "0017_knowledge_release_bindings")
         assert retention_snapshot(engine) == before
+        command.upgrade(config, "head")
         command.check(config)
         receipt(
             capfd,

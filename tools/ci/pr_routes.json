@@ -339,5 +339,22 @@
     "apps/web/",
     ".github/workflows/web.yml"
   ],
-  "delegated_check": "Web (existing independent workflow; not certified by Runtime API)"
+  "delegated_check": "Web (existing independent workflow; not certified by Runtime API)",
+  "fixture_scopes": [
+    {
+      "resources": "data/completion/",
+      "tests": "packages/domain/tests",
+      "evidence": "CompletionRegistry and selector/prompt projection are owned by complete Domain/Prompts tests. The complete apps/api/tests/completion namespace owns the actual checked-in proposed policy, loader/hash/activation refusal, contextual runtime completion and latest-state integration, plus all durable completion HTTP/PostgreSQL tests. No other runtime resource is mapped. Shared app.py/models.py Full qualification remains mandatory."
+    },
+    {
+      "resources": "data/completion/",
+      "tests": "packages/prompts/tests",
+      "evidence": "CompletionRegistry and selector/prompt projection are owned by complete Domain/Prompts tests. The complete apps/api/tests/completion namespace owns the actual checked-in proposed policy, loader/hash/activation refusal, contextual runtime completion and latest-state integration, plus all durable completion HTTP/PostgreSQL tests. No other runtime resource is mapped. Shared app.py/models.py Full qualification remains mandatory."
+    },
+    {
+      "resources": "data/completion/",
+      "tests": "apps/api/tests/completion",
+      "evidence": "CompletionRegistry and selector/prompt projection are owned by complete Domain/Prompts tests. The complete apps/api/tests/completion namespace owns the actual checked-in proposed policy, loader/hash/activation refusal, contextual runtime completion and latest-state integration, plus all durable completion HTTP/PostgreSQL tests. No other runtime resource is mapped. Shared app.py/models.py Full qualification remains mandatory."
+    }
+  ]
 }

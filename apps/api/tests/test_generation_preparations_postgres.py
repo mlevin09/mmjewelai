@@ -245,13 +245,19 @@ def test_f00_keep_authority_postgres(engine, tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def engine(monkeypatch, capfd):
+def engine(monkeypatch, capfd, request):
     if os.getenv("GITHUB_ACTIONS") != "true":
         pytest.skip(
             "NOT VERIFIED locally: B2 requires independently verified disposable PostgreSQL"
         )
     # No SQL DDL, migration, drop_all or fixture setup occurs until this succeeds.
     url = verified_ci_postgres()
+    # Only the two historical CHECK tests opt into 0018. Every ordinary user of
+    # this fixture retains full head upgrade/check/current and retention guards.
+    target = getattr(request, "param", "head")
+    if target not in {"head", "0018_f04_preparation_v2"}:
+        raise ValueError("Unsupported disposable migration-test baseline")
+    expected_version = "0019_prompt_completion" if target == "head" else target
     control = create_database_engine(url)
     schema = "b2_" + uuid4().hex
     with control.begin() as db:
@@ -270,20 +276,19 @@ def engine(monkeypatch, capfd):
             before = client.get(f"/sessions/{sid}", headers={"X-Organization-ID": org})
         with scoped.connect() as db:
             old_bytes = db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
-        command.upgrade(cfg, "head")
-        command.check(cfg)
+        command.upgrade(cfg, target)
+        if target == "head":
+            command.check(cfg)
         command.current(cfg)
         # Unsupported online downgrade refuses even with empty retained tables.
         retained = retention_snapshot(scoped)
         with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
             command.downgrade(cfg, "0015_reference_verification")
         assert retention_snapshot(scoped) == retained
-        command.check(cfg)
+        if target == "head":
+            command.check(cfg)
         with scoped.connect() as db:
-            assert (
-                db.scalar(text("SELECT version_num FROM alembic_version"))
-                == "0018_f04_preparation_v2"
-            )
+            assert db.scalar(text("SELECT version_num FROM alembic_version")) == expected_version
             assert (
                 db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
                 == old_bytes
@@ -292,10 +297,13 @@ def engine(monkeypatch, capfd):
         with client:
             after = client.get(f"/sessions/{sid}", headers={"X-Organization-ID": org})
         assert after.status_code == 200 and after.json() == before.json()
+        metadata_check = "PASS" if target == "head" else "deferred until test upgrades head"
         with capfd.disabled():
             print(
                 "B2_DISPOSABLE_POSTGRES: container/cluster verified; "
-                "upgrade/check/current PASS; old revision bytes unchanged",
+                f"upgrade/current {expected_version} PASS; "
+                f"head metadata check={metadata_check}; "
+                "old revision bytes unchanged",
                 flush=True,
             )
         yield scoped

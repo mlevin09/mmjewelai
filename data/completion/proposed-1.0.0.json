@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "jewelai.completion.initial-proposal",
+  "version": "1.0.0",
+  "review_status": "PROPOSED",
+  "rules": [
+    {"target_path":"metal.finish","when_jewelry_type":"ring","proposed_value":"polished","rule_id":"ring_finish_proposal","rule_version":"1.0.0","rationale":"PROPOSED for domain review only; no professional approval asserted.","requires":{"metal.material":"gold"}},
+    {"target_path":"metal.finish","when_jewelry_type":"earrings","proposed_value":"matte","rule_id":"earring_finish_proposal","rule_version":"1.0.0","rationale":"PROPOSED alternative for explicit review; not a universal jewelry preset.","requires":{"metal.material":"platinum"}}
+  ],
+  "eligibility": [
+    {"jewelry_type":"ring","target":"center_stone.dimensions","mode":"default_or_omit","requires":{"center_stone.material":"diamond","center_stone.shape":"oval"}},
+    {"jewelry_type":"ring","target":"metal.material","mode":"user_required","requires":{}},
+    {"jewelry_type":"earrings","target":"metal.material","mode":"user_required","requires":{}}
+  ]
+}
