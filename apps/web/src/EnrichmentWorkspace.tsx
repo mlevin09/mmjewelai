@@ -48,8 +48,17 @@ export function EnrichmentWorkspace({
     setSnapshot(data);
     setLoading(false);
     setFinal(null);
-    setFinalReason(data.state ? "Loading server output…" : "");
-    if (data.state) {
+    const outputReady =
+      data.state?.status === "final_output_ready" ||
+      data.state?.status === "final_output_ready_with_unresolved";
+    setFinalReason(
+      data.state
+        ? outputReady
+          ? "Loading server output…"
+          : "final_output_blocked"
+        : "",
+    );
+    if (data.state && outputReady) {
       try {
         const output = await client.final(data.state);
         if (currentEpoch === epoch.current) {
