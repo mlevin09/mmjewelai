@@ -35,7 +35,6 @@ export function EnrichmentWorkspace({
   const [copyStatus, setCopyStatus] = useState("");
   const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [completedFrame, setCompletedFrame] = useState<string | null>(null);
   const [completionRequested, setCompletionRequested] = useState(false);
   const [pieceCreating, setPieceCreating] = useState(false);
   const [guidedType, setGuidedType] = useState("");
@@ -278,11 +277,7 @@ export function EnrichmentWorkspace({
   const readyForFinal =
     s?.status === "final_output_ready" ||
     s?.status === "final_output_ready_with_unresolved";
-  const currentFrameHash = s?.current_frame.history_root_sha256 ?? null;
   const unsavedDesignInput = [guidedType, guidedMetal, guidedStone, guidedStyle, text].some((value) => value.trim());
-  const completedCurrentFrame = Boolean(
-    currentFrameHash && completedFrame === currentFrameHash && readyForFinal,
-  );
   const automaticFinal = Boolean(readyForFinal && final && !unsavedDesignInput);
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
@@ -837,7 +832,6 @@ export function EnrichmentWorkspace({
                   disabled={busy || unsavedDesignInput || automaticFinal}
                   onClick={() => {
                     setCompletionRequested(true);
-                    setCompletedFrame(readyForFinal ? currentFrameHash : null);
                   }}
                 >
                   {t("No, I'm finished", "Нет, больше нечего добавить")}
