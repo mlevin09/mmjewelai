@@ -940,3 +940,14 @@ nav {
     width: 100%;
   }
 }
+
+/* Clarification controls: editable shape suggestions and stone measurements. */
+.stone-shape-choices{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.3rem}
+.stone-shape-choices .shape-choice{width:auto;min-height:2.25rem;border:1px solid #bbcabf;border-radius:999px;padding:.35rem .8rem;background:#f8faf7;color:#284734;font:inherit;font-size:.85rem}
+.stone-shape-choices .shape-choice.selected{background:#dce9de;border-color:#477453;box-shadow:0 0 0 1px #477453}
+.stone-dimensions{margin:0;padding:.85rem;border:1px solid var(--line);border-radius:.75rem;min-width:0}
+.stone-dimensions legend{font-weight:650;padding:0 .35rem}
+.dimension-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem}
+.dimension-fields label{display:grid;gap:.25rem;min-width:0}
+.dimension-fields input{width:100%;min-width:0}
+@media(max-width:520px){.dimension-fields{grid-template-columns:1fr}}
