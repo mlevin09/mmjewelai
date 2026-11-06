@@ -35,7 +35,7 @@ export function EnrichmentWorkspace({
   const [copyStatus, setCopyStatus] = useState("");
   const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [completionRequested, setCompletionRequested] = useState(false);
+  const [completedFrame, setCompletedFrame] = useState<string | null>(null);
   const [pieceCreating, setPieceCreating] = useState(false);
   const [guidedType, setGuidedType] = useState("");
   const [guidedMetal, setGuidedMetal] = useState("");
@@ -118,6 +118,7 @@ export function EnrichmentWorkspace({
     if (flight.current) return;
     flight.current = true;
     setBusy(true);
+    setCompletedFrame(null);
     setError("");
     setCopyStatus("");
     setFinal(null);
@@ -278,7 +279,12 @@ export function EnrichmentWorkspace({
     s?.status === "final_output_ready" ||
     s?.status === "final_output_ready_with_unresolved";
   const unsavedDesignInput = [guidedType, guidedMetal, guidedStone, guidedStyle, text].some((value) => value.trim());
-  const automaticFinal = Boolean(readyForFinal && final && !unsavedDesignInput);
+  const canComplete = Boolean(readyForFinal && !unsavedDesignInput);
+  const finalConfirmed = Boolean(
+    completedFrame === s?.current_frame.history_root_sha256 &&
+    canComplete &&
+    final,
+  );
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -810,18 +816,21 @@ export function EnrichmentWorkspace({
               ))}
           </details>
           {s && (
-            <section className="finish-design" aria-label={t("Finish your prompt", "Завершение промпта")}>
+            <section
+              className="finish-design"
+              aria-label={t("Finish your prompt", "Завершение промпта")}
+            >
               <h3>{t("Anything else to add?", "Хотите добавить что-нибудь ещё?")}</h3>
               <p>{t(
-                "Mark any remaining unknowns as "I don\'t know" or skip them where allowed. JewelAI will not invent defaults.",
-                "Для неизвестных параметров выберите «Не знаю» или «Пропустить», если это разрешено. JewelAI не придумывает значения по умолчанию.",
+                "You can refine the design again, or finish with the details you know. Unspecified characteristics stay unspecified; no defaults are invented.",
+                "Вы можете снова уточнить дизайн или завершить его с известными характеристиками. Неуказанные значения остаются неуказанными — без значений по умолчанию.",
               )}</p>
               <div className="finish-design-actions">
                 <button
                   type="button"
                   className="quiet"
                   onClick={() => {
-                    setCompletionRequested(false);
+                    setCompletedFrame(null);
                     document.getElementById("guided-design-description")?.focus();
                   }}
                 >
@@ -829,9 +838,9 @@ export function EnrichmentWorkspace({
                 </button>
                 <button
                   type="button"
-                  disabled={busy || unsavedDesignInput || automaticFinal}
+                  disabled={busy || unsavedDesignInput || finalConfirmed}
                   onClick={() => {
-                    setCompletionRequested(true);
+                    setCompletedFrame(s.current_frame.history_root_sha256);
                   }}
                 >
                   {t("No, I'm finished", "Нет, больше нечего добавить")}
@@ -839,31 +848,34 @@ export function EnrichmentWorkspace({
               </div>
               {unsavedDesignInput && (
                 <p className="question-help">
-                  {t("Save your typed details before finishing.", "Сначала сохраните введённые детали, затем завершите работу.")}
-                </p>
-              )}
-              {completionRequested && !readyForFinal && (
-                <p role="status" className="finish-blocked">
                   {t(
-                    "Your available details are saved, but JewelAI still reports a blocking decision. Answer or explicitly skip the remaining questions where allowed. A final prompt cannot be issued yet.",
-                    "Доступные сведения сохранены, но JewelAI всё ещё сообщает об обязательном решении. Ответьте на оставшиеся вопросы или явно пропустите их, если это разрешено. Итоговый промпт пока недоступен.",
+                    "Save your entered details before finishing.",
+                    "Сначала сохраните введённые детали, затем завершите работу.",
                   )}
                 </p>
               )}
-              {automaticFinal && (
+              {completedFrame === s.current_frame.history_root_sha256 && !readyForFinal && (
+                <p role="status" className="finish-blocked">
+                  {t(
+                    "You have no more details to add, but the server still reports an unresolved blocking decision. Answer, skip, or mark remaining questions unknown where permitted. JewelAI cannot issue its authoritative final prompt yet.",
+                    "Вы больше не хотите ничего добавлять, но сервер сообщает о нерешённом обязательном вопросе. Ответьте, пропустите или отметьте «Не знаю», если это разрешено. Итоговый промпт пока нельзя выдать.",
+                  )}
+                </p>
+              )}
+              {finalConfirmed && (
                 <p role="status" className="finish-complete">
                   {t(
-                    "JewelAI has completed this design from the available information. The final prompt is ready below; no extra confirmation is required.",
-                    "JewelAI завершил обработку доступных сведений. Итоговый промпт готов ниже — дополнительное подтверждение не требуется.",
+                    "Prompt Enrichment complete for this design. The server-generated final prompt is below.",
+                    "Улучшение описания завершено. Ниже итоговый промпт, сформированный сервером.",
                   )}
                 </p>
               )}
             </section>
           )}
-          <h3>{automaticFinal
+          <h3>{finalConfirmed
             ? t("Final prompt", "Итоговый промпт")
             : t("Prompt preparation", "Подготовка промпта")}</h3>
-          {final ? (
+          {finalConfirmed && final ? (
             <>
               <p className="final-readiness">
                 {humanReadiness(final.internal_final_prompt.readiness, ru)}
@@ -874,18 +886,18 @@ export function EnrichmentWorkspace({
                 readOnly
                 value={final.internal_final_prompt.prompt_text}
               />
-              <button
-                className="quiet"
-                onClick={() => {
-                  void copyPrompt();
-                }}
-              >
+              <button className="quiet" type="button" onClick={() => void copyPrompt()}>
                 {t("Copy full prompt", "Копировать весь промпт")}
               </button>
               <span role="status">{copyStatus}</span>
             </>
           ) : (
-            <p>{friendlyFinalStatus(finalReason, ru)}</p>
+            <p>{readyForFinal
+              ? t(
+                  "The design is ready. Confirm that you have no more additions to see the final prompt.",
+                  "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
+                )
+              : friendlyFinalStatus(finalReason, ru)}</p>
           )}
           <details className="evidence-details">
             <summary>
