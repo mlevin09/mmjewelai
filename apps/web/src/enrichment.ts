@@ -296,9 +296,12 @@ export class EnrichmentClient {
     );
   }
   currentCompletion() {
-    return this.api.request<CompletionView>(`${this.path}/completions/current`, {
-      organizationId: this.organizationId,
-    });
+    return this.api.request<CompletionView>(
+      `${this.path}/completions/current`,
+      {
+        organizationId: this.organizationId,
+      },
+    );
   }
   // Keep a submitted command stable across a transport retry; do not create a
   // fresh completion Message when POST reached the server but its response was lost.

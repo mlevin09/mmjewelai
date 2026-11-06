@@ -330,8 +330,8 @@ export function EnrichmentWorkspace({
     ? Boolean(activeCompletion)
     : Boolean(
         completedFrame === s?.current_frame.history_root_sha256 &&
-          canComplete &&
-          final,
+        canComplete &&
+        final,
       );
   const promptText = completionEnabled
     ? activeCompletion?.prompt_text

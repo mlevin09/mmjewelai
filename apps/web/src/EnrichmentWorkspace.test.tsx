@@ -1100,5 +1100,4 @@ describe("Prompt Enrichment workspace", () => {
       screen.queryByLabelText("Internal Final Prompt"),
     ).not.toBeInTheDocument();
   });
-
 });
