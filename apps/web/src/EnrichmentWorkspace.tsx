@@ -815,7 +815,7 @@ export function EnrichmentWorkspace({
                 </p>
               ))}
           </details>
-          {s && (
+          {s && (s.questions.length === 0 || readyForFinal) && (
             <section
               className="finish-design"
               aria-label={t("Finish your prompt", "Завершение промпта")}
