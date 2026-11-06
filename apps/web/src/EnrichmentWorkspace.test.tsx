@@ -205,7 +205,9 @@ describe("Prompt Enrichment workspace", () => {
     fireEvent.change(screen.getByLabelText("Your message"), {
       target: { value: "A gold ring." },
     });
-    await userEvent.click(screen.getByRole("button", { name: "Update design" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
     expect(
       await screen.findByRole("button", { name: "Updating your design…" }),
     ).toBeDisabled();
@@ -575,7 +577,10 @@ describe("Prompt Enrichment workspace", () => {
           role_id: "retail_client",
           locale: "en",
         });
-        return HttpResponse.json({ session_id: "new-session" }, { status: 201 });
+        return HttpResponse.json(
+          { session_id: "new-session" },
+          { status: 201 },
+        );
       }),
     );
     f.view();
@@ -587,17 +592,29 @@ describe("Prompt Enrichment workspace", () => {
 
   it("keeps saved history scoped to the piece while allowing a clean screen", async () => {
     const f = fixture(true);
-    f.data.events = [{
-      event_id: "old-message", kind: "user", created_at: "2026-11-05T00:00:00Z",
-      text: "A previous design detail", message_id: "m1", outcome: null,
-    }];
+    f.data.events = [
+      {
+        event_id: "old-message",
+        kind: "user",
+        created_at: "2026-11-05T00:00:00Z",
+        text: "A previous design detail",
+        message_id: "m1",
+        outcome: null,
+      },
+    ];
     f.view();
     await screen.findByRole("button", { name: /Show history/ });
-    expect(screen.queryByText("A previous design detail")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("A previous design detail"),
+    ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /Show history/ }));
     expect(screen.getByText("A previous design detail")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Clear visible history" }));
-    expect(screen.queryByText("A previous design detail")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear visible history" }),
+    );
+    expect(
+      screen.queryByText("A previous design detail"),
+    ).not.toBeInTheDocument();
     expect(f.data.events).toHaveLength(1);
   });
 
@@ -608,8 +625,13 @@ describe("Prompt Enrichment workspace", () => {
     await userEvent.type(screen.getByLabelText("Jewelry type"), "Wedding band");
     await userEvent.type(screen.getByLabelText("Metal"), "Yellow gold");
     await userEvent.type(screen.getByLabelText("Center stone"), "No stone");
-    await userEvent.type(screen.getByLabelText("Your message"), "Delicate profile.");
-    await userEvent.click(screen.getByRole("button", { name: "Update design" }));
+    await userEvent.type(
+      screen.getByLabelText("Your message"),
+      "Delicate profile.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("initial");
     expect(f.data.events[0]?.text).toBe(
