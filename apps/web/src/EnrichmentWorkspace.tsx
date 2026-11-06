@@ -417,6 +417,7 @@ export function EnrichmentWorkspace({
               <label>
                 {t("Jewelry type", "Тип изделия")}
                 <input
+                  list="piece-type-suggestions"
                   value={guidedType}
                   disabled={busy}
                   onChange={(e) => setGuidedType(e.target.value)}
@@ -425,19 +426,59 @@ export function EnrichmentWorkspace({
                     "Например: обручальное кольцо",
                   )}
                 />
+                <datalist id="piece-type-suggestions">
+                  {ru ? (
+                    <>
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                    </>
+                  ) : (
+                    <>
+                  <option value="Wedding band" />
+                  <option value="Engagement ring" />
+                  <option value="Earrings" />
+                  <option value="Pendant" />
+                  <option value="Bracelet" />
+                    </>
+                  )}
+                </datalist>
               </label>
               <label>
                 {t("Metal", "Металл")}
                 <input
+                  list="metal-suggestions"
                   value={guidedMetal}
                   disabled={busy}
                   onChange={(e) => setGuidedMetal(e.target.value)}
                   placeholder={t("e.g. yellow gold", "Например: жёлтое золото")}
                 />
+                <datalist id="metal-suggestions">
+                  {ru ? (
+                    <>
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                    </>
+                  ) : (
+                    <>
+                  <option value="Yellow gold" />
+                  <option value="White gold" />
+                  <option value="Rose gold" />
+                  <option value="Platinum" />
+                  <option value="Silver" />
+                    </>
+                  )}
+                </datalist>
               </label>
               <label>
                 {t("Center stone", "Центральный камень")}
                 <input
+                  list="stone-suggestions"
                   value={guidedStone}
                   disabled={busy}
                   onChange={(e) => setGuidedStone(e.target.value)}
@@ -446,10 +487,32 @@ export function EnrichmentWorkspace({
                     "Нет камня / овальный бриллиант",
                   )}
                 />
+                <datalist id="stone-suggestions">
+                  {ru ? (
+                    <>
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                    </>
+                  ) : (
+                    <>
+                  <option value="No center stone" />
+                  <option value="Round diamond" />
+                  <option value="Oval diamond" />
+                  <option value="Emerald-cut diamond" />
+                  <option value="Ruby" />
+                  <option value="Sapphire" />
+                    </>
+                  )}
+                </datalist>
               </label>
               <label>
                 {t("Style and finish", "Стиль и отделка")}
                 <input
+                  list="style-suggestions"
                   value={guidedStyle}
                   disabled={busy}
                   onChange={(e) => setGuidedStyle(e.target.value)}
@@ -458,6 +521,27 @@ export function EnrichmentWorkspace({
                     "Минимализм, полировка",
                   )}
                 />
+                <datalist id="style-suggestions">
+                  {ru ? (
+                    <>
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                  <option value={ru.split('|')[i]} />
+                    </>
+                  ) : (
+                    <>
+                  <option value="Minimalist" />
+                  <option value="Classic" />
+                  <option value="Vintage" />
+                  <option value="Modern" />
+                  <option value="Polished" />
+                  <option value="Matte finish" />
+                    </>
+                  )}
+                </datalist>
               </label>
             </div>
             <label className="free-design-text">
