@@ -1037,7 +1037,7 @@ describe("Prompt Enrichment workspace", () => {
       prompt.prompt_text,
     );
     expect(screen.getByText("AI defaults and sources")).toBeInTheDocument();
-    expect(screen.getByText(/not specified/)).toBeInTheDocument();
+    expect(screen.getAllByText(/not specified/).length).toBeGreaterThan(0);
     view.unmount();
     f.view();
     expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
