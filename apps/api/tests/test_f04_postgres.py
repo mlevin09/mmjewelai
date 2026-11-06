@@ -4,6 +4,7 @@ No local URL or naming convention authorizes DDL. The imported fixture verifies
 container and cluster identity before creating its isolated, disposable schema.
 """
 
+import importlib.util
 import json
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
@@ -11,7 +12,10 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 from conftest import ROOT
+from sqlalchemy import text
 from test_effective_readiness import ready_session as ready_session
 from test_f04_http import (
     READY_TEXT,
@@ -137,27 +141,49 @@ def test_f04_concurrent_resume_postgres(engine, tmp_path, conflicting, capfd):
             assert results[0].json()["result"] == results[1].json()["result"]
 
 
-@pytest.mark.parametrize("engine", ["0018_f04_preparation_v2"], indirect=True)
+def apply_f04_check_migration(engine, direction):
+    # New runtime requires current columns. Exercise the historical CHECK-only
+    # migration in isolation, without pretending head can downgrade past0019.
+    spec = importlib.util.spec_from_file_location(
+        "f04_check", ROOT / "packages/persistence/migrations/versions/0018_f04_preparation_v2.py"
+    )
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+    with engine.begin() as db:
+        with Operations.context(MigrationContext.configure(db)):
+            getattr(migration, direction)()
+
+
 def test_f04_check_downgrade_retains_actual_preparation1_postgres(engine, ready_session, capfd):
     ctx = ready_session()
     assert post(ctx).status_code == 201
     before = retention_snapshot(engine)
-    assert before["version"] == "0018_f04_preparation_v2"
     config = Config(str(ROOT / "packages/persistence/alembic.ini"))
-    command.downgrade(config, "0017_knowledge_release_bindings")
+    apply_f04_check_migration(engine, "downgrade")
     middle = retention_snapshot(engine)
     assert middle["rows"] == before["rows"]
-    assert middle["version"] == "0017_knowledge_release_bindings"
-    command.upgrade(config, "0018_f04_preparation_v2")
+    assert middle["version"] == before["version"]
+    with engine.connect() as db:
+        check = db.scalar(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conrelid='generation_preparation'::regclass "
+                "AND conname='ck_preparation_version'"
+            )
+        )
+        assert "1.0.0" in check and "2.0.0" not in check
+    apply_f04_check_migration(engine, "upgrade")
     assert retention_snapshot(engine) == before
     command.upgrade(config, "head")
     command.check(config)
     receipt(
-        capfd, "0018-0017-0018-preparation1-retention", result="PASS", retained_rows_unchanged=True
+        capfd,
+        "0018-CHECK-isolated-preparation1-retention",
+        result="PASS",
+        retained_rows_unchanged=True,
     )
 
 
-@pytest.mark.parametrize("engine", ["0018_f04_preparation_v2"], indirect=True)
 def test_f04_check_downgrade_refuses_actual_preparation2_postgres(engine, tmp_path, capfd):
     with f04_session(engine, tmp_path) as ctx:
         state = initial(ctx, READY_TEXT)
@@ -171,10 +197,9 @@ def test_f04_check_downgrade_refuses_actual_preparation2_postgres(engine, tmp_pa
         assert prepared.status_code == 201, prepared.json()
         assert prepared.json()["schema_version"] == "2.0.0"
         before = retention_snapshot(engine)
-        assert before["version"] == "0018_f04_preparation_v2"
         config = Config(str(ROOT / "packages/persistence/alembic.ini"))
         with pytest.raises(RuntimeError, match="prevent safe downgrade"):
-            command.downgrade(config, "0017_knowledge_release_bindings")
+            apply_f04_check_migration(engine, "downgrade")
         assert retention_snapshot(engine) == before
         command.upgrade(config, "head")
         command.check(config)

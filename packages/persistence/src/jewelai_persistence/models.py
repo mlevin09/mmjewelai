@@ -85,6 +85,11 @@ class DesignSessionRow(Base):
     __table_args__ = (
         UniqueConstraint("session_id", "project_id", name="uq_design_session_project"),
         CheckConstraint(
+            "(deleted_at IS NULL AND deleted_by_principal_id IS NULL) OR "
+            "(deleted_at IS NOT NULL AND deleted_by_principal_id IS NOT NULL)",
+            name="ck_session_deletion_complete",
+        ),
+        CheckConstraint(
             "(knowledge_package_id IS NULL AND knowledge_artifact_version IS NULL "
             "AND knowledge_runtime_sha256 IS NULL "
             "AND knowledge_validation_report_sha256 IS NULL) OR "
@@ -103,6 +108,10 @@ class DesignSessionRow(Base):
     locale: Mapped[str] = mapped_column(String(16))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_by_principal_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("auth_principal.principal_id", ondelete="RESTRICT"), nullable=True
+    )
     current_revision_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
     design_schema_version: Mapped[str] = mapped_column(String(32))
     role_artifact_version: Mapped[str] = mapped_column(String(32))

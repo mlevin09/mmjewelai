@@ -1,5 +1,7 @@
 # Architecture decision records
 
+- [0041 — Non-destructive Design Session deletion (Owner-approved contract; review pending)](0041-non-destructive-session-retirement.md)
+
 Accepted records establish preparation direction; they do not claim implementation.
 Add a numbered record for changes, keeping superseded records and linking their replacement.
 

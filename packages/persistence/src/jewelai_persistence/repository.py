@@ -17,6 +17,7 @@ from jewelai_assets import (
     validate_asset_object_key,
 )
 from jewelai_auth import (
+    AuthorizationDeniedError,
     LastOwnerError,
     MembershipConflictError,
     MembershipNotFoundError,
@@ -124,6 +125,10 @@ class DuplicateRevisionError(PersistenceError):
 
 
 class GenerationStateConflictError(PersistenceError):
+    pass
+
+
+class SessionDeletionConflictError(PersistenceError):
     pass
 
 
@@ -639,6 +644,61 @@ class PersistenceRepository:
             db.expunge(row)
             return row
 
+    def retire_design_session(self, session_id, organization_id, principal_id, deleted_at):
+        """Owner-approved logical deletion. No history/asset DELETE or external work."""
+        with self._session_factory.begin() as db:
+            # Same organization → session lock order as native writes; role revocation
+            # and new generation/retry must serialize with the retirement decision.
+            db.scalar(
+                select(OrganizationRow)
+                .where(OrganizationRow.organization_id == organization_id)
+                .with_for_update(key_share=True)
+            )
+            membership = db.get(OrganizationMembershipRow, (organization_id, principal_id))
+            if membership is None:
+                raise MembershipNotFoundError("Organization membership not found")
+            if membership.role not in {MembershipRole.OWNER.value, MembershipRole.ADMIN.value}:
+                raise AuthorizationDeniedError(
+                    "Only organization owners/admins may delete sessions"
+                )
+            row = db.scalar(
+                self._scoped_session_query(
+                    session_id, organization_id, include_deleted=True
+                ).with_for_update()
+            )
+            if row is None:
+                raise OwnershipMismatchError("Session not found in organization scope")
+            if row.deleted_at is not None:
+                return
+            runs = db.scalars(
+                select(GenerationRunRow).where(GenerationRunRow.session_id == session_id)
+            ).all()
+            for run in runs:
+                if run.status not in {
+                    GenerationStatus.SUCCEEDED.value,
+                    GenerationStatus.FAILED.value,
+                }:
+                    raise SessionDeletionConflictError("Generation is still active")
+                if run.status == GenerationStatus.SUCCEEDED.value:
+                    result = self._generation_run(run).result
+                    assets = {
+                        a.generation_output_ordinal: a
+                        for a in db.scalars(
+                            select(AssetRow).where(
+                                AssetRow.generation_run_id == run.generation_run_id
+                            )
+                        )
+                    }
+                    if result is None or any(
+                        output.ordinal not in assets
+                        or assets[output.ordinal].status
+                        not in {AssetStatus.READY.value, AssetStatus.FAILED.value}
+                        for output in result.outputs
+                    ):
+                        raise SessionDeletionConflictError("Generated assets are still finalizing")
+            row.deleted_at = deleted_at
+            row.deleted_by_principal_id = principal_id
+
     def list_design_sessions(
         self, project_id: UUID, organization_id: UUID
     ) -> tuple[DesignSessionRow, ...]:
@@ -653,7 +713,9 @@ class PersistenceRepository:
                 raise OwnershipMismatchError("Project not found in organization scope")
             rows = db.scalars(
                 select(DesignSessionRow)
-                .where(DesignSessionRow.project_id == project_id)
+                .where(
+                    DesignSessionRow.project_id == project_id, DesignSessionRow.deleted_at.is_(None)
+                )
                 .order_by(DesignSessionRow.created_at, DesignSessionRow.session_id)
             ).all()
             for row in rows:
@@ -811,7 +873,9 @@ class PersistenceRepository:
 
     def create_message(self, row: MessageRow, organization_id: UUID) -> MessageRow:
         with self._session_factory.begin() as db:
-            scoped = db.scalar(self._scoped_session_query(row.session_id, organization_id))
+            scoped = db.scalar(
+                self._scoped_session_query(row.session_id, organization_id).with_for_update()
+            )
             if scoped is None:
                 raise OwnershipMismatchError("Session not found in organization scope")
             if row.actor != "user":
@@ -864,7 +928,9 @@ class PersistenceRepository:
 
     def add_question_event(self, row: QuestionEventRow, organization_id: UUID) -> QuestionEventRow:
         with self._session_factory.begin() as db:
-            scoped = db.scalar(self._scoped_session_query(row.session_id, organization_id))
+            scoped = db.scalar(
+                self._scoped_session_query(row.session_id, organization_id).with_for_update()
+            )
             if scoped is None:
                 raise OwnershipMismatchError("Session not found in organization scope")
             revision = db.scalar(
@@ -2345,7 +2411,9 @@ class PersistenceRepository:
             ) from exc
         try:
             with self._session_factory.begin() as db:
-                session = db.scalar(self._scoped_session_query(session_id, organization_id))
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
                 asset = db.scalar(
                     select(AssetRow).where(
                         AssetRow.asset_id == asset_id,
@@ -2450,7 +2518,9 @@ class PersistenceRepository:
             ) from exc
         try:
             with self._session_factory.begin() as db:
-                session = db.scalar(self._scoped_session_query(session_id, organization_id))
+                session = db.scalar(
+                    self._scoped_session_query(session_id, organization_id).with_for_update()
+                )
                 run = db.scalar(
                     select(GenerationRunRow).where(
                         GenerationRunRow.generation_run_id == run_id,
@@ -2606,7 +2676,9 @@ class PersistenceRepository:
         ):
             raise ValueError("Iteration runs must share the exact session and prompt")
         with self._session_factory.begin() as db:
-            scoped = db.scalar(self._scoped_session_query(session_id, organization_id))
+            scoped = db.scalar(
+                self._scoped_session_query(session_id, organization_id).with_for_update()
+            )
             prompt = db.scalar(
                 select(PromptRevisionRow).where(
                     PromptRevisionRow.prompt_revision_id == prompt_revision_id,
@@ -2739,7 +2811,9 @@ class PersistenceRepository:
         created_at: datetime,
     ) -> IterativeEditRecord:
         with self._session_factory.begin() as db:
-            session = db.scalar(self._scoped_session_query(session_id, organization_id))
+            session = db.scalar(
+                self._scoped_session_query(session_id, organization_id).with_for_update()
+            )
             if session is None or session.current_revision_id != starting_revision_id:
                 raise StaleRevisionError("Current revision changed before iterative edit")
             message = db.scalar(
@@ -2883,6 +2957,11 @@ class PersistenceRepository:
         ):
             raise ValueError("Visualization decision is invalid")
         with self._session_factory.begin() as db:
+            if (
+                db.scalar(self._scoped_session_query(session_id, organization_id).with_for_update())
+                is None
+            ):
+                raise OwnershipMismatchError("Session not found in organization scope")
             iteration = db.scalar(
                 select(VisualizationIterationRow)
                 .where(
@@ -3089,6 +3168,11 @@ class PersistenceRepository:
     ) -> GenerationRetryCreation:
         """Idempotently create one exact-input retry child and durable dispatch."""
         with self._session_factory.begin() as db:
+            if (
+                db.scalar(self._scoped_session_query(session_id, organization_id).with_for_update())
+                is None
+            ):
+                raise OwnershipMismatchError("Session not found in organization scope")
             parent = db.scalar(
                 select(GenerationRunRow)
                 .where(
@@ -3280,8 +3364,10 @@ class PersistenceRepository:
                     .where(
                         DesignSessionRow.session_id == asset.session_id,
                         DesignSessionRow.project_id == asset.project_id,
+                        DesignSessionRow.deleted_at.is_(None),
                         ProjectRow.organization_id == asset.organization_id,
                     )
+                    .with_for_update()
                 )
                 if session is None:
                     raise OwnershipMismatchError(
@@ -4679,7 +4765,9 @@ class PersistenceRepository:
             raise ValueError("A new generation run must be pending")
         if run.attempt != 1 or run.parent_generation_run_id is not None:
             raise ValueError("Generation Run v1 creates only initial attempt-1 runs")
-        session = db.scalar(self._scoped_session_query(run.session_id, organization_id))
+        session = db.scalar(
+            self._scoped_session_query(run.session_id, organization_id).with_for_update()
+        )
         if session is None:
             raise OwnershipMismatchError("Session not found in organization scope")
         prompt = db.scalar(
@@ -4858,12 +4946,14 @@ class PersistenceRepository:
         return (
             select(DesignSessionRow.session_id)
             .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
-            .where(ProjectRow.organization_id == organization_id)
+            .where(
+                ProjectRow.organization_id == organization_id, DesignSessionRow.deleted_at.is_(None)
+            )
         )
 
     @staticmethod
-    def _scoped_session_query(session_id: UUID, organization_id: UUID):
-        return (
+    def _scoped_session_query(session_id: UUID, organization_id: UUID, *, include_deleted=False):
+        query = (
             select(DesignSessionRow)
             .join(ProjectRow, ProjectRow.project_id == DesignSessionRow.project_id)
             .where(
@@ -4871,3 +4961,4 @@ class PersistenceRepository:
                 ProjectRow.organization_id == organization_id,
             )
         )
+        return query if include_deleted else query.where(DesignSessionRow.deleted_at.is_(None))
