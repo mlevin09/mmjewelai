@@ -181,8 +181,8 @@ async function send(text: string) {
   fireEvent.change(screen.getByLabelText("Your message"), {
     target: { value: text },
   });
-  await userEvent.click(screen.getByRole("button", { name: "Send message" }));
-  await screen.findByRole("button", { name: "Send message" });
+  await userEvent.click(screen.getByRole("button", { name: "Update design" }));
+  await screen.findByRole("button", { name: "Update design" });
 }
 
 describe("Prompt Enrichment workspace", () => {
@@ -205,9 +205,11 @@ describe("Prompt Enrichment workspace", () => {
     fireEvent.change(screen.getByLabelText("Your message"), {
       target: { value: "A gold ring." },
     });
-    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
     expect(
-      await screen.findByRole("button", { name: "Processing…" }),
+      await screen.findByRole("button", { name: "Updating your design…" }),
     ).toBeDisabled();
     expect(screen.getByLabelText("Your message")).toBeDisabled();
     expect(
@@ -215,7 +217,7 @@ describe("Prompt Enrichment workspace", () => {
     ).not.toBeInTheDocument();
     fireEvent.submit(screen.getByLabelText("Your message").closest("form")!);
     release();
-    await screen.findByRole("button", { name: "Send message" });
+    await screen.findByRole("button", { name: "Update design" });
     expect(posts).toBe(1);
   });
   it("uses the native L contract and RU composer without changing the user's text", async () => {
@@ -226,7 +228,7 @@ describe("Prompt Enrichment workspace", () => {
       target: { value: "Кольцо из белого золота с oval diamond." },
     });
     await userEvent.click(
-      screen.getByRole("button", { name: "Отправить сообщение" }),
+      screen.getByRole("button", { name: "Обновить дизайн" }),
     );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.body).not.toHaveProperty("schema_version");
@@ -261,7 +263,7 @@ describe("Prompt Enrichment workspace", () => {
     const view = f.view();
     await screen.findByLabelText("Your message");
     await send("I want a white gold ring with an oval diamond.");
-    await userEvent.click(screen.getByText(/Message history/));
+    await userEvent.click(screen.getByRole("button", { name: /Show history/ }));
     expect(
       within(screen.getByLabelText("Saved conversation")).getByText(
         "Your message",
@@ -300,6 +302,9 @@ describe("Prompt Enrichment workspace", () => {
     );
     view.unmount();
     f.view();
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Show history/ }),
+    );
     expect(
       await screen.findByText(
         "Keep the center stone unchanged. Add a delicate band.",
@@ -308,7 +313,7 @@ describe("Prompt Enrichment workspace", () => {
     await send("One more detail.");
     expect(f.commands).toHaveLength(4);
     expect(
-      screen.getByRole("heading", { name: "Create your jewelry" }),
+      screen.getByRole("heading", { name: "Design your piece" }),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Your message")).toBeInTheDocument();
   });
@@ -563,6 +568,109 @@ describe("Prompt Enrichment workspace", () => {
     ).toBeInTheDocument();
   });
 
+  it("starts a new isolated piece with the existing session API", async () => {
+    const f = fixture(true);
+    let created = 0;
+    server.use(
+      http.post(`${root}/projects/project/sessions`, async ({ request }) => {
+        created++;
+        expect(request.headers.get("X-Organization-ID")).toBe("org");
+        expect(await request.json()).toEqual({
+          role_id: "retail_client",
+          locale: "en",
+        });
+        return HttpResponse.json(
+          { session_id: "new-session" },
+          { status: 201 },
+        );
+      }),
+    );
+    f.view();
+    await screen.findByRole("button", { name: "+ New Piece" });
+    await userEvent.click(screen.getByRole("button", { name: "+ New Piece" }));
+    await waitFor(() => expect(created).toBe(1));
+    expect(f.commands).toHaveLength(0);
+  });
+
+  it("keeps saved history scoped to the piece while allowing a clean screen", async () => {
+    const f = fixture(true);
+    f.data.events = [
+      {
+        event_id: "old-message",
+        kind: "user",
+        created_at: "2026-11-05T00:00:00Z",
+        text: "A previous design detail",
+        message_id: "m1",
+        outcome: null,
+      },
+    ];
+    f.view();
+    await screen.findByRole("button", { name: /Show history/ });
+    expect(
+      screen.queryByText("A previous design detail"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Show history/ }));
+    expect(screen.getByText("A previous design detail")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Clear visible history" }),
+    );
+    expect(
+      screen.queryByText("A previous design detail"),
+    ).not.toBeInTheDocument();
+    expect(f.data.events).toHaveLength(1);
+  });
+
+  it("preserves structured inputs and free text after an unsuccessful save", async () => {
+    const f = fixture(true);
+    server.use(
+      http.post(`${prefix}/corrections`, () =>
+        HttpResponse.json(
+          { error: "stale_revision", detail: "Revision changed" },
+          { status: 409 },
+        ),
+      ),
+    );
+    f.view();
+    await screen.findByLabelText("Jewelry type");
+    await userEvent.type(screen.getByLabelText("Metal"), "Yellow gold");
+    await userEvent.type(
+      screen.getByLabelText("Your message"),
+      "Delicate band.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
+    await screen.findByText(/The design changed or a decision/);
+    expect(screen.getByLabelText("Metal")).toHaveValue("Yellow gold");
+    expect(screen.getByLabelText("Your message")).toHaveValue("Delicate band.");
+  });
+
+  it("submits guided parameters and free text as one initial user message", async () => {
+    const f = fixture();
+    f.view();
+    await screen.findByLabelText("Jewelry type");
+    await userEvent.type(screen.getByLabelText("Jewelry type"), "Wedding band");
+    await userEvent.type(screen.getByLabelText("Metal"), "Yellow gold");
+    await userEvent.type(screen.getByLabelText("Center stone"), "No stone");
+    await userEvent.type(
+      screen.getByLabelText("Your message"),
+      "Delicate profile.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.commands[0]?.route).toBe("initial");
+    expect(f.data.events[0]?.text).toBe(
+      [
+        "Jewelry type: Wedding band",
+        "Metal: Yellow gold",
+        "Center stone: No stone",
+        "Delicate profile.",
+      ].join("\n"),
+    );
+  });
+
   it("does not request final output while server status is blocked", async () => {
     const f = fixture(true);
     f.data.state!.status = "final_output_blocked";
@@ -618,10 +726,10 @@ describe("Prompt Enrichment workspace", () => {
     );
     expect(screen.queryByLabelText("Your message")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", {
+      screen.queryByRole("link", {
         name: "Open existing visualization workspace",
       }),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(f.commands).toHaveLength(0);
   });
   it("does not show session content or entry actions when the session itself is outside scope", async () => {
