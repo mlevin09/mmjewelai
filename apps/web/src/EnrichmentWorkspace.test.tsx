@@ -201,6 +201,9 @@ describe("Prompt Enrichment workspace", () => {
       }),
     );
     f.view();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "No, I'm finished" }),
+    );
     await screen.findByRole("button", { name: "Copy full prompt" });
     fireEvent.change(screen.getByLabelText("Your message"), {
       target: { value: "A gold ring." },
@@ -298,6 +301,9 @@ describe("Prompt Enrichment workspace", () => {
       .spyOn(navigator.clipboard, "writeText")
       .mockResolvedValue();
     await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    await userEvent.click(
       screen.getByRole("button", { name: "Copy full prompt" }),
     );
     expect(clipboard).toHaveBeenCalledWith(
@@ -322,6 +328,7 @@ describe("Prompt Enrichment workspace", () => {
   });
   it("does not invent output and preserves the draft on stale CAS; sends no duplicate command", async () => {
     const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
     let posts = 0;
     server.use(
       http.get(`${prefix}/final-output`, () =>
@@ -813,6 +820,7 @@ describe("Prompt Enrichment workspace", () => {
 
   it("hides internal JSON and explains blocked final output in plain language", async () => {
     const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
     server.use(
       http.get(`${prefix}/final-output`, () =>
         HttpResponse.json(
