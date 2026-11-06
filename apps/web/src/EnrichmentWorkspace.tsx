@@ -362,6 +362,61 @@ export function EnrichmentWorkspace({
               {t("Saved automatically", "Сохраняется автоматически")}
             </span>
           </div>
+          <form className="guided-piece-form" onSubmit={(e) => {
+            e.preventDefault();
+            const payload = [
+              guidedType.trim() ? `Jewelry type: ${guidedType.trim()}` : "",
+              guidedMetal.trim() ? `Metal: ${guidedMetal.trim()}` : "",
+              guidedStone.trim() ? `Center stone: ${guidedStone.trim()}` : "",
+              guidedStyle.trim() ? `Style and finish: ${guidedStyle.trim()}` : "",
+              text.trim(),
+            ].filter(Boolean).join("\n");
+            if (!payload) return;
+            void perform(async () => {
+              await client.send(session, snapshot, payload);
+              setGuidedType("");
+              setGuidedMetal("");
+              setGuidedStone("");
+              setGuidedStyle("");
+              setText("");
+            });
+          }}>
+            <div className="guided-heading">
+              <div>
+                <p className="eyebrow">{t("DESIGN DETAILS", "ПАРАМЕТРЫ ИЗДЕЛИЯ")}</p>
+                <h3>{t("Start with what you know", "Начните с того, что знаете")}</h3>
+              </div>
+              <span>{t("All fields optional", "Все поля необязательны")}</span>
+            </div>
+            <div className="guided-fields">
+              <label>{t("Jewelry type", "Тип изделия")}
+                <input value={guidedType} disabled={busy} onChange={e => setGuidedType(e.target.value)}
+                  placeholder={t("e.g. wedding band", "Например: обручальное кольцо")} />
+              </label>
+              <label>{t("Metal", "Металл")}
+                <input value={guidedMetal} disabled={busy} onChange={e => setGuidedMetal(e.target.value)}
+                  placeholder={t("e.g. yellow gold", "Например: жёлтое золото")} />
+              </label>
+              <label>{t("Center stone", "Центральный камень")}
+                <input value={guidedStone} disabled={busy} onChange={e => setGuidedStone(e.target.value)}
+                  placeholder={t("e.g. no stone / oval diamond", "Нет камня / овальный бриллиант")} />
+              </label>
+              <label>{t("Style and finish", "Стиль и отделка")}
+                <input value={guidedStyle} disabled={busy} onChange={e => setGuidedStyle(e.target.value)}
+                  placeholder={t("e.g. minimal, polished", "Минимализм, полировка")} />
+              </label>
+            </div>
+            <label className="free-design-text">
+              {t("Describe your idea or changes in your own words", "Опишите идею или изменения своими словами")}
+              <textarea aria-label={t("Your message", "Ваше сообщение")} disabled={busy} maxLength={2000}
+                value={text} onChange={e => setText(e.target.value)}
+                placeholder={t("What should the finished piece look and feel like?", "Как должно выглядеть изделие? Какие детали важны?")} />
+            </label>
+            <button disabled={busy || ![guidedType,guidedMetal,guidedStone,guidedStyle,text].some(v=>v.trim())} type="submit">
+              {busy ? t("Updating your design…", "Обновляем дизайн…") : t("Update design", "Обновить дизайн")}
+            </button>
+            <small>{t("JewelAI interprets these details using the existing API. Saved values appear in the current design, not in a second copy.", "JewelAI обрабатывает данные через существующий API. Сохранённые значения появятся в актуальном описании.")}</small>
+          </form>
           <section
             className="living-design"
             aria-label={t(
@@ -516,61 +571,6 @@ export function EnrichmentWorkspace({
               )}
             </button>
           )}
-          <form className="guided-piece-form" onSubmit={(e) => {
-            e.preventDefault();
-            const payload = [
-              guidedType.trim() ? `Jewelry type: ${guidedType.trim()}` : "",
-              guidedMetal.trim() ? `Metal: ${guidedMetal.trim()}` : "",
-              guidedStone.trim() ? `Center stone: ${guidedStone.trim()}` : "",
-              guidedStyle.trim() ? `Style and finish: ${guidedStyle.trim()}` : "",
-              text.trim(),
-            ].filter(Boolean).join("\n");
-            if (!payload) return;
-            void perform(async () => {
-              await client.send(session, snapshot, payload);
-              setGuidedType("");
-              setGuidedMetal("");
-              setGuidedStone("");
-              setGuidedStyle("");
-              setText("");
-            });
-          }}>
-            <div className="guided-heading">
-              <div>
-                <p className="eyebrow">{t("DESIGN DETAILS", "ПАРАМЕТРЫ ИЗДЕЛИЯ")}</p>
-                <h3>{t("Start with what you know", "Начните с того, что знаете")}</h3>
-              </div>
-              <span>{t("All fields optional", "Все поля необязательны")}</span>
-            </div>
-            <div className="guided-fields">
-              <label>{t("Jewelry type", "Тип изделия")}
-                <input value={guidedType} disabled={busy} onChange={e => setGuidedType(e.target.value)}
-                  placeholder={t("e.g. wedding band", "Например: обручальное кольцо")} />
-              </label>
-              <label>{t("Metal", "Металл")}
-                <input value={guidedMetal} disabled={busy} onChange={e => setGuidedMetal(e.target.value)}
-                  placeholder={t("e.g. yellow gold", "Например: жёлтое золото")} />
-              </label>
-              <label>{t("Center stone", "Центральный камень")}
-                <input value={guidedStone} disabled={busy} onChange={e => setGuidedStone(e.target.value)}
-                  placeholder={t("e.g. no stone / oval diamond", "Нет камня / овальный бриллиант")} />
-              </label>
-              <label>{t("Style and finish", "Стиль и отделка")}
-                <input value={guidedStyle} disabled={busy} onChange={e => setGuidedStyle(e.target.value)}
-                  placeholder={t("e.g. minimal, polished", "Минимализм, полировка")} />
-              </label>
-            </div>
-            <label className="free-design-text">
-              {t("Describe your idea or changes in your own words", "Опишите идею или изменения своими словами")}
-              <textarea aria-label={t("Your message", "Ваше сообщение")} disabled={busy} maxLength={2000}
-                value={text} onChange={e => setText(e.target.value)}
-                placeholder={t("What should the finished piece look and feel like?", "Как должно выглядеть изделие? Какие детали важны?")} />
-            </label>
-            <button disabled={busy || ![guidedType,guidedMetal,guidedStone,guidedStyle,text].some(v=>v.trim())} type="submit">
-              {busy ? t("Updating your design…", "Обновляем дизайн…") : t("Update design", "Обновить дизайн")}
-            </button>
-            <small>{t("JewelAI interprets these details using the existing API. Saved values appear in the current design, not in a second copy.", "JewelAI обрабатывает данные через существующий API. Сохранённые значения появятся в актуальном описании.")}</small>
-          </form>
         </section>
         <aside
           className="panel design-result"
