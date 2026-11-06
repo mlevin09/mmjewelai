@@ -1099,7 +1099,7 @@ function QuestionCard({
                 ["Marquise", "Маркиз"],
                 ["Heart", "Сердце"],
               ].map(([en, russian]) => {
-                const suggestion = ru ? (russian ?? en) : en;
+                const suggestion = ru ? (russian ?? en ?? "") : (en ?? "");
                 return (
                   <button
                     type="button"
