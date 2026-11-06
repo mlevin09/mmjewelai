@@ -221,7 +221,12 @@ function Shell() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: me, isError: meUnavailable, isFetching: meRefreshing, refetch: retryMe } = useQuery({
+  const {
+    data: me,
+    isError: meUnavailable,
+    isFetching: meRefreshing,
+    refetch: retryMe,
+  } = useQuery({
     queryKey: keys.me,
     queryFn: () => api.request<Me>("/me"),
   });
