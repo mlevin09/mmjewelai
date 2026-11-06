@@ -4,7 +4,6 @@ import { ApiClient, ApiError } from "./api";
 import {
   decisions,
   EnrichmentClient,
-  type CompletionResult,
   type CompletionView,
   type Conversation,
   type FinalOutput,
@@ -321,7 +320,7 @@ export function EnrichmentWorkspace({
     text,
   ].some((value) => value.trim());
   const activeCompletion = completionEnabled && completion?.status === "FINAL" && completion.is_current
-    ? (completion as CompletionResult).final_prompt
+    ? completion.final_prompt
     : null;
   const canComplete = Boolean((completionEnabled || readyForFinal) && !unsavedDesignInput);
   const finalConfirmed = completionEnabled
@@ -968,7 +967,9 @@ export function EnrichmentWorkspace({
                     {activeCompletion.effective_parameters.map((parameter) => (
                       <li key={parameter.concrete_target}>
                         <strong>{label(parameter.concrete_target)}</strong>: {display(parameter.value)} —{" "}
-                        {String(activeCompletion.parameter_sources[parameter.concrete_target]?.origin ?? "explicit")}
+                        {typeof activeCompletion.parameter_sources[parameter.concrete_target]?.origin === "string"
+                          ? activeCompletion.parameter_sources[parameter.concrete_target].origin as string
+                          : "explicit"}
                       </li>
                     ))}
                     {activeCompletion.omitted_targets.map((target) => (
