@@ -35,6 +35,8 @@ export function EnrichmentWorkspace({
   const [copyStatus, setCopyStatus] = useState("");
   const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [completedFrame, setCompletedFrame] = useState<string | null>(null);
+  const [completionRequested, setCompletionRequested] = useState(false);
   const [pieceCreating, setPieceCreating] = useState(false);
   const [guidedType, setGuidedType] = useState("");
   const [guidedMetal, setGuidedMetal] = useState("");
@@ -273,6 +275,13 @@ export function EnrichmentWorkspace({
     );
   const s = snapshot.state;
   const activeQuestion = s?.questions[0];
+  const readyForFinal =
+    s?.status === "final_output_ready" ||
+    s?.status === "final_output_ready_with_unresolved";
+  const currentFrameHash = s?.current_frame.history_root_sha256 ?? null;
+  const completedCurrentFrame = Boolean(
+    currentFrameHash && completedFrame === currentFrameHash && readyForFinal,
+  );
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -512,6 +521,7 @@ export function EnrichmentWorkspace({
               )}
               <textarea
                 aria-label={t("Your message", "Ваше сообщение")}
+                id="guided-design-description"
                 disabled={busy}
                 maxLength={2000}
                 value={text}
@@ -802,7 +812,56 @@ export function EnrichmentWorkspace({
                 </p>
               ))}
           </details>
-          <h3>{t("Generated prompt", "Сформированный промпт")}</h3>
+          {s && (
+            <section className="finish-design" aria-label={t("Finish your prompt", "Завершение промпта")}>
+              <h3>{t("Anything else to add?", "Хотите добавить что-нибудь ещё?")}</h3>
+              <p>{t(
+                "You may leave unknown details unanswered. JewelAI will not invent default values.",
+                "Неизвестные параметры можно оставить незаполненными. JewelAI не будет придумывать значения по умолчанию.",
+              )}</p>
+              <div className="finish-design-actions">
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => {
+                    setCompletionRequested(false);
+                    document.getElementById("guided-design-description")?.focus();
+                  }}
+                >
+                  {t("Yes, add details", "Да, добавить детали")}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setCompletionRequested(true);
+                    setCompletedFrame(readyForFinal ? currentFrameHash : null);
+                  }}
+                >
+                  {t("No, I'm finished", "Нет, больше нечего добавить")}
+                </button>
+              </div>
+              {completionRequested && !readyForFinal && (
+                <p role="status" className="finish-blocked">
+                  {t(
+                    "Your available details are saved, but JewelAI still reports a blocking decision. Answer or explicitly skip the remaining questions where allowed. A final prompt cannot be issued yet.",
+                    "Доступные сведения сохранены, но JewelAI всё ещё сообщает об обязательном решении. Ответьте на оставшиеся вопросы или явно пропустите их, если это разрешено. Итоговый промпт пока недоступен.",
+                  )}
+                </p>
+              )}
+              {completedCurrentFrame && (
+                <p role="status" className="finish-complete">
+                  {t(
+                    "Finished for the current design revision. The exact server-generated final prompt is shown below.",
+                    "Работа с текущей версией завершена. Ниже — точный итоговый промпт, сформированный сервером.",
+                  )}
+                </p>
+              )}
+            </section>
+          )}
+          <h3>{completedCurrentFrame
+            ? t("Final prompt", "Итоговый промпт")
+            : t("Generated prompt", "Сформированный промпт")}</h3>
           {final ? (
             <>
               <p className="final-readiness">
