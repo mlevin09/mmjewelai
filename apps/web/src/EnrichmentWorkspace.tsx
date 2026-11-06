@@ -427,23 +427,11 @@ export function EnrichmentWorkspace({
                   )}
                 />
                 <datalist id="piece-type-suggestions">
-                  {ru ? (
-                    <>
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                    </>
-                  ) : (
-                    <>
-                  <option value="Wedding band" />
-                  <option value="Engagement ring" />
-                  <option value="Earrings" />
-                  <option value="Pendant" />
-                  <option value="Bracelet" />
-                    </>
-                  )}
+                  <option value={t("Wedding band", "Обручальное кольцо")} />
+                  <option value={t("Engagement ring", "Помолвочное кольцо")} />
+                  <option value={t("Earrings", "Серьги")} />
+                  <option value={t("Pendant", "Подвеска")} />
+                  <option value={t("Bracelet", "Браслет")} />
                 </datalist>
               </label>
               <label>
@@ -456,23 +444,11 @@ export function EnrichmentWorkspace({
                   placeholder={t("e.g. yellow gold", "Например: жёлтое золото")}
                 />
                 <datalist id="metal-suggestions">
-                  {ru ? (
-                    <>
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                    </>
-                  ) : (
-                    <>
-                  <option value="Yellow gold" />
-                  <option value="White gold" />
-                  <option value="Rose gold" />
-                  <option value="Platinum" />
-                  <option value="Silver" />
-                    </>
-                  )}
+                  <option value={t("Yellow gold", "Жёлтое золото")} />
+                  <option value={t("White gold", "Белое золото")} />
+                  <option value={t("Rose gold", "Розовое золото")} />
+                  <option value={t("Platinum", "Платина")} />
+                  <option value={t("Silver", "Серебро")} />
                 </datalist>
               </label>
               <label>
@@ -488,25 +464,12 @@ export function EnrichmentWorkspace({
                   )}
                 />
                 <datalist id="stone-suggestions">
-                  {ru ? (
-                    <>
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                    </>
-                  ) : (
-                    <>
-                  <option value="No center stone" />
-                  <option value="Round diamond" />
-                  <option value="Oval diamond" />
-                  <option value="Emerald-cut diamond" />
-                  <option value="Ruby" />
-                  <option value="Sapphire" />
-                    </>
-                  )}
+                  <option value={t("No center stone", "Без центрального камня")} />
+                  <option value={t("Round diamond", "Круглый бриллиант")} />
+                  <option value={t("Oval diamond", "Овальный бриллиант")} />
+                  <option value={t("Emerald-cut diamond", "Бриллиант изумрудной огранки")} />
+                  <option value={t("Ruby", "Рубин")} />
+                  <option value={t("Sapphire", "Сапфир")} />
                 </datalist>
               </label>
               <label>
@@ -522,25 +485,12 @@ export function EnrichmentWorkspace({
                   )}
                 />
                 <datalist id="style-suggestions">
-                  {ru ? (
-                    <>
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                  <option value={ru.split('|')[i]} />
-                    </>
-                  ) : (
-                    <>
-                  <option value="Minimalist" />
-                  <option value="Classic" />
-                  <option value="Vintage" />
-                  <option value="Modern" />
-                  <option value="Polished" />
-                  <option value="Matte finish" />
-                    </>
-                  )}
+                  <option value={t("Minimalist", "Минимализм")} />
+                  <option value={t("Classic", "Классика")} />
+                  <option value={t("Vintage", "Винтаж")} />
+                  <option value={t("Modern", "Современный")} />
+                  <option value={t("Polished", "Полировка")} />
+                  <option value={t("Matte finish", "Матовая отделка")} />
                 </datalist>
               </label>
             </div>
