@@ -785,3 +785,21 @@ nav {
     width: 100%;
   }
 }
+
+/* Account API may briefly be unreachable while the current design remains usable. */
+.connection-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin: 0.8rem auto;
+  width: min(1180px, calc(100% - 2rem));
+  padding: 0.8rem 1rem;
+  border: 1px solid #d9b77d;
+  border-radius: 0.65rem;
+  background: #fff8e9;
+}
+.connection-warning button {
+  flex-shrink: 0;
+}
