@@ -32,6 +32,7 @@ export function EnrichmentWorkspace({
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copyStatus, setCopyStatus] = useState("");
+  const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
   const flight = useRef(false);
   const epoch = useRef(0);
   const log = useRef<HTMLOListElement>(null);
@@ -162,6 +163,7 @@ export function EnrichmentWorkspace({
   ) {
     await perform(async () => {
       const hasDecision = Boolean(decision);
+      let decisionCommitted = false;
       if (hasDecision) {
         await client.answer(
           state,
@@ -170,6 +172,7 @@ export function EnrichmentWorkspace({
             "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
           option,
         );
+        decisionCommitted = true;
       }
       const written = [
         value.trim()
@@ -182,8 +185,16 @@ export function EnrichmentWorkspace({
       if (written) {
         // An answer may advance the server revision. Read the new head before
         // submitting any additional free text through the existing API.
-        const fresh = hasDecision ? await client.read() : snapshot!;
-        await client.send(session!, fresh, written);
+        try {
+          const fresh = hasDecision ? await client.read() : snapshot!;
+          await client.send(session!, fresh, written);
+          setPartialAnswer(null);
+        } catch (e) {
+          if (decisionCommitted) setPartialAnswer(written);
+          throw e;
+        }
+      } else {
+        setPartialAnswer(null);
       }
     });
   }
@@ -269,6 +280,16 @@ export function EnrichmentWorkspace({
         <p role="alert" className="alert">
           {error}
         </p>
+      )}
+      {partialAnswer && (
+        <section className="alert" aria-label={t("Partially saved clarification", "Частично сохранённое уточнение")}>
+          <strong>{t("The selected option was saved, but additional text may not be fully applied.", "Выбранный вариант сохранён, но дополнительный текст мог примениться не полностью.")}</strong>
+          <p>{t("Check the updated design and message history before resending these details; do not repeat the option selection.", "Проверьте обновлённый дизайн и историю перед повторной отправкой деталей; не выбирайте тот же вариант повторно.")}</p>
+          <textarea aria-label={t("Additional text to review", "Дополнительный текст для проверки")} readOnly value={partialAnswer} />
+          <button className="quiet" type="button" onClick={() => setPartialAnswer(null)}>
+            {t("I reviewed these details", "Я проверил эти детали")}
+          </button>
+        </section>
       )}
       <div className="enrichment-grid" aria-busy={busy}>
         <section className="panel conversation-panel">
