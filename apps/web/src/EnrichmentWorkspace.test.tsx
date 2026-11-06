@@ -613,32 +613,37 @@ describe("Prompt Enrichment workspace", () => {
     },
   );
 
-  it("accepts positive sub-tenth mm dimensions using the server semantic question ID", async () => {
-    const f = fixture(true);
-    f.data.state!.questions = [
-      {
-        question_kind: "NATIVE",
-        retained_base: "F",
-        native_question: {
-          clarification_id: "dimensions",
-          semantic_question_id: "CENTER_STONE_DIMENSIONS",
-          text: "Return a Dimensions value.",
-          category: "information_gap",
-          allowed_decisions: ["UNKNOWN", "SKIP"],
-          options: [],
+  it.each(["0.05", "0.00000001", "1000000000000000000000"])(
+    "serializes positive decimal dimensions without scientific notation: %s",
+    async (length) => {
+      const f = fixture(true);
+      f.data.state!.questions = [
+        {
+          question_kind: "NATIVE",
+          retained_base: "F",
+          native_question: {
+            clarification_id: "dimensions",
+            semantic_question_id: "CENTER_STONE_DIMENSIONS",
+            text: "Return a Dimensions value.",
+            category: "information_gap",
+            allowed_decisions: ["UNKNOWN", "SKIP"],
+            options: [],
+          },
         },
-      },
-    ];
-    f.view();
-    await userEvent.type(await screen.findByLabelText("Length (mm)"), "0.05");
-    await userEvent.type(screen.getByLabelText("Width (mm)"), "0.03");
-    await userEvent.type(screen.getByLabelText("Depth (mm)"), "0.02");
-    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    await waitFor(() => expect(f.commands).toHaveLength(1));
-    expect(f.data.events[0]?.text).toContain(
-      "Center stone 0.05 x 0.03 x 0.02 mm",
-    );
-  });
+      ];
+      f.view();
+      await userEvent.type(await screen.findByLabelText("Length (mm)"), length);
+      await userEvent.type(screen.getByLabelText("Width (mm)"), "0.03");
+      await userEvent.type(screen.getByLabelText("Depth (mm)"), "0.02");
+      await userEvent.click(
+        screen.getByRole("button", { name: "Save answer" }),
+      );
+      await waitFor(() => expect(f.commands).toHaveLength(1));
+      expect(f.data.events[0]?.text).toContain(
+        `Center stone ${length} x 0.03 x 0.02 mm`,
+      );
+    },
+  );
 
   it("does not assign side-stone measurement questions to the center stone", async () => {
     const f = fixture(true);

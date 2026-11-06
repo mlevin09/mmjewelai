@@ -1141,7 +1141,7 @@ function QuestionCard({
   const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
   const measurements = [lengthMm, widthMm, depthMm];
   const dimensionText = measurements.some((v) => v.trim())
-    ? `${ru ? "Центральный камень" : "Center stone"} ${measurements.map((v) => Number(v.replace(",", "."))).join(" x ")} ${ru ? "мм" : "mm"}`
+    ? `${ru ? "Центральный камень" : "Center stone"} ${measurements.map((v) => Number(v.replace(",", ".")).toLocaleString("en-US", { useGrouping: false, maximumSignificantDigits: 21 })).join(" x ")} ${ru ? "мм" : "mm"}`
     : "";
   const enteredValue = kind === "dimensions" ? dimensionText : value;
   const canSend = Boolean(
