@@ -998,6 +998,32 @@ function QuestionCard({
                 <option key={en} value={ru ? russian : en} />
               ))}
             </datalist>
+            <div className="stone-shape-choices" role="group" aria-label={ru ? "Подсказки формы камня" : "Suggested stone shapes"}>
+              {[
+                ["Round", "Круглая"],
+                ["Oval", "Овальная"],
+                ["Princess", "Принцесса"],
+                ["Emerald", "Изумрудная"],
+                ["Pear", "Грушевидная"],
+                ["Cushion", "Кушон"],
+                ["Marquise", "Маркиз"],
+                ["Heart", "Сердце"],
+              ].map(([en, russian]) => {
+                const suggestion = ru ? russian : en;
+                return (
+                  <button
+                    type="button"
+                    key={en}
+                    className={value === suggestion ? "shape-choice selected" : "shape-choice"}
+                    aria-pressed={value === suggestion}
+                    disabled={busy}
+                    onClick={() => setValue(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                );
+              })}
+            </div>
             <small className="question-help">
               {ru
                 ? "Это подсказки ввода, не варианты, подтверждённые сервером. Ваш выбор обрабатывается как текст."
