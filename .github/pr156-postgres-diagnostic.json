@@ -1,1 +1,1 @@
-{"source_sha":"22afd5a031d613ebe9d9853059a8d89da5c9efdd","phase":"RED","authorization":"Owner requested exact three PostgreSQL reproducers; no full suite or Full Regression."}
+{"source_sha":"a46e0e4fa92787fd688351ebf349dde3cbe92e7c","phase":"GREEN","authorization":"Owner authorized only the three failed PostgreSQL functions; include the other directly affected race order as control. No full suite/Full Regression."}
