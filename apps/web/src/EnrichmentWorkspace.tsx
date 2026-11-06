@@ -153,6 +153,7 @@ export function EnrichmentWorkspace({
     setError("");
     setCopyStatus("");
     setFinal(null);
+    setCompletion(null);
     setFinalReason("Updating server output…");
     try {
       await action();
