@@ -279,6 +279,7 @@ export function EnrichmentWorkspace({
     s?.status === "final_output_ready" ||
     s?.status === "final_output_ready_with_unresolved";
   const currentFrameHash = s?.current_frame.history_root_sha256 ?? null;
+  const unsavedDesignInput = [guidedType, guidedMetal, guidedStone, guidedStyle, text].some((value) => value.trim());
   const completedCurrentFrame = Boolean(
     currentFrameHash && completedFrame === currentFrameHash && readyForFinal,
   );
@@ -816,8 +817,8 @@ export function EnrichmentWorkspace({
             <section className="finish-design" aria-label={t("Finish your prompt", "Завершение промпта")}>
               <h3>{t("Anything else to add?", "Хотите добавить что-нибудь ещё?")}</h3>
               <p>{t(
-                "You may leave unknown details unanswered. JewelAI will not invent default values.",
-                "Неизвестные параметры можно оставить незаполненными. JewelAI не будет придумывать значения по умолчанию.",
+                "Mark any remaining unknowns as "I don\'t know" or skip them where allowed. JewelAI will not invent defaults.",
+                "Для неизвестных параметров выберите «Не знаю» или «Пропустить», если это разрешено. JewelAI не придумывает значения по умолчанию.",
               )}</p>
               <div className="finish-design-actions">
                 <button
@@ -832,7 +833,7 @@ export function EnrichmentWorkspace({
                 </button>
                 <button
                   type="button"
-                  disabled={busy}
+                  disabled={busy || unsavedDesignInput}
                   onClick={() => {
                     setCompletionRequested(true);
                     setCompletedFrame(readyForFinal ? currentFrameHash : null);
@@ -841,6 +842,11 @@ export function EnrichmentWorkspace({
                   {t("No, I'm finished", "Нет, больше нечего добавить")}
                 </button>
               </div>
+              {unsavedDesignInput && (
+                <p className="question-help">
+                  {t("Save your typed details before finishing.", "Сначала сохраните введённые детали, затем завершите работу.")}
+                </p>
+              )}
               {completionRequested && !readyForFinal && (
                 <p role="status" className="finish-blocked">
                   {t(
