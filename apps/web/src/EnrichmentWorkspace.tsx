@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiClient, ApiError } from "./api";
 import {
   decisions,
@@ -19,6 +19,7 @@ export function EnrichmentWorkspace({
   organizationId: string;
   sessionId: string;
 }) {
+  const navigate = useNavigate();
   const client = useMemo(
     () => new EnrichmentClient(api, organizationId, sessionId),
     [api, organizationId, sessionId],
@@ -33,6 +34,12 @@ export function EnrichmentWorkspace({
   const [loading, setLoading] = useState(true);
   const [copyStatus, setCopyStatus] = useState("");
   const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [pieceCreating, setPieceCreating] = useState(false);
+  const [guidedType, setGuidedType] = useState("");
+  const [guidedMetal, setGuidedMetal] = useState("");
+  const [guidedStone, setGuidedStone] = useState("");
+  const [guidedStyle, setGuidedStyle] = useState("");
   const flight = useRef(false);
   const epoch = useRef(0);
   const log = useRef<HTMLOListElement>(null);
@@ -199,6 +206,33 @@ export function EnrichmentWorkspace({
     });
   }
 
+  async function newPiece() {
+    if (flight.current || pieceCreating || !session) return;
+    setPieceCreating(true);
+    setError("");
+    try {
+      const created = await api.request<Session>(
+        `/projects/${session.project_id}/sessions`,
+        {
+          organizationId,
+          method: "POST",
+          body: JSON.stringify({
+            role_id: session.role_id,
+            locale: session.locale,
+          }),
+        },
+      );
+      navigate(`/organizations/${organizationId}/sessions/${created.session_id}`);
+    } catch {
+      setError(t(
+        "Could not create a new piece. This design has not been changed. Please retry.",
+        "Не удалось создать новое изделие. Текущий дизайн не изменён. Повторите попытку.",
+      ));
+    } finally {
+      setPieceCreating(false);
+    }
+  }
+
   async function copyPrompt() {
     if (!final || flight.current) return;
     try {
@@ -261,20 +295,19 @@ export function EnrichmentWorkspace({
       </nav>
       <div className="design-hero">
         <div>
-          <p className="eyebrow">{t("JEWELAI STUDIO", "СТУДИЯ JEWELAI")}</p>
-          <h1>{t("Create your jewelry", "Создайте своё украшение")}</h1>
-          <p className="design-hero-subtitle">
-            {t(
-              "Describe your idea. Refine the details together.",
-              "Опишите идею. Вместе уточним детали вашего украшения.",
-            )}
-          </p>
+          <p className="eyebrow">{t("JEWELAI DESIGN STUDIO", "СТУДИЯ ДИЗАЙНА JEWELAI")}</p>
+          <h1>{t("Design your piece", "Создайте своё украшение")}</h1>
+          <p className="design-hero-subtitle">{t(
+            "Describe the piece, choose its details and refine one current design brief.",
+            "Опишите изделие, уточните параметры и получите одно актуальное описание.",
+          )}</p>
         </div>
-        <span className="studio-state">
-          {s
-            ? t("Design in progress", "Работа над дизайном")
-            : t("Ready to begin", "Можно начинать")}
-        </span>
+        <div className="piece-actions">
+          <span className="studio-state">{s ? t("Piece in progress", "Изделие в работе") : t("New piece", "Новое изделие")}</span>
+          <button type="button" className="new-piece-button" disabled={busy || pieceCreating} onClick={() => void newPiece()}>
+            {pieceCreating ? t("Creating…", "Создаём…") : t("+ New Piece", "+ Новое изделие")}
+          </button>
+        </div>
       </div>
       {error && (
         <p role="alert" className="alert">
@@ -323,7 +356,7 @@ export function EnrichmentWorkspace({
           <div className="conversation-heading">
             <div>
               <p className="eyebrow">{t("YOUR DESIGN", "ВАШ ДИЗАЙН")}</p>
-              <h2>{t("Conversation", "Беседа")}</h2>
+              <h2>{t("Your piece", "Ваше изделие")}</h2>
             </div>
             <span className="conversation-saved">
               {t("Saved automatically", "Сохраняется автоматически")}
@@ -350,11 +383,19 @@ export function EnrichmentWorkspace({
                 )}
             </p>
           </section>
-          <details className="conversation-history">
-            <summary>
-              {t("Message history", "История сообщений")} (
-              {snapshot.events.length})
-            </summary>
+          <div className="history-controls">
+            <button className="quiet" type="button" onClick={() => setShowHistory((value) => !value)}>
+              {showHistory
+                ? t("Hide history", "Скрыть историю")
+                : t("Show history", "Показать историю")} ({snapshot.events.length})
+            </button>
+            <button className="quiet" type="button" onClick={() => setShowHistory(false)}>
+              {t("Clear visible history", "Очистить экран от истории")}
+            </button>
+            <small>{t("History stays saved to this piece. New Piece starts a separate design.", "История остаётся сохранённой в этом изделии. «Новое изделие» создаёт отдельный дизайн.")}</small>
+          </div>
+          {showHistory && <details className="conversation-history" open>
+            <summary>{t("Saved messages and decisions", "Сохранённые сообщения и решения")}</summary>
             <ol
               ref={log}
               className="conversation-log"
@@ -374,7 +415,7 @@ export function EnrichmentWorkspace({
                 </li>
               ))}
             </ol>
-          </details>
+          </details>}
           {s && activeQuestion && (
             <section
               className="clarification-area"
@@ -475,41 +516,68 @@ export function EnrichmentWorkspace({
               )}
             </button>
           )}
-          <form
-            className="message-composer"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (text.trim())
-                void perform(() => client.send(session, snapshot, text), true);
-            }}
-          >
-            <label>
-              {t("Your message", "Ваше сообщение")}
-              <textarea
-                required
-                disabled={busy}
-                maxLength={2000}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder={t(
-                  "Describe your idea, add a detail, or request a correction…",
-                  "Опишите идею, добавьте деталь или попросите исправление…",
-                )}
-              />
+          <form className="guided-piece-form" onSubmit={(e) => {
+            e.preventDefault();
+            const payload = [
+              guidedType.trim() ? `Jewelry type: ${guidedType.trim()}` : "",
+              guidedMetal.trim() ? `Metal: ${guidedMetal.trim()}` : "",
+              guidedStone.trim() ? `Center stone: ${guidedStone.trim()}` : "",
+              guidedStyle.trim() ? `Style and finish: ${guidedStyle.trim()}` : "",
+              text.trim(),
+            ].filter(Boolean).join("\n");
+            if (!payload) return;
+            void perform(async () => {
+              await client.send(session, snapshot, payload);
+              setGuidedType("");
+              setGuidedMetal("");
+              setGuidedStone("");
+              setGuidedStyle("");
+              setText("");
+            });
+          }}>
+            <div className="guided-heading">
+              <div>
+                <p className="eyebrow">{t("DESIGN DETAILS", "ПАРАМЕТРЫ ИЗДЕЛИЯ")}</p>
+                <h3>{t("Start with what you know", "Начните с того, что знаете")}</h3>
+              </div>
+              <span>{t("All fields optional", "Все поля необязательны")}</span>
+            </div>
+            <div className="guided-fields">
+              <label>{t("Jewelry type", "Тип изделия")}
+                <input value={guidedType} disabled={busy} onChange={e => setGuidedType(e.target.value)}
+                  placeholder={t("e.g. wedding band", "Например: обручальное кольцо")} />
+              </label>
+              <label>{t("Metal", "Металл")}
+                <input value={guidedMetal} disabled={busy} onChange={e => setGuidedMetal(e.target.value)}
+                  placeholder={t("e.g. yellow gold", "Например: жёлтое золото")} />
+              </label>
+              <label>{t("Center stone", "Центральный камень")}
+                <input value={guidedStone} disabled={busy} onChange={e => setGuidedStone(e.target.value)}
+                  placeholder={t("e.g. no stone / oval diamond", "Нет камня / овальный бриллиант")} />
+              </label>
+              <label>{t("Style and finish", "Стиль и отделка")}
+                <input value={guidedStyle} disabled={busy} onChange={e => setGuidedStyle(e.target.value)}
+                  placeholder={t("e.g. minimal, polished", "Минимализм, полировка")} />
+              </label>
+            </div>
+            <label className="free-design-text">
+              {t("Describe your idea or changes in your own words", "Опишите идею или изменения своими словами")}
+              <textarea aria-label={t("Your message", "Ваше сообщение")} disabled={busy} maxLength={2000}
+                value={text} onChange={e => setText(e.target.value)}
+                placeholder={t("What should the finished piece look and feel like?", "Как должно выглядеть изделие? Какие детали важны?")} />
             </label>
-            <button disabled={busy || !text.trim()} type="submit">
-              {busy
-                ? t("Processing…", "Обработка…")
-                : t("Send message", "Отправить сообщение")}
+            <button disabled={busy || ![guidedType,guidedMetal,guidedStone,guidedStyle,text].some(v=>v.trim())} type="submit">
+              {busy ? t("Updating your design…", "Обновляем дизайн…") : t("Update design", "Обновить дизайн")}
             </button>
+            <small>{t("JewelAI interprets these details using the existing API. Saved values appear in the current design, not in a second copy.", "JewelAI обрабатывает данные через существующий API. Сохранённые значения появятся в актуальном описании.")}</small>
           </form>
         </section>
         <aside
           className="panel design-result"
           aria-label={t("Current design", "Текущий дизайн")}
         >
-          <p className="eyebrow">{t("DESIGN PREVIEW", "ОБЗОР ДИЗАЙНА")}</p>
-          <h2>{t("Your design so far", "Ваш текущий дизайн")}</h2>
+          <p className="eyebrow">{t("YOUR CURRENT BRIEF", "АКТУАЛЬНОЕ ОПИСАНИЕ")}</p>
+          <h2>{t("Design details and final prompt", "Параметры и итоговый промпт")}</h2>
           <p role="status">
             {s
               ? label(s.status)
