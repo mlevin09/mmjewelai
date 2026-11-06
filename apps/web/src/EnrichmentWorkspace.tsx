@@ -35,6 +35,7 @@ export function EnrichmentWorkspace({
   const [copyStatus, setCopyStatus] = useState("");
   const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [completedFrame, setCompletedFrame] = useState<string | null>(null);
   const [pieceCreating, setPieceCreating] = useState(false);
   const [guidedType, setGuidedType] = useState("");
   const [guidedMetal, setGuidedMetal] = useState("");
@@ -117,6 +118,7 @@ export function EnrichmentWorkspace({
     if (flight.current) return;
     flight.current = true;
     setBusy(true);
+    setCompletedFrame(null);
     setError("");
     setCopyStatus("");
     setFinal(null);
@@ -273,6 +275,22 @@ export function EnrichmentWorkspace({
     );
   const s = snapshot.state;
   const activeQuestion = s?.questions[0];
+  const readyForFinal =
+    s?.status === "final_output_ready" ||
+    s?.status === "final_output_ready_with_unresolved";
+  const unsavedDesignInput = [
+    guidedType,
+    guidedMetal,
+    guidedStone,
+    guidedStyle,
+    text,
+  ].some((value) => value.trim());
+  const canComplete = Boolean(readyForFinal && !unsavedDesignInput);
+  const finalConfirmed = Boolean(
+    completedFrame === s?.current_frame.history_root_sha256 &&
+    canComplete &&
+    final,
+  );
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -512,6 +530,7 @@ export function EnrichmentWorkspace({
               )}
               <textarea
                 aria-label={t("Your message", "Ваше сообщение")}
+                id="guided-design-description"
                 disabled={busy}
                 maxLength={2000}
                 value={text}
@@ -802,8 +821,76 @@ export function EnrichmentWorkspace({
                 </p>
               ))}
           </details>
-          <h3>{t("Generated prompt", "Сформированный промпт")}</h3>
-          {final ? (
+          {s && (s.questions.length === 0 || readyForFinal) && (
+            <section
+              className="finish-design"
+              aria-label={t("Finish your prompt", "Завершение промпта")}
+            >
+              <h3>
+                {t("Anything else to add?", "Хотите добавить что-нибудь ещё?")}
+              </h3>
+              <p>
+                {t(
+                  "You can refine the design again, or finish with the details you know. Unspecified characteristics stay unspecified; no defaults are invented.",
+                  "Вы можете снова уточнить дизайн или завершить его с известными характеристиками. Неуказанные значения остаются неуказанными — без значений по умолчанию.",
+                )}
+              </p>
+              <div className="finish-design-actions">
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() => {
+                    setCompletedFrame(null);
+                    document
+                      .getElementById("guided-design-description")
+                      ?.focus();
+                  }}
+                >
+                  {t("Yes, add details", "Да, добавить детали")}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy || unsavedDesignInput || finalConfirmed}
+                  onClick={() => {
+                    setCompletedFrame(s.current_frame.history_root_sha256);
+                  }}
+                >
+                  {t("No, I'm finished", "Нет, больше нечего добавить")}
+                </button>
+              </div>
+              {unsavedDesignInput && (
+                <p className="question-help">
+                  {t(
+                    "Save your entered details before finishing.",
+                    "Сначала сохраните введённые детали, затем завершите работу.",
+                  )}
+                </p>
+              )}
+              {completedFrame === s.current_frame.history_root_sha256 &&
+                !readyForFinal && (
+                  <p role="status" className="finish-blocked">
+                    {t(
+                      "You have no more details to add, but the server still reports an unresolved blocking decision. Answer, skip, or mark remaining questions unknown where permitted. JewelAI cannot issue its authoritative final prompt yet.",
+                      "Вы больше не хотите ничего добавлять, но сервер сообщает о нерешённом обязательном вопросе. Ответьте, пропустите или отметьте «Не знаю», если это разрешено. Итоговый промпт пока нельзя выдать.",
+                    )}
+                  </p>
+                )}
+              {finalConfirmed && (
+                <p role="status" className="finish-complete">
+                  {t(
+                    "Prompt Enrichment complete for this design. The server-generated final prompt is below.",
+                    "Улучшение описания завершено. Ниже итоговый промпт, сформированный сервером.",
+                  )}
+                </p>
+              )}
+            </section>
+          )}
+          <h3>
+            {finalConfirmed
+              ? t("Final prompt", "Итоговый промпт")
+              : t("Prompt preparation", "Подготовка промпта")}
+          </h3>
+          {finalConfirmed && final ? (
             <>
               <p className="final-readiness">
                 {humanReadiness(final.internal_final_prompt.readiness, ru)}
@@ -816,16 +903,22 @@ export function EnrichmentWorkspace({
               />
               <button
                 className="quiet"
-                onClick={() => {
-                  void copyPrompt();
-                }}
+                type="button"
+                onClick={() => void copyPrompt()}
               >
                 {t("Copy full prompt", "Копировать весь промпт")}
               </button>
               <span role="status">{copyStatus}</span>
             </>
           ) : (
-            <p>{friendlyFinalStatus(finalReason, ru)}</p>
+            <p>
+              {readyForFinal
+                ? t(
+                    "The design is ready. Confirm that you have no more additions to see the final prompt.",
+                    "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
+                  )
+                : friendlyFinalStatus(finalReason, ru)}
+            </p>
           )}
           <details className="evidence-details">
             <summary>
@@ -863,6 +956,26 @@ export function EnrichmentWorkspace({
   );
 }
 
+type GuidedClarificationKind = "shape" | "dimensions" | "general";
+
+function guidedClarificationKind(q: Question): GuidedClarificationKind {
+  if (q.question_kind !== "NATIVE") return "general";
+  const wording = q.native_question.text.toLowerCase();
+  if (
+    /(?:length|width|depth|dimensions?|размер|длин|ширин|глубин)/i.test(
+      wording,
+    ) &&
+    /(?:stone|камн)/i.test(wording)
+  )
+    return "dimensions";
+  if (
+    /(?:shape|форм|cut|огранк)/i.test(wording) &&
+    /(?:stone|камн)/i.test(wording)
+  )
+    return "shape";
+  return "general";
+}
+
 function QuestionCard({
   q,
   busy,
@@ -882,6 +995,10 @@ function QuestionCard({
   const [choice, setChoice] = useState("");
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
+  const [lengthMm, setLengthMm] = useState("");
+  const [widthMm, setWidthMm] = useState("");
+  const [depthMm, setDepthMm] = useState("");
+  const kind = guidedClarificationKind(q);
   const native = q.question_kind === "NATIVE" ? q.native_question : null;
   const allowed = native
     ? decisions(native)
@@ -900,13 +1017,21 @@ function QuestionCard({
     (o) => (o.option_id ?? o.value) === choice,
   );
   const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
+  const dimensionText = [
+    lengthMm.trim() ? `${ru ? "Длина" : "Length"}: ${lengthMm.trim()} mm` : "",
+    widthMm.trim() ? `${ru ? "Ширина" : "Width"}: ${widthMm.trim()} mm` : "",
+    depthMm.trim() ? `${ru ? "Глубина" : "Depth"}: ${depthMm.trim()} mm` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+  const enteredValue = kind === "dimensions" ? dimensionText : value;
   const canSend = Boolean(
     (selectedDecision &&
       allowed.includes(
         selectedDecision as
           "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
       )) ||
-    value.trim() ||
+    enteredValue.trim() ||
     note.trim(),
   );
   return (
@@ -946,24 +1071,144 @@ function QuestionCard({
               ))}
           </select>
         </label>
-        <label>
-          <span>
-            {ru
-              ? "Значение параметра своими словами"
-              : "Parameter value in your words"}
-          </span>
-          <input
-            value={value}
-            disabled={busy}
-            maxLength={500}
-            placeholder={
-              ru
-                ? "Например: ширина кольца 3 мм"
-                : "For example: band width 3 mm"
-            }
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </label>
+        {kind === "shape" ? (
+          <label>
+            <span>
+              {ru ? "Форма центрального камня" : "Center stone shape"}
+            </span>
+            <input
+              list="center-stone-shape-suggestions"
+              value={value}
+              disabled={busy}
+              maxLength={500}
+              aria-label={ru ? "Форма камня" : "Stone shape"}
+              placeholder={
+                ru
+                  ? "Выберите форму или напишите свою"
+                  : "Choose a shape or type your own"
+              }
+              onChange={(e) => setValue(e.target.value)}
+            />
+            <datalist id="center-stone-shape-suggestions">
+              {[
+                ["Round", "Круглая"],
+                ["Oval", "Овальная"],
+                ["Princess", "Принцесса"],
+                ["Emerald", "Изумрудная"],
+                ["Pear", "Грушевидная"],
+                ["Cushion", "Кушон"],
+                ["Marquise", "Маркиз"],
+                ["Heart", "Сердце"],
+              ].map(([en, russian]) => (
+                <option key={en} value={ru ? russian : en} />
+              ))}
+            </datalist>
+            <div
+              className="stone-shape-choices"
+              role="group"
+              aria-label={
+                ru ? "Подсказки формы камня" : "Suggested stone shapes"
+              }
+            >
+              {[
+                ["Round", "Круглая"],
+                ["Oval", "Овальная"],
+                ["Princess", "Принцесса"],
+                ["Emerald", "Изумрудная"],
+                ["Pear", "Грушевидная"],
+                ["Cushion", "Кушон"],
+                ["Marquise", "Маркиз"],
+                ["Heart", "Сердце"],
+              ].map(([en, russian]) => {
+                const suggestion = ru ? (russian ?? en ?? "") : (en ?? "");
+                return (
+                  <button
+                    type="button"
+                    key={en}
+                    className={
+                      value === suggestion
+                        ? "shape-choice selected"
+                        : "shape-choice"
+                    }
+                    aria-pressed={value === suggestion}
+                    disabled={busy}
+                    onClick={() => setValue(suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                );
+              })}
+            </div>
+            <small className="question-help">
+              {ru
+                ? "Это подсказки ввода, не варианты, подтверждённые сервером. Ваш выбор обрабатывается как текст."
+                : "These are typing suggestions, not server-authorized answer options. Your choice is submitted as text."}
+            </small>
+          </label>
+        ) : kind === "dimensions" ? (
+          <fieldset className="stone-dimensions">
+            <legend>{ru ? "Размеры камня, мм" : "Stone dimensions, mm"}</legend>
+            <div className="dimension-fields">
+              {[
+                {
+                  key: "length",
+                  label: ru ? "Длина" : "Length",
+                  current: lengthMm,
+                  update: setLengthMm,
+                },
+                {
+                  key: "width",
+                  label: ru ? "Ширина" : "Width",
+                  current: widthMm,
+                  update: setWidthMm,
+                },
+                {
+                  key: "depth",
+                  label: ru ? "Глубина" : "Depth",
+                  current: depthMm,
+                  update: setDepthMm,
+                },
+              ].map((field) => (
+                <label key={field.key}>
+                  <span>{field.label}</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={field.current}
+                    disabled={busy}
+                    aria-label={field.label + " (mm)"}
+                    placeholder={ru ? "Необязательно" : "Optional"}
+                    onChange={(e) => field.update(e.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+            <small className="question-help">
+              {ru
+                ? "Заполните только известные размеры. Остальные можно оставить пустыми."
+                : "Enter only known measurements. Leave the others blank."}
+            </small>
+          </fieldset>
+        ) : (
+          <label>
+            <span>
+              {ru ? "Ваше значение параметра" : "Your parameter value"}
+            </span>
+            <input
+              value={value}
+              disabled={busy}
+              maxLength={500}
+              placeholder={
+                ru
+                  ? "Введите значение для вопроса выше"
+                  : "Enter a value for the question above"
+              }
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </label>
+        )}
         <label>
           <span>
             {ru
@@ -995,13 +1240,39 @@ function QuestionCard({
               (selectedDecision || "") as
                 "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
               selectedOption,
-              value,
+              enteredValue,
               note,
             );
           }}
         >
           {ru ? "Сохранить ответ" : "Save answer"}
         </button>
+        {(allowed.includes("UNKNOWN") || allowed.includes("SKIP")) && (
+          <div className="unknown-clarification-actions">
+            {allowed.includes("UNKNOWN") && (
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy || Boolean(enteredValue.trim() || note.trim())}
+                onClick={() => submit("UNKNOWN", undefined, "", "")}
+              >
+                {ru
+                  ? "Не знаю — оставить неуказанным"
+                  : "I don't know — leave unspecified"}
+              </button>
+            )}
+            {allowed.includes("SKIP") && (
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy || Boolean(enteredValue.trim() || note.trim())}
+                onClick={() => submit("SKIP", undefined, "", "")}
+              >
+                {ru ? "Пропустить этот вопрос" : "Skip this question"}
+              </button>
+            )}
+          </div>
+        )}
         <p className="question-help">
           {ru
             ? "Можно заполнить один или все поля. Значения сохраняются через JewelAI, затем актуальное описание обновляется с сервера."

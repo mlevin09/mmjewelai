@@ -201,6 +201,9 @@ describe("Prompt Enrichment workspace", () => {
       }),
     );
     f.view();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "No, I'm finished" }),
+    );
     await screen.findByRole("button", { name: "Copy full prompt" });
     fireEvent.change(screen.getByLabelText("Your message"), {
       target: { value: "A gold ring." },
@@ -247,6 +250,9 @@ describe("Prompt Enrichment workspace", () => {
       new Error("Synthetic clipboard denial"),
     );
     f.view();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "No, I'm finished" }),
+    );
     await userEvent.click(
       await screen.findByRole("button", { name: "Copy full prompt" }),
     );
@@ -295,6 +301,9 @@ describe("Prompt Enrichment workspace", () => {
       .spyOn(navigator.clipboard, "writeText")
       .mockResolvedValue();
     await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    await userEvent.click(
       screen.getByRole("button", { name: "Copy full prompt" }),
     );
     expect(clipboard).toHaveBeenCalledWith(
@@ -319,6 +328,7 @@ describe("Prompt Enrichment workspace", () => {
   });
   it("does not invent output and preserves the draft on stale CAS; sends no duplicate command", async () => {
     const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
     let posts = 0;
     server.use(
       http.get(`${prefix}/final-output`, () =>
@@ -451,9 +461,7 @@ describe("Prompt Enrichment workspace", () => {
     f.view();
     await screen.findByText("Which metal?");
     expect(screen.getByLabelText("Parameter / decision")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Parameter value in your words"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Your parameter value")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Clarification free-text answer"),
     ).toBeInTheDocument();
@@ -473,6 +481,75 @@ describe("Prompt Enrichment workspace", () => {
     );
     expect(f.commands.some((c) => c.route === "corrections")).toBe(true);
   });
+  it("shows visible stone shape suggestions and saves typed choice as correction, not invented option", async () => {
+    const f = fixture(true, "F", "ru");
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "shape-ru",
+          text: "Какую форму центрального камня вы хотели бы выбрать?",
+          category: "material_ambiguity",
+          allowed_decisions: ["SKIP", "UNKNOWN"],
+          options: [],
+        },
+      },
+    ];
+    f.view();
+    await screen.findByText(
+      "Какую форму центрального камня вы хотели бы выбрать?",
+    );
+    expect(
+      screen.getByRole("group", { name: "Подсказки формы камня" }),
+    ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Овальная" }));
+    expect(screen.getByLabelText("Форма камня")).toHaveValue("Овальная");
+    await userEvent.type(
+      screen.getByLabelText("Свободный ответ на уточнение"),
+      "Без острых углов",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Сохранить ответ" }),
+    );
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.commands[0]?.route).toBe("corrections");
+    expect(f.data.events[0]?.text).toContain("Овальная");
+    expect(f.data.events[0]?.text).toContain("Без острых углов");
+  });
+
+  it("shows separate optional length width depth measurements and submits only those supplied", async () => {
+    const f = fixture(true, "F", "ru");
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "dimensions-ru",
+          text: "Каковы длина, ширина и глубина центрального камня в миллиметрах?",
+          category: "material_ambiguity",
+          allowed_decisions: ["SKIP", "UNKNOWN"],
+          options: [],
+        },
+      },
+    ];
+    f.view();
+    await screen.findByText(
+      "Каковы длина, ширина и глубина центрального камня в миллиметрах?",
+    );
+    await userEvent.type(screen.getByLabelText("Длина (mm)"), "8");
+    await userEvent.type(screen.getByLabelText("Ширина (mm)"), "6");
+    expect(screen.getByLabelText("Глубина (mm)")).toHaveValue(null);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Сохранить ответ" }),
+    );
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.commands[0]?.route).toBe("corrections");
+    expect(f.data.events[0]?.text).toContain("Длина: 8 mm");
+    expect(f.data.events[0]?.text).toContain("Ширина: 6 mm");
+    expect(f.data.events[0]?.text).not.toContain("Глубина:");
+  });
+
   it("runs an initial-to-clarification-to-correction UI journey with server-owned description", async () => {
     const f = fixture();
     f.view();
@@ -516,6 +593,9 @@ describe("Prompt Enrichment workspace", () => {
     );
     expect(screen.getByLabelText("Current design text")).toHaveTextContent(
       "A white gold ring with an oval diamond.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
     );
     expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
       "The actual server prompt, without client additions.",
@@ -671,6 +751,55 @@ describe("Prompt Enrichment workspace", () => {
     );
   });
 
+  it("asks for additions and shows final prompt after user declines, with server-ready data", async () => {
+    const f = fixture(true);
+    f.data.state!.questions = [];
+    f.data.state!.status = "final_output_ready_with_unresolved";
+    f.view();
+    await screen.findByRole("button", { name: "No, I'm finished" });
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Yes, add details" }),
+    );
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Final prompt" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Prompt Enrichment complete for this design/),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
+      "The actual server prompt, without client additions.",
+    );
+  });
+
+  it("does not invent a final prompt on user completion when server is blocked", async () => {
+    const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
+    f.data.state!.questions = [];
+    f.view();
+    await screen.findByRole("button", { name: "No, I'm finished" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    expect(
+      screen.getByText(/still reports an unresolved blocking decision/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Final prompt" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+  });
+
   it("does not request final output while server status is blocked", async () => {
     const f = fixture(true);
     f.data.state!.status = "final_output_blocked";
@@ -691,6 +820,7 @@ describe("Prompt Enrichment workspace", () => {
 
   it("hides internal JSON and explains blocked final output in plain language", async () => {
     const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
     server.use(
       http.get(`${prefix}/final-output`, () =>
         HttpResponse.json(
