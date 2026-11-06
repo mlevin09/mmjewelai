@@ -863,6 +863,22 @@ export function EnrichmentWorkspace({
   );
 }
 
+type GuidedClarificationKind = "shape" | "dimensions" | "general";
+
+function guidedClarificationKind(q: Question): GuidedClarificationKind {
+  if (q.question_kind !== "NATIVE") return "general";
+  const wording = q.native_question.text.toLowerCase();
+  if (
+    /(?:length|width|depth|dimensions?|размер|длин|ширин|глубин)/i.test(wording) &&
+    /(?:stone|камн)/i.test(wording)
+  ) return "dimensions";
+  if (
+    /(?:shape|форм|cut|огранк)/i.test(wording) &&
+    /(?:stone|камн)/i.test(wording)
+  ) return "shape";
+  return "general";
+}
+
 function QuestionCard({
   q,
   busy,
@@ -882,6 +898,10 @@ function QuestionCard({
   const [choice, setChoice] = useState("");
   const [value, setValue] = useState("");
   const [note, setNote] = useState("");
+  const [lengthMm, setLengthMm] = useState("");
+  const [widthMm, setWidthMm] = useState("");
+  const [depthMm, setDepthMm] = useState("");
+  const kind = guidedClarificationKind(q);
   const native = q.question_kind === "NATIVE" ? q.native_question : null;
   const allowed = native
     ? decisions(native)
@@ -900,13 +920,19 @@ function QuestionCard({
     (o) => (o.option_id ?? o.value) === choice,
   );
   const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
+  const dimensionText = [
+    lengthMm.trim() ? `${ru ? "Длина" : "Length"}: ${lengthMm.trim()} mm` : "",
+    widthMm.trim() ? `${ru ? "Ширина" : "Width"}: ${widthMm.trim()} mm` : "",
+    depthMm.trim() ? `${ru ? "Глубина" : "Depth"}: ${depthMm.trim()} mm` : "",
+  ].filter(Boolean).join("; ");
+  const enteredValue = kind === "dimensions" ? dimensionText : value;
   const canSend = Boolean(
     (selectedDecision &&
       allowed.includes(
         selectedDecision as
           "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
       )) ||
-    value.trim() ||
+    enteredValue.trim() ||
     note.trim(),
   );
   return (
@@ -946,24 +972,81 @@ function QuestionCard({
               ))}
           </select>
         </label>
-        <label>
-          <span>
-            {ru
-              ? "Значение параметра своими словами"
-              : "Parameter value in your words"}
-          </span>
-          <input
-            value={value}
-            disabled={busy}
-            maxLength={500}
-            placeholder={
-              ru
-                ? "Например: ширина кольца 3 мм"
-                : "For example: band width 3 mm"
-            }
-            onChange={(e) => setValue(e.target.value)}
-          />
-        </label>
+        {kind === "shape" ? (
+          <label>
+            <span>{ru ? "Форма центрального камня" : "Center stone shape"}</span>
+            <input
+              list="center-stone-shape-suggestions"
+              value={value}
+              disabled={busy}
+              maxLength={500}
+              aria-label={ru ? "Форма камня" : "Stone shape"}
+              placeholder={ru ? "Выберите форму или напишите свою" : "Choose a shape or type your own"}
+              onChange={(e) => setValue(e.target.value)}
+            />
+            <datalist id="center-stone-shape-suggestions">
+              {[
+                ["Round", "Круглая"],
+                ["Oval", "Овальная"],
+                ["Princess", "Принцесса"],
+                ["Emerald", "Изумрудная"],
+                ["Pear", "Грушевидная"],
+                ["Cushion", "Кушон"],
+                ["Marquise", "Маркиз"],
+                ["Heart", "Сердце"],
+              ].map(([en, russian]) => (
+                <option key={en} value={ru ? russian : en} />
+              ))}
+            </datalist>
+            <small className="question-help">
+              {ru
+                ? "Это подсказки ввода, не варианты, подтверждённые сервером. Ваш выбор обрабатывается как текст."
+                : "These are typing suggestions, not server-authorized answer options. Your choice is submitted as text."}
+            </small>
+          </label>
+        ) : kind === "dimensions" ? (
+          <fieldset className="stone-dimensions">
+            <legend>{ru ? "Размеры камня, мм" : "Stone dimensions, mm"}</legend>
+            <div className="dimension-fields">
+              {[
+                { key: "length", label: ru ? "Длина" : "Length", current: lengthMm, update: setLengthMm },
+                { key: "width", label: ru ? "Ширина" : "Width", current: widthMm, update: setWidthMm },
+                { key: "depth", label: ru ? "Глубина" : "Depth", current: depthMm, update: setDepthMm },
+              ].map((field) => (
+                <label key={field.key}>
+                  <span>{field.label}</span>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    inputMode="decimal"
+                    value={field.current}
+                    disabled={busy}
+                    aria-label={field.label + " (mm)"}
+                    placeholder={ru ? "Необязательно" : "Optional"}
+                    onChange={(e) => field.update(e.target.value)}
+                  />
+                </label>
+              ))}
+            </div>
+            <small className="question-help">
+              {ru
+                ? "Заполните только известные размеры. Остальные можно оставить пустыми."
+                : "Enter only known measurements. Leave the others blank."}
+            </small>
+          </fieldset>
+        ) : (
+          <label>
+            <span>{ru ? "Ваше значение параметра" : "Your parameter value"}</span>
+            <input
+              value={value}
+              disabled={busy}
+              maxLength={500}
+              placeholder={ru ? "Введите значение для вопроса выше" : "Enter a value for the question above"}
+              onChange={(e) => setValue(e.target.value)}
+            />
+          </label>
+        )}
         <label>
           <span>
             {ru
@@ -995,7 +1078,7 @@ function QuestionCard({
               (selectedDecision || "") as
                 "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
               selectedOption,
-              value,
+              enteredValue,
               note,
             );
           }}
