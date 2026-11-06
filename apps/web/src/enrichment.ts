@@ -15,6 +15,7 @@ export interface Frame {
 }
 export interface NativeQuestion {
   clarification_id: string;
+  semantic_question_id?: string;
   text: string;
   category: string;
   cause_id?: string;

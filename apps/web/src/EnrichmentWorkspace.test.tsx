@@ -524,7 +524,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(f.data.events[0]?.text).toContain("Без острых углов");
   });
 
-  it("shows separate optional length width depth measurements and submits only those supplied", async () => {
+  it("submits complete dimensions in the current Parser format with explicit center ownership", async () => {
     const f = fixture(true, "F", "ru");
     f.data.state!.questions = [
       {
@@ -545,15 +545,118 @@ describe("Prompt Enrichment workspace", () => {
     );
     await userEvent.type(screen.getByLabelText("Длина (mm)"), "8");
     await userEvent.type(screen.getByLabelText("Ширина (mm)"), "6");
-    expect(screen.getByLabelText("Глубина (mm)")).toHaveValue(null);
+    await userEvent.type(screen.getByLabelText("Глубина (mm)"), "4");
     await userEvent.click(
       screen.getByRole("button", { name: "Сохранить ответ" }),
     );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("corrections");
-    expect(f.data.events[0]?.text).toContain("Длина: 8 mm");
-    expect(f.data.events[0]?.text).toContain("Ширина: 6 mm");
-    expect(f.data.events[0]?.text).not.toContain("Глубина:");
+    expect(f.data.events[0]?.text).toContain("Центральный камень 8 x 6 x 4 мм");
+  });
+
+  it.each([
+    ["en", "SKIP"],
+    ["ru", "SKIP"],
+    ["en", "UNKNOWN"],
+    ["ru", "UNKNOWN"],
+  ] as const)(
+    "keeps invalid dimension drafts in %s and saves only explicit %s",
+    async (locale, decision) => {
+      const f = fixture(true, "F", locale);
+      f.data.state!.questions = [
+        {
+          question_kind: "NATIVE",
+          retained_base: "F",
+          native_question: {
+            clarification_id: "dimensions",
+            semantic_question_id: "CENTER_STONE_DIMENSIONS",
+            text:
+              locale === "ru"
+                ? "Размеры центрального камня?"
+                : "Center stone dimensions?",
+            category: "information_gap",
+            allowed_decisions: ["SKIP", "UNKNOWN"],
+            options: [],
+          },
+        },
+      ];
+      f.view();
+      const length = await screen.findByLabelText(
+        locale === "ru" ? "Длина (mm)" : "Length (mm)",
+      );
+      await userEvent.type(length, "0");
+      await userEvent.click(
+        screen.getByRole("button", {
+          name: locale === "ru" ? "Сохранить ответ" : "Save answer",
+        }),
+      );
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        locale === "ru" ? "положительн" : "positive",
+      );
+      expect(length).toHaveValue(0);
+      expect(f.commands).toHaveLength(0);
+      const skip = screen.getByRole("button", {
+        name:
+          decision === "SKIP"
+            ? locale === "ru"
+              ? "Пропустить этот вопрос"
+              : "Skip this question"
+            : locale === "ru"
+              ? "Не знаю — оставить неуказанным"
+              : "I don't know — leave unspecified",
+      });
+      expect(skip).toBeEnabled();
+      await userEvent.click(skip);
+      await waitFor(() => expect(f.commands).toHaveLength(1));
+      expect(f.commands[0]?.body.decision).toBe(decision);
+      expect(f.data.events.filter((e) => e.kind === "user")).toHaveLength(1);
+    },
+  );
+
+  it("accepts positive sub-tenth mm dimensions using the server semantic question ID", async () => {
+    const f = fixture(true);
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "dimensions",
+          semantic_question_id: "CENTER_STONE_DIMENSIONS",
+          text: "Return a Dimensions value.",
+          category: "information_gap",
+          allowed_decisions: ["UNKNOWN", "SKIP"],
+          options: [],
+        },
+      },
+    ];
+    f.view();
+    await userEvent.type(await screen.findByLabelText("Length (mm)"), "0.05");
+    await userEvent.type(screen.getByLabelText("Width (mm)"), "0.03");
+    await userEvent.type(screen.getByLabelText("Depth (mm)"), "0.02");
+    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.data.events[0]?.text).toContain(
+      "Center stone 0.05 x 0.03 x 0.02 mm",
+    );
+  });
+
+  it("does not assign side-stone measurement questions to the center stone", async () => {
+    const f = fixture(true);
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "side",
+          text: "Side stone dimensions?",
+          category: "information_gap",
+          options: [],
+        },
+      },
+    ];
+    f.view();
+    await screen.findByText("Side stone dimensions?");
+    expect(screen.queryByLabelText("Length (mm)")).not.toBeInTheDocument();
   });
 
   it("runs an initial-to-clarification-to-correction UI journey with server-owned description", async () => {

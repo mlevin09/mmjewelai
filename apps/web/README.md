@@ -57,6 +57,12 @@ draft, reload current state and require explicit retry rather than automatic rep
 Offered questions, Unknown/Skip, explicit continuation admission, protected-change
 consent and supported dormant clarification resume use existing server contracts.
 
+Center-stone measurements are submitted as explicitly owned `length x width x depth mm`
+text through the current Parser, not as independently labelled values it cannot apply.
+The existing Dimensions contract requires all three positive measurements; incomplete
+or invalid input stays in the draft with a clear error. Skip/Unknown save only that
+explicit decision, without silently submitting any draft measurements or preferences.
+
 The result panel separates canonical values, missing/Unknown/unresolved information,
 KEEP, LOCK and confirmed flags. Description and full copyable IFP are server output;
 blocked/unavailable output shows the actual error. Advanced source/evidence details
