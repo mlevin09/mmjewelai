@@ -963,7 +963,7 @@ describe("Prompt Enrichment workspace", () => {
       effective_parameters: [{ concrete_target: "metal.material", value: "platinum" }],
       parameter_sources: { "metal.material": { origin: "explicit" } },
       assumptions: [{
-        target: "metal.finish",
+        target_path: "metal.finish",
         proposed_value: "polished",
         rule_id: "policy-finish",
         rule_version: "1.0.0",
@@ -1001,7 +1001,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(f.data.events[0]?.text).toBe("NO");
     expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(prompt.prompt_text);
     expect(screen.getByText("AI defaults and sources")).toBeInTheDocument();
-    expect(screen.getByText("not specified")).toBeInTheDocument();
+    expect(screen.getByText(/not specified/)).toBeInTheDocument();
     view.unmount();
     f.view();
     expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(prompt.prompt_text);
