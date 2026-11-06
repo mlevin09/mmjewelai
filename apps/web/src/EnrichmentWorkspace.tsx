@@ -107,12 +107,25 @@ export function EnrichmentWorkspace({
     } catch (e) {
       setFinal(null);
       setError(
-        e instanceof ApiError
-          ? `${e.code}: ${e.message}${e.status === 409 ? t(" — State changed; review the refreshed design before trying again.", " — Состояние изменилось; проверьте обновлённый дизайн перед повтором.") : ""}`
-          : t(
-              "Request could not be completed. Review the conversation before retrying.",
-              "Запрос не выполнен. Проверьте беседу перед повтором.",
-            ),
+        e instanceof ApiError && e.status === 409
+          ? t(
+              "The design changed or a decision still needs confirmation. Your input is kept here. Review the updated description before retrying.",
+              "Дизайн изменился или решение ещё требует подтверждения. Ваш ввод сохранён на экране. Проверьте актуальное описание и повторите попытку.",
+            )
+          : e instanceof ApiError
+            ? e.status === 401 || e.status === 403
+              ? t(
+                  "Your session needs attention. Sign in again or check your access.",
+                  "Требуется повторный вход или проверка доступа.",
+                )
+              : t(
+                  "The answer could not be saved. Your input remains available; retry after checking the connection.",
+                  "Не удалось сохранить ответ. Введённый текст остаётся доступен; проверьте соединение и повторите попытку.",
+                )
+            : t(
+                "Connection interrupted. Your latest input remains available; retry when the connection recovers.",
+                "Соединение прервано. Введённый текст сохранён на экране; повторите попытку после восстановления связи.",
+              ),
       );
       try {
         await refresh();
