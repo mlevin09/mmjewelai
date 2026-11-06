@@ -83,7 +83,10 @@ function fixture(
       return HttpResponse.json(data);
     }),
     http.get(`${prefix}/completions/current`, () =>
-      HttpResponse.json({ error: "not_found", detail: "Completion disabled" }, { status: 404 }),
+      HttpResponse.json(
+        { error: "not_found", detail: "Completion disabled" },
+        { status: 404 },
+      ),
     ),
     http.get(`${prefix}/final-output`, ({ request }) => {
       expect(request.headers.get("If-Match")).toBe(
@@ -960,27 +963,51 @@ describe("Prompt Enrichment workspace", () => {
       prompt_text: "Authoritative IFP6: platinum with approved provenance.",
       readiness: "READY_WITH_UNRESOLVED",
       policy_sha256: "e".repeat(64),
-      effective_parameters: [{ concrete_target: "metal.material", value: "platinum" }],
+      effective_parameters: [
+        { concrete_target: "metal.material", value: "platinum" },
+      ],
       parameter_sources: { "metal.material": { origin: "explicit" } },
-      assumptions: [{
-        target_path: "metal.finish",
-        proposed_value: "polished",
-        rule_id: "policy-finish",
-        rule_version: "1.0.0",
-        rationale: "TEST ONLY",
-      }],
+      assumptions: [
+        {
+          target_path: "metal.finish",
+          proposed_value: "polished",
+          rule_id: "policy-finish",
+          rule_version: "1.0.0",
+          rationale: "TEST ONLY",
+        },
+      ],
       omitted_targets: ["center_stone.dimensions"],
     };
     server.use(
       http.get(`${prefix}/completions/current`, () =>
-        HttpResponse.json(completed
-          ? { schema_version: "1.0.0", completion_id: "done", status: "FINAL",
-              is_current: true, replayed: false, expected_frame: frame,
-              content_hash: "f".repeat(64), final_prompt: prompt,
-              question: { question_id: "ANYTHING_ELSE/1.0.0", text: "Anything else?", choices: ["YES", "NO"] } }
-          : { schema_version: "completion-context/1.0.0", status: "AWAITING_COMPLETION",
-              expected_frame: frame,
-              question: { question_id: "ANYTHING_ELSE/1.0.0", text: "Anything else?", choices: ["YES", "NO"] } }),
+        HttpResponse.json(
+          completed
+            ? {
+                schema_version: "1.0.0",
+                completion_id: "done",
+                status: "FINAL",
+                is_current: true,
+                replayed: false,
+                expected_frame: frame,
+                content_hash: "f".repeat(64),
+                final_prompt: prompt,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              }
+            : {
+                schema_version: "completion-context/1.0.0",
+                status: "AWAITING_COMPLETION",
+                expected_frame: frame,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              },
+        ),
       ),
       http.post(`${prefix}/completions`, async ({ request }) => {
         const body = (await request.json()) as Record<string, unknown>;
@@ -992,19 +1019,30 @@ describe("Prompt Enrichment workspace", () => {
     );
     const view = f.view();
     await screen.findByRole("button", { name: "No, I'm finished" });
-    expect(screen.queryByLabelText("Internal Final Prompt")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
     await waitFor(() => expect(completions).toHaveLength(1));
     expect(completions[0]).toMatchObject({
-      schema_version: "1.0.0", anything_else: "NO", expected_frame: frame, message_id: "m0",
+      schema_version: "1.0.0",
+      anything_else: "NO",
+      expected_frame: frame,
+      message_id: "m0",
     });
     expect(f.data.events[0]?.text).toBe("NO");
-    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(prompt.prompt_text);
+    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
+      prompt.prompt_text,
+    );
     expect(screen.getByText("AI defaults and sources")).toBeInTheDocument();
     expect(screen.getByText(/not specified/)).toBeInTheDocument();
     view.unmount();
     f.view();
-    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(prompt.prompt_text);
+    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
+      prompt.prompt_text,
+    );
     expect(completions).toHaveLength(1);
   });
 
@@ -1014,13 +1052,32 @@ describe("Prompt Enrichment workspace", () => {
     const commands: Record<string, unknown>[] = [];
     server.use(
       http.get(`${prefix}/completions/current`, () =>
-        HttpResponse.json(choice === "EDITING"
-          ? { schema_version: "1.0.0", status: "EDITING", is_current: true,
-              final_prompt: null, expected_frame: frame, replayed: false,
-              question: { question_id: "ANYTHING_ELSE/1.0.0", text: "Anything else?", choices: ["YES", "NO"] } }
-          : { schema_version: "completion-context/1.0.0", status: choice,
-              expected_frame: frame,
-              question: { question_id: "ANYTHING_ELSE/1.0.0", text: "Anything else?", choices: ["YES", "NO"] } }),
+        HttpResponse.json(
+          choice === "EDITING"
+            ? {
+                schema_version: "1.0.0",
+                status: "EDITING",
+                is_current: true,
+                final_prompt: null,
+                expected_frame: frame,
+                replayed: false,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              }
+            : {
+                schema_version: "completion-context/1.0.0",
+                status: choice,
+                expected_frame: frame,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              },
+        ),
       ),
       http.post(`${prefix}/completions`, async ({ request }) => {
         commands.push((await request.json()) as Record<string, unknown>);
@@ -1030,11 +1087,18 @@ describe("Prompt Enrichment workspace", () => {
     );
     f.view();
     await screen.findByRole("button", { name: "Yes, add details" });
-    await userEvent.click(screen.getByRole("button", { name: "Yes, add details" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Yes, add details" }),
+    );
     await waitFor(() => expect(commands).toHaveLength(1));
-    expect(commands[0]).toMatchObject({ anything_else: "YES", expected_frame: frame });
+    expect(commands[0]).toMatchObject({
+      anything_else: "YES",
+      expected_frame: frame,
+    });
     expect(f.data.events[0]?.text).toBe("YES");
-    expect(screen.queryByLabelText("Internal Final Prompt")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
   });
 
 });
