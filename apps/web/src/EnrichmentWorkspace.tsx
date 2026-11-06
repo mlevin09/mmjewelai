@@ -109,7 +109,7 @@ export function EnrichmentWorkspace({
     // The wrapper remounts on a scoped route change; refresh reads this exact client.
   }, [client]);
 
-  async function perform(action: () => Promise<unknown>, clearText = false) {
+  async function perform(action: () => Promise<unknown>, clearText = false, onSaved?: () => void) {
     if (flight.current) return;
     flight.current = true;
     setBusy(true);
@@ -121,6 +121,7 @@ export function EnrichmentWorkspace({
       await action();
       if (clearText) setText("");
       await refresh();
+      onSaved?.();
     } catch (e) {
       setFinal(null);
       setError(
@@ -263,15 +264,6 @@ export function EnrichmentWorkspace({
     return (
       <main className="page">
         <p role="alert">{error || "Conversation unavailable."}</p>
-        {session && (
-          <p>
-            <Link
-              to={`/organizations/${organizationId}/sessions/${sessionId}/visualization`}
-            >
-              Open existing visualization workspace
-            </Link>
-          </p>
-        )}
         <Link to={`/organizations/${organizationId}`}>Back to projects</Link>
       </main>
     );
@@ -397,14 +389,17 @@ export function EnrichmentWorkspace({
                 .filter(Boolean)
                 .join("\n");
               if (!payload) return;
-              void perform(async () => {
-                await client.send(session, snapshot, payload);
-                setGuidedType("");
-                setGuidedMetal("");
-                setGuidedStone("");
-                setGuidedStyle("");
-                setText("");
-              });
+              void perform(
+                () => client.send(session, snapshot, payload),
+                false,
+                () => {
+                  setGuidedType("");
+                  setGuidedMetal("");
+                  setGuidedStone("");
+                  setGuidedStyle("");
+                  setText("");
+                },
+              );
             }}
           >
             <div className="guided-heading">
