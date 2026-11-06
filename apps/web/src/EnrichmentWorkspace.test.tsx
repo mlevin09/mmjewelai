@@ -251,7 +251,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(
       await screen.findByText("Copy unavailable — select the text above."),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
+    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
       "The actual server prompt, without client additions.",
     );
   });
@@ -539,7 +539,7 @@ describe("Prompt Enrichment workspace", () => {
     await screen.findByLabelText("Partially saved clarification");
     expect(screen.getByLabelText("Additional text to review")).toHaveValue("Matte finish");
     expect(f.commands.filter((c) => c.route === "clarification-answers")).toHaveLength(1);
-    expect(screen.getByRole("alert")).toHaveTextContent("The design changed");
+    expect(screen.getByText(/The design changed or a decision/)).toBeInTheDocument();
   });
 
   it("does not request final output while server status is blocked", async () => {
