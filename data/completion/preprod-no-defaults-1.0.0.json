@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "jewelai.completion.preprod.no-defaults",
+  "version": "1.0.0",
+  "review_status": "APPROVED",
+  "rules": [],
+  "eligibility": [
+    {"jewelry_type": "ring", "target": "center_stone.dimensions", "mode": "default_or_omit", "requires": {}},
+    {"jewelry_type": "ring", "target": "center_stone.setting", "mode": "default_or_omit", "requires": {}},
+    {"jewelry_type": "ring", "target": "center_stone.cut", "mode": "default_or_omit", "requires": {}},
+    {"jewelry_type": "ring", "target": "metal.color", "mode": "default_or_omit", "requires": {}}
+  ]
+}

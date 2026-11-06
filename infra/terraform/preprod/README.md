@@ -58,6 +58,31 @@ the exact allowlist. OpenAI configuration is independent and optional: leaving
 mount. When enabled, the stack looks up the existing `jewelai-preprod-openai-api-key` secret and
 mounts its latest enabled version as `OPENAI_API_KEY`; Terraform never reads the value into state.
 
+## IFP6 completion (preproduction only)
+
+When the qualified Prompt Enrichment release is configured, the API also enables
+the existing completion service with the immutable
+[`preprod-no-defaults-1.0.0.json`](../../../data/completion/preprod-no-defaults-1.0.0.json)
+registry. The API image already copies `data/` to `/app/data/`; the service pins the
+registry's **domain-separated** `CompletionRegistry.sha256`, not its file checksum.
+Startup rejects a missing, unapproved or mismatched registry.
+
+The Owner's IFP6 activation directive authorizes conservative completion without
+professional default values. This new registry has **zero default rules**; the
+existing PROPOSED professional example remains unchanged and cannot activate.
+No professional Smart Defaults are active. For rings, explicit NO may leave
+center-stone dimensions, setting, cut and metal color unspecified, using the
+existing `default_or_omit` contract (ADR0040). IFP6 preserves the immutable canonical
+basis, lists omissions and prohibits invention. All other native blocking gaps,
+conflicts and pending preservation consent retain their existing checks. This is
+not a blanket completion override or approval of professional values.
+
+The activation affects only the preproduction API. Worker/provider configuration,
+production and the audited deployment/plan-binding mechanism are unchanged.
+Migration0019 was already applied by deployment run42236683395; no manual migration
+is required. Live Studio completion/reload/edit verification must still be recorded
+after the independently reviewed configuration is deployed.
+
 ## Credential-free validation
 
 ```bash

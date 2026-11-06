@@ -337,9 +337,11 @@
   ],
   "delegated_prefixes": [
     "apps/web/",
-    ".github/workflows/web.yml"
+    ".github/workflows/web.yml",
+    "infra/terraform/preprod/services.tf",
+    "infra/terraform/preprod/README.md"
   ],
-  "delegated_check": "Web (existing independent workflow; not certified by Runtime API)",
+  "delegated_check": "Web / Infrastructure (existing independent workflows; not certified by Runtime API)",
   "fixture_scopes": [
     {
       "resources": "data/completion/",
