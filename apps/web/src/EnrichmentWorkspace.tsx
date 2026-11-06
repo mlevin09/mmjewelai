@@ -1154,6 +1154,30 @@ function QuestionCard({
         >
           {ru ? "Сохранить ответ" : "Save answer"}
         </button>
+        {(allowed.includes("UNKNOWN") || allowed.includes("SKIP")) && (
+          <div className="unknown-clarification-actions">
+            {allowed.includes("UNKNOWN") && (
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy || Boolean(enteredValue.trim() || note.trim())}
+                onClick={() => submit("UNKNOWN", undefined, "", "")}
+              >
+                {ru ? "Не знаю — оставить неуказанным" : "I don't know — leave unspecified"}
+              </button>
+            )}
+            {allowed.includes("SKIP") && (
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy || Boolean(enteredValue.trim() || note.trim())}
+                onClick={() => submit("SKIP", undefined, "", "")}
+              >
+                {ru ? "Пропустить этот вопрос" : "Skip this question"}
+              </button>
+            )}
+          </div>
+        )}
         <p className="question-help">
           {ru
             ? "Можно заполнить один или все поля. Значения сохраняются через JewelAI, затем актуальное описание обновляется с сервера."
