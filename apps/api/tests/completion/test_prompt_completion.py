@@ -190,7 +190,7 @@ def test_completion_scope_idempotency_and_tamper(engine, tmp_path, enabled):
         assert current(ctx).status_code == 500
 
 
-def test_completion_rejects_pending_keep_atomically(engine, tmp_path, enabled):
+def test_completion_rejects_pending_keep_atomically(engine, tmp_path, enabled, record_property):
     from jewelai_persistence.models import PromptCompletionRow
     from sqlalchemy import func, select
     from test_f05_admission import admit
@@ -227,6 +227,64 @@ def test_completion_rejects_pending_keep_atomically(engine, tmp_path, enabled):
             ]
             == "oval"
         )
+        prompt = final.json()["final_prompt"]
+        assert "center_stone.shape" not in prompt["omitted_targets"]
+        active, separator, unspecified = prompt["prompt_text"].partition(
+            "LEFT UNSPECIFIED — DO NOT INVENT"
+        )
+        assert separator
+        assert 'center_stone.shape: "oval"' in active
+        assert "center_stone.shape" not in unspecified
+        assert '"center_stone.shape": "oval"' in active
+        record_property("keep_reject_final_ifp6", prompt["prompt_text"])
+        assert any(
+            d["kind"] == "unbound_request" and d["target"] == "center_stone.shape"
+            for d in prompt["base_prompt"]["unresolved_details"]
+        )  # Rejected interpretation remains sealed audit, not a missing accepted value.
+
+
+@pytest.mark.parametrize("corruption", ["choice", "actor", "scope"])
+def test_completion_rejects_rehashed_inconsistent_source(engine, tmp_path, enabled, corruption):
+    import hashlib
+    from copy import deepcopy
+
+    from jewelai_domain.preservation import contract_hash
+    from jewelai_persistence.models import MessageRow, PromptCompletionRow
+    from sqlalchemy import select
+
+    with f04_session(engine, tmp_path, binding=True) as ctx:
+        initial(ctx, "F")
+        body, done = command(ctx, read(ctx))
+        assert done.status_code == 200, done.json()
+        with ctx.repo._session_factory.begin() as db:
+            row = db.scalar(select(PromptCompletionRow))
+            message = db.get(MessageRow, UUID(body["message_id"]))
+            if corruption == "choice":
+                message.content = "YES"
+            elif corruption == "actor":
+                message.actor = "assistant"
+            else:
+                from jewelai_persistence.models import DesignSessionRow
+
+                other = db.scalar(
+                    select(DesignSessionRow).where(DesignSessionRow.session_id != ctx.sid)
+                )  # Existing disposable legacy session in the same test hierarchy.
+                assert other is not None
+                message.session_id = other.session_id
+            payload = deepcopy(row.payload)
+            payload["message_sha256"] = hashlib.sha256(message.content.encode()).hexdigest()
+            row.payload = payload
+            row.content_hash = contract_hash("jewelai.CompletionRecord/1", payload)
+        for response in (
+            current(ctx),
+            ctx.client.post(
+                f"/v1/sessions/{ctx.sid}/prompt-enrichment/completions",
+                headers=ctx.headers,
+                json=body,
+            ),
+        ):
+            assert response.status_code == 500, response.json()
+            assert response.json()["error"] == "invalid_completion_history"
 
 
 def test_completion_conflicting_material_is_not_defaulted(engine, tmp_path, enabled):

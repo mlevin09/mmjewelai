@@ -93,7 +93,21 @@ def _render(facts, constraints, omitted):
         value = json.dumps(f.value, ensure_ascii=False, sort_keys=True)
         lines.append(f"{f.concrete_target}: {value} [{f.origin}; {f.applicability}]")
     lines.append("ACTIVE CONSTRAINTS — MUST PRESERVE")
-    lines.extend(c.instruction for c in constraints)
+    by_target = {f.concrete_target: f.value for f in facts}
+    for constraint in constraints:
+        target = constraint.target
+        value = constraint.value
+        has_value = value is not None
+        if not has_value and target in by_target:
+            value, has_value = by_target[target], True
+        elif not has_value and target.startswith("component."):
+            # Existing coalesced KEEP ownership, not a new concept-to-target binding.
+            prefix = target.removeprefix("component.") + "."
+            owned = {p: v for p, v in by_target.items() if p.startswith(prefix)}
+            if owned:
+                value, has_value = owned, True
+        current = ": " + json.dumps(value, ensure_ascii=False, sort_keys=True) if has_value else ""
+        lines.append(f"{constraint.kind} {target}{current} — {constraint.instruction}")
     lines.append("LEFT UNSPECIFIED — DO NOT INVENT")
     lines.extend(omitted)
     return "\n".join(lines)
@@ -268,7 +282,14 @@ def _project_completion(revision, base, registry, completed_at):
             state = _path_value(revision.design, detail.target)
             if state is not None and getattr(state, "availability", None) != "unknown":
                 raise ValueError("inconsistent_gap")
-        omitted.add(detail.target)
+        # An unaccepted interpretation of an existing value is audit evidence, not a gap.
+        # Blocking/conflicting evidence was checked above and cannot be discharged here.
+        try:
+            state = _path_value(effective.design, detail.target)
+        except ValueError:
+            state = None
+        if getattr(state, "availability", None) not in {"value", "not_applicable"}:
+            omitted.add(detail.target)
     return proposals, effective, omitted
 
 

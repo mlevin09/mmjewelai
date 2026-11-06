@@ -38,8 +38,12 @@ entry with `resources` (exact path/directory prefix), `tests` (complete owning
 pytest directory) and `evidence` explaining why it covers all consumers. Whole
 directories are collected/executed, never only recognized reader files.
 
-There are deliberately **no live fixture mappings** yet: shared API resources
-have no established safe narrower ownership boundary. Such changes fail with
+The only proposed live mapping is `data/completion/`: complete Domain and Prompts
+pytest directories plus the complete `apps/api/tests/completion` owning namespace.
+The latter retains all completion lifecycle/migration/PostgreSQL tests and exercises
+the actual proposed policy through its loader and API consumer. The data stays in
+place; no test is dropped. This mapping needs independent review in PR156. Other
+shared API resources have no established safe narrower ownership boundary. Such changes fail with
 `unmapped_fixture_data` before running tests. Do not map shared resources to a
 convenient subset merely to clear CI. A future mapping requires demonstrated
 complete ownership and review; a nonempty justification alone is not evidence.
@@ -51,8 +55,8 @@ is unchanged; its independent full Web gate remains responsible for Web scope.
 
 Synthetic controls declare one self-contained nested test namespace and prove
 that its complete scope executes direct and indirect consumers, including the
-previously omitted Path-variable reader. No professional/runtime fixture mapping
-is activated by those tests. This is an internal CI configuration, not a product
+previously omitted Path-variable reader. No other professional/runtime fixture mapping
+is activated by those synthetic tests. This is an internal CI configuration, not a product
 or durable domain contract.
 
 The smoke combines one real HTTP integration journey (J7: RU input, canonical

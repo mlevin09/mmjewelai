@@ -15,6 +15,7 @@ from jewelai_persistence.completion import (
     completion_transaction,
 )
 from jewelai_persistence.models import PromptCompletionRow
+from jewelai_persistence.repository import NotFoundError
 from jewelai_prompts.completion import (
     CompletionRegistry,
     InternalFinalPromptV6,
@@ -76,6 +77,15 @@ def load_registry(path: Path, expected_sha256: str):
     return registry
 
 
+def _valid_choice_source(message, request, session_id):
+    allowed = {"YES": {"yes", "да"}, "NO": {"no", "нет"}}[request.anything_else]
+    return (
+        message.session_id == session_id
+        and message.actor == "user"
+        and message.content.strip().casefold() in allowed
+    )
+
+
 class CompletionService:
     def __init__(self, service, registry, *, clock=None):
         registry = CompletionRegistry.model_validate_json(registry.model_dump_json())
@@ -106,7 +116,8 @@ class CompletionService:
             revision = repo.get_revision(sid, row.revision_id, oid)
             cycle = repo.get_enrichment_cycle(sid, row.cycle_id, oid)
             if (
-                snapshot.revision != revision
+                not _valid_choice_source(message, request, sid)
+                or snapshot.revision != revision
                 or cycle.result != snapshot.enrichment_result
                 or cycle.result.content_hash != snapshot.current_frame.enrichment_result_hash
                 or row.message_id != request.message_id
@@ -150,7 +161,7 @@ class CompletionService:
             return request, payload
         except ContinuationReadError:
             raise
-        except ValueError:
+        except (ValueError, NotFoundError):
             raise ContinuationReadError(
                 500, "invalid_completion_history", "Stored completion source failed validation"
             ) from None
@@ -179,8 +190,7 @@ class CompletionService:
             if request.expected_frame != current.current_frame:
                 raise ContinuationReadError(409, "stale_completion_frame", "Current design changed")
             message = repo.get_message(sid, request.message_id, oid)
-            allowed = {"YES": {"yes", "да"}, "NO": {"no", "нет"}}[request.anything_else]
-            if message.actor != "user" or message.content.strip().casefold() not in allowed:
+            if not _valid_choice_source(message, request, sid):
                 raise ContinuationReadError(
                     422, "invalid_completion_intent", "Store an explicit YES or NO user Message"
                 )

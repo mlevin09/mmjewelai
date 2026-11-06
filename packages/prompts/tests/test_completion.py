@@ -135,3 +135,36 @@ def test_ifp6_does_not_override_locked_user_value(current, templates, dictionary
     assert result.effective_revision.design.metal.color == current.revision.design.metal.color
     assert current.revision.design.metal.color.locked
     assert not any(a.target_path == "metal.color" for a in result.assumptions)
+    constraints = result.prompt_text.split("ACTIVE CONSTRAINTS — MUST PRESERVE\n")[1]
+    locked = [line for line in constraints.splitlines() if "locked value must not change" in line]
+    assert len(locked) == 1
+    assert 'metal.color: "white"' in locked[0]
+
+
+def test_ifp6_field_keep_names_current_target_and_value(current, templates, dictionary):
+    from jewelai_prompts.completion import _render
+    from jewelai_prompts.final_prompt import FinalPromptConstraint
+
+    result = build_completion(
+        current,
+        registry(),
+        completion_id=uuid4(),
+        message_id=uuid4(),
+        completed_at=current.revision.created_at,
+        dictionary=dictionary,
+        templates=templates,
+    )
+    text = _render(
+        result.effective_parameters,
+        (
+            FinalPromptConstraint(
+                kind="preservation",
+                target="center_stone.shape",
+                instruction="Keep this current authoritative center-stone field unchanged.",
+            ),
+        ),
+        (),
+    )
+    line = text.split("ACTIVE CONSTRAINTS — MUST PRESERVE\n")[1].splitlines()[0]
+    assert 'center_stone.shape: "oval"' in line
+    assert "unchanged" in line

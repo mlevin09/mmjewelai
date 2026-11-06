@@ -28,8 +28,8 @@ After NO, approved default_or_omit information gaps may remain unspecified; the
 prompt explicitly prohibits invention. default_only gaps require a valid matching
 default. user_required targets still require a real answer. Material alternatives,
 competing facts, blocking unbound requests and pending KEEP consent cannot be
-discharged by completion. Nonblocking unaccepted requests remain explicitly
-unspecified and unaccepted; NO does not turn them into facts or silently erase
+discharged by completion. Nonblocking unaccepted requests remain unaccepted source evidence; only actually
+missing effective values are left unspecified; NO does not turn them into facts or silently erase
 source history. Native criticality is preserved. Legacy blockers need existing compatibility proofs.
 
 No original frontier/answer/blocking flag is rewritten. The separate IFP6 validator

@@ -1,11 +1,11 @@
 """Portable metadata check of only the new additive migration; no shared database."""
 
 import importlib.util
-from pathlib import Path
 
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from conftest import ROOT
 from sqlalchemy import create_engine, inspect
 
 
@@ -14,7 +14,7 @@ def test_completion_routes_absent_by_default(client):
 
 
 def test_completion_additive_migration_matches_model():
-    root = Path(__file__).resolve().parents[3]
+    root = ROOT
     spec = importlib.util.spec_from_file_location(
         "completion_migration",
         root / "packages/persistence/migrations/versions/0019_prompt_completion.py",

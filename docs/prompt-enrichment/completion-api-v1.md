@@ -138,3 +138,12 @@ No visualization/downstream handoff6 is enabled; old consumers reject unknown6.
 
 See the Draft PR for exact source SHA, focused commands/results, failed-development
 receipts and test-execution ledger. Do not substitute green CI for functional review.
+
+## PR156 acceptance corrections
+
+Known values with unaccepted nonblocking interpretations stay known; only actual gaps
+appear under LEFT UNSPECIFIED. Those interpretations remain in the sealed basis.
+Active constraint text now names target/current value and the original preservation
+instruction; component KEEP includes its current owned facts. Durable GET/replay
+validate actual user actor, session and YES/NO semantics as well as existing hashes.
+See completion-acceptance-fixes.md for RED/GREEN receipts and PostgreSQL limitations.
