@@ -4,6 +4,8 @@ import { ApiClient, ApiError } from "./api";
 import {
   decisions,
   EnrichmentClient,
+  type CompletionResult,
+  type CompletionView,
   type Conversation,
   type FinalOutput,
   type Question,
@@ -27,6 +29,8 @@ export function EnrichmentWorkspace({
   const [session, setSession] = useState<Session | null>(null);
   const [snapshot, setSnapshot] = useState<Conversation | null>(null);
   const [final, setFinal] = useState<FinalOutput | null>(null);
+  const [completionEnabled, setCompletionEnabled] = useState(false);
+  const [completion, setCompletion] = useState<CompletionView | null>(null);
   const [finalReason, setFinalReason] = useState("");
   const [error, setError] = useState("");
   const [text, setText] = useState("");
@@ -57,6 +61,33 @@ export function EnrichmentWorkspace({
     setSnapshot(data);
     setLoading(false);
     setFinal(null);
+    setCompletion(null);
+    if (data.state) {
+      try {
+        const current = await client.currentCompletion();
+        if (currentEpoch !== epoch.current) return;
+        setCompletionEnabled(true);
+        setCompletion(current);
+        setFinalReason("");
+        return;
+      } catch (e) {
+        if (currentEpoch !== epoch.current) return;
+        if (e instanceof ApiError && e.status === 404) {
+          // The new opt-in route is absent on deployments with completion disabled.
+          setCompletionEnabled(false);
+        } else if (
+          e instanceof ApiError &&
+          e.status === 409 &&
+          e.code === "completion_invalidated"
+        ) {
+          setCompletionEnabled(true);
+          setFinalReason(e.code);
+          return;
+        } else {
+          throw e;
+        }
+      }
+    }
     const outputReady =
       data.state?.status === "final_output_ready" ||
       data.state?.status === "final_output_ready_with_unresolved";
@@ -245,11 +276,14 @@ export function EnrichmentWorkspace({
   }
 
   async function copyPrompt() {
-    if (!final || flight.current) return;
+    const prompt = completionEnabled
+      ? completion?.status === "FINAL" && completion.is_current
+        ? completion.final_prompt?.prompt_text
+        : null
+      : final?.internal_final_prompt.prompt_text;
+    if (!prompt || flight.current) return;
     try {
-      await navigator.clipboard.writeText(
-        final.internal_final_prompt.prompt_text,
-      );
+      await navigator.clipboard.writeText(prompt);
       setCopyStatus(t("Copied", "Скопировано"));
     } catch {
       setCopyStatus(
@@ -285,12 +319,19 @@ export function EnrichmentWorkspace({
     guidedStyle,
     text,
   ].some((value) => value.trim());
-  const canComplete = Boolean(readyForFinal && !unsavedDesignInput);
-  const finalConfirmed = Boolean(
-    completedFrame === s?.current_frame.history_root_sha256 &&
-    canComplete &&
-    final,
-  );
+  const activeCompletion = completionEnabled && completion?.status === "FINAL" && completion.is_current
+    ? (completion as CompletionResult).final_prompt
+    : null;
+  const canComplete = Boolean((completionEnabled || readyForFinal) && !unsavedDesignInput);
+  const finalConfirmed = completionEnabled
+    ? Boolean(activeCompletion)
+    : Boolean(completedFrame === s?.current_frame.history_root_sha256 && canComplete && final);
+  const promptText = completionEnabled
+    ? activeCompletion?.prompt_text
+    : final?.internal_final_prompt.prompt_text;
+  const promptReadiness = completionEnabled
+    ? activeCompletion?.readiness
+    : final?.internal_final_prompt.readiness;
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -840,7 +881,11 @@ export function EnrichmentWorkspace({
                   type="button"
                   className="quiet"
                   onClick={() => {
-                    setCompletedFrame(null);
+                    if (completionEnabled) {
+                      void perform(() => client.complete(s, "YES"));
+                    } else {
+                      setCompletedFrame(null);
+                    }
                     document
                       .getElementById("guided-design-description")
                       ?.focus();
@@ -852,7 +897,11 @@ export function EnrichmentWorkspace({
                   type="button"
                   disabled={busy || unsavedDesignInput || finalConfirmed}
                   onClick={() => {
-                    setCompletedFrame(s.current_frame.history_root_sha256);
+                    if (completionEnabled) {
+                      void perform(() => client.complete(s, "NO"));
+                    } else {
+                      setCompletedFrame(s.current_frame.history_root_sha256);
+                    }
                   }}
                 >
                   {t("No, I'm finished", "Нет, больше нечего добавить")}
@@ -866,7 +915,8 @@ export function EnrichmentWorkspace({
                   )}
                 </p>
               )}
-              {completedFrame === s.current_frame.history_root_sha256 &&
+              {!completionEnabled &&
+                completedFrame === s.current_frame.history_root_sha256 &&
                 !readyForFinal && (
                   <p role="status" className="finish-blocked">
                     {t(
@@ -890,16 +940,16 @@ export function EnrichmentWorkspace({
               ? t("Final prompt", "Итоговый промпт")
               : t("Prompt preparation", "Подготовка промпта")}
           </h3>
-          {finalConfirmed && final ? (
+          {finalConfirmed && promptText ? (
             <>
               <p className="final-readiness">
-                {humanReadiness(final.internal_final_prompt.readiness, ru)}
+                {humanReadiness(promptReadiness ?? "READY", ru)}
               </p>
               <textarea
                 aria-label="Internal Final Prompt"
                 className="final-prompt"
                 readOnly
-                value={final.internal_final_prompt.prompt_text}
+                value={promptText}
               />
               <button
                 className="quiet"
@@ -909,10 +959,37 @@ export function EnrichmentWorkspace({
                 {t("Copy full prompt", "Копировать весь промпт")}
               </button>
               <span role="status">{copyStatus}</span>
+              {activeCompletion && (
+                <details className="evidence-details">
+                  <summary>{t("AI defaults and sources", "AI-параметры и источники")}</summary>
+                  <p>{t("Suggestions are marked separately from your own decisions.", "Предложения AI обозначены отдельно от ваших решений.")}</p>
+                  <ul>
+                    {activeCompletion.effective_parameters.map((parameter) => (
+                      <li key={parameter.concrete_target}>
+                        <strong>{label(parameter.concrete_target)}</strong>: {display(parameter.value)} —{" "}
+                        {String(activeCompletion.parameter_sources[parameter.concrete_target]?.origin ?? "explicit")}
+                      </li>
+                    ))}
+                    {activeCompletion.omitted_targets.map((target) => (
+                      <li key={`omitted-${target}`}>
+                        {label(target)}: {t("not specified", "не указано")}
+                      </li>
+                    ))}
+                  </ul>
+                  {activeCompletion.assumptions.length > 0 && (
+                    <p>{t("AI assumptions are suggestions, not confirmed user choices.", "Предположения AI — предложения, а не подтверждённые решения пользователя.")}</p>
+                  )}
+                </details>
+              )}
             </>
           ) : (
             <p>
-              {readyForFinal
+              {completionEnabled
+                ? t(
+                    "Answer No to complete the design, or Yes to refine it. The server decides whether the final prompt can be issued.",
+                    "Ответьте «Нет» для завершения или «Да» для уточнений. Сервер проверит готовность итогового промпта.",
+                  )
+                : readyForFinal
                 ? t(
                     "The design is ready. Confirm that you have no more additions to see the final prompt.",
                     "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
