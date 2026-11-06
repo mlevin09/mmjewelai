@@ -82,6 +82,12 @@ function fixture(
       expect(request.headers.get("X-Organization-ID")).toBe("org");
       return HttpResponse.json(data);
     }),
+    http.get(`${prefix}/completions/current`, () =>
+      HttpResponse.json(
+        { error: "not_found", detail: "Completion disabled" },
+        { status: 404 },
+      ),
+    ),
     http.get(`${prefix}/final-output`, ({ request }) => {
       expect(request.headers.get("If-Match")).toBe(
         data.state?.current_frame.history_root_sha256,
@@ -947,5 +953,151 @@ describe("Prompt Enrichment workspace", () => {
       }),
     );
     await c.resume(s, "intent1", true);
+  });
+  it("persists explicit NO through completion API and restores authoritative IFP6 after remount", async () => {
+    const f = fixture(true);
+    let completed = false;
+    const completions: Record<string, unknown>[] = [];
+    const prompt = {
+      schema_version: "6.0.0",
+      prompt_text: "Authoritative IFP6: platinum with approved provenance.",
+      readiness: "READY_WITH_UNRESOLVED",
+      policy_sha256: "e".repeat(64),
+      effective_parameters: [
+        { concrete_target: "metal.material", value: "platinum" },
+      ],
+      parameter_sources: { "metal.material": { origin: "explicit" } },
+      assumptions: [
+        {
+          target_path: "metal.finish",
+          proposed_value: "polished",
+          rule_id: "policy-finish",
+          rule_version: "1.0.0",
+          rationale: "TEST ONLY",
+        },
+      ],
+      omitted_targets: ["center_stone.dimensions"],
+    };
+    server.use(
+      http.get(`${prefix}/completions/current`, () =>
+        HttpResponse.json(
+          completed
+            ? {
+                schema_version: "1.0.0",
+                completion_id: "done",
+                status: "FINAL",
+                is_current: true,
+                replayed: false,
+                expected_frame: frame,
+                content_hash: "f".repeat(64),
+                final_prompt: prompt,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              }
+            : {
+                schema_version: "completion-context/1.0.0",
+                status: "AWAITING_COMPLETION",
+                expected_frame: frame,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              },
+        ),
+      ),
+      http.post(`${prefix}/completions`, async ({ request }) => {
+        const body = (await request.json()) as Record<string, unknown>;
+        completions.push(body);
+        expect(request.headers.get("X-Organization-ID")).toBe("org");
+        completed = true;
+        return HttpResponse.json({ status: "FINAL" });
+      }),
+    );
+    const view = f.view();
+    await screen.findByRole("button", { name: "No, I'm finished" });
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    await waitFor(() => expect(completions).toHaveLength(1));
+    expect(completions[0]).toMatchObject({
+      schema_version: "1.0.0",
+      anything_else: "NO",
+      expected_frame: frame,
+      message_id: "m0",
+    });
+    expect(f.data.events[0]?.text).toBe("NO");
+    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
+      prompt.prompt_text,
+    );
+    expect(screen.getByText("AI defaults and sources")).toBeInTheDocument();
+    expect(screen.getAllByText(/not specified/).length).toBeGreaterThan(0);
+    view.unmount();
+    f.view();
+    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
+      prompt.prompt_text,
+    );
+    expect(completions).toHaveLength(1);
+  });
+
+  it("records YES as editing instead of completing and does not show a stale prompt", async () => {
+    const f = fixture(true);
+    let choice: "AWAITING_COMPLETION" | "EDITING" = "AWAITING_COMPLETION";
+    const commands: Record<string, unknown>[] = [];
+    server.use(
+      http.get(`${prefix}/completions/current`, () =>
+        HttpResponse.json(
+          choice === "EDITING"
+            ? {
+                schema_version: "1.0.0",
+                status: "EDITING",
+                is_current: true,
+                final_prompt: null,
+                expected_frame: frame,
+                replayed: false,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              }
+            : {
+                schema_version: "completion-context/1.0.0",
+                status: choice,
+                expected_frame: frame,
+                question: {
+                  question_id: "ANYTHING_ELSE/1.0.0",
+                  text: "Anything else?",
+                  choices: ["YES", "NO"],
+                },
+              },
+        ),
+      ),
+      http.post(`${prefix}/completions`, async ({ request }) => {
+        commands.push((await request.json()) as Record<string, unknown>);
+        choice = "EDITING";
+        return HttpResponse.json({ status: "EDITING" });
+      }),
+    );
+    f.view();
+    await screen.findByRole("button", { name: "Yes, add details" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Yes, add details" }),
+    );
+    await waitFor(() => expect(commands).toHaveLength(1));
+    expect(commands[0]).toMatchObject({
+      anything_else: "YES",
+      expected_frame: frame,
+    });
+    expect(f.data.events[0]?.text).toBe("YES");
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
   });
 });

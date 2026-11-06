@@ -90,6 +90,45 @@ export interface FinalOutput {
   };
 }
 
+export interface CompletionContext {
+  schema_version: "completion-context/1.0.0";
+  status: "AWAITING_COMPLETION";
+  expected_frame: Frame;
+  question: {
+    question_id: string;
+    text: string;
+    choices: ("YES" | "NO")[];
+  };
+}
+export interface CompletionPromptV6 {
+  schema_version: "6.0.0";
+  prompt_text: string;
+  readiness: "READY" | "READY_WITH_UNRESOLVED";
+  policy_sha256: string;
+  effective_parameters: { concrete_target: string; value: unknown }[];
+  parameter_sources: Record<string, Record<string, unknown>>;
+  assumptions: {
+    target_path: string;
+    proposed_value: unknown;
+    rule_id: string;
+    rule_version: string;
+    rationale: string;
+  }[];
+  omitted_targets: string[];
+}
+export interface CompletionResult {
+  schema_version: "1.0.0";
+  completion_id: string;
+  status: "FINAL" | "EDITING";
+  is_current: boolean;
+  replayed: boolean;
+  expected_frame: Frame;
+  final_prompt: CompletionPromptV6 | null;
+  content_hash: string;
+  question: CompletionContext["question"];
+}
+export type CompletionView = CompletionContext | CompletionResult;
+
 /** Wire existing server commands; never interpret text or compute authority/hash evidence. */
 export class EnrichmentClient {
   readonly path: string;
@@ -255,6 +294,58 @@ export class EnrichmentClient {
             message_id: message.message_id,
           },
     );
+  }
+  currentCompletion() {
+    return this.api.request<CompletionView>(
+      `${this.path}/completions/current`,
+      {
+        organizationId: this.organizationId,
+      },
+    );
+  }
+  // Keep a submitted command stable across a transport retry; do not create a
+  // fresh completion Message when POST reached the server but its response was lost.
+  private pendingCompletion: {
+    frame: string;
+    choice: "YES" | "NO";
+    body: {
+      schema_version: "1.0.0";
+      request_id: string;
+      message_id: string;
+      expected_frame: Frame;
+      anything_else: "YES" | "NO";
+    };
+  } | null = null;
+  async complete(s: EnrichmentState, choice: "YES" | "NO") {
+    const frame = JSON.stringify(s.current_frame);
+    if (
+      !this.pendingCompletion ||
+      this.pendingCompletion.frame !== frame ||
+      this.pendingCompletion.choice !== choice
+    ) {
+      const message = await this.message(choice);
+      this.pendingCompletion = {
+        frame,
+        choice,
+        body: {
+          schema_version: "1.0.0",
+          request_id: crypto.randomUUID(),
+          message_id: message.message_id,
+          expected_frame: s.current_frame,
+          anything_else: choice,
+        },
+      };
+    }
+    const result = await this.api.request<CompletionResult>(
+      `${this.path}/completions`,
+      {
+        organizationId: this.organizationId,
+        method: "POST",
+        body: JSON.stringify(this.pendingCompletion.body),
+      },
+    );
+    this.pendingCompletion = null;
+    return result;
   }
   final(s: EnrichmentState) {
     return this.api.request<FinalOutput>(
