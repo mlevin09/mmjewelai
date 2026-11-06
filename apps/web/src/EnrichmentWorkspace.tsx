@@ -319,13 +319,20 @@ export function EnrichmentWorkspace({
     guidedStyle,
     text,
   ].some((value) => value.trim());
-  const activeCompletion = completionEnabled && completion?.status === "FINAL" && completion.is_current
-    ? completion.final_prompt
-    : null;
-  const canComplete = Boolean((completionEnabled || readyForFinal) && !unsavedDesignInput);
+  const activeCompletion =
+    completionEnabled && completion?.status === "FINAL" && completion.is_current
+      ? completion.final_prompt
+      : null;
+  const canComplete = Boolean(
+    (completionEnabled || readyForFinal) && !unsavedDesignInput,
+  );
   const finalConfirmed = completionEnabled
     ? Boolean(activeCompletion)
-    : Boolean(completedFrame === s?.current_frame.history_root_sha256 && canComplete && final);
+    : Boolean(
+        completedFrame === s?.current_frame.history_root_sha256 &&
+          canComplete &&
+          final,
+      );
   const promptText = completionEnabled
     ? activeCompletion?.prompt_text
     : final?.internal_final_prompt.prompt_text;
@@ -961,13 +968,25 @@ export function EnrichmentWorkspace({
               <span role="status">{copyStatus}</span>
               {activeCompletion && (
                 <details className="evidence-details">
-                  <summary>{t("AI defaults and sources", "AI-параметры и источники")}</summary>
-                  <p>{t("Suggestions are marked separately from your own decisions.", "Предложения AI обозначены отдельно от ваших решений.")}</p>
+                  <summary>
+                    {t("AI defaults and sources", "AI-параметры и источники")}
+                  </summary>
+                  <p>
+                    {t(
+                      "Suggestions are marked separately from your own decisions.",
+                      "Предложения AI обозначены отдельно от ваших решений.",
+                    )}
+                  </p>
                   <ul>
                     {activeCompletion.effective_parameters.map((parameter) => (
                       <li key={parameter.concrete_target}>
-                        <strong>{label(parameter.concrete_target)}</strong>: {display(parameter.value)} —{" "}
-                        {sourceOrigin(activeCompletion.parameter_sources[parameter.concrete_target]?.origin)}
+                        <strong>{label(parameter.concrete_target)}</strong>:{" "}
+                        {display(parameter.value)} —{" "}
+                        {sourceOrigin(
+                          activeCompletion.parameter_sources[
+                            parameter.concrete_target
+                          ]?.origin,
+                        )}
                       </li>
                     ))}
                     {activeCompletion.omitted_targets.map((target) => (
@@ -978,13 +997,21 @@ export function EnrichmentWorkspace({
                   </ul>
                   {activeCompletion.assumptions.length > 0 && (
                     <>
-                      <p>{t("AI assumptions are suggestions, not confirmed user choices.", "Предположения AI — предложения, а не подтверждённые решения пользователя.")}</p>
+                      <p>
+                        {t(
+                          "AI assumptions are suggestions, not confirmed user choices.",
+                          "Предположения AI — предложения, а не подтверждённые решения пользователя.",
+                        )}
+                      </p>
                       <ul>
                         {activeCompletion.assumptions.map((assumption) => (
                           <li key={assumption.target_path}>
-                            <strong>{label(assumption.target_path)}</strong>: {display(assumption.proposed_value)}
-                            {" — AI_DEFAULT · "}{assumption.rule_id} ({assumption.rule_version})
-                            {": "}{assumption.rationale}
+                            <strong>{label(assumption.target_path)}</strong>:{" "}
+                            {display(assumption.proposed_value)}
+                            {" — AI_DEFAULT · "}
+                            {assumption.rule_id} ({assumption.rule_version})
+                            {": "}
+                            {assumption.rationale}
                           </li>
                         ))}
                       </ul>
@@ -1001,11 +1028,11 @@ export function EnrichmentWorkspace({
                     "Ответьте «Нет» для завершения или «Да» для уточнений. Сервер проверит готовность итогового промпта.",
                   )
                 : readyForFinal
-                ? t(
-                    "The design is ready. Confirm that you have no more additions to see the final prompt.",
-                    "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
-                  )
-                : friendlyFinalStatus(finalReason, ru)}
+                  ? t(
+                      "The design is ready. Confirm that you have no more additions to see the final prompt.",
+                      "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
+                    )
+                  : friendlyFinalStatus(finalReason, ru)}
             </p>
           )}
           <details className="evidence-details">
