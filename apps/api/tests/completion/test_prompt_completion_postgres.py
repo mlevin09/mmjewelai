@@ -153,12 +153,13 @@ def test_completion_distinct_concurrent_postgres(engine, tmp_path, enabled):
 
 
 @pytest.mark.parametrize("winner", ["completion", "edit"])
-def test_completion_edit_lock_race_postgres(engine, tmp_path, enabled, winner):
+def test_completion_edit_lock_race_postgres(engine, tmp_path, enabled, winner, record_property):
     from concurrent.futures import ThreadPoolExecutor
     from contextvars import ContextVar
     from threading import Event
+    from time import monotonic, sleep
 
-    from sqlalchemy import event
+    from sqlalchemy import event, text
     from test_conversation import read
     from test_f04_http import f04_session
     from test_f05_history import initial
@@ -181,16 +182,35 @@ def test_completion_edit_lock_race_postgres(engine, tmp_path, enabled, winner):
         )
         locked, contender, release = Event(), Event(), Event()
         role_context = ContextVar("completion_race_role", default=None)
+        observed = {}
 
         def session_lock(statement):
             return "design_session" in statement.lower() and "FOR UPDATE" in statement.upper()
 
         def before(conn, cursor, statement, parameters, context, executemany):
-            if session_lock(statement) and role_context.get() == "loser":
+            sql = statement.upper()
+            # Correction first performs a scoped FOR SHARE history read. It can
+            # legitimately block before reaching its write transaction's FOR UPDATE.
+            lock_mode = next(
+                (
+                    m
+                    for m in ("FOR NO KEY UPDATE", "FOR KEY SHARE", "FOR UPDATE", "FOR SHARE")
+                    if m in sql
+                ),
+                None,
+            )
+            if (
+                lock_mode
+                and "design_session" in statement.lower()
+                and role_context.get() == "loser"
+            ):
+                observed["waiter_pid"] = conn.connection.driver_connection.info.backend_pid
+                observed["waiter_lock"] = lock_mode
                 contender.set()
 
         def after(conn, cursor, statement, parameters, context, executemany):
             if session_lock(statement) and role_context.get() == "winner" and not locked.is_set():
+                observed["holder_pid"] = conn.connection.driver_connection.info.backend_pid
                 locked.set()  # Real PG row lock acquired, not a mocked reservation.
                 assert release.wait(20)
 
@@ -215,8 +235,22 @@ def test_completion_edit_lock_race_postgres(engine, tmp_path, enabled, winner):
                         invoke, "edit" if winner == "completion" else "completion", "loser"
                     )
                     assert contender.wait(10), (
-                        "Second transaction did not attempt the same session lock"
+                        "Second request did not attempt a scoped session read/write lock"
                     )
+                    deadline = monotonic() + 5
+                    while monotonic() < deadline:
+                        with engine.connect() as db:
+                            blockers = db.scalar(
+                                text("SELECT pg_blocking_pids(:pid)"),
+                                {"pid": observed["waiter_pid"]},
+                            )
+                        if observed["holder_pid"] in blockers:
+                            break
+                        sleep(0.02)
+                    else:
+                        pytest.fail("PostgreSQL did not confirm the scoped lock wait")
+                    record_property("verified_postgres_lock_wait", observed["waiter_lock"])
+                    record_property("first_writer", winner)
                 finally:
                     release.set()
                 results = {winner: first.result(timeout=30)}
