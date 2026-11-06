@@ -620,6 +620,26 @@ describe("Prompt Enrichment workspace", () => {
     expect(f.data.events).toHaveLength(1);
   });
 
+  it("preserves structured inputs and free text after an unsuccessful save", async () => {
+    const f = fixture(true);
+    server.use(
+      http.post(`${prefix}/corrections`, () =>
+        HttpResponse.json(
+          { error: "stale_revision", detail: "Revision changed" },
+          { status: 409 },
+        ),
+      ),
+    );
+    f.view();
+    await screen.findByLabelText("Jewelry type");
+    await userEvent.type(screen.getByLabelText("Metal"), "Yellow gold");
+    await userEvent.type(screen.getByLabelText("Your message"), "Delicate band.");
+    await userEvent.click(screen.getByRole("button", { name: "Update design" }));
+    await screen.findByText(/The design changed or a decision/);
+    expect(screen.getByLabelText("Metal")).toHaveValue("Yellow gold");
+    expect(screen.getByLabelText("Your message")).toHaveValue("Delicate band.");
+  });
+
   it("submits guided parameters and free text as one initial user message", async () => {
     const f = fixture();
     f.view();
