@@ -977,7 +977,18 @@ export function EnrichmentWorkspace({
                     ))}
                   </ul>
                   {activeCompletion.assumptions.length > 0 && (
-                    <p>{t("AI assumptions are suggestions, not confirmed user choices.", "Предположения AI — предложения, а не подтверждённые решения пользователя.")}</p>
+                    <>
+                      <p>{t("AI assumptions are suggestions, not confirmed user choices.", "Предположения AI — предложения, а не подтверждённые решения пользователя.")}</p>
+                      <ul>
+                        {activeCompletion.assumptions.map((assumption) => (
+                          <li key={assumption.target_path}>
+                            <strong>{label(assumption.target_path)}</strong>: {display(assumption.proposed_value)}
+                            {" — AI_DEFAULT · "}{assumption.rule_id} ({assumption.rule_version})
+                            {": "}{assumption.rationale}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </details>
               )}
