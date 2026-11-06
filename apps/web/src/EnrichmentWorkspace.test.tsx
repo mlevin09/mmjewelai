@@ -738,6 +738,33 @@ describe("Prompt Enrichment workspace", () => {
     );
   });
 
+  it("shows a true final prompt only after user confirms there are no more details", async () => {
+    const f = fixture(true);
+    f.data.state!.questions = [];
+    f.data.state!.status = "final_output_ready_with_unresolved";
+    f.view();
+    await screen.findByLabelText("Internal Final Prompt");
+    expect(screen.getByRole("heading", { name: "Generated prompt" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
+    expect(screen.getByRole("heading", { name: "Final prompt" })).toBeInTheDocument();
+    expect(screen.getByText(/Finished for the current design revision/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
+      "The actual server prompt, without client additions.",
+    );
+  });
+
+  it("does not invent a final prompt on user completion when server is blocked", async () => {
+    const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
+    f.data.state!.questions = [];
+    f.view();
+    await screen.findByRole("button", { name: "No, I'm finished" });
+    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
+    expect(screen.getByText(/still reports a blocking decision/)).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Final prompt" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Internal Final Prompt")).not.toBeInTheDocument();
+  });
+
   it("does not request final output while server status is blocked", async () => {
     const f = fixture(true);
     f.data.state!.status = "final_output_blocked";
