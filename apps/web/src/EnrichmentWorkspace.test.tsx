@@ -473,7 +473,7 @@ describe("Prompt Enrichment workspace", () => {
     f.view();
     await screen.findByLabelText("Your message");
     await send("I want a yellow gold wedding ring.");
-    expect(f.commands[0].route).toBe("initial");
+    expect(f.commands[0]?.route).toBe("initial");
     expect(screen.getByLabelText("Current design text")).toBeInTheDocument();
     f.data.state!.questions = [
       {
