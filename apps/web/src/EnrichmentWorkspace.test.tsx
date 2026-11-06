@@ -1036,7 +1036,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
       prompt.prompt_text,
     );
-    expect(screen.getByText("AI defaults and sources")).toBeInTheDocument();
+    expect(screen.getByText("Final prompt sources")).toBeInTheDocument();
     expect(screen.getAllByText(/not specified/).length).toBeGreaterThan(0);
     view.unmount();
     f.view();
@@ -1100,4 +1100,202 @@ describe("Prompt Enrichment workspace", () => {
       screen.queryByLabelText("Internal Final Prompt"),
     ).not.toBeInTheDocument();
   });
+
+  it("uses the authoritative NO response without a redundant completion read", async () => {
+    const f = fixture(true);
+    let reads = 0;
+    const completed = {
+      schema_version: "1.0.0",
+      completion_id: "done",
+      status: "FINAL",
+      is_current: true,
+      replayed: false,
+      expected_frame: frame,
+      content_hash: "f".repeat(64),
+      question: {
+        question_id: "ANYTHING_ELSE/1.0.0",
+        text: "Anything else?",
+        choices: ["YES", "NO"],
+      },
+      final_prompt: {
+        schema_version: "6.0.0",
+        prompt_text: "Exact authoritative server-owned IFP6",
+        readiness: "READY",
+        policy_sha256: "e".repeat(64),
+        effective_parameters: [],
+        parameter_sources: {},
+        assumptions: [],
+        omitted_targets: [],
+      },
+    };
+    server.use(
+      http.get(`${prefix}/completions/current`, () => {
+        reads++;
+        return HttpResponse.json({
+          ...completed,
+          status: "AWAITING_COMPLETION",
+          schema_version: "completion-context/1.0.0",
+          final_prompt: null,
+        });
+      }),
+      http.post(`${prefix}/completions`, () => HttpResponse.json(completed)),
+    );
+    f.view();
+    await waitFor(() => expect(reads).toBe(1));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "No, I'm finished" }),
+    );
+    expect(await screen.findByLabelText("Internal Final Prompt")).toHaveValue(
+      completed.final_prompt.prompt_text,
+    );
+    expect(reads).toBe(1);
+    expect(f.data.events.filter((e) => e.kind === "user")).toHaveLength(1);
+  });
+
+  it("does not refetch an invalidated completion after an accepted edit", async () => {
+    const f = fixture(true);
+    let reads = 0;
+    server.use(
+      http.get(`${prefix}/completions/current`, () => {
+        reads++;
+        return HttpResponse.json({
+          schema_version: "completion-context/1.0.0",
+          status: "AWAITING_COMPLETION",
+          expected_frame: frame,
+        });
+      }),
+      http.post(`${prefix}/corrections`, async ({ request }) => {
+        f.commands.push({
+          route: "corrections",
+          body: (await request.json()) as Record<string, unknown>,
+        });
+        f.data.state!.current_frame = {
+          ...frame,
+          revision_id: "r2",
+          history_root_sha256: "e".repeat(64),
+        };
+        f.data.state!.description.text = "A platinum ring.";
+        return HttpResponse.json({ state: f.data.state });
+      }),
+    );
+    f.view();
+    await waitFor(() => expect(reads).toBe(1));
+    await send("Use platinum.");
+    await waitFor(() =>
+      expect(screen.getByLabelText("Current design text")).toHaveTextContent(
+        "A platinum ring.",
+      ),
+    );
+    expect(reads).toBe(1);
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("guards an acknowledged write when refresh fails and retries reads only", async () => {
+    const f = fixture(true);
+    let blocked = false;
+    let writes = 0;
+    server.use(
+      http.get(`${prefix}/conversation`, () =>
+        blocked ? HttpResponse.error() : HttpResponse.json(f.data),
+      ),
+      http.post(`${prefix}/corrections`, async ({ request }) => {
+        writes++;
+        f.commands.push({
+          route: "corrections",
+          body: (await request.json()) as Record<string, unknown>,
+        });
+        f.data.state!.current_frame = { ...frame, revision_id: "r2" };
+        f.data.state!.description.text = "Saved platinum design.";
+        blocked = true;
+        return HttpResponse.json({ state: f.data.state });
+      }),
+    );
+    f.view();
+    await screen.findByLabelText("Your message");
+    await userEvent.type(
+      screen.getByLabelText("Your message"),
+      "Use platinum.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
+    const retry = await screen.findByRole("button", {
+      name: "Refresh saved design",
+    });
+    expect(screen.getByLabelText("Your message")).toHaveValue("Use platinum.");
+    expect(
+      screen.getByRole("button", { name: "Updating your design…" }),
+    ).toBeDisabled();
+    expect(writes).toBe(1);
+    blocked = false;
+    await userEvent.click(retry);
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Refresh saved design" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(writes).toBe(1);
+    expect(screen.getByLabelText("Your message")).toHaveValue("");
+    expect(screen.getByLabelText("Current design text")).toHaveTextContent(
+      "Saved platinum design.",
+    );
+  });
+
+  it.each(["en", "ru"] as const)(
+    "groups dormant clarifications with distinct human labels in %s",
+    async (locale) => {
+      const f = fixture(true, "F", locale);
+      f.data.state!.native_frontier = {
+        frontier_core: {
+          cause_states: [
+            {
+              cause_id: "setting-cause",
+              status: "OPEN",
+              offer_state: "DORMANT",
+              availability_target_ref: {
+                concrete_target: "center_stone.setting",
+              },
+            },
+            {
+              cause_id: "dimensions-cause",
+              status: "OPEN",
+              offer_state: "DORMANT",
+              availability_target_ref: {
+                concrete_target: "center_stone.dimensions",
+              },
+            },
+          ],
+        },
+      };
+      let resumed = "";
+      server.use(
+        http.post(`${prefix}/clarifications/:id/resume`, ({ params }) => {
+          resumed = String(params.id);
+          return HttpResponse.json({});
+        }),
+      );
+      f.view();
+      const summary = await screen.findByText(
+        locale === "ru"
+          ? "Предыдущие уточнения (2)"
+          : "Previous clarifications (2)",
+      );
+      expect(resumed).toBe("");
+      await userEvent.click(summary);
+      await userEvent.click(
+        screen.getByRole("button", {
+          name:
+            locale === "ru"
+              ? "Закрепка центрального камня"
+              : "Center stone setting",
+        }),
+      );
+      await waitFor(() => expect(resumed).toBe("setting-cause"));
+      expect(
+        within(summary.closest("details")!).queryByText(/center_stone\./),
+      ).not.toBeInTheDocument();
+    },
+  );
 });

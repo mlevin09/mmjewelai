@@ -5,6 +5,8 @@ import {
   decisions,
   EnrichmentClient,
   type CompletionView,
+  type CompletionResult,
+  type Frame,
   type Conversation,
   type FinalOutput,
   type Question,
@@ -33,7 +35,10 @@ export function EnrichmentWorkspace({
   const [finalReason, setFinalReason] = useState("");
   const [error, setError] = useState("");
   const [text, setText] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [working, setBusy] = useState(false);
+  const [refreshPending, setRefreshPending] = useState(false);
+  const pendingSaved = useRef<(() => void) | null>(null);
+  const busy = working || refreshPending;
   const [loading, setLoading] = useState(true);
   const [copyStatus, setCopyStatus] = useState("");
   const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
@@ -53,7 +58,10 @@ export function EnrichmentWorkspace({
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [snapshot?.events.length]);
 
-  async function refresh(currentEpoch = epoch.current) {
+  async function refresh(
+    currentEpoch = epoch.current,
+    savedCompletion?: CompletionResult,
+  ) {
     if (currentEpoch !== epoch.current) return;
     const data = await client.read();
     if (currentEpoch !== epoch.current) return;
@@ -62,11 +70,35 @@ export function EnrichmentWorkspace({
     setFinal(null);
     setCompletion(null);
     if (data.state) {
+      if (
+        savedCompletion &&
+        sameFrame(savedCompletion.expected_frame, data.state.current_frame) &&
+        savedCompletion.is_current
+      ) {
+        setCompletionEnabled(true);
+        setCompletion(savedCompletion);
+        setFinalReason("");
+        return;
+      }
+      // A changed authoritative frame invalidates old completion by contract.
+      // Hide it; another expensive current-completion assembly cannot make it current.
+      if (
+        completionEnabled &&
+        snapshot?.state &&
+        !sameFrame(snapshot.state.current_frame, data.state.current_frame)
+      ) {
+        setFinalReason("completion_invalidated");
+        return;
+      }
       try {
         const current = await client.currentCompletion();
         if (currentEpoch !== epoch.current) return;
         setCompletionEnabled(true);
-        setCompletion(current);
+        setCompletion(
+          sameFrame(current.expected_frame, data.state.current_frame)
+            ? current
+            : null,
+        );
         setFinalReason("");
         return;
       } catch (e) {
@@ -145,7 +177,7 @@ export function EnrichmentWorkspace({
     clearText = false,
     onSaved?: () => void,
   ) {
-    if (flight.current) return;
+    if (flight.current || refreshPending) return;
     flight.current = true;
     setBusy(true);
     setCompletedFrame(null);
@@ -154,11 +186,16 @@ export function EnrichmentWorkspace({
     setFinal(null);
     setCompletion(null);
     setFinalReason("Updating server output…");
-    try {
-      await action();
+    let saved = false;
+    const savedDraft = () => {
       if (clearText) setText("");
-      await refresh();
       onSaved?.();
+    };
+    try {
+      const result = await action();
+      saved = true;
+      await refresh(epoch.current, completionResult(result));
+      savedDraft();
     } catch (e) {
       setFinal(null);
       setError(
@@ -184,15 +221,44 @@ export function EnrichmentWorkspace({
       );
       try {
         await refresh();
+        if (saved) {
+          savedDraft();
+          setError("");
+        }
       } catch {
+        if (saved) {
+          pendingSaved.current = savedDraft;
+          setRefreshPending(true);
+        }
         // Preserve the last good snapshot; a network error must not erase the conversation UI.
         setError(
           t(
-            "Could not refresh. Your saved conversation remains available; try again.",
-            "Не удалось обновить. Сохранённая беседа доступна — повторите попытку.",
+            saved
+              ? "Saved, but the latest view could not be loaded. Refresh the saved design; do not submit it again."
+              : "Could not refresh. Your draft remains available; try again.",
+            saved
+              ? "Сохранено, но не удалось загрузить актуальный вид. Обновите сохранённый дизайн — не отправляйте его повторно."
+              : "Не удалось обновить. Черновик сохранён на экране; повторите попытку.",
           ),
         );
       }
+    } finally {
+      flight.current = false;
+      setBusy(false);
+    }
+  }
+  async function retrySavedRead() {
+    if (flight.current) return;
+    flight.current = true;
+    setBusy(true);
+    try {
+      await refresh();
+      pendingSaved.current?.();
+      pendingSaved.current = null;
+      setRefreshPending(false);
+      setError("");
+    } catch {
+      /* Keep the saved-write guard and drafts; this retries reads only. */
     } finally {
       flight.current = false;
       setBusy(false);
@@ -394,6 +460,23 @@ export function EnrichmentWorkspace({
         <p role="alert" className="alert">
           {error}
         </p>
+      )}
+      {working && (
+        <p role="status">
+          {t(
+            "Saving and loading your current design…",
+            "Сохраняем и загружаем актуальный дизайн…",
+          )}
+        </p>
+      )}
+      {refreshPending && (
+        <button
+          type="button"
+          disabled={working}
+          onClick={() => void retrySavedRead()}
+        >
+          {t("Refresh saved design", "Обновить сохранённый дизайн")}
+        </button>
       )}
       {partialAnswer && (
         <section
@@ -744,17 +827,33 @@ export function EnrichmentWorkspace({
               )}
             </section>
           )}
-          {dormant.map((c) => (
-            <button
-              className="quiet"
-              key={c.cause_id}
-              disabled={busy}
-              onClick={() => void perform(() => client.resume(s!, c.cause_id))}
-            >
-              {t("Reopen clarification", "Вернуться к уточнению")}:{" "}
-              {c.availability_target_ref.concrete_target.replaceAll("_", " ")}
-            </button>
-          ))}
+          {dormant.length > 0 && (
+            <details className="previous-clarifications">
+              <summary>
+                {t("Previous clarifications", "Предыдущие уточнения")} (
+                {dormant.length})
+              </summary>
+              <ul>
+                {dormant.map((c) => (
+                  <li key={c.cause_id}>
+                    <button
+                      className="quiet"
+                      key={c.cause_id}
+                      disabled={busy}
+                      onClick={() =>
+                        void perform(() => client.resume(s!, c.cause_id))
+                      }
+                    >
+                      {clarificationLabel(
+                        c.availability_target_ref.concrete_target,
+                        ru,
+                      )}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
           {s?.protection_projection.pending_requests
             .filter((p) => p.status === "RECONFIRMATION_REQUIRED")
             .map((p) => (
@@ -887,6 +986,7 @@ export function EnrichmentWorkspace({
                 <button
                   type="button"
                   className="quiet"
+                  disabled={busy}
                   onClick={() => {
                     if (completionEnabled) {
                       void perform(() => client.complete(s, "YES"));
@@ -969,12 +1069,16 @@ export function EnrichmentWorkspace({
               {activeCompletion && (
                 <details className="evidence-details">
                   <summary>
-                    {t("AI defaults and sources", "AI-параметры и источники")}
+                    {t("Final prompt sources", "Источники итогового промпта")}
                   </summary>
                   <p>
                     {t(
-                      "Suggestions are marked separately from your own decisions.",
-                      "Предложения AI обозначены отдельно от ваших решений.",
+                      activeCompletion.assumptions.length
+                        ? "AI assumptions are labelled separately from your decisions."
+                        : "No AI defaults were applied. These are the final parameters and their sources.",
+                      activeCompletion.assumptions.length
+                        ? "Предположения AI отмечены отдельно от ваших решений."
+                        : "AI defaults не применялись. Ниже — итоговые параметры и их источники.",
                     )}
                   </p>
                   <ul>
@@ -1007,7 +1111,6 @@ export function EnrichmentWorkspace({
                         {activeCompletion.assumptions.map((assumption) => (
                           <li key={assumption.target_path}>
                             <strong>{label(assumption.target_path)}</strong>:{" "}
-                            {display(assumption.proposed_value)}
                             {" — AI_DEFAULT · "}
                             {assumption.rule_id} ({assumption.rule_version})
                             {": "}
@@ -1073,6 +1176,49 @@ export function EnrichmentWorkspace({
 
 function sourceOrigin(value: unknown): string {
   return typeof value === "string" ? value : "explicit";
+}
+
+function sameFrame(a: Frame, b: Frame): boolean {
+  return (Object.keys(b) as (keyof Frame)[]).every((key) => a[key] === b[key]);
+}
+
+function completionResult(value: unknown): CompletionResult | undefined {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "expected_frame" in value &&
+    "is_current" in value &&
+    "final_prompt" in value
+  )
+    return value as CompletionResult;
+  return undefined;
+}
+
+function clarificationLabel(target: string, ru: boolean): string {
+  const labels: Record<string, [string, string]> = {
+    "center_stone.setting": [
+      "Center stone setting",
+      "Закрепка центрального камня",
+    ],
+    "center_stone.dimensions": [
+      "Center stone measurements",
+      "Размеры центрального камня",
+    ],
+    "center_stone.shape": ["Center stone shape", "Форма центрального камня"],
+    "center_stone.material": [
+      "Center stone material",
+      "Материал центрального камня",
+    ],
+    "center_stone.cut": ["Center stone cut", "Огранка центрального камня"],
+    "metal.color": ["Metal color", "Цвет металла"],
+    "metal.material": ["Metal", "Металл"],
+  };
+  const pair = labels[target];
+  return pair
+    ? pair[ru ? 1 : 0]
+    : ru
+      ? "Уточнить параметр изделия"
+      : "Review a design detail";
 }
 
 type GuidedClarificationKind = "shape" | "dimensions" | "general";
