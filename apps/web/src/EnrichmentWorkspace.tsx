@@ -282,11 +282,38 @@ export function EnrichmentWorkspace({
         </p>
       )}
       {partialAnswer && (
-        <section className="alert" aria-label={t("Partially saved clarification", "Частично сохранённое уточнение")}>
-          <strong>{t("The selected option was saved, but additional text may not be fully applied.", "Выбранный вариант сохранён, но дополнительный текст мог примениться не полностью.")}</strong>
-          <p>{t("Check the updated design and message history before resending these details; do not repeat the option selection.", "Проверьте обновлённый дизайн и историю перед повторной отправкой деталей; не выбирайте тот же вариант повторно.")}</p>
-          <textarea aria-label={t("Additional text to review", "Дополнительный текст для проверки")} readOnly value={partialAnswer} />
-          <button className="quiet" type="button" onClick={() => setPartialAnswer(null)}>
+        <section
+          className="alert"
+          aria-label={t(
+            "Partially saved clarification",
+            "Частично сохранённое уточнение",
+          )}
+        >
+          <strong>
+            {t(
+              "The selected option was saved, but additional text may not be fully applied.",
+              "Выбранный вариант сохранён, но дополнительный текст мог примениться не полностью.",
+            )}
+          </strong>
+          <p>
+            {t(
+              "Check the updated design and message history before resending these details; do not repeat the option selection.",
+              "Проверьте обновлённый дизайн и историю перед повторной отправкой деталей; не выбирайте тот же вариант повторно.",
+            )}
+          </p>
+          <textarea
+            aria-label={t(
+              "Additional text to review",
+              "Дополнительный текст для проверки",
+            )}
+            readOnly
+            value={partialAnswer}
+          />
+          <button
+            className="quiet"
+            type="button"
+            onClick={() => setPartialAnswer(null)}
+          >
             {t("I reviewed these details", "Я проверил эти детали")}
           </button>
         </section>

@@ -500,10 +500,14 @@ describe("Prompt Enrichment workspace", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await waitFor(() =>
-      expect(f.commands.filter((c) => c.route === "clarification-answers")).toHaveLength(1),
+      expect(
+        f.commands.filter((c) => c.route === "clarification-answers"),
+      ).toHaveLength(1),
     );
     await waitFor(() =>
-      expect(f.commands.filter((c) => c.route === "corrections")).toHaveLength(2),
+      expect(f.commands.filter((c) => c.route === "corrections")).toHaveLength(
+        2,
+      ),
     );
     expect(screen.getByLabelText("Current design text")).toHaveTextContent(
       "A white gold ring with an oval diamond.",
@@ -515,31 +519,48 @@ describe("Prompt Enrichment workspace", () => {
 
   it("surfaces partial save instead of repeating a committed choice after text failure", async () => {
     const f = fixture(true);
-    f.data.state!.questions = [{
-      question_kind: "NATIVE",
-      retained_base: "F",
-      native_question: {
-        clarification_id: "q-risk",
-        text: "Which metal?",
-        category: "material_ambiguity",
-        allowed_decisions: ["SELECT_OPTION", "UNKNOWN"],
-        options: [{ value: "gold", label: "Gold", option_id: "gold-id" }],
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "q-risk",
+          text: "Which metal?",
+          category: "material_ambiguity",
+          allowed_decisions: ["SELECT_OPTION", "UNKNOWN"],
+          options: [{ value: "gold", label: "Gold", option_id: "gold-id" }],
+        },
       },
-    }];
+    ];
     server.use(
       http.post(`${prefix}/corrections`, () =>
-        HttpResponse.json({ error: "stale_revision", detail: "Revision changed" }, { status: 409 }),
+        HttpResponse.json(
+          { error: "stale_revision", detail: "Revision changed" },
+          { status: 409 },
+        ),
       ),
     );
     f.view();
     await screen.findByText("Which metal?");
-    await userEvent.selectOptions(screen.getByLabelText("Parameter / decision"), "gold-id");
-    await userEvent.type(screen.getByLabelText("Clarification free-text answer"), "Matte finish");
+    await userEvent.selectOptions(
+      screen.getByLabelText("Parameter / decision"),
+      "gold-id",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Clarification free-text answer"),
+      "Matte finish",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await screen.findByLabelText("Partially saved clarification");
-    expect(screen.getByLabelText("Additional text to review")).toHaveValue("Matte finish");
-    expect(f.commands.filter((c) => c.route === "clarification-answers")).toHaveLength(1);
-    expect(screen.getByText(/The design changed or a decision/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Additional text to review")).toHaveValue(
+      "Matte finish",
+    );
+    expect(
+      f.commands.filter((c) => c.route === "clarification-answers"),
+    ).toHaveLength(1);
+    expect(
+      screen.getByText(/The design changed or a decision/),
+    ).toBeInTheDocument();
   });
 
   it("does not request final output while server status is blocked", async () => {
