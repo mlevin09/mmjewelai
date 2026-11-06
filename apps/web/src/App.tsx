@@ -221,7 +221,7 @@ function Shell() {
   const client = useQueryClient();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: me } = useQuery({
+  const { data: me, isError: meUnavailable, isFetching: meRefreshing, refetch: retryMe } = useQuery({
     queryKey: keys.me,
     queryFn: () => api.request<Me>("/me"),
   });
@@ -267,6 +267,22 @@ function Shell() {
           </button>
         </div>
       </header>
+      {meUnavailable && (
+        <div className="connection-warning" role="alert">
+          <span>
+            We couldn't refresh your account information. Your current design
+            stays on screen; check your connection and retry.
+          </span>
+          <button
+            type="button"
+            className="quiet"
+            disabled={meRefreshing}
+            onClick={() => void retryMe()}
+          >
+            {meRefreshing ? "Checking…" : "Retry connection"}
+          </button>
+        </div>
+      )}
       <Outlet />
     </div>
   );
