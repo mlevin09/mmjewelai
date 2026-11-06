@@ -94,7 +94,11 @@ export interface CompletionContext {
   schema_version: "completion-context/1.0.0";
   status: "AWAITING_COMPLETION";
   expected_frame: Frame;
-  question: { question_id: string; text: string; choices: ("YES" | "NO")[] };
+  question: {
+    question_id: string;
+    text: string;
+    choices: ("YES" | "NO")[];
+  };
 }
 export interface CompletionPromptV6 {
   schema_version: "6.0.0";
