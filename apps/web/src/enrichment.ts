@@ -104,7 +104,7 @@ export interface CompletionPromptV6 {
   effective_parameters: { concrete_target: string; value: unknown }[];
   parameter_sources: Record<string, Record<string, unknown>>;
   assumptions: {
-    target: string;
+    target_path: string;
     proposed_value: unknown;
     rule_id: string;
     rule_version: string;
