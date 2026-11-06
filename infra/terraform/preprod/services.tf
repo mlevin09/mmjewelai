@@ -33,6 +33,9 @@ locals {
     PROMPT_ENRICHMENT_CANDIDATE_KIND                 = "PRODUCTION_INTENDED"
     QUESTION_ARTIFACT_VERSION                        = "2.0.0"
     RULES_ARTIFACT_VERSION                           = "2.0.0"
+    PROMPT_COMPLETION_ENABLED                        = "true"
+    PROMPT_COMPLETION_POLICY_PATH                    = "/app/data/completion/preprod-no-defaults-1.0.0.json"
+    PROMPT_COMPLETION_POLICY_SHA256                  = "223a8e9a3d6ca07ee0b516d36fce590f61b184699232234a1c241a00c695cf55"
   } : {})
 
   worker_environment = merge(local.database_env, {
