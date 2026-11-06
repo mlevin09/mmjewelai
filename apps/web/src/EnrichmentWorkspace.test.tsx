@@ -587,7 +587,9 @@ describe("Prompt Enrichment workspace", () => {
     expect(screen.getByLabelText("Current design text")).toHaveTextContent(
       "A white gold ring with an oval diamond.",
     );
-    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
     expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
       "The actual server prompt, without client additions.",
     );
@@ -748,12 +750,24 @@ describe("Prompt Enrichment workspace", () => {
     f.data.state!.status = "final_output_ready_with_unresolved";
     f.view();
     await screen.findByRole("button", { name: "No, I'm finished" });
-    expect(screen.queryByLabelText("Internal Final Prompt")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Yes, add details" }));
-    expect(screen.queryByLabelText("Internal Final Prompt")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
-    expect(screen.getByRole("heading", { name: "Final prompt" })).toBeInTheDocument();
-    expect(screen.getByText(/Prompt Enrichment complete for this design/)).toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Yes, add details" }),
+    );
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Final prompt" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Prompt Enrichment complete for this design/),
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
       "The actual server prompt, without client additions.",
     );
@@ -765,10 +779,18 @@ describe("Prompt Enrichment workspace", () => {
     f.data.state!.questions = [];
     f.view();
     await screen.findByRole("button", { name: "No, I'm finished" });
-    await userEvent.click(screen.getByRole("button", { name: "No, I'm finished" }));
-    expect(screen.getByText(/still reports an unresolved blocking decision/)).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Final prompt" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Internal Final Prompt")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "No, I'm finished" }),
+    );
+    expect(
+      screen.getByText(/still reports an unresolved blocking decision/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Final prompt" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Internal Final Prompt"),
+    ).not.toBeInTheDocument();
   });
 
   it("does not request final output while server status is blocked", async () => {

@@ -278,7 +278,13 @@ export function EnrichmentWorkspace({
   const readyForFinal =
     s?.status === "final_output_ready" ||
     s?.status === "final_output_ready_with_unresolved";
-  const unsavedDesignInput = [guidedType, guidedMetal, guidedStone, guidedStyle, text].some((value) => value.trim());
+  const unsavedDesignInput = [
+    guidedType,
+    guidedMetal,
+    guidedStone,
+    guidedStyle,
+    text,
+  ].some((value) => value.trim());
   const canComplete = Boolean(readyForFinal && !unsavedDesignInput);
   const finalConfirmed = Boolean(
     completedFrame === s?.current_frame.history_root_sha256 &&
@@ -820,18 +826,24 @@ export function EnrichmentWorkspace({
               className="finish-design"
               aria-label={t("Finish your prompt", "Завершение промпта")}
             >
-              <h3>{t("Anything else to add?", "Хотите добавить что-нибудь ещё?")}</h3>
-              <p>{t(
-                "You can refine the design again, or finish with the details you know. Unspecified characteristics stay unspecified; no defaults are invented.",
-                "Вы можете снова уточнить дизайн или завершить его с известными характеристиками. Неуказанные значения остаются неуказанными — без значений по умолчанию.",
-              )}</p>
+              <h3>
+                {t("Anything else to add?", "Хотите добавить что-нибудь ещё?")}
+              </h3>
+              <p>
+                {t(
+                  "You can refine the design again, or finish with the details you know. Unspecified characteristics stay unspecified; no defaults are invented.",
+                  "Вы можете снова уточнить дизайн или завершить его с известными характеристиками. Неуказанные значения остаются неуказанными — без значений по умолчанию.",
+                )}
+              </p>
               <div className="finish-design-actions">
                 <button
                   type="button"
                   className="quiet"
                   onClick={() => {
                     setCompletedFrame(null);
-                    document.getElementById("guided-design-description")?.focus();
+                    document
+                      .getElementById("guided-design-description")
+                      ?.focus();
                   }}
                 >
                   {t("Yes, add details", "Да, добавить детали")}
@@ -854,14 +866,15 @@ export function EnrichmentWorkspace({
                   )}
                 </p>
               )}
-              {completedFrame === s.current_frame.history_root_sha256 && !readyForFinal && (
-                <p role="status" className="finish-blocked">
-                  {t(
-                    "You have no more details to add, but the server still reports an unresolved blocking decision. Answer, skip, or mark remaining questions unknown where permitted. JewelAI cannot issue its authoritative final prompt yet.",
-                    "Вы больше не хотите ничего добавлять, но сервер сообщает о нерешённом обязательном вопросе. Ответьте, пропустите или отметьте «Не знаю», если это разрешено. Итоговый промпт пока нельзя выдать.",
-                  )}
-                </p>
-              )}
+              {completedFrame === s.current_frame.history_root_sha256 &&
+                !readyForFinal && (
+                  <p role="status" className="finish-blocked">
+                    {t(
+                      "You have no more details to add, but the server still reports an unresolved blocking decision. Answer, skip, or mark remaining questions unknown where permitted. JewelAI cannot issue its authoritative final prompt yet.",
+                      "Вы больше не хотите ничего добавлять, но сервер сообщает о нерешённом обязательном вопросе. Ответьте, пропустите или отметьте «Не знаю», если это разрешено. Итоговый промпт пока нельзя выдать.",
+                    )}
+                  </p>
+                )}
               {finalConfirmed && (
                 <p role="status" className="finish-complete">
                   {t(
@@ -872,9 +885,11 @@ export function EnrichmentWorkspace({
               )}
             </section>
           )}
-          <h3>{finalConfirmed
-            ? t("Final prompt", "Итоговый промпт")
-            : t("Prompt preparation", "Подготовка промпта")}</h3>
+          <h3>
+            {finalConfirmed
+              ? t("Final prompt", "Итоговый промпт")
+              : t("Prompt preparation", "Подготовка промпта")}
+          </h3>
           {finalConfirmed && final ? (
             <>
               <p className="final-readiness">
@@ -886,18 +901,24 @@ export function EnrichmentWorkspace({
                 readOnly
                 value={final.internal_final_prompt.prompt_text}
               />
-              <button className="quiet" type="button" onClick={() => void copyPrompt()}>
+              <button
+                className="quiet"
+                type="button"
+                onClick={() => void copyPrompt()}
+              >
                 {t("Copy full prompt", "Копировать весь промпт")}
               </button>
               <span role="status">{copyStatus}</span>
             </>
           ) : (
-            <p>{readyForFinal
-              ? t(
-                  "The design is ready. Confirm that you have no more additions to see the final prompt.",
-                  "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
-                )
-              : friendlyFinalStatus(finalReason, ru)}</p>
+            <p>
+              {readyForFinal
+                ? t(
+                    "The design is ready. Confirm that you have no more additions to see the final prompt.",
+                    "Дизайн готов. Подтвердите, что больше нечего добавить, чтобы увидеть итоговый промпт.",
+                  )
+                : friendlyFinalStatus(finalReason, ru)}
+            </p>
           )}
           <details className="evidence-details">
             <summary>
@@ -1235,7 +1256,9 @@ function QuestionCard({
                 disabled={busy || Boolean(enteredValue.trim() || note.trim())}
                 onClick={() => submit("UNKNOWN", undefined, "", "")}
               >
-                {ru ? "Не знаю — оставить неуказанным" : "I don't know — leave unspecified"}
+                {ru
+                  ? "Не знаю — оставить неуказанным"
+                  : "I don't know — leave unspecified"}
               </button>
             )}
             {allowed.includes("SKIP") && (
