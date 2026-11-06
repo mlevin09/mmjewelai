@@ -109,7 +109,11 @@ export function EnrichmentWorkspace({
     // The wrapper remounts on a scoped route change; refresh reads this exact client.
   }, [client]);
 
-  async function perform(action: () => Promise<unknown>, clearText = false, onSaved?: () => void) {
+  async function perform(
+    action: () => Promise<unknown>,
+    clearText = false,
+    onSaved?: () => void,
+  ) {
     if (flight.current) return;
     flight.current = true;
     setBusy(true);
@@ -464,10 +468,17 @@ export function EnrichmentWorkspace({
                   )}
                 />
                 <datalist id="stone-suggestions">
-                  <option value={t("No center stone", "Без центрального камня")} />
+                  <option
+                    value={t("No center stone", "Без центрального камня")}
+                  />
                   <option value={t("Round diamond", "Круглый бриллиант")} />
                   <option value={t("Oval diamond", "Овальный бриллиант")} />
-                  <option value={t("Emerald-cut diamond", "Бриллиант изумрудной огранки")} />
+                  <option
+                    value={t(
+                      "Emerald-cut diamond",
+                      "Бриллиант изумрудной огранки",
+                    )}
+                  />
                   <option value={t("Ruby", "Рубин")} />
                   <option value={t("Sapphire", "Сапфир")} />
                 </datalist>

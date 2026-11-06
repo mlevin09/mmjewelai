@@ -633,8 +633,13 @@ describe("Prompt Enrichment workspace", () => {
     f.view();
     await screen.findByLabelText("Jewelry type");
     await userEvent.type(screen.getByLabelText("Metal"), "Yellow gold");
-    await userEvent.type(screen.getByLabelText("Your message"), "Delicate band.");
-    await userEvent.click(screen.getByRole("button", { name: "Update design" }));
+    await userEvent.type(
+      screen.getByLabelText("Your message"),
+      "Delicate band.",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Update design" }),
+    );
     await screen.findByText(/The design changed or a decision/);
     expect(screen.getByLabelText("Metal")).toHaveValue("Yellow gold");
     expect(screen.getByLabelText("Your message")).toHaveValue("Delicate band.");
