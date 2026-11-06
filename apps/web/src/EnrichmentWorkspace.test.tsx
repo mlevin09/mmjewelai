@@ -207,7 +207,7 @@ describe("Prompt Enrichment workspace", () => {
     });
     await userEvent.click(screen.getByRole("button", { name: "Update design" }));
     expect(
-      await screen.findByRole("button", { name: "Processing…" }),
+      await screen.findByRole("button", { name: "Updating your design…" }),
     ).toBeDisabled();
     expect(screen.getByLabelText("Your message")).toBeDisabled();
     expect(
