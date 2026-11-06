@@ -222,7 +222,7 @@ export function EnrichmentWorkspace({
           }),
         },
       );
-      navigate(`/organizations/${organizationId}/sessions/${created.session_id}`);
+      void navigate(`/organizations/${organizationId}/sessions/${created.session_id}`);
     } catch {
       setError(t(
         "Could not create a new piece. This design has not been changed. Please retry.",
