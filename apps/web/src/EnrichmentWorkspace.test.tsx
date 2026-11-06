@@ -726,10 +726,10 @@ describe("Prompt Enrichment workspace", () => {
     );
     expect(screen.queryByLabelText("Your message")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", {
+      screen.queryByRole("link", {
         name: "Open existing visualization workspace",
       }),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
     expect(f.commands).toHaveLength(0);
   });
   it("does not show session content or entry actions when the session itself is outside scope", async () => {
