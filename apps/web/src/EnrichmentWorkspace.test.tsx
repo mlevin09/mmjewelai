@@ -468,6 +468,80 @@ describe("Prompt Enrichment workspace", () => {
     );
     expect(f.commands.some((c) => c.route === "corrections")).toBe(true);
   });
+  it("runs an initial-to-clarification-to-correction UI journey with server-owned description", async () => {
+    const f = fixture();
+    f.view();
+    await screen.findByLabelText("Your message");
+    await send("I want a yellow gold wedding ring.");
+    expect(f.commands[0].route).toBe("initial");
+    expect(screen.getByLabelText("Current design text")).toBeInTheDocument();
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "shape-1",
+          text: "What shape for the center stone?",
+          category: "material_ambiguity",
+          allowed_decisions: ["SELECT_OPTION", "SKIP", "UNKNOWN"],
+          options: [{ value: "oval", label: "Oval", option_id: "oval-id" }],
+        },
+      },
+    ];
+    await send("A delicate band.");
+    await screen.findByText("What shape for the center stone?");
+    await userEvent.selectOptions(
+      screen.getByLabelText("Parameter / decision"),
+      "oval-id",
+    );
+    await userEvent.type(
+      screen.getByLabelText("Clarification free-text answer"),
+      "Keep the band delicate.",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    await waitFor(() =>
+      expect(f.commands.filter((c) => c.route === "clarification-answers")).toHaveLength(1),
+    );
+    await waitFor(() =>
+      expect(f.commands.filter((c) => c.route === "corrections")).toHaveLength(2),
+    );
+    expect(screen.getByLabelText("Current design text")).toHaveTextContent(
+      "A white gold ring with an oval diamond.",
+    );
+    expect(screen.getByLabelText("Internal Final Prompt")).toHaveValue(
+      "The actual server prompt, without client additions.",
+    );
+  });
+
+  it("surfaces partial save instead of repeating a committed choice after text failure", async () => {
+    const f = fixture(true);
+    f.data.state!.questions = [{
+      question_kind: "NATIVE",
+      retained_base: "F",
+      native_question: {
+        clarification_id: "q-risk",
+        text: "Which metal?",
+        category: "material_ambiguity",
+        allowed_decisions: ["SELECT_OPTION", "UNKNOWN"],
+        options: [{ value: "gold", label: "Gold", option_id: "gold-id" }],
+      },
+    }];
+    server.use(
+      http.post(`${prefix}/corrections`, () =>
+        HttpResponse.json({ error: "stale_revision", detail: "Revision changed" }, { status: 409 }),
+      ),
+    );
+    f.view();
+    await screen.findByText("Which metal?");
+    await userEvent.selectOptions(screen.getByLabelText("Parameter / decision"), "gold-id");
+    await userEvent.type(screen.getByLabelText("Clarification free-text answer"), "Matte finish");
+    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    await screen.findByLabelText("Partially saved clarification");
+    expect(screen.getByLabelText("Additional text to review")).toHaveValue("Matte finish");
+    expect(f.commands.filter((c) => c.route === "clarification-answers")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("The design changed");
+  });
+
   it("does not request final output while server status is blocked", async () => {
     const f = fixture(true);
     f.data.state!.status = "final_output_blocked";
