@@ -451,9 +451,7 @@ describe("Prompt Enrichment workspace", () => {
     f.view();
     await screen.findByText("Which metal?");
     expect(screen.getByLabelText("Parameter / decision")).toBeInTheDocument();
-    expect(
-      screen.getByText("Your parameter value"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Your parameter value")).toBeInTheDocument();
     expect(
       screen.getByLabelText("Clarification free-text answer"),
     ).toBeInTheDocument();
@@ -475,20 +473,35 @@ describe("Prompt Enrichment workspace", () => {
   });
   it("shows visible stone shape suggestions and saves typed choice as correction, not invented option", async () => {
     const f = fixture(true, "F", "ru");
-    f.data.state!.questions = [{
-      question_kind: "NATIVE", retained_base: "F",
-      native_question: {
-        clarification_id: "shape-ru", text: "Какую форму центрального камня вы хотели бы выбрать?",
-        category: "material_ambiguity", allowed_decisions: ["SKIP", "UNKNOWN"], options: [],
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "shape-ru",
+          text: "Какую форму центрального камня вы хотели бы выбрать?",
+          category: "material_ambiguity",
+          allowed_decisions: ["SKIP", "UNKNOWN"],
+          options: [],
+        },
       },
-    }];
+    ];
     f.view();
-    await screen.findByText("Какую форму центрального камня вы хотели бы выбрать?");
-    expect(screen.getByRole("group", { name: "Подсказки формы камня" })).toBeInTheDocument();
+    await screen.findByText(
+      "Какую форму центрального камня вы хотели бы выбрать?",
+    );
+    expect(
+      screen.getByRole("group", { name: "Подсказки формы камня" }),
+    ).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Овальная" }));
     expect(screen.getByLabelText("Форма камня")).toHaveValue("Овальная");
-    await userEvent.type(screen.getByLabelText("Свободный ответ на уточнение"), "Без острых углов");
-    await userEvent.click(screen.getByRole("button", { name: "Сохранить ответ" }));
+    await userEvent.type(
+      screen.getByLabelText("Свободный ответ на уточнение"),
+      "Без острых углов",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Сохранить ответ" }),
+    );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("corrections");
     expect(f.data.events[0]?.text).toContain("Овальная");
@@ -497,19 +510,29 @@ describe("Prompt Enrichment workspace", () => {
 
   it("shows separate optional length width depth measurements and submits only those supplied", async () => {
     const f = fixture(true, "F", "ru");
-    f.data.state!.questions = [{
-      question_kind: "NATIVE", retained_base: "F",
-      native_question: {
-        clarification_id: "dimensions-ru", text: "Каковы длина, ширина и глубина центрального камня в миллиметрах?",
-        category: "material_ambiguity", allowed_decisions: ["SKIP", "UNKNOWN"], options: [],
+    f.data.state!.questions = [
+      {
+        question_kind: "NATIVE",
+        retained_base: "F",
+        native_question: {
+          clarification_id: "dimensions-ru",
+          text: "Каковы длина, ширина и глубина центрального камня в миллиметрах?",
+          category: "material_ambiguity",
+          allowed_decisions: ["SKIP", "UNKNOWN"],
+          options: [],
+        },
       },
-    }];
+    ];
     f.view();
-    await screen.findByText("Каковы длина, ширина и глубина центрального камня в миллиметрах?");
+    await screen.findByText(
+      "Каковы длина, ширина и глубина центрального камня в миллиметрах?",
+    );
     await userEvent.type(screen.getByLabelText("Длина (mm)"), "8");
     await userEvent.type(screen.getByLabelText("Ширина (mm)"), "6");
     expect(screen.getByLabelText("Глубина (mm)")).toHaveValue(null);
-    await userEvent.click(screen.getByRole("button", { name: "Сохранить ответ" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Сохранить ответ" }),
+    );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("corrections");
     expect(f.data.events[0]?.text).toContain("Длина: 8 mm");
