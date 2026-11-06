@@ -1,0 +1,81 @@
+name: PR156 three-case PostgreSQL diagnostic
+on:
+  push:
+    branches: [codex/pr156-postgres-three-case-diagnostic]
+    paths:
+      - .github/pr156-postgres-diagnostic.json
+      - .github/workflows/pr156-postgres-diagnostic.yml
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jewelai_test
+          POSTGRES_USER: jewelai
+          POSTGRES_PASSWORD: jewelai
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jewelai -d jewelai_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
+      TEST_POSTGRES_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Pin authorized diagnostic source
+        id: source
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          p=json.loads(Path('.github/pr156-postgres-diagnostic.json').read_text())
+          assert re.fullmatch('[0-9a-f]{40}',p['source_sha'])
+          assert p['phase'] in {'RED','GREEN'}
+          Path(os.environ['RUNNER_TEMP'],'source.json').write_text(json.dumps(p))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('sha='+p['source_sha']+'\n')
+              out.write('phase='+p['phase']+'\n')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require PR156 ancestry
+        run: git merge-base --is-ancestor 22afd5a031d613ebe9d9853059a8d89da5c9efdd HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: bash tools/ci/install_runtime.sh
+      - name: Verify actual disposable container, cluster, job and freshness
+        run: >-
+          python -c "import sys; sys.path.insert(0,'apps/api/tests');
+          from disposable_postgres import verified_ci_postgres; verified_ci_postgres()"
+      - name: Run only authorized failing tests
+        env:
+          PHASE: ${{ steps.source.outputs.phase }}
+        run: |
+          set -euo pipefail
+          TEST='apps/api/tests/completion/test_prompt_completion_postgres.py::test_completion_edit_lock_race_postgres'
+          if test "${PHASE}" = RED; then TEST="${TEST}[completion]"; fi
+          timeout 180s python -m pytest -c apps/api/pyproject.toml "${TEST}" \
+            apps/api/tests/test_f04_postgres.py::test_f04_check_downgrade_retains_actual_preparation1_postgres \
+            apps/api/tests/test_f04_postgres.py::test_f04_check_downgrade_refuses_actual_preparation2_postgres \
+            -q --tb=short --junitxml="${RUNNER_TEMP}/targeted.xml" 2>&1 | tee "${RUNNER_TEMP}/targeted.log"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pr156-pg-${{ steps.source.outputs.phase }}-${{ steps.source.outputs.sha }}
+          path: |
+            ${{ runner.temp }}/source.json
+            ${{ runner.temp }}/targeted.xml
+            ${{ runner.temp }}/targeted.log
+          retention-days: 3
+          if-no-files-found: error
