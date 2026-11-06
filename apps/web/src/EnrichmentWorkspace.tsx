@@ -283,6 +283,7 @@ export function EnrichmentWorkspace({
   const completedCurrentFrame = Boolean(
     currentFrameHash && completedFrame === currentFrameHash && readyForFinal,
   );
+  const automaticFinal = Boolean(readyForFinal && final && !unsavedDesignInput);
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -833,7 +834,7 @@ export function EnrichmentWorkspace({
                 </button>
                 <button
                   type="button"
-                  disabled={busy || unsavedDesignInput}
+                  disabled={busy || unsavedDesignInput || automaticFinal}
                   onClick={() => {
                     setCompletionRequested(true);
                     setCompletedFrame(readyForFinal ? currentFrameHash : null);
@@ -855,19 +856,19 @@ export function EnrichmentWorkspace({
                   )}
                 </p>
               )}
-              {completedCurrentFrame && (
+              {automaticFinal && (
                 <p role="status" className="finish-complete">
                   {t(
-                    "Finished for the current design revision. The exact server-generated final prompt is shown below.",
-                    "Работа с текущей версией завершена. Ниже — точный итоговый промпт, сформированный сервером.",
+                    "JewelAI has completed this design from the available information. The final prompt is ready below; no extra confirmation is required.",
+                    "JewelAI завершил обработку доступных сведений. Итоговый промпт готов ниже — дополнительное подтверждение не требуется.",
                   )}
                 </p>
               )}
             </section>
           )}
-          <h3>{completedCurrentFrame
+          <h3>{automaticFinal
             ? t("Final prompt", "Итоговый промпт")
-            : t("Generated prompt", "Сформированный промпт")}</h3>
+            : t("Prompt preparation", "Подготовка промпта")}</h3>
           {final ? (
             <>
               <p className="final-readiness">
