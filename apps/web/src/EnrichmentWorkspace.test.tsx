@@ -342,7 +342,7 @@ describe("Prompt Enrichment workspace", () => {
       screen.queryByRole("button", { name: "Copy full prompt" }),
     ).not.toBeInTheDocument();
     await send("Make a correction.");
-    expect(screen.getByRole("alert")).toHaveTextContent("stale_revision");
+    expect(screen.getByRole("alert")).toHaveTextContent("The design changed");
     expect(screen.getByLabelText("Your message")).toHaveValue(
       "Make a correction.",
     );
