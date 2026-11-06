@@ -86,7 +86,15 @@ class ContinuationCommandResponseV3(StrictEvidenceModel):
 
 
 def read_preview(
-    service, sid, oid, *, final=False, if_match=None, projection=None, _repository=None
+    service,
+    sid,
+    oid,
+    *,
+    final=False,
+    if_match=None,
+    projection=None,
+    _repository=None,
+    _consume=None,
 ):
     """Validate sources and build current output within the same scoped transaction."""
     with (
@@ -159,6 +167,13 @@ def read_preview(
                 from .continuation_planning import pending_descriptions
 
                 pending_lines = pending_descriptions(repo, admitted[1], bound.artifacts.dictionary)
+            if _consume is not None:
+                return _consume(
+                    snapshot,
+                    bound,
+                    pending_lines,
+                    _accepted_source_facts(repo, sid, oid, snapshot.revision),
+                )
             output = assemble_internal_final_prompt_v4(
                 snapshot,
                 dictionary=bound.artifacts.dictionary,

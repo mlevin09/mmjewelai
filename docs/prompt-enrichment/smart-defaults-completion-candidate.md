@@ -1,5 +1,9 @@
 # Smart Defaults and completion — unregistered backend candidate
 
+Historical PR155 candidate scope. The separate full opt-in runtime implementation
+is documented in [completion-api-v1.md](completion-api-v1.md) and ADR0040; this
+document does not activate or redefine the original candidate.
+
 Status: **proposal / development only**. No route, persistence, migration, policy
 catalog, renderer activation or readiness override. This is not a completed live
 completion workflow. Owner approval of the product goal is not approval of these

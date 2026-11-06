@@ -85,8 +85,16 @@ class RuntimeSettings:
     web_allowed_origins: tuple[str, ...] = ()
     text_understanding: GoogleTextUnderstandingConfig | None = None
     prompt_enrichment: PromptEnrichmentRuntimeConfig | None = None
+    completion_policy_path: Path | None = None
+    completion_policy_sha256: str | None = None
 
     def __post_init__(self) -> None:
+        if self.completion_policy_path is not None and (
+            self.completion_policy_sha256 is None
+            or len(self.completion_policy_sha256) != 64
+            or any(c not in "0123456789abcdef" for c in self.completion_policy_sha256)
+        ):
+            raise ValueError("Completion registry requires exact SHA-256 binding")
         if isinstance(self.asset_upload_max_bytes, bool) or not isinstance(
             self.asset_upload_max_bytes, int
         ):
@@ -243,6 +251,8 @@ class RuntimeSettings:
             ),
             generation_profiles=_parse_generation_profiles(os.getenv("GENERATION_PROFILES_JSON")),
             web_allowed_origins=_parse_web_allowed_origins(os.getenv("WEB_ALLOWED_ORIGINS")),
+            completion_policy_path=_completion_policy_path(),
+            completion_policy_sha256=os.getenv("PROMPT_COMPLETION_POLICY_SHA256"),
             text_understanding=(
                 GoogleTextUnderstandingConfig(
                     model=os.environ["GOOGLE_TEXT_UNDERSTANDING_MODEL"],
@@ -370,3 +380,15 @@ def _validate_web_origins(origins: tuple[str, ...]) -> None:
         hostname = parsed.hostname
         if parsed.scheme == "http" and hostname not in {"localhost", "127.0.0.1", "::1"}:
             raise ValueError("Production WEB_ALLOWED_ORIGINS entries must use HTTPS")
+
+
+def _completion_policy_path():
+    enabled = os.getenv("PROMPT_COMPLETION_ENABLED", "false")
+    if enabled not in {"true", "false"}:
+        raise ValueError("PROMPT_COMPLETION_ENABLED must be true or false")
+    if enabled == "false":
+        return None
+    path = os.getenv("PROMPT_COMPLETION_POLICY_PATH")
+    if not path:
+        raise ValueError("Explicit approved completion registry path is required")
+    return Path(path)

@@ -255,6 +255,7 @@ def create_app(
     generation_task_publisher: GenerationTaskPublisher | None = None,
     text_understanding_provider: TextUnderstandingProvider | None = None,
     prompt_enrichment_service: PromptEnrichmentRuntimeService | None = None,
+    completion_registry=None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
@@ -1142,6 +1143,53 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.evaluate(session_id, organization_id, request)
+
+    if completion_registry is not None or settings.completion_policy_path is not None:
+        from .completion import (
+            CompleteRequest,
+            CompletionContext,
+            CompletionResponse,
+            CompletionService,
+            load_registry,
+        )
+
+        if prompt_enrichment_service is None:
+            raise ValueError("Completion requires qualified Prompt Enrichment")
+        completion = CompletionService(
+            prompt_enrichment_service,
+            completion_registry
+            if completion_registry is not None
+            else load_registry(settings.completion_policy_path, settings.completion_policy_sha256),
+            clock=clock,
+        )
+        app.state.completion_service = completion
+
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/completions",
+            response_model=CompletionResponse,
+        )
+        def complete_design(
+            session_id: UUID,
+            request: CompleteRequest,
+            organization_id: AuthorizedOrganization,
+            principal: Authenticated,
+            response: Response,
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            return completion.execute(session_id, organization_id, principal.principal_id, request)
+
+        @app.get(
+            "/v1/sessions/{session_id}/prompt-enrichment/completions/current",
+            response_model=CompletionResponse | CompletionContext,
+        )
+        def current_completion(
+            session_id: UUID,
+            organization_id: AuthorizedOrganization,
+            principal: Authenticated,
+            response: Response,
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            return completion.current(session_id, organization_id, principal.principal_id)
 
     if prompt_enrichment_service is not None:
         from .conversation import ConversationResponse, read_conversation

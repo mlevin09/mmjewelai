@@ -69,7 +69,9 @@ def _path_value(design, target: str):
             raise ValueError(f"unsupported canonical target path: {target}")
         current = getattr(current, component)
     # A path must terminate at a state leaf, not a whole component.
-    if current is not None and not hasattr(current, "availability"):
+    if tuple(components) not in state_fields(design) or (
+        current is not None and not hasattr(current, "availability")
+    ):
         raise ValueError(f"target must refer to a canonical state leaf: {target}")
     return current
 

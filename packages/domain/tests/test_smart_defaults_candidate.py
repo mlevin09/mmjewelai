@@ -143,3 +143,10 @@ def test_same_target_rules_are_scoped_by_type(wire):
 def test_invalid_leaf_under_confirmed_parent_is_still_rejected(wire):
     with pytest.raises(ValueError, match="target must refer"):
         project(wire, rule("metal.material.value", "gold"))
+
+
+@pytest.mark.parametrize("suffix", ["value", "reason"])
+def test_unknown_wrapper_internals_are_not_canonical_targets(wire, suffix):
+    assert wire["design"]["center_stone"]["dimensions"]["availability"] == "unknown"
+    with pytest.raises(ValueError, match="target must refer|unsupported canonical target"):
+        project(wire, rule(f"center_stone.dimensions.{suffix}", "anything"))

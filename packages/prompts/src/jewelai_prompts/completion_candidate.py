@@ -93,7 +93,15 @@ class CompletionReviewCandidate(StrictEvidenceModel):
 
 
 def prepare_completion_candidate(
-    snapshot, intent, policy, *, dictionary, templates, output_version="4.0.0"
+    snapshot,
+    intent,
+    policy,
+    *,
+    dictionary,
+    templates,
+    output_version="4.0.0",
+    _source_facts=None,
+    _pending_descriptions=(),
 ) -> CompletionReviewCandidate:
     """Pure, deterministic full-frame check -> typed overlay -> honest finalization gate.
 
@@ -129,7 +137,13 @@ def prepare_completion_candidate(
     current = (
         None
         if pending
-        else builders[output_version](snapshot, dictionary=dictionary, templates=templates)
+        else builders[output_version](
+            snapshot,
+            dictionary=dictionary,
+            templates=templates,
+            _source_facts=_source_facts,
+            _pending_descriptions=_pending_descriptions,
+        )
     )
     source = current.internal_final_prompt if current else None
     defaults, compilation, final = (), None, None

@@ -784,3 +784,35 @@ class VisualizationVerificationRow(Base):
     payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PromptCompletionRow(Base):
+    __tablename__ = "prompt_completion"
+    __table_args__ = (
+        UniqueConstraint("session_id", "request_id", name="uq_completion_request"),
+        UniqueConstraint("session_id", "sequence_number", name="uq_completion_sequence"),
+        Index("ix_completion_session_time", "session_id", "created_at"),
+    )
+    completion_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT")
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT")
+    )
+    revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT")
+    )
+    cycle_id: Mapped[UUID] = mapped_column(
+        ForeignKey("enrichment_cycle.enrichment_cycle_id", ondelete="RESTRICT")
+    )
+    message_id: Mapped[UUID] = mapped_column(ForeignKey("message.message_id", ondelete="RESTRICT"))
+    principal_id: Mapped[UUID] = mapped_column(
+        ForeignKey("auth_principal.principal_id", ondelete="RESTRICT")
+    )
+    request_id: Mapped[UUID] = mapped_column(Uuid)
+    request_hash: Mapped[str] = mapped_column(String(64))
+    sequence_number: Mapped[int] = mapped_column(Integer)
+    payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -282,7 +282,7 @@ def engine(monkeypatch, capfd):
         with scoped.connect() as db:
             assert (
                 db.scalar(text("SELECT version_num FROM alembic_version"))
-                == "0018_f04_preparation_v2"
+                == "0019_prompt_completion"
             )
             assert (
                 db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))

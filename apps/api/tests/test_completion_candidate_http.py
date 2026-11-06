@@ -65,10 +65,14 @@ def test_current_http_corrections_restart_and_stale_completion(engine, tmp_path,
                 policy,
                 dictionary=ctx.runtime.artifacts.dictionary,
                 templates=ctx.runtime.artifacts.prompts,
+                _source_facts=captured["kwargs"]["_source_facts"],
+                _pending_descriptions=captured["kwargs"]["_pending_descriptions"],
             )
 
         result = complete()
         assert result.status == "FINAL_AVAILABLE"
+        verified = original(captured["snapshot"], **captured["kwargs"])
+        assert result.final_prompt == verified.internal_final_prompt
         assert result.final_prompt.current_frame == snapshot.current_frame
         facts = {f.target: f.value for f in result.final_prompt.design_facts}
         assert facts["metal.material"] == "platinum"
