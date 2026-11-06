@@ -716,3 +716,90 @@ nav {
     min-height: 2.7rem;
   }
 }
+
+/* Guided design: one current description and structured clarification inputs. */
+.living-design {
+  flex: 1 1 auto;
+  min-height: 120px;
+  overflow-y: auto;
+  background: #fffaf0;
+  border: 1px solid #dfd3b7;
+  border-radius: 0.9rem;
+  padding: 1.15rem 1.3rem;
+  margin: 1rem 0 0.6rem;
+}
+.living-design h3 {
+  margin: 0.4rem 0 0.85rem;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+}
+.living-design-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  margin: 0;
+}
+.conversation-history {
+  padding: 0.6rem 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--line);
+}
+.conversation-history summary {
+  cursor: pointer;
+  color: #456b55;
+}
+.conversation-history .conversation-log {
+  max-height: 12rem;
+  overflow-y: auto;
+  margin-top: 0.65rem;
+}
+.clarification-inputs {
+  display: grid;
+  gap: 0.7rem;
+}
+.clarification-inputs label {
+  font-size: 0.83rem;
+}
+.clarification-inputs input,
+.clarification-inputs select,
+.clarification-inputs textarea {
+  width: 100%;
+  min-width: 0;
+}
+.clarification-inputs textarea {
+  min-height: 4.5rem;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  font: inherit;
+}
+.clarification-inputs button {
+  width: fit-content;
+  margin: 0;
+}
+@media (max-width: 850px) {
+  .living-design {
+    min-height: 140px;
+  }
+  .clarification-inputs button {
+    width: 100%;
+  }
+}
+
+/* Account API may briefly be unreachable while the current design remains usable. */
+.connection-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin: 0.8rem auto;
+  width: min(1180px, calc(100% - 2rem));
+  padding: 0.8rem 1rem;
+  border: 1px solid #d9b77d;
+  border-radius: 0.65rem;
+  background: #fff8e9;
+}
+.connection-warning button {
+  flex-shrink: 0;
+}

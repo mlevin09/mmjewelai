@@ -32,6 +32,7 @@ export function EnrichmentWorkspace({
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copyStatus, setCopyStatus] = useState("");
+  const [partialAnswer, setPartialAnswer] = useState<string | null>(null);
   const flight = useRef(false);
   const epoch = useRef(0);
   const log = useRef<HTMLOListElement>(null);
@@ -48,8 +49,17 @@ export function EnrichmentWorkspace({
     setSnapshot(data);
     setLoading(false);
     setFinal(null);
-    setFinalReason(data.state ? "Loading server output…" : "");
-    if (data.state) {
+    const outputReady =
+      data.state?.status === "final_output_ready" ||
+      data.state?.status === "final_output_ready_with_unresolved";
+    setFinalReason(
+      data.state
+        ? outputReady
+          ? "Loading server output…"
+          : "final_output_blocked"
+        : "",
+    );
+    if (data.state && outputReady) {
       try {
         const output = await client.final(data.state);
         if (currentEpoch === epoch.current) {
@@ -107,12 +117,25 @@ export function EnrichmentWorkspace({
     } catch (e) {
       setFinal(null);
       setError(
-        e instanceof ApiError
-          ? `${e.code}: ${e.message}${e.status === 409 ? t(" — State changed; review the refreshed design before trying again.", " — Состояние изменилось; проверьте обновлённый дизайн перед повтором.") : ""}`
-          : t(
-              "Request could not be completed. Review the conversation before retrying.",
-              "Запрос не выполнен. Проверьте беседу перед повтором.",
-            ),
+        e instanceof ApiError && e.status === 409
+          ? t(
+              "The design changed or a decision still needs confirmation. Your input is kept here. Review the updated description before retrying.",
+              "Дизайн изменился или решение ещё требует подтверждения. Ваш ввод сохранён на экране. Проверьте актуальное описание и повторите попытку.",
+            )
+          : e instanceof ApiError
+            ? e.status === 401 || e.status === 403
+              ? t(
+                  "Your session needs attention. Sign in again or check your access.",
+                  "Требуется повторный вход или проверка доступа.",
+                )
+              : t(
+                  "The answer could not be saved. Your input remains available; retry after checking the connection.",
+                  "Не удалось сохранить ответ. Введённый текст остаётся доступен; проверьте соединение и повторите попытку.",
+                )
+            : t(
+                "Connection interrupted. Your latest input remains available; retry when the connection recovers.",
+                "Соединение прервано. Введённый текст сохранён на экране; повторите попытку после восстановления связи.",
+              ),
       );
       try {
         await refresh();
@@ -130,6 +153,52 @@ export function EnrichmentWorkspace({
       setBusy(false);
     }
   }
+  async function submitClarification(
+    state: NonNullable<Conversation["state"]>,
+    question: Question,
+    decision: "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+    option: { value: string; label: string; option_id?: string } | undefined,
+    value: string,
+    note: string,
+  ) {
+    await perform(async () => {
+      const hasDecision = Boolean(decision);
+      let decisionCommitted = false;
+      if (hasDecision) {
+        await client.answer(
+          state,
+          question,
+          decision as
+            "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
+          option,
+        );
+        decisionCommitted = true;
+      }
+      const written = [
+        value.trim()
+          ? `${question.question_kind === "NATIVE" ? question.native_question.text : question.offer.rendered_question}: ${value.trim()}`
+          : "",
+        note.trim(),
+      ]
+        .filter(Boolean)
+        .join("\n");
+      if (written) {
+        // An answer may advance the server revision. Read the new head before
+        // submitting any additional free text through the existing API.
+        try {
+          const fresh = hasDecision ? await client.read() : snapshot!;
+          await client.send(session!, fresh, written);
+          setPartialAnswer(null);
+        } catch (e) {
+          if (decisionCommitted) setPartialAnswer(written);
+          throw e;
+        }
+      } else {
+        setPartialAnswer(null);
+      }
+    });
+  }
+
   async function copyPrompt() {
     if (!final || flight.current) return;
     try {
@@ -212,6 +281,43 @@ export function EnrichmentWorkspace({
           {error}
         </p>
       )}
+      {partialAnswer && (
+        <section
+          className="alert"
+          aria-label={t(
+            "Partially saved clarification",
+            "Частично сохранённое уточнение",
+          )}
+        >
+          <strong>
+            {t(
+              "The selected option was saved, but additional text may not be fully applied.",
+              "Выбранный вариант сохранён, но дополнительный текст мог примениться не полностью.",
+            )}
+          </strong>
+          <p>
+            {t(
+              "Check the updated design and message history before resending these details; do not repeat the option selection.",
+              "Проверьте обновлённый дизайн и историю перед повторной отправкой деталей; не выбирайте тот же вариант повторно.",
+            )}
+          </p>
+          <textarea
+            aria-label={t(
+              "Additional text to review",
+              "Дополнительный текст для проверки",
+            )}
+            readOnly
+            value={partialAnswer}
+          />
+          <button
+            className="quiet"
+            type="button"
+            onClick={() => setPartialAnswer(null)}
+          >
+            {t("I reviewed these details", "Я проверил эти детали")}
+          </button>
+        </section>
+      )}
       <div className="enrichment-grid" aria-busy={busy}>
         <section className="panel conversation-panel">
           <div className="conversation-heading">
@@ -223,7 +329,32 @@ export function EnrichmentWorkspace({
               {t("Saved automatically", "Сохраняется автоматически")}
             </span>
           </div>
-          <div className="conversation-scroll">
+          <section
+            className="living-design"
+            aria-label={t(
+              "Current design text",
+              "Актуальное описание украшения",
+            )}
+          >
+            <p className="eyebrow">
+              {t("CURRENT VERSION", "АКТУАЛЬНАЯ ВЕРСИЯ")}
+            </p>
+            <h3>
+              {t("Your design, updated", "Ваше украшение — актуальный текст")}
+            </h3>
+            <p className="living-design-text" aria-live="polite">
+              {s?.description.text ||
+                t(
+                  "Start by describing your jewelry below. Your saved answers will be reflected here in one current description.",
+                  "Опишите своё украшение ниже. Сохранённые ответы будут отражены здесь в одном актуальном описании.",
+                )}
+            </p>
+          </section>
+          <details className="conversation-history">
+            <summary>
+              {t("Message history", "История сообщений")} (
+              {snapshot.events.length})
+            </summary>
             <ol
               ref={log}
               className="conversation-log"
@@ -233,28 +364,17 @@ export function EnrichmentWorkspace({
                 <li key={e.event_id} className={`conversation-${e.kind}`}>
                   <strong>
                     {e.kind === "user"
-                      ? t(
-                          "User · stored message",
-                          "Пользователь · сохранённое сообщение",
-                        )
+                      ? t("Your message", "Ваше сообщение")
                       : e.kind === "question"
-                        ? t("JewelAI · clarification", "JewelAI · уточнение")
-                        : t("Server decision", "Решение сервера")}
+                        ? t("Question", "Уточнение")
+                        : t("Saved decision", "Сохранённое решение")}
                   </strong>
                   {e.text !== e.outcome && <p>{e.text}</p>}
                   {e.outcome && <span className="badge">{e.outcome}</span>}
                 </li>
               ))}
             </ol>
-            {!snapshot.events.length && (
-              <p>
-                {t(
-                  "Describe the jewelry you have in mind.",
-                  "Опишите украшение, которое хотите создать.",
-                )}
-              </p>
-            )}
-          </div>
+          </details>
           {s && activeQuestion && (
             <section
               className="clarification-area"
@@ -272,9 +392,14 @@ export function EnrichmentWorkspace({
                 q={activeQuestion}
                 busy={busy}
                 ru={ru}
-                answer={(decision, option) =>
-                  void perform(() =>
-                    client.answer(s, activeQuestion, decision, option),
+                submit={(decision, option, value, note) =>
+                  void submitClarification(
+                    s,
+                    activeQuestion,
+                    decision,
+                    option,
+                    value,
+                    note,
                   )
                 }
               />
@@ -294,9 +419,14 @@ export function EnrichmentWorkspace({
                       q={q}
                       busy={busy}
                       ru={ru}
-                      answer={(decision, option) =>
-                        void perform(() =>
-                          client.answer(s, q, decision, option),
+                      submit={(decision, option, value, note) =>
+                        void submitClarification(
+                          s,
+                          q,
+                          decision,
+                          option,
+                          value,
+                          note,
                         )
                       }
                     />
@@ -396,20 +526,26 @@ export function EnrichmentWorkspace({
               )}
             </p>
           )}
-          <dl className="design-facts">
-            {known.map((f) => (
-              <div key={f.path}>
-                <dt>{label(f.path)}</dt>
-                <dd>
-                  {display(f.value)}{" "}
-                  <small>
-                    {f.origin} {f.confirmed ? " · confirmed" : " · unconfirmed"}{" "}
-                    {f.locked ? " · LOCK" : ""}
-                  </small>
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <details className="saved-parameters">
+            <summary>
+              {t("Saved parameters", "Сохранённые параметры")} ({known.length})
+            </summary>
+            <dl className="design-facts">
+              {known.map((f) => (
+                <div key={f.path}>
+                  <dt>{label(f.path)}</dt>
+                  <dd>
+                    {display(f.value)}{" "}
+                    <small>
+                      {f.origin}{" "}
+                      {f.confirmed ? " · confirmed" : " · unconfirmed"}{" "}
+                      {f.locked ? " · LOCK" : ""}
+                    </small>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </details>
           {s?.protection_projection.roots.length ||
           known.some((f) => f.locked || f.confirmed) ? (
             <div className="design-notice">
@@ -445,15 +581,7 @@ export function EnrichmentWorkspace({
                 </p>
               ))}
           </details>
-          <h3>{t("Design description", "Описание дизайна")}</h3>
-          <p className="description-text">
-            {s?.description.text ??
-              t(
-                "Available after your first message.",
-                "Появится после первого сообщения.",
-              )}
-          </p>
-          <h3>{t("Ready for visualization?", "Готово к визуализации?")}</h3>
+          <h3>{t("Generated prompt", "Сформированный промпт")}</h3>
           {final ? (
             <>
               <p className="final-readiness">
@@ -518,29 +646,48 @@ function QuestionCard({
   q,
   busy,
   ru,
-  answer,
+  submit,
 }: {
   q: Question;
   busy: boolean;
   ru: boolean;
-  answer: (
-    d: "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
-    o?: { value: string; label: string; option_id?: string },
+  submit: (
+    decision: "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+    option: { value: string; label: string; option_id?: string } | undefined,
+    value: string,
+    note: string,
   ) => void;
 }) {
+  const [choice, setChoice] = useState("");
+  const [value, setValue] = useState("");
+  const [note, setNote] = useState("");
   const native = q.question_kind === "NATIVE" ? q.native_question : null;
   const allowed = native
     ? decisions(native)
     : q.question_kind === "KEEP_RELEASE"
       ? q.offer.allowed_decisions
       : [];
-  const labels = {
-    ACCEPT: ru ? "Принять предложение" : "Accept offered change",
+  const options =
+    native && allowed.includes("SELECT_OPTION") ? native.options : [];
+  const labels: Record<string, string> = {
+    ACCEPT: ru ? "Принять" : "Accept",
     REJECT: ru ? "Отклонить" : "Reject",
     SKIP: ru ? "Пропустить" : "Skip",
     UNKNOWN: ru ? "Не знаю" : "I don't know",
-    SELECT_OPTION: "",
   };
+  const selectedOption = options.find(
+    (o) => (o.option_id ?? o.value) === choice,
+  );
+  const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
+  const canSend = Boolean(
+    (selectedDecision &&
+      allowed.includes(
+        selectedDecision as
+          "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN",
+      )) ||
+    value.trim() ||
+    note.trim(),
+  );
   return (
     <section className="clarification-card">
       <h3>
@@ -548,36 +695,98 @@ function QuestionCard({
           ? q.offer.rendered_question
           : q.native_question.text}
       </h3>
-      {native && !native.options.length && (
+      <div className="clarification-inputs">
+        <label>
+          <span>{ru ? "Параметр / решение" : "Parameter / decision"}</span>
+          <select
+            value={choice}
+            disabled={busy}
+            onChange={(e) => setChoice(e.target.value)}
+          >
+            <option value="">
+              {ru
+                ? "Выберите вариант (необязательно)"
+                : "Choose an option (optional)"}
+            </option>
+            {options.map((o) => (
+              <option
+                value={o.option_id ?? o.value}
+                key={o.option_id ?? o.value}
+              >
+                {o.label}
+              </option>
+            ))}
+            {allowed
+              .filter((d) => d !== "SELECT_OPTION")
+              .map((d) => (
+                <option value={d} key={d}>
+                  {labels[d]}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          <span>
+            {ru
+              ? "Значение параметра своими словами"
+              : "Parameter value in your words"}
+          </span>
+          <input
+            value={value}
+            disabled={busy}
+            maxLength={500}
+            placeholder={
+              ru
+                ? "Например: ширина кольца 3 мм"
+                : "For example: band width 3 mm"
+            }
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </label>
+        <label>
+          <span>
+            {ru
+              ? "Дополнительные пожелания / свободный текст"
+              : "Additional preferences / free text"}
+          </span>
+          <textarea
+            value={note}
+            disabled={busy}
+            maxLength={1400}
+            aria-label={
+              ru
+                ? "Свободный ответ на уточнение"
+                : "Clarification free-text answer"
+            }
+            placeholder={
+              ru
+                ? "Добавьте детали, которые важны для вас…"
+                : "Add any details that matter to you…"
+            }
+            onChange={(e) => setNote(e.target.value)}
+          />
+        </label>
+        <button
+          type="button"
+          disabled={busy || !canSend}
+          onClick={() => {
+            submit(
+              (selectedDecision || "") as
+                "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
+              selectedOption,
+              value,
+              note,
+            );
+          }}
+        >
+          {ru ? "Сохранить ответ" : "Save answer"}
+        </button>
         <p className="question-help">
           {ru
-            ? "Напишите ответ в поле сообщения ниже."
-            : "Write your answer in the message box below."}
+            ? "Можно заполнить один или все поля. Значения сохраняются через JewelAI, затем актуальное описание обновляется с сервера."
+            : "Use any or all of these fields. JewelAI saves your answer, then refreshes the current design from the server."}
         </p>
-      )}
-      {allowed.includes("SELECT_OPTION") &&
-        native?.options.map((o) => (
-          <button
-            className="choice-option"
-            key={o.option_id ?? o.value}
-            disabled={busy}
-            onClick={() => answer("SELECT_OPTION", o)}
-          >
-            {o.label}
-          </button>
-        ))}
-      {allowed
-        .filter((d) => d !== "SELECT_OPTION")
-        .map((d) => (
-          <button
-            className="quiet"
-            key={d}
-            disabled={busy}
-            onClick={() => answer(d)}
-          >
-            {labels[d]}
-          </button>
-        ))}
+      </div>
     </section>
   );
 }
