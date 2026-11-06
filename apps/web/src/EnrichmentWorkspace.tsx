@@ -967,9 +967,7 @@ export function EnrichmentWorkspace({
                     {activeCompletion.effective_parameters.map((parameter) => (
                       <li key={parameter.concrete_target}>
                         <strong>{label(parameter.concrete_target)}</strong>: {display(parameter.value)} —{" "}
-                        {typeof activeCompletion.parameter_sources[parameter.concrete_target]?.origin === "string"
-                          ? activeCompletion.parameter_sources[parameter.concrete_target].origin as string
-                          : "explicit"}
+                        {sourceOrigin(activeCompletion.parameter_sources[parameter.concrete_target]?.origin)}
                       </li>
                     ))}
                     {activeCompletion.omitted_targets.map((target) => (
@@ -1044,6 +1042,10 @@ export function EnrichmentWorkspace({
       </div>
     </main>
   );
+}
+
+function sourceOrigin(value: unknown): string {
+  return typeof value === "string" ? value : "explicit";
 }
 
 type GuidedClarificationKind = "shape" | "dimensions" | "general";
