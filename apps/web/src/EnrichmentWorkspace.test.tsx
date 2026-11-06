@@ -468,6 +468,24 @@ describe("Prompt Enrichment workspace", () => {
     );
     expect(f.commands.some((c) => c.route === "corrections")).toBe(true);
   });
+  it("does not request final output while server status is blocked", async () => {
+    const f = fixture(true);
+    f.data.state!.status = "final_output_blocked";
+    let calls = 0;
+    server.use(
+      http.get(`${prefix}/final-output`, () => {
+        calls++;
+        return HttpResponse.json(
+          { error: "final_output_blocked", detail: "Unresolved" },
+          { status: 409 },
+        );
+      }),
+    );
+    f.view();
+    await screen.findByText(/A few design details still need your input/);
+    expect(calls).toBe(0);
+  });
+
   it("hides internal JSON and explains blocked final output in plain language", async () => {
     const f = fixture(true);
     server.use(
