@@ -302,7 +302,7 @@ describe("Prompt Enrichment workspace", () => {
     );
     view.unmount();
     f.view();
-    await userEvent.click(screen.getByRole("button", { name: /Show history/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Show history/ }));
     expect(
       await screen.findByText(
         "Keep the center stone unchanged. Add a delicate band.",
@@ -635,7 +635,7 @@ describe("Prompt Enrichment workspace", () => {
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("initial");
     expect(f.data.events[0]?.text).toBe(
-      "Jewelry type: Wedding band\\nMetal: Yellow gold\\nCenter stone: No stone\\nDelicate profile.",
+      ["Jewelry type: Wedding band", "Metal: Yellow gold", "Center stone: No stone", "Delicate profile."].join("\n"),
     );
   });
 
