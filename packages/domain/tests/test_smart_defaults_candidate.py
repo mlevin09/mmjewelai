@@ -118,7 +118,7 @@ def test_unknown_paths_and_duplicate_rules_fail_closed(wire):
     with pytest.raises(ValueError, match="unsupported canonical target"):
         project(wire, rule("unknown.field", "anything"))
     with pytest.raises(ValueError, match="target must refer"):
-        project(wire, rule("metal", "anything"))
+        project(wire, rule("metal.material.value", "anything"))
     with pytest.raises(ValueError, match="duplicate default target"):
         project(wire, rule("metal.finish", "polished"), rule("metal.finish", "matte"))
 
