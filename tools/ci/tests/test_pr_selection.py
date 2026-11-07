@@ -159,25 +159,17 @@ def test_parser_13_version_exception_is_exact_and_fails_closed(tmp_path):
 
 def test_frozen_parser13_risk_profile_is_strict_and_protects_core_checks():
     merge_base = "ef656c70f341940183905eca890b507ee2f457e8"
-    current = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-    ).strip()
+    current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     raw = subprocess.check_output(
         ["git", "diff", "--name-only", merge_base, current], cwd=ROOT, text=True
     )
     changed = raw.splitlines()
-    assert selection.is_exact_parser13_recovery_release(
-        ROOT, changed, merge_base, current
-    )
+    assert selection.is_exact_parser13_recovery_release(ROOT, changed, merge_base, current)
     assert not selection.is_exact_parser13_recovery_release(
         ROOT, changed + ["apps/api/src/unapproved.py"], merge_base, current
     )
-    assert not selection.is_exact_parser13_recovery_release(
-        ROOT, changed, "a" * 40, current
-    )
-    assert not selection.is_exact_parser13_recovery_release(
-        ROOT, changed, merge_base, "f" * 40
-    )
+    assert not selection.is_exact_parser13_recovery_release(ROOT, changed, "a" * 40, current)
+    assert not selection.is_exact_parser13_recovery_release(ROOT, changed, merge_base, "f" * 40)
     assert len(selection.PARSER13_RECOVERY_API_TESTS) == len(
         set(selection.PARSER13_RECOVERY_API_TESTS)
     )
