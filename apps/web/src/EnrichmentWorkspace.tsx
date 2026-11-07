@@ -1079,12 +1079,14 @@ type GuidedClarificationKind = "shape" | "dimensions" | "general";
 
 function guidedClarificationKind(q: Question): GuidedClarificationKind {
   if (q.question_kind !== "NATIVE") return "general";
+  if (q.native_question.semantic_question_id === "CENTER_STONE_DIMENSIONS")
+    return "dimensions";
   const wording = q.native_question.text.toLowerCase();
   if (
     /(?:length|width|depth|dimensions?|размер|длин|ширин|глубин)/i.test(
       wording,
     ) &&
-    /(?:stone|камн)/i.test(wording)
+    /(?:cent(?:er|re)[ -]stone|central stone|центральн)/i.test(wording)
   )
     return "dimensions";
   if (
@@ -1117,6 +1119,7 @@ function QuestionCard({
   const [lengthMm, setLengthMm] = useState("");
   const [widthMm, setWidthMm] = useState("");
   const [depthMm, setDepthMm] = useState("");
+  const [validationError, setValidationError] = useState("");
   const kind = guidedClarificationKind(q);
   const native = q.question_kind === "NATIVE" ? q.native_question : null;
   const allowed = native
@@ -1136,13 +1139,10 @@ function QuestionCard({
     (o) => (o.option_id ?? o.value) === choice,
   );
   const selectedDecision = selectedOption ? "SELECT_OPTION" : choice;
-  const dimensionText = [
-    lengthMm.trim() ? `${ru ? "Длина" : "Length"}: ${lengthMm.trim()} mm` : "",
-    widthMm.trim() ? `${ru ? "Ширина" : "Width"}: ${widthMm.trim()} mm` : "",
-    depthMm.trim() ? `${ru ? "Глубина" : "Depth"}: ${depthMm.trim()} mm` : "",
-  ]
-    .filter(Boolean)
-    .join("; ");
+  const measurements = [lengthMm, widthMm, depthMm];
+  const dimensionText = measurements.some((v) => v.trim())
+    ? `${ru ? "Центральный камень" : "Center stone"} ${measurements.map((v) => Number(v.replace(",", ".")).toLocaleString("en-US", { useGrouping: false, maximumSignificantDigits: 21 })).join(" x ")} ${ru ? "мм" : "mm"}`
+    : "";
   const enteredValue = kind === "dimensions" ? dimensionText : value;
   const canSend = Boolean(
     (selectedDecision &&
@@ -1182,7 +1182,7 @@ function QuestionCard({
               </option>
             ))}
             {allowed
-              .filter((d) => d !== "SELECT_OPTION")
+              .filter((d) => !["SELECT_OPTION", "UNKNOWN", "SKIP"].includes(d))
               .map((d) => (
                 <option value={d} key={d}>
                   {labels[d]}
@@ -1292,8 +1292,8 @@ function QuestionCard({
                   <span>{field.label}</span>
                   <input
                     type="number"
-                    min="0.1"
-                    step="0.1"
+                    min="0"
+                    step="any"
                     inputMode="decimal"
                     value={field.current}
                     disabled={busy}
@@ -1306,8 +1306,8 @@ function QuestionCard({
             </div>
             <small className="question-help">
               {ru
-                ? "Заполните только известные размеры. Остальные можно оставить пустыми."
-                : "Enter only known measurements. Leave the others blank."}
+                ? "Для сохранения размеров нужны все три известных значения. Если полного набора нет, можно пропустить вопрос или выбрать «Не знаю» — не придумывайте измерения."
+                : "Saving dimensions requires all three known measurements. Otherwise skip or choose I don't know; do not invent measurements."}
             </small>
           </fieldset>
         ) : (
@@ -1355,6 +1355,40 @@ function QuestionCard({
           type="button"
           disabled={busy || !canSend}
           onClick={() => {
+            setValidationError("");
+            if (selectedDecision === "SKIP" || selectedDecision === "UNKNOWN") {
+              submit(selectedDecision, undefined, "", "");
+              return;
+            }
+            if (
+              q.question_kind === "NATIVE" &&
+              selectedDecision &&
+              (enteredValue.trim() || note.trim())
+            ) {
+              setValidationError(
+                ru
+                  ? "Выберите одно действие: вариант ответа или текст. Чтобы отправить текст, снимите выбранный вариант."
+                  : "Choose one action: an offered answer or text. Clear the selected option to send text.",
+              );
+              return;
+            }
+            if (
+              kind === "dimensions" &&
+              dimensionText &&
+              measurements.some(
+                (v) =>
+                  !v.trim() ||
+                  !Number.isFinite(Number(v.replace(",", "."))) ||
+                  Number(v.replace(",", ".")) <= 0,
+              )
+            ) {
+              setValidationError(
+                ru
+                  ? "Укажите три положительных размера в мм или пропустите вопрос. Введённые значения сохранены на экране."
+                  : "Enter three positive measurements in mm or skip this question. Your draft values are kept here.",
+              );
+              return;
+            }
             submit(
               (selectedDecision || "") as
                 "SELECT_OPTION" | "ACCEPT" | "REJECT" | "SKIP" | "UNKNOWN" | "",
@@ -1366,13 +1400,14 @@ function QuestionCard({
         >
           {ru ? "Сохранить ответ" : "Save answer"}
         </button>
+        {validationError && <p role="alert">{validationError}</p>}
         {(allowed.includes("UNKNOWN") || allowed.includes("SKIP")) && (
           <div className="unknown-clarification-actions">
             {allowed.includes("UNKNOWN") && (
               <button
                 type="button"
                 className="quiet"
-                disabled={busy || Boolean(enteredValue.trim() || note.trim())}
+                disabled={busy}
                 onClick={() => submit("UNKNOWN", undefined, "", "")}
               >
                 {ru
@@ -1384,7 +1419,7 @@ function QuestionCard({
               <button
                 type="button"
                 className="quiet"
-                disabled={busy || Boolean(enteredValue.trim() || note.trim())}
+                disabled={busy}
                 onClick={() => submit("SKIP", undefined, "", "")}
               >
                 {ru ? "Пропустить этот вопрос" : "Skip this question"}
@@ -1392,10 +1427,17 @@ function QuestionCard({
             )}
           </div>
         )}
+        {(allowed.includes("UNKNOWN") || allowed.includes("SKIP")) && (
+          <small className="question-help">
+            {ru
+              ? "«Пропустить» и «Не знаю» сохраняют только выбранное решение, без черновых значений выше."
+              : "Skip and I don't know save only that decision, not the draft values above."}
+          </small>
+        )}
         <p className="question-help">
           {ru
-            ? "Можно заполнить один или все поля. Значения сохраняются через JewelAI, затем актуальное описание обновляется с сервера."
-            : "Use any or all of these fields. JewelAI saves your answer, then refreshes the current design from the server."}
+            ? "Отправьте одно решение или текстовый ответ. Размеры сохраняются только полным набором из трёх значений. Актуальное описание загружается с сервера."
+            : "Submit one decision or text answer. Dimensions require all three measurements. JewelAI refreshes the current design from the server."}
         </p>
       </div>
     </section>
