@@ -57,6 +57,17 @@ draft, reload current state and require explicit retry rather than automatic rep
 Offered questions, Unknown/Skip, explicit continuation admission, protected-change
 consent and supported dormant clarification resume use existing server contracts.
 
+Update/Finish keep one in-flight command. After an acknowledged write, a failed
+refresh offers a read-only retry and retains drafts while blocking duplicate writes.
+Completion responses are reused only against the same authoritative conversation
+frame; editing invalidates the previous Final Prompt without an unnecessary completion
+read. Reload still fetches the saved completion from the server. Both Current Version
+and the separate exact/copyable Final Prompt pane remain available.
+
+Dormant questions are grouped under Previous clarifications with EN/RU names. Each
+button still resumes its own server cause ID. Full parameter provenance remains
+expandable; assumption values are not repeated in the policy-rationale list.
+
 The result panel separates canonical values, missing/Unknown/unresolved information,
 KEEP, LOCK and confirmed flags. Description and full copyable IFP are server output;
 blocked/unavailable output shows the actual error. Advanced source/evidence details
