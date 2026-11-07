@@ -37,6 +37,7 @@ from jewelai_parser import (
     build_parser_proposal,
     read_full_message_parse_result,
 )
+from jewelai_parser.full_message import _recorded_governance
 from jewelai_parser.models import QuantityCandidate, StyleTermsCandidate, TermCandidate
 from jewelai_parser.p010_symmetry import TARGET as SYMMETRY_TARGET
 from jewelai_parser.p010_symmetry import VALUE as SYMMETRY_VALUE
@@ -141,7 +142,16 @@ class ParsedCandidateEnrichmentResultV2(ParsedCandidateEnrichmentResult):
 
     enrichment_result: StructuredPromptEnrichmentResultV2
 
+    @model_validator(mode="after")
+    def validate_parser_pin(self):
+        if self.enrichment_result.parser_evidence_version != (
+            "1.3.0" if self.parse_result.parse_version == "1.3.0" else None
+        ):
+            raise ValueError("Native evaluation parser evidence pin mismatch")
+        return self
 
+
+@_recorded_governance("parse_result")
 def enrich_parsed_candidates_with_active_release(
     revision: AnyDesignRevision | object,
     *,

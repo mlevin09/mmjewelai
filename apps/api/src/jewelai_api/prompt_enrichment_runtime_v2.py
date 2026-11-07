@@ -17,6 +17,7 @@ from jewelai_domain.knowledge_storage import KnowledgeArtifactStorageError
 from jewelai_domain.models import KnownValue, MessageSource
 from jewelai_domain.revisions import RevisionConflict, revise_design
 from jewelai_parser import ParserTarget, parse_full_message, same_parse_evidence
+from jewelai_parser.full_message import _parse_recorded_message, _source_governance
 from jewelai_persistence import (
     ClarificationDecisionConflictError,
     ClarificationDecisionIntegrityError,
@@ -403,6 +404,28 @@ def _question_integrity(service, plan, question):
 def _verify_source_evaluation(
     service, repo, session_id, organization_id, plan, cycle, message, verified, *, correction=None
 ):
+    version = (
+        correction.parsed_correction.parse_version
+        if correction
+        else (cycle.result.parser_evidence_version or "1.2.0")
+    )
+    with _source_governance(version):
+        return _verify_recorded_source_evaluation(
+            service,
+            repo,
+            session_id,
+            organization_id,
+            plan,
+            cycle,
+            message,
+            verified,
+            correction=correction,
+        )
+
+
+def _verify_recorded_source_evaluation(
+    service, repo, session_id, organization_id, plan, cycle, message, verified, *, correction=None
+):
     """Reverify the one recorded transition; never rebuild canonical state from chat."""
     source_revision = repo.get_revision(
         session_id, cycle.result.context.source_revision_id, organization_id
@@ -421,8 +444,13 @@ def _verify_source_evaluation(
     )
     if context != cycle.result.context:
         raise ValueError("Enrichment input context does not match actual source event")
-    parsed = parse_full_message(
+    parsed = _parse_recorded_message(
         message.content,
+        parse_version=(
+            correction.parsed_correction.parse_version
+            if correction
+            else cycle.result.parser_evidence_version or "1.2.0"
+        ),
         locale=plan.locale.value,
         dictionary=service.artifacts.dictionary,
         knowledge_runtime=verified.compiled_runtime,
@@ -593,8 +621,9 @@ def _verify_answer_transition(
             service.artifacts,
             cycle.release_pin,
         )
-        if f04_enrichment(base, revision=after, context=context) != cycle.result:
-            raise ValueError("Answer enrichment does not match the exact accepted transition")
+        with _source_governance(cycle.result.parser_evidence_version or "1.2.0"):
+            if f04_enrichment(base, revision=after, context=context) != cycle.result:
+                raise ValueError("Answer enrichment does not match the exact accepted transition")
 
 
 def _verify_source_plan(
@@ -815,8 +844,14 @@ def _history_frame(service, repo, session_id, organization_id):
                 organization_id,
                 repository=repo,
             )
-            parsed = parse_full_message(
+            parsed = _parse_recorded_message(
                 message.content,
+                parse_version=(
+                    repo.get_enrichment_cycle(
+                        session_id, conflict.context.source_enrichment_cycle_id, organization_id
+                    ).result.parser_evidence_version
+                    or "1.2.0"
+                ),
                 locale=plan.locale.value,
                 dictionary=service.artifacts.dictionary,
                 knowledge_runtime=verified.compiled_runtime,

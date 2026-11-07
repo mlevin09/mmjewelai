@@ -58,7 +58,7 @@ def test_conversation_multiturn_current_state_and_restart_no_writes(engine, tmp_
         assert len([e for e in current["events"] if e["kind"] == "user"]) == 4
         assert len([e for e in current["events"] if e["kind"] == "decision"]) == 3
         assert all(
-            r.result_payload["parsed_correction"]["parse_version"] == "1.2.0"
+            r.result_payload["parsed_correction"]["parse_version"] == "1.3.0"
             for r in ctx.repo.list_user_corrections(ctx.sid, ctx.org)
         )
         committed = (

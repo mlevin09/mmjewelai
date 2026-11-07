@@ -715,3 +715,113 @@ def test_empty_input_and_partial_knowledge_identity_fail_closed(dictionary):
             dictionary_artifact_version="1.0.0",
             knowledge_package_id="partial",
         )
+
+
+def test_lexical_pass_reuses_immutable_index_without_cross_release_cache(
+    dictionary, collision_runtime, monkeypatch
+):
+    import jewelai_parser.full_message as module
+
+    original = module.KnowledgeLibraryMatcher
+    built = []
+
+    def counted(runtime):
+        built.append(runtime)
+        return original(runtime)
+
+    monkeypatch.setattr(module, "KnowledgeLibraryMatcher", counted)
+    text = "A white gold ring with an oval diamond center stone in prong setting."
+    first = module._lexical_candidates(text, dictionary, collision_runtime)
+    assert (
+        sum(c["normalization_source"] == NormalizationSource.KNOWLEDGE_LIBRARY for c in first) > 1
+    )
+    assert built == [collision_runtime]
+    other = _test_knowledge_terms([("other_shape", "stone_shape", "oval")])
+    second = module._lexical_candidates(text, dictionary, other)
+    assert built == [collision_runtime, other]
+    assert any(c["normalized_values"] == ("other_shape",) for c in second)
+    assert not any(c["normalized_values"] == ("other_shape",) for c in first)
+
+
+@pytest.mark.parametrize(
+    "locale,text",
+    [
+        ("en", "Center stone: No center stone\nStyle: Minimalist"),
+        ("ru", "Центральный камень: Без центрального камня\nСтиль: Минимализм"),
+        ("ru", "Center stone: Без центрального камня\nStyle: Minimalist"),
+        ("en", "Metal: No platinum\nStyle: minimalist\nCenter stone: oval diamond"),
+    ],
+)
+def test_labelled_assertions_have_independent_governors(dictionary, locale, text):
+    result = parse_full_message(text, locale=locale, dictionary=dictionary)
+    assert result.parse_version == "1.3.0"
+    assert not any(
+        c.target is None and c.evidence.text.lower() in {"style", "metal"}
+        for c in result.candidates
+    )
+    styles = [c for c in result.candidates if c.target == "style" and c.parser_update]
+    assert styles and all(c.classification == "requirement" for c in styles)
+    assert all(
+        c.evidence.text == text[c.evidence.start : c.evidence.end] for c in result.candidates
+    )
+    for c in result.candidates:
+        if c.target == "center_stone.shape":
+            assert c.subject == "center_stone"
+
+
+@pytest.mark.parametrize(
+    "source", ["-8 x 6 x 4", "- 8 x 6 x 4", "8 x -6 x 4", "8 x 6 x −4", "0 x 6 x 4"]
+)
+def test_invalid_dimensions_remain_explicit_unapplied_evidence(dictionary, source):
+    result = parse_full_message(f"Center stone {source} mm", locale="en", dictionary=dictionary)
+    dimensions = [c for c in result.candidates if c.target == "center_stone.dimensions"]
+    assert len(dimensions) == 1
+    assert dimensions[0].parser_update is None
+    assert dimensions[0].application == "structured_evidence_only"
+    assert dimensions[0].evidence.text == source + " mm"
+
+
+def test_current_parser_never_inherits_historical_read_governance(dictionary):
+    from jewelai_parser.full_message import _parse_recorded_message, _source_governance
+
+    text = "Center stone: No center stone\nStyle: minimalist"
+    with _source_governance("1.2.0"):
+        current = parse_full_message(text, locale="en", dictionary=dictionary)
+    old = _parse_recorded_message(text, parse_version="1.2.0", locale="en", dictionary=dictionary)
+    assert old.parse_version == "1.2.0" and current.parse_version == "1.3.0"
+    assert next(c for c in old.candidates if c.target == "style").classification == "prohibition"
+    assert (
+        next(c for c in current.candidates if c.target == "style").classification == "requirement"
+    )
+    assert read_full_message_parse_result(old.model_dump(mode="json")) == old
+
+
+def test_real_prechange_studio_source_evidence_is_reverified_byte_identically(dictionary):
+    from jewelai_domain.knowledge_library_v1_1 import (
+        CompiledKnowledgeLibraryV1_1,
+        compile_knowledge_library_v1_1,
+    )
+    from tools.knowledge.build_recovered_draft import project_core
+
+    from jewelai_parser.full_message import _parse_recorded_message
+
+    # The actual before-change HTTP records used the existing core test release.
+    bundle = project_core((ROOT / "data/knowledge/v1/jewelry-core-1.0.0.json").read_bytes())
+    payload = bundle.model_dump(mode="json")
+    payload["artifact_version"] = "1.0.0"  # Existing f04_session fixture release pin.
+    runtime, _ = compile_knowledge_library_v1_1(payload)
+    cases = json.loads(
+        (Path(__file__).parent / "fixtures/parser-1.2-studio-evidence.json").read_text()
+    )
+    for case in cases:
+        old = read_full_message_parse_result(case["parsed"])
+        assert isinstance(runtime, CompiledKnowledgeLibraryV1_1)
+        assert runtime.sha256 == old.knowledge_runtime_sha256
+        verified = _parse_recorded_message(
+            old.original_text,
+            parse_version=old.parse_version,
+            locale=old.requested_locale,
+            dictionary=dictionary,
+            knowledge_runtime=runtime,
+        )
+        assert verified.model_dump(mode="json") == case["parsed"]

@@ -338,6 +338,7 @@ def replay_admitted(service, repo, sid, oid):
                 plan_id=record.clarification_plan_id,
                 created_at=actual.created_at if actual else row.created_at,
                 committed_revision=actual,
+                _recorded_parse_version=result.source_parse.parse_version,
             )
             if result != expected_result or plan.trigger.result_hash != row.content_hash:
                 raise ValueError(
@@ -402,6 +403,11 @@ def replay_admitted(service, repo, sid, oid):
                 created_at=actual.created_at if actual else row.created_at,
                 intents=intent_map,
                 committed_revision=actual,
+                _recorded_governance_version=(
+                    result.next_enrichment_result.native.parser_evidence_version or "1.2.0"
+                    if result.context.retained_base == "F"
+                    else "1.2.0"
+                ),
             )
             if result != expected_result or result.content_hash != plan.trigger.result_hash:
                 raise ValueError(

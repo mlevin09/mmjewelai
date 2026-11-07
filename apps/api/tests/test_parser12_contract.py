@@ -24,15 +24,13 @@ def current_parse_calls(monkeypatch):
         "prompt_enrichment_runtime_v2",
         "correction_enrichment",
         "continuation_evaluation",
-        "conflict_evidence",
-        "compatibility_projection",
     ):
         module = importlib.import_module(f"jewelai_api.{name}")
         actual = module.parse_full_message
 
         def observe(*args, _actual=actual, _name=name, **kwargs):
             parsed = _actual(*args, **kwargs)
-            assert parsed.parse_version == "1.2.0", _name
+            assert parsed.parse_version == "1.3.0", _name
             calls.append(_name)
             return parsed
 
@@ -93,7 +91,7 @@ def test_current_initial_native_correction_and_restart(
             record["correction_evaluation"]["parse_result"],
             record["post_transition_evaluation"]["parse_result"],
         ):
-            assert parsed["parse_version"] == "1.2.0"
+            assert parsed["parse_version"] == "1.3.0"
         restored_dto = decode_correction_result(record)
         assert restored_dto.model_dump(mode="json") == record
         with restart(ctx, engine):
@@ -123,9 +121,9 @@ def test_new_continuation_and_resumed_request_use_current_parse(
         assert rows[-1].result_payload["correction_version"] == "3.0.0"
         assert (
             rows[-1].result_payload["correction_evaluation"]["parse_result"]["parse_version"]
-            == "1.2.0"
+            == "1.3.0"
         )
-        assert rows[-1].result_payload["source_parse"]["parse_version"] == "1.2.0"
+        assert rows[-1].result_payload["source_parse"]["parse_version"] == "1.3.0"
         final = output(ctx, changed, projection=False)
         assert final.status_code == 200, final.json()
         assert "platinum" in final.json()["description"]["text"]
@@ -162,7 +160,7 @@ def test_new_continuation_and_resumed_request_use_current_parse(
                         resumed_state=resumed,
                         resumed_revision=current.model_dump(mode="json"),
                         restart_equal=True,
-                        observed_parse_version="1.2.0",
+                        observed_parse_version="1.3.0",
                         observed_calls=current_parse_calls,
                         provider_calls=0,
                     ),

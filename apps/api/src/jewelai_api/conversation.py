@@ -89,7 +89,7 @@ def read_conversation(service, sid, oid):
                     event_id=f"decision:{identity}",
                     kind="decision",
                     created_at=record.created_at,
-                    text=payload.get("decision", outcome),
+                    text=_decision_text(payload, session.locale),
                     outcome=outcome,
                     message_id=message,
                     cycle_number=numbers.get(getattr(record, "next_enrichment_cycle_id", None)),
@@ -106,3 +106,92 @@ def read_conversation(service, sid, oid):
         return ConversationResponse(
             session_id=sid, events=tuple(events), state=state, revision=revision
         )
+
+
+# Presentation of already source-verified records, not another interpretation or
+# acceptance boundary. APPLIED can mean a subset; Matrix APPLIED alone is not a
+# committed transition. Original records/hashes and the outcome badge are unchanged.
+def _decision_text(payload, locale):
+    original = payload.get("decision", payload["outcome"])
+    if "correction_version" not in payload:
+        return original
+    ru = locale == "ru"
+    if payload.get("reason") == "keep_release_required":
+        return (
+            "Изменение сохранённого свойства ожидает подтверждения; значение не изменено."
+            if ru
+            else "A preserved-property change awaits confirmation; the value is unchanged."
+        )
+    dispositions = payload.get("correction_evaluation", {}).get("dispositions", [])
+    committed = payload["outcome"] in {"APPLIED", "NO_CHANGE"}
+    accepted = {
+        (
+            d["candidate"]["evidence"]["start"],
+            d["candidate"]["evidence"]["end"],
+            d["candidate"].get("target"),
+            d["candidate"]["subject"],
+        )
+        for d in dispositions
+        if committed and d["outcome"] in {"APPLIED", "KEPT", "NO_CHANGE"}
+    }
+    labels = {
+        "jewelry_type": ("jewelry type", "тип украшения"),
+        "metal.material": ("metal", "металл"),
+        "metal.color": ("metal color", "цвет металла"),
+        "center_stone.material": ("center stone material", "материал центрального камня"),
+        "center_stone.shape": ("center stone shape", "форма центрального камня"),
+        "center_stone.dimensions": ("center stone dimensions", "размеры центрального камня"),
+        "center_stone.setting": ("center stone setting", "закрепка центрального камня"),
+        "style": ("style", "стиль"),
+    }
+    reasons = {
+        "target_not_supported_by_parser": (
+            "the current contract cannot apply this value; clarify with a supported value",
+            "текущий контракт не поддерживает это значение; уточните поддерживаемое значение",
+        ),
+        "component_target_not_representable": (
+            "the named component has no supported canonical target",
+            "указанный компонент не имеет поддерживаемого канонического поля",
+        ),
+        "ambiguous_candidate": ("clarify the intended value", "уточните выбранное значение"),
+        "preference_requires_acceptance": (
+            "explicit acceptance is still required",
+            "требуется явное принятие предпочтения",
+        ),
+    }
+    details = []
+    for d in dispositions:
+        c = d["candidate"]
+        occurrence = (c["evidence"]["start"], c["evidence"]["end"], c.get("target"), c["subject"])
+        if d["outcome"] not in {"DEFERRED", "BLOCKED"} or occurrence in accepted:
+            continue
+        target = d.get("concrete_target") or c.get("target")
+        if target not in labels:
+            continue
+        reason = reasons.get(
+            d["reason"],
+            (
+                "not accepted; review the unresolved request",
+                "не принято; проверьте неразрешённый запрос",
+            ),
+        )[ru]
+        details.append(labels[target][ru] + " — " + reason)
+    if not details:
+        return original
+    if payload["outcome"] == "NO_CHANGE":
+        prefix = "Канонические значения не изменены. " if ru else "Canonical values are unchanged. "
+    else:
+        prefix = (
+            "Поддерживаемые изменения сохранены. "
+            if committed and ru
+            else "Supported changes were saved. "
+            if committed
+            else "Изменение не сохранено. "
+            if ru
+            else "The change was not saved. "
+        )
+    return (
+        prefix
+        + ("Не применено из этого сообщения: " if ru else "Not applied from this message: ")
+        + "; ".join(dict.fromkeys(details))
+    )

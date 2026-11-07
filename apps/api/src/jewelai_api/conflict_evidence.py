@@ -15,11 +15,13 @@ from jewelai_domain.clarification_state import (
 )
 from jewelai_domain.dictionary import DictionaryCategory, EntryLifecycle
 from jewelai_domain.models import DomainId, ImmutableModel
-from jewelai_parser import parse_full_message, read_full_message_parse_result, same_parse_evidence
+from jewelai_parser import read_full_message_parse_result, same_parse_evidence
 from jewelai_parser.full_message import (
     _assertion_breaks,
     _certainty_for,
     _classification_for,
+    _parse_recorded_message,
+    _recorded_governance,
     _sentence_bounds,
     _source_dictionary_material_ids,
 )
@@ -121,6 +123,7 @@ class ConflictEvidence(ImmutableModel):
         return self
 
 
+@_recorded_governance("parsed")
 def product_body_material_conflict(parsed, *, message, context, dictionary, knowledge_runtime=None):
     """Consume actual persisted Message plus existing parser authority/scope, not detail prose."""
     parsed = read_full_message_parse_result(parsed)
@@ -141,8 +144,9 @@ def product_body_material_conflict(parsed, *, message, context, dictionary, know
         context.release_pin.runtime_sha256,
     ):
         raise ValueError("Conflict Knowledge release pin mismatch")
-    verified_parse = parse_full_message(
+    verified_parse = _parse_recorded_message(
         message.content,
+        parse_version=parsed.parse_version,
         locale=parsed.requested_locale,
         dictionary=dictionary,
         knowledge_runtime=knowledge_runtime,

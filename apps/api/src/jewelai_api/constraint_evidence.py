@@ -11,7 +11,7 @@ from jewelai_parser import (
     CandidateCertainty,
     CandidateClassification,
 )
-from jewelai_parser.full_message import _ownership_context
+from jewelai_parser.full_message import _ownership_context, _recorded_governance
 from jewelai_prompts import FinalPromptConstraintEvidence, project_revision
 
 from .clarification import _TARGET_QUESTION
@@ -60,6 +60,7 @@ _INSTRUCTIONS = {
 }
 
 
+@_recorded_governance("enrichment", "parse_result")
 def merge_constraint_evidence(
     enrichment: ParsedCandidateEnrichmentResult,
     *,

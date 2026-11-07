@@ -1,0 +1,120 @@
+[
+  {
+    "case": "field_negation",
+    "source_sha": "ef656c70f341940183905eca890b507ee2f457e8",
+    "parsed": {
+      "parse_version": "1.2.0",
+      "original_text": "Center stone: No center stone\nStyle: Minimalist",
+      "requested_locale": "en",
+      "detected_language": "en",
+      "dictionary_artifact_version": "1.0.0",
+      "knowledge_package_id": "jewelai.draft.recovered_core",
+      "knowledge_artifact_version": "1.0.0",
+      "knowledge_runtime_sha256": "77b454c4cd0d8d434c7870a412fb88a467ae19f5816f6baf57054599bdecf90f",
+      "candidates": [
+        {
+          "candidate_id": "candidate_0001",
+          "target": "style",
+          "subject": "overall_design",
+          "classification": "prohibition",
+          "certainty": "explicit",
+          "evidence": {
+            "start": 37,
+            "end": 47,
+            "text": "Minimalist"
+          },
+          "raw_value": "Minimalist",
+          "normalized_values": [
+            "minimalist"
+          ],
+          "semantic_subject": null,
+          "normalization_source": "domain_dictionary",
+          "application": "structured_evidence_only",
+          "parser_update": null,
+          "detail": "A prohibition is retained as constraint evidence, not a positive value update."
+        },
+        {
+          "candidate_id": "candidate_0002",
+          "target": "style",
+          "subject": "overall_design",
+          "classification": "prohibition",
+          "certainty": "explicit",
+          "evidence": {
+            "start": 37,
+            "end": 47,
+            "text": "Minimalist"
+          },
+          "raw_value": "Minimalist",
+          "normalized_values": [
+            "minimalist"
+          ],
+          "semantic_subject": null,
+          "normalization_source": "knowledge_library",
+          "application": "structured_evidence_only",
+          "parser_update": null,
+          "detail": "A prohibition is retained as constraint evidence, not a positive value update."
+        }
+      ]
+    }
+  },
+  {
+    "case": "negative_dimensions",
+    "source_sha": "ef656c70f341940183905eca890b507ee2f457e8",
+    "parsed": {
+      "parse_version": "1.2.0",
+      "original_text": "Center stone -8 x 6 x 4 mm",
+      "requested_locale": "en",
+      "detected_language": "en",
+      "dictionary_artifact_version": "1.0.0",
+      "knowledge_package_id": "jewelai.draft.recovered_core",
+      "knowledge_artifact_version": "1.0.0",
+      "knowledge_runtime_sha256": "77b454c4cd0d8d434c7870a412fb88a467ae19f5816f6baf57054599bdecf90f",
+      "candidates": [
+        {
+          "candidate_id": "candidate_0001",
+          "target": "center_stone.dimensions",
+          "subject": "center_stone",
+          "classification": "requirement",
+          "certainty": "explicit",
+          "evidence": {
+            "start": 14,
+            "end": 26,
+            "text": "8 x 6 x 4 mm"
+          },
+          "raw_value": {
+            "length": 8.0,
+            "width": 6.0,
+            "depth": 4.0,
+            "unit": "mm"
+          },
+          "normalized_values": [],
+          "semantic_subject": null,
+          "normalization_source": "deterministic_pattern",
+          "application": "parser_candidate_ready",
+          "parser_update": {
+            "target": "center_stone.dimensions",
+            "value": {
+              "kind": "dimensions",
+              "value": {
+                "length": {
+                  "value": 8.0,
+                  "unit": "mm"
+                },
+                "width": {
+                  "value": 6.0,
+                  "unit": "mm"
+                },
+                "depth": {
+                  "value": 4.0,
+                  "unit": "mm"
+                }
+              }
+            },
+            "group_id": null
+          },
+          "detail": null
+        }
+      ]
+    }
+  }
+]
