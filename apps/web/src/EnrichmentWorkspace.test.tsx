@@ -192,7 +192,7 @@ async function send(text: string) {
 }
 
 describe("Prompt Enrichment workspace", () => {
-  it("shows UNKNOWN/SKIP only once and never submits decision plus text together", async () => {
+  it("submits one action without duplicate UNKNOWN/SKIP", async () => {
     const f = fixture(true);
     f.data.state!.questions = [
       {
@@ -219,7 +219,9 @@ describe("Prompt Enrichment workspace", () => {
       screen.getAllByRole("button", { name: "Skip this question" }),
     ).toHaveLength(1);
     expect(
-      screen.getAllByRole("button", { name: "I don't know — leave unspecified" }),
+      screen.getAllByRole("button", {
+        name: "I don't know — leave unspecified",
+      }),
     ).toHaveLength(1);
 
     await userEvent.selectOptions(selector, "opt-oval");
