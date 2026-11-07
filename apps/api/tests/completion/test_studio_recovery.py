@@ -130,17 +130,51 @@ def test_setting_and_atomic_dimension_contracts(engine, tmp_path, preprod_enable
 
 
 @pytest.mark.parametrize(
-    "locale,text,expected_style",
+    "locale,text,expected_style,unresolved_request",
     [
-        ("en", "Center stone: No center stone\nStyle: Minimalist", "minimalist"),
-        ("ru", "Center stone: Без центрального камня\nStyle: Минимализм", "minimalist"),
-        ("en", "Center stone -8 x 6 x 4 mm", None),
+        (
+            "en",
+            "Center stone: No center stone\nStyle: Minimalist",
+            "minimalist",
+            "Center stone: No center stone",
+        ),
+        (
+            "ru",
+            "Центральный камень: Без центрального камня\nСтиль: Минимализм",
+            "minimalist",
+            "Центральный камень: Без центрального камня",
+        ),
+        (
+            "ru",
+            "Center stone: Без центрального камня\nStyle: Минимализм",
+            "minimalist",
+            "Center stone: Без центрального камня",
+        ),
+        ("en", "Center stone -8 x 6 x 4 mm", None, None),
+        ("en", "No center stone", None, "No center stone"),
+        ("ru", "Без центрального камня", None, "Без центрального камня"),
+    ],
+    ids=[
+        "absence-en",
+        "absence-ru",
+        "absence-mixed",
+        "negative-dimensions",
+        "absence-alone-en",
+        "absence-alone-ru",
     ],
 )
 def test_source_boundaries_current_correction_restart_and_final(
-    engine, tmp_path, preprod_enabled, core_release, locale, text, expected_style
+    engine,
+    tmp_path,
+    preprod_enabled,
+    core_release,
+    locale,
+    text,
+    expected_style,
+    unresolved_request,
 ):
     from test_f04_http import restart
+    from test_prompt_completion import current
 
     with f04.f04_session(engine, tmp_path, locale=locale) as ctx:
         initial(ctx, "F", "A white gold ring with an oval diamond center stone in prong setting.")
@@ -152,19 +186,75 @@ def test_source_boundaries_current_correction_restart_and_final(
             assert design["style"]["value"] == [expected_style]
         else:
             assert design["center_stone"]["dimensions"] is None
-        row = ctx.repo.list_user_corrections(ctx.sid, ctx.org)[-1]
-        assert row.result_payload["parsed_correction"]["parse_version"] == "1.3.0"
+        row = next(
+            r
+            for r in ctx.repo.list_user_corrections(ctx.sid, ctx.org)
+            if r.result_payload["correction_text"] == text
+        )
+        parsed = row.result_payload["parsed_correction"]
+        assert parsed["parse_version"] == "1.3.0"
         assert (
             row.result_payload["post_transition_evaluation"]["enrichment_result"][
                 "parser_evidence_version"
             ]
             == "1.3.0"
         )
+        if unresolved_request:
+            candidates = [
+                c for c in parsed["candidates"] if c["evidence"]["text"] == unresolved_request
+            ]
+            assert len(candidates) == 1  # One complete request, not isolated noun fragments.
+            candidate = candidates[0]
+            assert candidate["classification"] == "prohibition"
+            assert candidate["certainty"] == "unresolved"
+            assert candidate["target"] is None and candidate["parser_update"] is None
+            span = candidate["evidence"]
+            assert text[span["start"] : span["end"]] == unresolved_request
+            disposition = next(
+                d
+                for d in row.result_payload["correction_evaluation"]["dispositions"]
+                if d["candidate"]["candidate_id"] == candidate["candidate_id"]
+            )
+            assert disposition["outcome"] == "DEFERRED"
+            event = next(
+                e
+                for e in after["events"]
+                if e["event_id"] == "decision:" + str(row.correction_record_id)
+            )
+            assert event["text"] != "APPLIED"
+            assert unresolved_request in event["text"]
+            assert ("Не применено" if locale == "ru" else "Not applied") in event["text"]
+            assert event["outcome"] == ("APPLIED" if expected_style else "DEFERRED")
+            if not expected_style:
+                assert after["revision"] == before["revision"]
+            assert unresolved_request in after["state"]["description"]["text"]
         with restart(ctx, engine):
             assert read(ctx) == after
         _, done = command(ctx, after)
         assert done.status_code == 200, done.json()
-        assert done.json()["final_prompt"]["canonical_revision"]["design"] == design
+        final = done.json()["final_prompt"]
+        assert final["canonical_revision"]["design"] == design
+        if unresolved_request:
+            evidence = [
+                e
+                for e in final["base_prompt"]["constraint_evidence"]
+                if e["original_wording"] == unresolved_request
+            ]
+            assert len(evidence) == 1
+            item = evidence[0]
+            assert item["status"] == "unresolved" and item["acceptance"] == "unresolved"
+            assert item["canonical_target"] is None and item["normalized_instruction"] is None
+            assert item["source"] == row.result_payload["source"]
+            assert item["source_candidate_id"] == candidate["candidate_id"]
+            assert (item["source_span_start"], item["source_span_end"]) == (
+                span["start"],
+                span["end"],
+            )
+            assert unresolved_request in final["base_prompt"]["prompt_text"]
+            assert not final["assumptions"]
+        with restart(ctx, engine):
+            assert current(ctx).json()["final_prompt"] == final
+            assert read(ctx)["revision"] == after["revision"]
         assert ctx.provider.calls == []
 
 

@@ -166,7 +166,17 @@ def _decision_text(payload, locale):
         if d["outcome"] not in {"DEFERRED", "BLOCKED"} or occurrence in accepted:
             continue
         target = d.get("concrete_target") or c.get("target")
-        if target not in labels:
+        if target in labels:
+            label = labels[target][ru]
+        elif (
+            target is None and c["certainty"] == "unresolved" and c.get("semantic_subject") is None
+        ):
+            # This is already source-verified, unapplied evidence, not a new
+            # target binding. Do not imply that a partial APPLIED accepted it.
+            label = ("неразрешённый запрос" if ru else "unresolved request") + (
+                " «" + c["evidence"]["text"] + "»"
+            )
+        else:
             continue
         reason = reasons.get(
             d["reason"],
@@ -175,7 +185,7 @@ def _decision_text(payload, locale):
                 "не принято; проверьте неразрешённый запрос",
             ),
         )[ru]
-        details.append(labels[target][ru] + " — " + reason)
+        details.append(label + " — " + reason)
     if not details:
         return original
     if payload["outcome"] == "NO_CHANGE":

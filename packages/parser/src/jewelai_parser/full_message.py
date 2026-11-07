@@ -728,11 +728,14 @@ def _extract_full_message(
             )
         )
     recognized = [(item["evidence"]["start"], item["evidence"]["end"]) for item in candidates]
-    if _SOURCE_GOVERNANCE.get() == "1.3.0":
-        # Field headings are syntax, not additional jewelry facts or unresolved
-        # requests. Values retain their own original spans and normal authority.
-        recognized.extend(match.span() for match in _FIELD_ASSERTION.finditer(text))
-    candidates.extend(_unresolved_candidates(text, recognized))
+    syntax_spans = (
+        tuple(match.span() for match in _FIELD_ASSERTION.finditer(text))
+        if _SOURCE_GOVERNANCE.get() == "1.3.0"
+        else ()
+    )
+    # Syntax excludes heading tokens only. It is never proof that a field's
+    # semantic contents were recognized (an unbound negative object can remain).
+    candidates.extend(_unresolved_candidates(text, recognized, syntax_spans=syntax_spans))
 
     candidates = _deduplicate(candidates)
     candidates.sort(
@@ -1625,7 +1628,9 @@ _OWNER_WORD = re.compile(
 )
 
 
-def _unresolved_candidates(text: str, recognized: list[tuple[int, int]]) -> list[dict]:
+def _unresolved_candidates(
+    text: str, recognized: list[tuple[int, int]], *, syntax_spans: tuple[tuple[int, int], ...] = ()
+) -> list[dict]:
     candidates = []
     for token in _tokens(text):
         normalized = normalize_knowledge_text(token.text).replace("ё", "е")
@@ -1639,18 +1644,34 @@ def _unresolved_candidates(text: str, recognized: list[tuple[int, int]]) -> list
             )
             or normalized.isdigit()
             or _inside_any(token.start, token.end, recognized)
+            or _inside_any(token.start, token.end, syntax_spans)
         ):
             continue
+        start, end = token.start, token.end
+        classification = _classification_for(text, start, end)
+        if (
+            _SOURCE_GOVERNANCE.get() == "1.3.0"
+            and classification == CandidateClassification.PROHIBITION
+            and _OWNER_WORD.fullmatch(token.text)
+        ):
+            # Retain the governed request, including its negative operator,
+            # rather than isolated object words. Existing ownership boundaries
+            # keep independent fields out; deduplication coalesces this one span.
+            start, end = owner_left, owner_right
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
         candidates.append(
             _structured_candidate(
                 text,
-                token.start,
-                token.end,
+                start,
+                end,
                 target=None,
                 subject=_subject_for(text, token.start, token.end, None),
-                classification=_classification_for(text, token.start, token.end),
+                classification=classification,
                 certainty=CandidateCertainty.UNRESOLVED,
-                raw_value=token.text,
+                raw_value=text[start:end],
                 normalization_source=NormalizationSource.NONE,
                 application=CandidateApplication.STRUCTURED_EVIDENCE_ONLY,
                 detail="Unrecognized wording is retained for later clarification.",

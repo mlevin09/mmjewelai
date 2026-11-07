@@ -825,3 +825,49 @@ def test_real_prechange_studio_source_evidence_is_reverified_byte_identically(di
             knowledge_runtime=runtime,
         )
         assert verified.model_dump(mode="json") == case["parsed"]
+
+
+@pytest.mark.parametrize(
+    "locale,phrase",
+    [
+        ("en", "Center stone: No center stone"),
+        ("ru", "Центральный камень: Без центрального камня"),
+        ("en", "No center stone"),
+        ("ru", "Без центрального камня"),
+    ],
+)
+def test_unbound_negative_owner_retains_complete_sourced_request(dictionary, locale, phrase):
+    text = phrase + ("\nStyle: Minimalist" if locale == "en" else "\nСтиль: Минимализм")
+    parsed = parse_full_message(text, locale=locale, dictionary=dictionary)
+    unresolved = [c for c in parsed.candidates if c.certainty == "unresolved"]
+    assert len(unresolved) == 1
+    c = unresolved[0]
+    assert c.evidence.text == phrase and text[c.evidence.start : c.evidence.end] == phrase
+    assert c.raw_value == phrase and c.subject == "center_stone"
+    assert c.classification == "prohibition" and c.semantic_subject is None
+    assert c.target is None and c.parser_update is None
+    assert any(c.target == "style" and c.parser_update for c in parsed.candidates)
+
+
+def test_syntax_only_heading_is_not_a_semantic_recognition(dictionary):
+    text = "Metal: platinum\nCenter stone: oval diamond\nStyle: minimalist"
+    parsed = parse_full_message(text, locale="en", dictionary=dictionary)
+    assert parsed.candidates
+    assert not any(c.certainty == "unresolved" for c in parsed.candidates)
+    assert {c.target for c in parsed.candidates} >= {
+        "metal.material",
+        "center_stone.shape",
+        "center_stone.material",
+        "style",
+    }
+
+
+def test_field_heading_does_not_promote_rejected_negative_list_objects(dictionary):
+    parsed = parse_full_message(
+        "No gold, platinum or diamonds.\nStyle: minimalist", locale="en", dictionary=dictionary
+    )
+    objects = [
+        c for c in parsed.candidates if c.target in {"metal.material", "center_stone.material"}
+    ]
+    assert objects and all(c.parser_update is None for c in objects)
+    assert any(c.target == "style" and c.parser_update for c in parsed.candidates)
