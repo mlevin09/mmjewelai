@@ -66,13 +66,30 @@ def is_exact_parser13_recovery_release(root, changed, merge_base, head):
         )
         if set(changed) - allowed_ci != set(original.splitlines()):
             return False
-        match = subprocess.run(
-            ["git", "diff", "--quiet", frozen, head, "--", "apps/api", "packages", "docs"],
+        changed_product = subprocess.check_output(
+            ["git", "diff", "--name-only", frozen, head, "--", "apps/api", "packages", "docs"],
             cwd=root,
-            check=False,
-            capture_output=True,
+            text=True,
+        ).splitlines()
+        fixture = "apps/api/tests/completion/test_studio_recovery.py"
+        if changed_product != [fixture]:
+            return False
+        before = subprocess.check_output(["git", "show", f"{frozen}:{fixture}"], cwd=root)
+        after = subprocess.check_output(["git", "show", f"{head}:{fixture}"], cwd=root)
+        old = (
+            b"def core_release(monkeypatch):\\n"
+            b"    # Existing immutable source, local SYNTHETIC release only; "
+            b"no professional promotion.\\n"
         )
-        return match.returncode == 0
+        new = (
+            b"def core_release(monkeypatch):\\n"
+            b"    # Explicit test import root. Do not depend on unrelated collected modules\\n"
+            b"    # adding the repository to sys.path during broad-suite collection.\\n"
+            b"    monkeypatch.syspath_prepend(str(ROOT))\\n"
+            b"    # Existing immutable source, local SYNTHETIC release only; "
+            b"no professional promotion.\\n"
+        )
+        return before.count(old) == 1 and after == before.replace(old, new)
     except (OSError, subprocess.CalledProcessError):
         return False
 
