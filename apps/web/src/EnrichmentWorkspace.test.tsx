@@ -482,7 +482,7 @@ describe("Prompt Enrichment workspace", () => {
       body: { decision: "SELECT_OPTION", selected_option_id: "option-gold" },
     });
   });
-  it("offers both parameter entry and free text for every native clarification", async () => {
+  it("offers native text while preventing a double submit", async () => {
     const f = fixture(true);
     f.data.state!.questions = [
       {
@@ -499,27 +499,25 @@ describe("Prompt Enrichment workspace", () => {
     ];
     f.view();
     await screen.findByText("Which metal?");
-    expect(screen.getByLabelText("Parameter / decision")).toBeInTheDocument();
+    const select = screen.getByLabelText("Parameter / decision");
+    const note = screen.getByLabelText("Clarification free-text answer");
     expect(screen.getByText("Your parameter value")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Clarification free-text answer"),
-    ).toBeInTheDocument();
-    await userEvent.selectOptions(
-      screen.getByLabelText("Parameter / decision"),
-      "gold-id",
-    );
-    await userEvent.type(
-      screen.getByLabelText("Clarification free-text answer"),
-      "Matte finish",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    await waitFor(() =>
-      expect(f.commands.some((c) => c.route === "clarification-answers")).toBe(
-        true,
-      ),
-    );
-    expect(f.commands.some((c) => c.route === "corrections")).toBe(true);
+    await userEvent.selectOptions(select, "gold-id");
+    await userEvent.type(note, "Matte finish");
+    const save = screen.getByRole("button", { name: "Save answer" });
+    await userEvent.click(save);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Choose one action");
+    expect(f.commands).toHaveLength(0);
+    expect(note).toHaveValue("Matte finish");
+
+    await userEvent.selectOptions(select, "");
+    await userEvent.click(save);
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.commands[0]?.route).toBe("corrections");
+    expect(f.data.events[0]?.text).toContain("Matte finish");
   });
+
   it("shows visible stone shape suggestions and saves typed choice as correction, not invented option", async () => {
     const f = fixture(true, "F", "ru");
     f.data.state!.questions = [
@@ -697,7 +695,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(screen.queryByLabelText("Length (mm)")).not.toBeInTheDocument();
   });
 
-  it("runs an initial-to-clarification-to-correction UI journey with server-owned description", async () => {
+  it("runs initial to clarification with server-owned description", async () => {
     const f = fixture();
     f.view();
     await screen.findByLabelText("Your message");
@@ -723,21 +721,15 @@ describe("Prompt Enrichment workspace", () => {
       screen.getByLabelText("Parameter / decision"),
       "oval-id",
     );
-    await userEvent.type(
-      screen.getByLabelText("Clarification free-text answer"),
-      "Keep the band delicate.",
-    );
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await waitFor(() =>
       expect(
         f.commands.filter((c) => c.route === "clarification-answers"),
       ).toHaveLength(1),
     );
-    await waitFor(() =>
-      expect(f.commands.filter((c) => c.route === "corrections")).toHaveLength(
-        2,
-      ),
-    );
+    expect(
+      f.commands.filter((c) => c.route === "corrections"),
+    ).toHaveLength(1);
     expect(screen.getByLabelText("Current design text")).toHaveTextContent(
       "A white gold ring with an oval diamond.",
     );
@@ -749,7 +741,7 @@ describe("Prompt Enrichment workspace", () => {
     );
   });
 
-  it("surfaces partial save instead of repeating a committed choice after text failure", async () => {
+  it("rejects dual submit and keeps text after a failed retry", async () => {
     const f = fixture(true);
     f.data.state!.questions = [
       {
@@ -774,25 +766,27 @@ describe("Prompt Enrichment workspace", () => {
     );
     f.view();
     await screen.findByText("Which metal?");
-    await userEvent.selectOptions(
-      screen.getByLabelText("Parameter / decision"),
-      "gold-id",
-    );
-    await userEvent.type(
-      screen.getByLabelText("Clarification free-text answer"),
-      "Matte finish",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    await screen.findByLabelText("Partially saved clarification");
-    expect(screen.getByLabelText("Additional text to review")).toHaveValue(
-      "Matte finish",
-    );
+    const select = screen.getByLabelText("Parameter / decision");
+    const note = screen.getByLabelText("Clarification free-text answer");
+    const save = screen.getByRole("button", { name: "Save answer" });
+    await userEvent.selectOptions(select, "gold-id");
+    await userEvent.type(note, "Matte finish");
+    await userEvent.click(save);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Choose one action");
+    expect(f.commands).toHaveLength(0);
+    expect(note).toHaveValue("Matte finish");
+    expect(
+      screen.queryByLabelText("Partially saved clarification"),
+    ).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(select, "");
+    await userEvent.click(save);
+    await screen.findByText(/The design changed or a decision/);
     expect(
       f.commands.filter((c) => c.route === "clarification-answers"),
-    ).toHaveLength(1);
-    expect(
-      screen.getByText(/The design changed or a decision/),
-    ).toBeInTheDocument();
+    ).toHaveLength(0);
+    expect(note).toHaveValue("Matte finish");
   });
 
   it("starts a new isolated piece with the existing session API", async () => {
