@@ -196,7 +196,9 @@ header {
   border-radius: 0.75rem;
   background: transparent;
   color: #667269;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 .session-card .session-delete-button:hover {
   background: #f9eae6;
