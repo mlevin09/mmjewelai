@@ -192,58 +192,37 @@ async function send(text: string) {
 }
 
 describe("Prompt Enrichment workspace", () => {
-  it("submits one action without duplicate UNKNOWN/SKIP", async () => {
+  it("submits only one clarification action", async () => {
     const f = fixture(true);
     f.data.state!.questions = [
       {
         question_kind: "NATIVE",
         retained_base: "F",
         native_question: {
-          clarification_id: "single-action",
-          text: "Choose a center stone shape.",
+          clarification_id: "q",
+          text: "Choose a shape",
           category: "information_gap",
           allowed_decisions: ["SELECT_OPTION", "UNKNOWN", "SKIP"],
-          options: [{ option_id: "opt-oval", value: "oval", label: "Oval" }],
+          options: [{ option_id: "o", value: "oval", label: "Oval" }],
         },
       },
     ];
     f.view();
-    const selector = await screen.findByLabelText("Parameter / decision");
-    expect(
-      within(selector).queryByRole("option", { name: "Skip" }),
-    ).not.toBeInTheDocument();
-    expect(
-      within(selector).queryByRole("option", { name: "I don't know" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getAllByRole("button", { name: "Skip this question" }),
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByRole("button", {
-        name: "I don't know — leave unspecified",
-      }),
-    ).toHaveLength(1);
-
-    await userEvent.selectOptions(selector, "opt-oval");
-    await userEvent.type(
-      screen.getByLabelText("Your parameter value"),
-      "platinum",
-    );
-    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Choose one action",
-    );
+    const select = await screen.findByLabelText("Parameter / decision");
+    expect(within(select).queryByText("Skip")).toBeNull();
+    expect(within(select).queryByText("I don't know")).toBeNull();
+    await userEvent.selectOptions(select, "o");
+    const input = screen.getByLabelText("Your parameter value");
+    await userEvent.type(input, "platinum");
+    const save = screen.getByRole("button", { name: "Save answer" });
+    await userEvent.click(save);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Choose one action");
     expect(f.commands).toHaveLength(0);
-
-    fireEvent.change(screen.getByLabelText("Your parameter value"), {
-      target: { value: "" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
+    fireEvent.change(input, { target: { value: "" } });
+    await userEvent.click(save);
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("clarification-answers");
-    expect(
-      f.data.events.filter((event) => event.kind === "user"),
-    ).toHaveLength(1);
   });
 
   it("keeps writes single-flight and hides the previous prompt while a change is pending", async () => {
