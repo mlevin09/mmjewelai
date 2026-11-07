@@ -209,22 +209,39 @@ describe("Prompt Enrichment workspace", () => {
     ];
     f.view();
     const selector = await screen.findByLabelText("Parameter / decision");
-    expect(within(selector).queryByRole("option", { name: "Skip" })).not.toBeInTheDocument();
-    expect(within(selector).queryByRole("option", { name: "I don't know" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Skip this question" })).toHaveLength(1);
-    expect(screen.getAllByRole("button", { name: "I don't know — leave unspecified" })).toHaveLength(1);
+    expect(
+      within(selector).queryByRole("option", { name: "Skip" }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(selector).queryByRole("option", { name: "I don't know" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Skip this question" }),
+    ).toHaveLength(1);
+    expect(
+      screen.getAllByRole("button", { name: "I don't know — leave unspecified" }),
+    ).toHaveLength(1);
 
     await userEvent.selectOptions(selector, "opt-oval");
-    await userEvent.type(screen.getByLabelText("Your parameter value"), "platinum");
+    await userEvent.type(
+      screen.getByLabelText("Your parameter value"),
+      "platinum",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Choose one action");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Choose one action",
+    );
     expect(f.commands).toHaveLength(0);
 
-    fireEvent.change(screen.getByLabelText("Your parameter value"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Your parameter value"), {
+      target: { value: "" },
+    });
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]?.route).toBe("clarification-answers");
-    expect(f.data.events.filter((event) => event.kind === "user")).toHaveLength(1);
+    expect(
+      f.data.events.filter((event) => event.kind === "user"),
+    ).toHaveLength(1);
   });
 
   it("keeps writes single-flight and hides the previous prompt while a change is pending", async () => {
