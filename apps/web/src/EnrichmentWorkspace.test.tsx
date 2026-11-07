@@ -727,9 +727,7 @@ describe("Prompt Enrichment workspace", () => {
         f.commands.filter((c) => c.route === "clarification-answers"),
       ).toHaveLength(1),
     );
-    expect(
-      f.commands.filter((c) => c.route === "corrections"),
-    ).toHaveLength(1);
+    expect(f.commands.filter((c) => c.route === "corrections")).toHaveLength(1);
     expect(screen.getByLabelText("Current design text")).toHaveTextContent(
       "A white gold ring with an oval diamond.",
     );
