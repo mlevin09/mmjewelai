@@ -1,8 +1,13 @@
 """Deterministic, relationship-aware extraction from complete RU/EN user messages."""
 
+import math
 import re
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from functools import wraps
+from inspect import signature
 from typing import Annotated, Literal
 
 from jewelai_domain.dictionary import (
@@ -33,7 +38,44 @@ from .models import (
     WeightCandidate,
 )
 
-FULL_MESSAGE_PARSE_VERSION = "1.2.0"
+FULL_MESSAGE_PARSE_VERSION = "1.3.0"
+# Only historical source verification may select frozen governance. Public parsing
+# always resets this context to CURRENT; no active route can request a legacy parse.
+_SOURCE_GOVERNANCE = ContextVar("jewelai_source_governance", default="1.3.0")
+
+
+@contextmanager
+def _source_governance(version):
+    if version not in {"1.1.0", "1.2.0", "1.3.0"}:
+        raise ValueError("Unsupported source evidence version")
+    token = _SOURCE_GOVERNANCE.set(version)
+    try:
+        yield
+    finally:
+        _SOURCE_GOVERNANCE.reset(token)
+
+
+def _recorded_governance(argument, attribute=None):
+    """Scope downstream source proofs to their immutable parse evidence."""
+
+    def decorate(function):
+        parameters = signature(function)
+
+        @wraps(function)
+        def verify(*args, **kwargs):
+            value = parameters.bind(*args, **kwargs).arguments[argument]
+            parsed = (
+                (value[attribute] if isinstance(value, dict) else getattr(value, attribute))
+                if attribute
+                else value
+            )
+            parsed = read_full_message_parse_result(parsed)
+            with _source_governance(parsed.parse_version):
+                return function(*args, **kwargs)
+
+        return verify
+
+    return decorate
 
 
 class MessageLanguage(StrEnum):
@@ -176,13 +218,20 @@ class FullMessageParseResult(ImmutableModel):
 
 
 class FullMessageParseResultV1_2(FullMessageParseResult):
-    """The single current parse output; interpretation is shared, not version-dispatched."""
+    """Frozen historical evidence; never selected for new requests."""
 
-    parse_version: Literal["1.2.0"] = FULL_MESSAGE_PARSE_VERSION
+    parse_version: Literal["1.2.0"] = "1.2.0"
+
+
+class FullMessageParseResultV1_3(FullMessageParseResult):
+    """Current signed-measurement and labelled-assertion governance."""
+
+    parse_version: Literal["1.3.0"] = FULL_MESSAGE_PARSE_VERSION
 
 
 AnyFullMessageParseResult = Annotated[
-    FullMessageParseResult | FullMessageParseResultV1_2, Field(discriminator="parse_version")
+    FullMessageParseResult | FullMessageParseResultV1_2 | FullMessageParseResultV1_3,
+    Field(discriminator="parse_version"),
 ]
 _PARSE_EVIDENCE = TypeAdapter(AnyFullMessageParseResult)
 
@@ -593,12 +642,34 @@ def _govern_preservation(text, candidate):
 
 
 def parse_full_message(
+    text, *, locale, dictionary, knowledge_runtime=None
+) -> FullMessageParseResultV1_3:
+    """The only active entrypoint, including corrections and resumed requests."""
+    with _source_governance(FULL_MESSAGE_PARSE_VERSION):
+        return _extract_full_message(
+            text, locale=locale, dictionary=dictionary, knowledge_runtime=knowledge_runtime
+        )
+
+
+def _parse_recorded_message(text, *, parse_version, locale, dictionary, knowledge_runtime=None):
+    """Reverify historical source with the shared extractor and frozen read rules.
+
+    This is not a write/interpretation endpoint. Callers must compare the entire
+    retained evidence and its original hashes, not just the version tag.
+    """
+    with _source_governance(parse_version):
+        return _extract_full_message(
+            text, locale=locale, dictionary=dictionary, knowledge_runtime=knowledge_runtime
+        )
+
+
+def _extract_full_message(
     text: str,
     *,
     locale: Literal["en", "ru"],
     dictionary: DictionaryRegistry,
     knowledge_runtime: AnyCompiledKnowledge | None = None,
-) -> FullMessageParseResultV1_2:
+) -> AnyFullMessageParseResult:
     """Extract conservative structured evidence without changing canonical Product State."""
 
     if not isinstance(text, str) or not text or not text.strip():
@@ -657,7 +728,14 @@ def parse_full_message(
             )
         )
     recognized = [(item["evidence"]["start"], item["evidence"]["end"]) for item in candidates]
-    candidates.extend(_unresolved_candidates(text, recognized))
+    syntax_spans = (
+        tuple(match.span() for match in _FIELD_ASSERTION.finditer(text))
+        if _SOURCE_GOVERNANCE.get() == "1.3.0"
+        else ()
+    )
+    # Syntax excludes heading tokens only. It is never proof that a field's
+    # semantic contents were recognized (an unbound negative object can remain).
+    candidates.extend(_unresolved_candidates(text, recognized, syntax_spans=syntax_spans))
 
     candidates = _deduplicate(candidates)
     candidates.sort(
@@ -689,7 +767,12 @@ def parse_full_message(
         if runtime is not None
         else {}
     )
-    return FullMessageParseResultV1_2(
+    result_type = {
+        "1.1.0": FullMessageParseResult,
+        "1.2.0": FullMessageParseResultV1_2,
+        "1.3.0": FullMessageParseResultV1_3,
+    }[_SOURCE_GOVERNANCE.get()]
+    return result_type(
         original_text=text,
         requested_locale=locale,
         detected_language=_detect_language(text),
@@ -706,9 +789,16 @@ def _lexical_candidates(text: str, dictionary: DictionaryRegistry, runtime) -> l
         surfaces.extend(_knowledge_surfaces(runtime))
     candidates, protected_spans = _special_constraint_candidates(text)
     found = _mark_choice_ambiguity(text, _find_surfaces(text, surfaces))
+    matcher = None
     for item in found:
         if not _inside_any(item.start, item.end, protected_spans):
-            candidates.append(_candidate_from_surface(text, item, dictionary, runtime, found))
+            # One immutable index per lexical pass; no cross-request/release cache
+            # or change to candidate normalization, source spans or authority.
+            if item.surface.source == NormalizationSource.KNOWLEDGE_LIBRARY and matcher is None:
+                matcher = KnowledgeLibraryMatcher(runtime)
+            candidates.append(
+                _candidate_from_surface(text, item, dictionary, runtime, found, matcher=matcher)
+            )
     candidates.extend(_measurement_candidates(text))
     candidates.extend(_quantity_candidates(text))
     candidates.extend(_aesthetic_candidates(text, protected_spans))
@@ -918,6 +1008,8 @@ def _candidate_from_surface(
     dictionary: DictionaryRegistry,
     runtime: AnyCompiledKnowledge | None,
     found: list[_Found],
+    *,
+    matcher: KnowledgeLibraryMatcher | None = None,
 ) -> dict:
     evidence = text[item.start : item.end]
     subject, owner_detail = _owner_for(text, item.start, item.end, item.surface.category)
@@ -957,7 +1049,9 @@ def _candidate_from_surface(
                     DictionaryLocale(item.surface.locale)
                 )
     elif runtime is not None:
-        match = KnowledgeLibraryMatcher(runtime).match(evidence, locale=item.surface.locale)
+        match = (matcher or KnowledgeLibraryMatcher(runtime)).match(
+            evidence, locale=item.surface.locale
+        )
         if isinstance(match, AmbiguousKnowledgeMatch):
             certainty = CandidateCertainty.AMBIGUOUS
             normalized_values = tuple(candidate.concept_id for candidate in match.candidates)
@@ -1099,6 +1193,14 @@ def _intent_bounds(text: str, start: int, end: int) -> tuple[int, int]:
     return left, right
 
 
+_FIELD_ASSERTION = re.compile(
+    r"(?:^|[\n;])\s*(?:jewel(?:ry|lery)\s+type|metal|center\s+stone|side\s+stones?|"
+    r"style(?:\s+and\s+finish)?|finish|setting|dimensions|тип\s+украшения|металл|"
+    r"центральный\s+камень|боковые\s+камни|стиль(?:\s+и\s+отделка)?|отделка|закрепка|размеры)\s*:",
+    re.I,
+)
+
+
 def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
     """Original-offset boundaries proved by a new governor, not by 'and' alone.
 
@@ -1108,6 +1210,13 @@ def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
     This classifies evidence only; it cannot select a canonical conflict winner.
     """
     boundaries = [match.span() for match in _CONTRAST.finditer(text)]
+    if _SOURCE_GOVERNANCE.get() == "1.3.0":
+        # Explicit field headings establish independent assertion ownership. A
+        # bare newline/object list does not: its shared negative governor remains.
+        boundaries.extend(
+            (m.start(), m.start() + (text[m.start() : m.start() + 1] in {"\n", ";"}))
+            for m in _FIELD_ASSERTION.finditer(text)
+        )
     for match in _COORDINATION.finditer(text):
         left, right = _sentence_bounds(text, match.start(), match.end())
         before, after = text[left : match.start()], text[match.end() : right].lstrip()
@@ -1311,6 +1420,13 @@ def _measurement_candidates(text: str) -> list[dict]:
         r"(?P<c>\d+(?:[.,]\d+)?)\s*(?:mm|мм)\b",
         re.I,
     )
+    if _SOURCE_GOVERNANCE.get() == "1.3.0":
+        dimensions_pattern = re.compile(
+            r"(?<![\w.,+−-])(?P<a>(?:[+−-][ \t]*)?\d+(?:[.,]\d+)?)\s*[x×х]\s*"
+            r"(?P<b>(?:[+−-][ \t]*)?\d+(?:[.,]\d+)?)\s*[x×х]\s*"
+            r"(?P<c>(?:[+−-][ \t]*)?\d+(?:[.,]\d+)?)\s*(?:mm|мм)\b",
+            re.I,
+        )
     occupied = []
     for match in dimensions_pattern.finditer(text):
         occupied.append(match.span())
@@ -1324,7 +1440,16 @@ def _measurement_candidates(text: str) -> list[dict]:
                 else None
             )
         )
-        values = tuple(float(match.group(key).replace(",", ".")) for key in ("a", "b", "c"))
+        values = tuple(
+            float(
+                match.group(key)
+                .replace(",", ".")
+                .replace("−", "-")
+                .replace(" ", "")
+                .replace("\t", "")
+            )
+            for key in ("a", "b", "c")
+        )
         update = None
         application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
         detail = (
@@ -1332,7 +1457,10 @@ def _measurement_candidates(text: str) -> list[dict]:
             if subject == CandidateSubject.SIDE_STONES
             else "Component-specific measurement has no approved parser target binding."
         )
-        if subject == CandidateSubject.CENTER_STONE:
+        valid_dimensions = all(math.isfinite(v) and v > 0 for v in values)
+        if subject == CandidateSubject.CENTER_STONE and (
+            _SOURCE_GOVERNANCE.get() != "1.3.0" or valid_dimensions
+        ):
             update = CandidateUpdate(
                 target=ParserTarget.CENTER_STONE_DIMENSIONS,
                 value=DimensionsCandidate(
@@ -1345,6 +1473,8 @@ def _measurement_candidates(text: str) -> list[dict]:
             )
             application = CandidateApplication.PARSER_CANDIDATE_READY
             detail = None
+        if _SOURCE_GOVERNANCE.get() == "1.3.0" and not valid_dimensions:
+            detail = "Dimensions require three explicitly stated positive finite measurements."
         candidates.append(
             _structured_candidate(
                 text,
@@ -1354,12 +1484,11 @@ def _measurement_candidates(text: str) -> list[dict]:
                 subject=subject,
                 classification=_classification_for(text, match.start(), match.end()),
                 certainty=CandidateCertainty.EXPLICIT,
-                raw_value={
-                    "length": values[0],
-                    "width": values[1],
-                    "depth": values[2],
-                    "unit": "mm",
-                },
+                raw_value=(
+                    {"length": values[0], "width": values[1], "depth": values[2], "unit": "mm"}
+                    if all(math.isfinite(v) for v in values)
+                    else match.group()
+                ),
                 normalization_source=NormalizationSource.DETERMINISTIC_PATTERN,
                 application=application,
                 parser_update=update,
@@ -1499,7 +1628,9 @@ _OWNER_WORD = re.compile(
 )
 
 
-def _unresolved_candidates(text: str, recognized: list[tuple[int, int]]) -> list[dict]:
+def _unresolved_candidates(
+    text: str, recognized: list[tuple[int, int]], *, syntax_spans: tuple[tuple[int, int], ...] = ()
+) -> list[dict]:
     candidates = []
     for token in _tokens(text):
         normalized = normalize_knowledge_text(token.text).replace("ё", "е")
@@ -1513,18 +1644,34 @@ def _unresolved_candidates(text: str, recognized: list[tuple[int, int]]) -> list
             )
             or normalized.isdigit()
             or _inside_any(token.start, token.end, recognized)
+            or _inside_any(token.start, token.end, syntax_spans)
         ):
             continue
+        start, end = token.start, token.end
+        classification = _classification_for(text, start, end)
+        if (
+            _SOURCE_GOVERNANCE.get() == "1.3.0"
+            and classification == CandidateClassification.PROHIBITION
+            and _OWNER_WORD.fullmatch(token.text)
+        ):
+            # Retain the governed request, including its negative operator,
+            # rather than isolated object words. Existing ownership boundaries
+            # keep independent fields out; deduplication coalesces this one span.
+            start, end = owner_left, owner_right
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
         candidates.append(
             _structured_candidate(
                 text,
-                token.start,
-                token.end,
+                start,
+                end,
                 target=None,
                 subject=_subject_for(text, token.start, token.end, None),
-                classification=_classification_for(text, token.start, token.end),
+                classification=classification,
                 certainty=CandidateCertainty.UNRESOLVED,
-                raw_value=token.text,
+                raw_value=text[start:end],
                 normalization_source=NormalizationSource.NONE,
                 application=CandidateApplication.STRUCTURED_EVIDENCE_ONLY,
                 detail="Unrecognized wording is retained for later clarification.",

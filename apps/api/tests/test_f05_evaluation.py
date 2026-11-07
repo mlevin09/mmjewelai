@@ -75,7 +75,7 @@ def test_new_parse_and_native_matrix_are_sourced_evidence_not_a_revision(
             native_context=native,
         )
         assert result.evaluation_version == "3.0.0"
-        assert result.parse_result.parse_version == "1.2.0"
+        assert result.parse_result.parse_version == "1.3.0"
         assert result.parse_result.original_text == text
         assert result.parser_proposal.source == source
         updates = result.parser_proposal.accepted_updates

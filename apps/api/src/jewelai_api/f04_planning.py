@@ -83,6 +83,8 @@ def input_context(scope, revision, cycle_id, cycle_number, artifacts, release_pi
 
 
 def f04_enrichment(result, *, revision, context):
+    from jewelai_parser.full_message import _SOURCE_GOVERNANCE
+
     payload = result.model_dump(mode="json", exclude={"content_hash"})
     payload.update(
         enrichment_version="2.0.0",
@@ -91,6 +93,8 @@ def f04_enrichment(result, *, revision, context):
         context=context,
         availability_overlay=build_availability_overlay(revision, scope=context.scope),
     )
+    if _SOURCE_GOVERNANCE.get() == "1.3.0":
+        payload["parser_evidence_version"] = "1.3.0"
     return StructuredPromptEnrichmentResultV2(**payload, content_hash=evidence_hash(payload))
 
 

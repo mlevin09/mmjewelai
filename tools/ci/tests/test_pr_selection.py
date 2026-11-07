@@ -132,6 +132,66 @@ def test_merge_base_covers_all_feature_commits_not_only_last(tmp_path):
     assert paths == ["first.py", "last.py"]
 
 
+def test_parser_13_version_exception_is_exact_and_fails_closed(tmp_path):
+    path = "packages/domain/src/jewelai_domain/preservation_release.py"
+    source = tmp_path / path
+    source.parent.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "ci@example.invalid"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "Synthetic CI"], cwd=tmp_path, check=True)
+    source.write_text('parse_version: Literal["1.2.0"]\nOTHER = "unchanged"\n')
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-qm", "base"], cwd=tmp_path, check=True)
+    base = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+    source.write_text('parse_version: Literal["1.2.0", "1.3.0"]\nOTHER = "unchanged"\n')
+    subprocess.run(["git", "commit", "-qam", "exact addition"], cwd=tmp_path, check=True)
+    good = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+    assert selection.is_exact_parser_13_release_version_widening(tmp_path, base, good, path)
+    source.write_text('parse_version: Literal["1.2.0", "1.3.0"]\nOTHER = "changed"\n')
+    subprocess.run(["git", "commit", "-qam", "unrelated edit"], cwd=tmp_path, check=True)
+    bad = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=tmp_path, text=True).strip()
+    assert not selection.is_exact_parser_13_release_version_widening(tmp_path, base, bad, path)
+    assert not selection.is_exact_parser_13_release_version_widening(
+        tmp_path, base, good, "packages/domain/src/jewelai_domain/preservation.py"
+    )
+    assert not selection.is_exact_parser_13_release_version_widening(tmp_path, "f" * 40, good, path)
+
+
+def test_frozen_parser13_risk_profile_is_strict_and_protects_core_checks():
+    merge_base = "ef656c70f341940183905eca890b507ee2f457e8"
+    current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    raw = subprocess.check_output(
+        ["git", "diff", "--name-only", merge_base, current], cwd=ROOT, text=True
+    )
+    changed = raw.splitlines()
+    assert selection.is_exact_parser13_recovery_release(ROOT, changed, merge_base, current)
+    assert not selection.is_exact_parser13_recovery_release(
+        ROOT, changed + ["apps/api/src/unapproved.py"], merge_base, current
+    )
+    assert not selection.is_exact_parser13_recovery_release(ROOT, changed, "a" * 40, current)
+    assert not selection.is_exact_parser13_recovery_release(ROOT, changed, merge_base, "f" * 40)
+    assert len(selection.PARSER13_RECOVERY_API_TESTS) == len(
+        set(selection.PARSER13_RECOVERY_API_TESTS)
+    )
+    assert {
+        "apps/api/tests/completion/test_studio_recovery.py",
+        "apps/api/tests/test_f05_mutation_safety.py",
+        "apps/api/tests/test_parser12_contract.py",
+        "apps/api/tests/test_f05_release_http.py",
+    }.issubset(selection.PARSER13_RECOVERY_API_TESTS)
+    assert "apps/api/tests/test_generation_preparations_postgres.py" not in (
+        selection.PARSER13_RECOVERY_API_TESTS
+    )
+
+
+def test_other_preservation_changes_keep_full_regression_gate():
+    result = selected("packages/domain/src/jewelai_domain/preservation_release.py")
+    assert result["full_regression_required"]
+    assert "continuation" in result["buckets"]
+    assert "evidence" in result["buckets"]
+    assert "persistence" in result["buckets"]
+
+
 def passed_report():
     case = "a" * 64
     return dict(

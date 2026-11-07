@@ -94,3 +94,24 @@ def test_f04_valid_checksum_cannot_hide_scope_mismatch(ring, templates, runtime)
     data["content_hash"] = evidence_hash({k: v for k, v in data.items() if k != "content_hash"})
     with pytest.raises(ValidationError, match="context mismatch"):
         decode_f04_prompt_enrichment_result(data)
+
+
+def test_parser13_pin_is_hash_bound_without_rewriting_historical_wire(ring, templates, runtime):
+    _, historical = payload(ring, templates, runtime)
+    original = decode_f04_prompt_enrichment_result(historical)
+    current = {**historical, "parser_evidence_version": "1.3.0"}
+    with pytest.raises(ValidationError, match="hash"):
+        decode_f04_prompt_enrichment_result(current)
+    current["content_hash"] = evidence_hash(
+        {k: v for k, v in current.items() if k != "content_hash"}
+    )
+    checked = decode_f04_prompt_enrichment_result(current)
+    assert checked.model_dump(mode="json") == current
+    assert original.model_dump(mode="json") == historical
+    assert checked.content_hash != original.content_hash
+    current["parser_evidence_version"] = "9.0.0"
+    current["content_hash"] = evidence_hash(
+        {k: v for k, v in current.items() if k != "content_hash"}
+    )
+    with pytest.raises(ValidationError):
+        decode_f04_prompt_enrichment_result(current)

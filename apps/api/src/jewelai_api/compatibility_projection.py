@@ -18,7 +18,8 @@ from jewelai_domain.compatibility import (
 from jewelai_domain.continuation import ContinuationArtifactPins, ContinuationFrameCore
 from jewelai_domain.models import Explicit, KnownValue, MessageSource, Unknown
 from jewelai_domain.preservation import contract_hash
-from jewelai_parser import parse_full_message, same_parse_evidence
+from jewelai_parser import same_parse_evidence
+from jewelai_parser.full_message import _parse_recorded_message
 
 from .correction_enrichment import CorrectionReenrichmentResult
 from .f04_planning import canonical_target
@@ -53,8 +54,9 @@ def _verified_corrections(service, repo, native, sid, oid):
         message = repo.get_message(sid, UUID(correction.source.message_id), oid)
         before = repo.get_revision(sid, correction.previous_revision_id, oid)
         after = repo.get_revision(sid, correction.new_revision_id or before.revision_id, oid)
-        parsed = parse_full_message(
+        parsed = _parse_recorded_message(
             message.content,
+            parse_version=correction.parsed_correction.parse_version,
             locale=native.session.locale,
             dictionary=service.artifacts.dictionary,
             knowledge_runtime=verified.compiled_runtime,
