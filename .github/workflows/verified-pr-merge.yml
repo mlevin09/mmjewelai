@@ -44,9 +44,9 @@ jobs:
             read -r state draft base head <<<"$(jq -r '[.state, (.draft|tostring), .base.ref, .head.sha] | join(" ")' <<<"$pr")"
             [[ "$state" == open && "$draft" == false && "$base" == jewelai-v2 && "$head" == "$SHA" ]] || continue
 
-            # A coordinator must explicitly apply this label AFTER independent
+            # A coordinator must explicitly apply the SHA-bound label AFTER independent
             # functional review and after confirming all Owner-gated decisions.
-            label_count="$(gh api "repos/$REPO/issues/$number/labels" --jq '[.[] | select(.name=="automerge:verified")] | length')"
+            label_count="$(gh api "repos/$REPO/issues/$number/labels" --jq '[.[] | select(.name==("automerge:" + env.SHA))] | length')"
             [[ "$label_count" == 1 ]] || continue
 
             reviews="$(gh api "repos/$REPO/pulls/$number/reviews")"
