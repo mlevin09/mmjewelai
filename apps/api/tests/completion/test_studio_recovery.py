@@ -11,6 +11,9 @@ from test_prompt_completion import command
 
 @pytest.fixture
 def core_release(monkeypatch):
+    # Explicit test import root. Do not depend on unrelated collected modules
+    # adding the repository to sys.path during broad-suite collection.
+    monkeypatch.syspath_prepend(str(ROOT))
     # Existing immutable source, local SYNTHETIC release only; no professional promotion.
     from tools.knowledge.build_recovered_draft import project_core
 
