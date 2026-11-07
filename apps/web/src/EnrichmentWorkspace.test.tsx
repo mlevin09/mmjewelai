@@ -695,7 +695,7 @@ describe("Prompt Enrichment workspace", () => {
     expect(screen.queryByLabelText("Length (mm)")).not.toBeInTheDocument();
   });
 
-  it("runs initial to clarification with server-owned description", async () => {
+  it("keeps server-owned description after clarification", async () => {
     const f = fixture();
     f.view();
     await screen.findByLabelText("Your message");
