@@ -223,8 +223,8 @@ describe("Prompt Enrichment workspace", () => {
     fireEvent.change(screen.getByLabelText("Your parameter value"), { target: { value: "" } });
     await userEvent.click(screen.getByRole("button", { name: "Save answer" }));
     await waitFor(() => expect(f.commands).toHaveLength(1));
-    expect(f.commands[0]?.route).toBe("answers");
-    expect(f.data.events.filter((event) => event.kind === "user")).toHaveLength(0);
+    expect(f.commands[0]?.route).toBe("clarification-answers");
+    expect(f.data.events.filter((event) => event.kind === "user")).toHaveLength(1);
   });
 
   it("keeps writes single-flight and hides the previous prompt while a change is pending", async () => {
