@@ -1,0 +1,79 @@
+name: Verified PR merge on CI completion
+
+# Event-driven handoff. This workflow must live on GitHub's default branch.
+on:
+  workflow_run:
+    workflows:
+      - Runtime API
+      - Web
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: verified-merge-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  merge-verified:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Merge only independently authorized, fully checked PRs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          # Query the GitHub API only. NEVER checkout or execute PR code in
+          # this privileged workflow_run context.
+          prs="$(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[].number')"
+          for number in $prs; do
+            pr="$(gh api "repos/$REPO/pulls/$number")"
+            read -r state draft base head <<<"$(jq -r '[.state, (.draft|tostring), .base.ref, .head.sha] | join(" ")' <<<"$pr")"
+            [[ "$state" == open && "$draft" == false && "$base" == jewelai-v2 && "$head" == "$SHA" ]] || continue
+
+            # A coordinator must explicitly apply this label AFTER independent
+            # functional review and after confirming all Owner-gated decisions.
+            label_count="$(gh api "repos/$REPO/issues/$number/labels" --jq '[.[] | select(.name=="automerge:verified")] | length')"
+            [[ "$label_count" == 1 ]] || continue
+
+            reviews="$(gh api "repos/$REPO/pulls/$number/reviews")"
+            [[ "$(jq '[.[] | select(.state=="CHANGES_REQUESTED")] | length' <<<"$reviews")" == 0 ]] || continue
+
+            runs="$(gh api "repos/$REPO/actions/runs?event=pull_request&head_sha=$SHA&per_page=100")"
+            ready=true
+            for workflow in 'Runtime API' 'Web'; do
+              outcome="$(jq -r --arg name "$workflow" '[.workflow_runs[] | select(.name==$name and .head_sha==env.SHA)] | sort_by(.run_started_at) | last | if . == null then "missing" else (.status + ":" + (.conclusion // "pending")) end' <<<"$runs")"
+              if [[ "$outcome" != 'completed:success' ]]; then
+                echo "PR #$number: $workflow is $outcome; no merge."
+                ready=false
+              fi
+            done
+            [[ "$ready" == true ]] || continue
+
+            # GitHub enforces branch protection and mergeability. Verify
+            # expected head SHA again atomically at merge.
+            if result="$(gh api --method PUT "repos/$REPO/pulls/$number/merge" -f sha="$SHA" -f merge_method=merge 2>&1)"; then
+              merged="$(jq -r '.merged // false' <<<"$result")"
+              if [[ "$merged" == true ]]; then
+                merge_sha="$(jq -r '.sha' <<<"$result")"
+                echo "PR #$number merged as $merge_sha."
+                gh api --method POST "repos/$REPO/issues/$number/comments" -f body="Automated integration completed after exact-SHA Runtime API and Web PASS. Merge commit: \`$merge_sha\`. Deployment and shared database migrations were NOT performed." >/dev/null
+              fi
+            else
+              echo "PR #$number was not merged: $result"
+              gh api --method POST "repos/$REPO/issues/$number/comments" -f body="Automatic integration was blocked after CI completion; no merge performed. See [event workflow run](https://github.com/$REPO/actions/runs/$GITHUB_RUN_ID) for the exact GitHub merge error. No deployment or migration occurred." >/dev/null || true
+            fi
+          done
