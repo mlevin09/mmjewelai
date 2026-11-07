@@ -9,11 +9,12 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from conftest import ROOT, create_hierarchy
 from disposable_postgres import verified_ci_postgres
 from jewelai_persistence import create_database_engine
 from jewelai_persistence.models import GenerationCommandRow, GenerationPreparationRow
-from sqlalchemy import select, text, update
+from sqlalchemy import MetaData, Table, select, text, update
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from test_core_intent import (
@@ -244,20 +245,38 @@ def test_f00_keep_authority_postgres(engine, tmp_path, monkeypatch):
     exercise_keep_correction_sequence(engine, tmp_path, monkeypatch, (), external_edit=True)
 
 
+def seed_checkpoint_session(repository, scoped, row, revision, *, organization_id):
+    """Seed the OLD schema with Core columns, never run new ORM against old columns.
+
+    The current factory still creates the canonical source; this is test fixture
+    serialization, not a historical application runtime or interpretation adapter.
+    """
+    with scoped.begin() as db:
+        for name, value in (
+            ("design_session", row),
+            ("specification_revision", repository._revision_row(row.session_id, revision)),
+        ):
+            table = Table(name, MetaData(), autoload_with=db, resolve_fks=False)
+            # Reflection exposes SQLite UUID columns as CHAR. Keep the existing
+            # model bind processors for old columns, without selecting new ones.
+            for column in table.c:
+                column.type = value.__table__.c[column.name].type
+            db.execute(table.insert().values(**{c.name: getattr(value, c.name) for c in table.c}))
+    return row
+
+
 @pytest.fixture
-def engine(monkeypatch, capfd, request):
+def engine(monkeypatch, capfd):
     if os.getenv("GITHUB_ACTIONS") != "true":
         pytest.skip(
             "NOT VERIFIED locally: B2 requires independently verified disposable PostgreSQL"
         )
     # No SQL DDL, migration, drop_all or fixture setup occurs until this succeeds.
     url = verified_ci_postgres()
-    # Only the two historical CHECK tests opt into 0018. Every ordinary user of
-    # this fixture retains full head upgrade/check/current and retention guards.
-    target = getattr(request, "param", "head")
-    if target not in {"head", "0018_f04_preparation_v2"}:
-        raise ValueError("Unsupported disposable migration-test baseline")
-    expected_version = "0019_prompt_completion" if target == "head" else target
+    target = "head"
+    expected_version = ScriptDirectory.from_config(
+        Config(str(ROOT / "packages/persistence/alembic.ini"))
+    ).get_current_head()
     control = create_database_engine(url)
     schema = "b2_" + uuid4().hex
     with control.begin() as db:
@@ -271,9 +290,18 @@ def engine(monkeypatch, capfd, request):
         # Insert an actual old session/revision before the additive upgrade, retain exact bytes.
         client, _ = _client(scoped)
         with client:
-            org, _, old_session = create_hierarchy(client)
+            repository = client.app.state.service.repository
+            with monkeypatch.context() as checkpoint:
+                checkpoint.setattr(
+                    repository,
+                    "create_design_session",
+                    lambda row, revision, **kw: seed_checkpoint_session(
+                        repository, scoped, row, revision, **kw
+                    ),
+                )
+                org, _, old_session = create_hierarchy(client)
             sid = old_session.json()["session_id"]
-            before = client.get(f"/sessions/{sid}", headers={"X-Organization-ID": org})
+            before = old_session
         with scoped.connect() as db:
             old_bytes = db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
         command.upgrade(cfg, target)

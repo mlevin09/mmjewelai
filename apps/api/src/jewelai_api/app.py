@@ -64,7 +64,7 @@ from jewelai_persistence.preparations import (
     PreparationIntegrityError,
     PreparationStorageError,
 )
-from jewelai_persistence.repository import PersistenceRepository
+from jewelai_persistence.repository import PersistenceRepository, SessionDeletionConflictError
 from jewelai_prompts import GenerationPreparationError
 from jewelai_prompts.final_prompt_v4 import CanonicalFinalPromptAssemblyV4
 from jewelai_text_understanding_google import (
@@ -481,6 +481,10 @@ def create_app(
     async def generation_state_handler(_, exc):
         return _error_response(409, "generation_state_conflict", str(exc))
 
+    @app.exception_handler(SessionDeletionConflictError)
+    async def session_deletion_conflict_handler(_, exc):
+        return _error_response(409, "session_deletion_conflict", str(exc))
+
     @app.exception_handler(IterativeEditConflictError)
     async def iterative_edit_conflict_handler(_, exc):
         return _error_response(409, "iterative_edit_conflict", str(exc))
@@ -638,10 +642,24 @@ def create_app(
     Authenticated = Annotated[AuthenticatedPrincipal, Depends(get_authenticated_principal)]
 
     def require_header_organization(
+        request: Request,
         principal: Authenticated,
         organization_id: Annotated[UUID, Header(alias="X-Organization-ID")],
     ) -> UUID:
         service.require_organization_member(organization_id, principal.principal_id)
+        raw_sid = request.path_params.get("session_id")
+        if raw_sid is not None:
+            try:
+                sid = UUID(str(raw_sid))
+            except ValueError as exc:
+                raise HTTPException(422, "Invalid session identifier") from exc
+            # Every public session route, including native enrichment and signed
+            # Asset access, must reject retired sessions. DELETE remains idempotent.
+            if not (
+                request.method == "DELETE"
+                and getattr(request.scope.get("route"), "path", "") == "/sessions/{session_id}"
+            ):
+                service.repository.get_design_session(sid, organization_id)
         return organization_id
 
     AuthorizedOrganization = Annotated[UUID, Depends(require_header_organization)]
@@ -774,6 +792,15 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.get_session(session_id, organization_id)
+
+    @app.delete("/sessions/{session_id}", status_code=204, response_class=Response)
+    def delete_session(
+        session_id: UUID, principal: Authenticated, organization_id: AuthorizedOrganization
+    ):
+        service.repository.retire_design_session(
+            session_id, organization_id, principal.principal_id, service._clock()
+        )
+        return Response(status_code=204)
 
     @app.get(
         "/sessions/{session_id}/schema-v1-1-eligibility",

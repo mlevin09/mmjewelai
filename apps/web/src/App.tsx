@@ -433,6 +433,17 @@ function ProjectSessions() {
   const navigate = useNavigate();
   const client = useQueryClient();
   const { organizationId = "", projectId = "" } = useParams();
+  const [deleting, setDeleting] = useState<Session | null>(null);
+  useEffect(() => setDeleting(null), [organizationId, projectId]);
+  const me = useQuery({
+    queryKey: keys.me,
+    queryFn: () => api.request<Me>("/me"),
+  });
+  const canDelete = me.data?.memberships.some(
+    (m) =>
+      m.organization_id === organizationId &&
+      (m.role === "owner" || m.role === "admin"),
+  );
   const catalog = useQuery({
     queryKey: keys.catalog,
     queryFn: () => api.request<UiCatalog>("/ui/catalog"),
@@ -443,6 +454,39 @@ function ProjectSessions() {
       api.request<{ sessions: Session[] }>(`/projects/${projectId}/sessions`, {
         organizationId,
       }),
+  });
+  const remove = useMutation({
+    mutationFn: (session: Session) =>
+      api.request(`/sessions/${session.session_id}`, {
+        organizationId,
+        method: "DELETE",
+      }),
+    onSuccess: async (_, session) => {
+      client.setQueryData<{ sessions: Session[] }>(
+        keys.sessions(organizationId, projectId),
+        (old) =>
+          old
+            ? {
+                ...old,
+                sessions: old.sessions.filter(
+                  (s) => s.session_id !== session.session_id,
+                ),
+              }
+            : old,
+      );
+      client.removeQueries({
+        queryKey: [
+          "organization",
+          organizationId,
+          "session",
+          session.session_id,
+        ],
+      });
+      setDeleting(null);
+      await client.invalidateQueries({
+        queryKey: keys.sessions(organizationId, projectId),
+      });
+    },
   });
   const [role, setRole] = useState("");
   const [locale, setLocale] = useState("");
@@ -472,17 +516,70 @@ function ProjectSessions() {
       <h1>Design sessions</h1>
       <div className="card-grid">
         {sessions.data?.sessions.map((session) => (
-          <Link
-            className="card"
-            key={session.session_id}
-            to={`/organizations/${organizationId}/sessions/${session.session_id}`}
-          >
-            <span className="badge">{session.locale}</span>
-            <h2>{humanize(session.role_id)}</h2>
-            <span>Revision workspace →</span>
-          </Link>
+          <article className="card" key={session.session_id}>
+            <Link
+              to={`/organizations/${organizationId}/sessions/${session.session_id}`}
+            >
+              <span className="badge">{session.locale}</span>
+              <h2>{humanize(session.role_id)}</h2>
+              <span>Revision workspace →</span>
+            </Link>
+            {canDelete && (
+              <button
+                type="button"
+                className="quiet"
+                disabled={remove.isPending}
+                aria-label={`Delete session ${session.session_id}`}
+                onClick={() => {
+                  remove.reset();
+                  setDeleting(session);
+                }}
+              >
+                Delete
+              </button>
+            )}
+          </article>
         ))}
       </div>
+      {deleting && (
+        <section
+          role="dialog"
+          aria-labelledby="delete-session-title"
+          className="panel"
+        >
+          <h2 id="delete-session-title">Delete this design session?</h2>
+          <p>
+            {humanize(deleting.role_id)} · {deleting.locale} ·{" "}
+            {deleting.session_id}
+          </p>
+          <p>
+            The session will no longer be accessible. Its history and images are
+            retained.
+          </p>
+          {remove.isError && (
+            <p role="alert">
+              {remove.error instanceof ApiError &&
+              remove.error.code === "session_deletion_conflict"
+                ? "Generation or image finalization is still active. Wait for it to finish before deleting this session."
+                : "Could not delete this session. It remains in the list; check your access or connection."}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={remove.isPending}
+            onClick={() => setDeleting(null)}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={remove.isPending}
+            onClick={() => remove.mutate(deleting)}
+          >
+            {remove.isPending ? "Deleting…" : "Delete session"}
+          </button>
+        </section>
+      )}
       <form
         className="inline-form"
         onSubmit={(event) => submitName(event, create.mutate)}

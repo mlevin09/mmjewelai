@@ -1,10 +1,16 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   App,
@@ -95,6 +101,127 @@ describe("authentication shell", () => {
     expect(await screen.findByText("Alice")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Log out" }));
     await waitFor(() => expect(oidc.signoutRedirect).toHaveBeenCalledOnce());
+  });
+});
+
+describe("design session deletion", () => {
+  beforeEach(cleanup);
+  afterEach(cleanup);
+  function sessions(role = "owner", failure = false) {
+    oidc.currentUser = { access_token: "access-token" };
+    let rows = ["session-one", "session-two"];
+    let deletions = 0;
+    let opens = 0;
+    server.use(
+      http.get("http://localhost:8000/me", () =>
+        HttpResponse.json({
+          principal_id: "actor",
+          display_name: "Tester",
+          memberships: [
+            {
+              organization_id: "organization-one",
+              organization_name: "Test org",
+              role,
+            },
+          ],
+        }),
+      ),
+      http.get("http://localhost:8000/ui/catalog", () =>
+        HttpResponse.json({
+          roles: [{ role_id: "retail_client" }],
+          locales: ["en", "ru"],
+        }),
+      ),
+      http.get("http://localhost:8000/projects/project-one/sessions", () =>
+        HttpResponse.json({
+          sessions: rows.map((session_id) => ({
+            session_id,
+            project_id: "project-one",
+            locale: "en",
+            role_id: "retail_client",
+          })),
+        }),
+      ),
+      http.delete(
+        "http://localhost:8000/sessions/:id",
+        ({ request, params }) => {
+          expect(request.headers.get("X-Organization-ID")).toBe(
+            "organization-one",
+          );
+          deletions++;
+          if (failure)
+            return HttpResponse.json(
+              {
+                error: "session_deletion_conflict",
+                detail: "Active generation",
+              },
+              { status: 409 },
+            );
+          rows = rows.filter((id) => id !== params.id);
+          return new HttpResponse(null, { status: 204 });
+        },
+      ),
+      http.get("http://localhost:8000/sessions/:id", () => {
+        opens++;
+        return HttpResponse.json({}, { status: 404 });
+      }),
+    );
+    renderApp("/organizations/organization-one/projects/project-one");
+    return {
+      get deletions() {
+        return deletions;
+      },
+      get opens() {
+        return opens;
+      },
+    };
+  }
+  it("cancels without a write or navigation, confirms exact session and removes only it", async () => {
+    const f = sessions();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Delete session session-one" }),
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent("session-one");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(f.deletions).toBe(0);
+    expect(f.opens).toBe(0);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete session session-one" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete session" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "Delete session session-one" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Delete session session-two" }),
+    ).toBeInTheDocument();
+    expect(f.deletions).toBe(1);
+    expect(f.opens).toBe(0);
+  });
+  it("keeps the consistent list and confirmation when generation prevents deletion", async () => {
+    const f = sessions("owner", true);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Delete session session-one" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Delete session" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("still active");
+    expect(
+      screen.getByRole("button", { name: "Delete session session-one" }),
+    ).toBeInTheDocument();
+    expect(f.deletions).toBe(1);
+  });
+  it("does not offer owner/admin deletion to a member", async () => {
+    sessions("member");
+    await screen.findByText("Design sessions");
+    expect(
+      screen.queryByRole("button", { name: /Delete session/ }),
+    ).not.toBeInTheDocument();
   });
 });
 
