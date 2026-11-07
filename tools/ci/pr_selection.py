@@ -77,17 +77,17 @@ def is_exact_parser13_recovery_release(root, changed, merge_base, head):
         before = subprocess.check_output(["git", "show", f"{frozen}:{fixture}"], cwd=root)
         after = subprocess.check_output(["git", "show", f"{head}:{fixture}"], cwd=root)
         old = (
-            b"def core_release(monkeypatch):\\n"
+            b"def core_release(monkeypatch):\n"
             b"    # Existing immutable source, local SYNTHETIC release only; "
-            b"no professional promotion.\\n"
+            b"no professional promotion.\n"
         )
         new = (
-            b"def core_release(monkeypatch):\\n"
-            b"    # Explicit test import root. Do not depend on unrelated collected modules\\n"
-            b"    # adding the repository to sys.path during broad-suite collection.\\n"
-            b"    monkeypatch.syspath_prepend(str(ROOT))\\n"
+            b"def core_release(monkeypatch):\n"
+            b"    # Explicit test import root. Do not depend on unrelated collected modules\n"
+            b"    # adding the repository to sys.path during broad-suite collection.\n"
+            b"    monkeypatch.syspath_prepend(str(ROOT))\n"
             b"    # Existing immutable source, local SYNTHETIC release only; "
-            b"no professional promotion.\\n"
+            b"no professional promotion.\n"
         )
         return before.count(old) == 1 and after == before.replace(old, new)
     except (OSError, subprocess.CalledProcessError):
