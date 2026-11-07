@@ -1182,7 +1182,7 @@ function QuestionCard({
               </option>
             ))}
             {allowed
-              .filter((d) => d !== "SELECT_OPTION")
+              .filter((d) => !["SELECT_OPTION", "UNKNOWN", "SKIP"].includes(d))
               .map((d) => (
                 <option value={d} key={d}>
                   {labels[d]}
@@ -1361,6 +1361,18 @@ function QuestionCard({
               return;
             }
             if (
+              q.question_kind === "NATIVE" &&
+              selectedDecision &&
+              (enteredValue.trim() || note.trim())
+            ) {
+              setValidationError(
+                ru
+                  ? "Выберите одно действие: вариант ответа или текст. Чтобы отправить текст, снимите выбранный вариант."
+                  : "Choose one action: an offered answer or text. Clear the selected option to send text.",
+              );
+              return;
+            }
+            if (
               kind === "dimensions" &&
               dimensionText &&
               measurements.some(
@@ -1424,8 +1436,8 @@ function QuestionCard({
         )}
         <p className="question-help">
           {ru
-            ? "Можно заполнить один или все поля. Значения сохраняются через JewelAI, затем актуальное описание обновляется с сервера."
-            : "Use any or all of these fields. JewelAI saves your answer, then refreshes the current design from the server."}
+            ? "Отправьте одно решение или текстовый ответ. Размеры сохраняются только полным набором из трёх значений. Актуальное описание загружается с сервера."
+            : "Submit one decision or text answer. Dimensions require all three measurements. JewelAI refreshes the current design from the server."}
         </p>
       </div>
     </section>
