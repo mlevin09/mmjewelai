@@ -167,6 +167,46 @@ header {
   border-color: var(--gold);
   transform: translateY(-2px);
 }
+
+/* Destructive utility action is secondary to opening the session. */
+.session-card {
+  position: relative;
+}
+.session-card > a {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding-right: 2.6rem;
+  text-decoration: none;
+}
+.session-card > a h2 {
+  margin: 0;
+}
+.session-card .session-delete-button {
+  position: absolute;
+  top: 0.85rem;
+  right: 0.85rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  background: transparent;
+  color: #667269;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.session-card .session-delete-button:hover {
+  background: #f9eae6;
+  border-color: #ebc9be;
+  color: #9b322d;
+}
+.session-card .session-delete-button:focus-visible {
+  outline: 3px solid var(--forest);
+  outline-offset: 2px;
+}
 .badge {
   display: inline-block;
   width: fit-content;
