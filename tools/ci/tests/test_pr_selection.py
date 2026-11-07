@@ -157,6 +157,42 @@ def test_parser_13_version_exception_is_exact_and_fails_closed(tmp_path):
     assert not selection.is_exact_parser_13_release_version_widening(tmp_path, "f" * 40, good, path)
 
 
+def test_frozen_parser13_risk_profile_is_strict_and_protects_core_checks():
+    frozen = "b829ce0bae9a51f3f54bcafc68e4f091034c99db"
+    merge_base = "ef656c70f341940183905eca890b507ee2f457e8"
+    current = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    raw = subprocess.check_output(
+        ["git", "diff", "--name-only", merge_base, current], cwd=ROOT, text=True
+    )
+    changed = raw.splitlines()
+    assert selection.is_exact_parser13_recovery_release(
+        ROOT, changed, merge_base, current
+    )
+    assert not selection.is_exact_parser13_recovery_release(
+        ROOT, changed + ["apps/api/src/unapproved.py"], merge_base, current
+    )
+    assert not selection.is_exact_parser13_recovery_release(
+        ROOT, changed, "a" * 40, current
+    )
+    assert not selection.is_exact_parser13_recovery_release(
+        ROOT, changed, merge_base, "f" * 40
+    )
+    assert len(selection.PARSER13_RECOVERY_API_TESTS) == len(
+        set(selection.PARSER13_RECOVERY_API_TESTS)
+    )
+    assert {
+        "apps/api/tests/completion/test_studio_recovery.py",
+        "apps/api/tests/test_f05_mutation_safety.py",
+        "apps/api/tests/test_parser12_contract.py",
+        "apps/api/tests/test_f05_release_http.py",
+    }.issubset(selection.PARSER13_RECOVERY_API_TESTS)
+    assert "apps/api/tests/test_generation_preparations_postgres.py" not in (
+        selection.PARSER13_RECOVERY_API_TESTS
+    )
+
+
 def test_other_preservation_changes_keep_full_regression_gate():
     result = selected("packages/domain/src/jewelai_domain/preservation_release.py")
     assert result["full_regression_required"]
