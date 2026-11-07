@@ -158,7 +158,6 @@ def test_parser_13_version_exception_is_exact_and_fails_closed(tmp_path):
 
 
 def test_frozen_parser13_risk_profile_is_strict_and_protects_core_checks():
-    frozen = "b829ce0bae9a51f3f54bcafc68e4f091034c99db"
     merge_base = "ef656c70f341940183905eca890b507ee2f457e8"
     current = subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
