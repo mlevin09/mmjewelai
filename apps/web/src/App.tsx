@@ -516,7 +516,7 @@ function ProjectSessions() {
       <h1>Design sessions</h1>
       <div className="card-grid">
         {sessions.data?.sessions.map((session) => (
-          <article className="card" key={session.session_id}>
+          <article className="card session-card" key={session.session_id}>
             <Link
               to={`/organizations/${organizationId}/sessions/${session.session_id}`}
             >
@@ -527,15 +527,31 @@ function ProjectSessions() {
             {canDelete && (
               <button
                 type="button"
-                className="quiet"
+                className="session-delete-button"
                 disabled={remove.isPending}
                 aria-label={`Delete session ${session.session_id}`}
+                title="Delete session"
                 onClick={() => {
                   remove.reset();
                   setDeleting(session);
                 }}
               >
-                Delete
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  width="19"
+                  height="19"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 7h16" />
+                  <path d="M10 4h4l1 3H9l1-3Z" />
+                  <path d="M6.5 7 7.4 20h9.2L17.5 7" />
+                  <path d="M10 11v5M14 11v5" />
+                </svg>
               </button>
             )}
           </article>
