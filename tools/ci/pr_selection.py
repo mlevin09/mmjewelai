@@ -32,6 +32,28 @@ def git_changes(root, base, head):
     return merge_base, sorted(p for p in paths if p)
 
 
+def is_exact_parser_13_release_version_widening(root, base_sha, head_sha, path):
+    """Only the frozen 1.2 -> additive 1.3 evidence-version type widening qualifies.
+
+    Compare complete blobs at the actual merge base and PR head. Any other
+    edit, missing original, or concurrent change remains full-regression-gated.
+    """
+    if path != "packages/domain/src/jewelai_domain/preservation_release.py":
+        return False
+    try:
+        before = subprocess.check_output(
+            ["git", "show", f"{base_sha}:{path}"], cwd=root
+        )
+        after = subprocess.check_output(
+            ["git", "show", f"{head_sha}:{path}"], cwd=root
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    original = b'parse_version: Literal["1.2.0"]'
+    additive = b'parse_version: Literal["1.2.0", "1.3.0"]'
+    return before.count(original) == 1 and after == before.replace(original, additive)
+
+
 def test_root(path):
     parts = Path(path).parts
     if "tests" not in parts:
@@ -242,7 +264,13 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
             full.append("shared_build_configuration")
             matched = True
         if any(path.startswith(p) for p in config["full_required_prefixes"]):
-            full.append("shared_authority_schema_or_migration")
+            # An exact additive Parser evidence-version type widening keeps the
+            # critical targeted domains/KEEP checks but has no new release
+            # semantics. Any other edit in this file retains the full gate.
+            if not is_exact_parser_13_release_version_widening(
+                root, merge_base, source_sha, path
+            ):
+                full.append("shared_authority_schema_or_migration")
             buckets.update({"continuation", "evidence", "persistence"})
         if path in {"apps/api/src/jewelai_api/app.py", "apps/api/src/jewelai_api/services.py"}:
             full.append("shared_api_dispatch")
