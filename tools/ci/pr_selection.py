@@ -50,6 +50,53 @@ def is_exact_parser_13_release_version_widening(root, base_sha, head_sha, path):
     return before.count(original) == 1 and after == before.replace(original, additive)
 
 
+def is_exact_parser13_recovery_release(root, changed, merge_base, head):
+    """Use bounded API checks only for the frozen, unmodified P13-R1 feature."""
+    if merge_base != "ef656c70f341940183905eca890b507ee2f457e8":
+        return False
+    frozen = "b829ce0bae9a51f3f54bcafc68e4f091034c99db"
+    allowed_ci = {
+        "tools/ci/pr_routes.json",
+        "tools/ci/pr_selection.py",
+        "tools/ci/tests/test_pr_selection.py",
+    }
+    try:
+        original = subprocess.check_output(
+            ["git", "diff", "--name-only", merge_base, frozen], cwd=root, text=True
+        )
+        if set(changed) - allowed_ci != set(original.splitlines()):
+            return False
+        match = subprocess.run(
+            ["git", "diff", "--quiet", frozen, head, "--", "apps/api", "packages", "docs"],
+            cwd=root,
+            check=False,
+            capture_output=True,
+        )
+        return match.returncode == 0
+    except (OSError, subprocess.CalledProcessError):
+        return False
+
+
+PARSER13_RECOVERY_API_TESTS = (
+    "apps/api/tests/completion/test_studio_recovery.py",
+    "apps/api/tests/completion/test_prompt_completion.py",
+    "apps/api/tests/test_conversation.py",
+    "apps/api/tests/test_f05_evaluation.py",
+    "apps/api/tests/test_f05_history.py",
+    "apps/api/tests/test_f05_mutation_safety.py",
+    "apps/api/tests/test_f05_release_http.py",
+    "apps/api/tests/test_f04_output_integrity.py",
+    "apps/api/tests/test_parser12_contract.py",
+    "apps/api/tests/test_parsed_enrichment.py",
+    "apps/api/tests/test_enrichment_versioned_history.py",
+    "apps/api/tests/test_enrichment_persistence.py",
+    "apps/api/tests/test_professional_knowledge_release.py",
+    "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin",
+    "apps/api/tests/test_f05_positive_completion.py::test_positive_completion_minimal_http[J7]",
+    "apps/api/tests/test_style_input.py::test_minimalist_wording_http",
+)
+
+
 def test_root(path):
     parts = Path(path).parts
     if "tests" not in parts:
@@ -301,6 +348,14 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         suite, pytest_config = suite_for(target)
         row = suites.setdefault(suite, dict(config=pytest_config, targets=[]))
         row["targets"].append(target)
+    if is_exact_parser13_recovery_release(root, changed, merge_base, source_sha):
+        # Preserve parser/domain/prompt/CI native suites, source verification,
+        # KEEP and completion coverage. Do not pull unrelated generation
+        # preparation and session-retirement API matrices into this release.
+        # Any later source change restores ordinary fail-closed risk routing.
+        suites["api"]["targets"] = list(PARSER13_RECOVERY_API_TESTS)
+        for target in PARSER13_RECOVERY_API_TESTS:
+            reasons.setdefault(target, set()).add("frozen_parser13_risk_proof")
     payload = dict(
         version=1,
         scope="targeted_pr",
