@@ -796,7 +796,10 @@ def test_current_parser_never_inherits_historical_read_governance(dictionary):
     assert read_full_message_parse_result(old.model_dump(mode="json")) == old
 
 
-def test_real_prechange_studio_source_evidence_is_reverified_byte_identically(dictionary):
+def test_real_prechange_studio_source_evidence_is_reverified_byte_identically(
+    dictionary, monkeypatch
+):
+    monkeypatch.syspath_prepend(str(ROOT))
     from jewelai_domain.knowledge_library_v1_1 import (
         CompiledKnowledgeLibraryV1_1,
         compile_knowledge_library_v1_1,
