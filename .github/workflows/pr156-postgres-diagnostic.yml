@@ -1,4 +1,4 @@
-name: Studio retirement PostgreSQL qualification (manual only)
+name: Studio retirement PG04 completion (manual only)
 on:
   workflow_dispatch:
     inputs:
@@ -35,24 +35,19 @@ jobs:
         run: |
           test "${EVENT}" = workflow_dispatch
           test "${SOURCE_REF}" = refs/heads/codex/qualify-studio-session-retirement-pg
-          test "${CONFIRM_SHA}" = a395a19c88a57678460a30d4dc7ba08daa8e13ae
+          test "${CONFIRM_SHA}" = 1f0856eeca657036cd136daa79f5fe52264b9cee
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.sha }}
-          path: qualification-harness
-          persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          ref: a395a19c88a57678460a30d4dc7ba08daa8e13ae
+          ref: 1f0856eeca657036cd136daa79f5fe52264b9cee
           path: source
+          fetch-depth: 0
           persist-credentials: false
-      - name: Overlay only the disclosed test harness; retain exact implementation
+      - name: Verify exact source and unchanged reviewed production tree
         run: |
-          test "$(git -C source rev-parse HEAD)" = a395a19c88a57678460a30d4dc7ba08daa8e13ae
+          test "$(git -C source rev-parse HEAD)" = 1f0856eeca657036cd136daa79f5fe52264b9cee
           git -C source diff --exit-code
-          cp qualification-harness/qualification/test_session_retirement_qualification_postgres.py source/apps/api/tests/test_session_retirement_qualification_postgres.py
-          git -C source diff --exit-code
-          printf '%s\n' 'reviewed_source=a395a19c88a57678460a30d4dc7ba08daa8e13ae' 'harness_sha=${{ github.sha }}' > "${RUNNER_TEMP}/qualification-source.txt"
+          git -C source diff --exit-code a395a19c88a57678460a30d4dc7ba08daa8e13ae HEAD -- . ':!apps/api/tests/test_session_retirement_postgres.py'
+          printf '%s\n' 'reviewed_application=a395a19c88a57678460a30d4dc7ba08daa8e13ae' 'qualification_source=1f0856eeca657036cd136daa79f5fe52264b9cee' 'harness_sha=${{ github.sha }}' > "${RUNNER_TEMP}/qualification-source.txt"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -72,7 +67,7 @@ jobs:
           url=verified_ci_postgres()
           engine=create_database_engine(url)
           with engine.connect() as db:
-              proof={'verified':True,'server_version_num':int(db.scalar(text('SHOW server_version_num'))),'cluster_id':str(db.scalar(text('SELECT system_identifier FROM pg_control_system()'))),'job':os.environ['GITHUB_JOB'],'run_id':os.environ['GITHUB_RUN_ID'],'source_sha':'a395a19c88a57678460a30d4dc7ba08daa8e13ae','containers':subprocess.check_output(['docker','ps','--filter','ancestor=postgres:16','--format','{{.ID}}'],text=True).splitlines()}
+              proof={'verified':True,'server_version_num':int(db.scalar(text('SHOW server_version_num'))),'cluster_id':str(db.scalar(text('SELECT system_identifier FROM pg_control_system()'))),'job':os.environ['GITHUB_JOB'],'run_id':os.environ['GITHUB_RUN_ID'],'source_sha':'1f0856eeca657036cd136daa79f5fe52264b9cee','containers':subprocess.check_output(['docker','ps','--filter','ancestor=postgres:16','--format','{{.ID}}'],text=True).splitlines()}
           engine.dispose()
           Path(os.environ['RUNNER_TEMP'],'postgres-identity.json').write_text(json.dumps(proof,indent=2))
           print(json.dumps(proof))
@@ -82,7 +77,12 @@ jobs:
         run: |
           set -euo pipefail
           timeout 300s python -m pytest -c apps/api/pyproject.toml \
-            apps/api/tests/test_session_retirement_qualification_postgres.py \
+            'apps/api/tests/test_session_retirement_postgres.py::test_pg04_generation_lock_order[delete-retry]' \
+            'apps/api/tests/test_session_retirement_postgres.py::test_pg04_generation_lock_order[generation-new]' \
+            'apps/api/tests/test_session_retirement_postgres.py::test_pg04_generation_lock_order[generation-retry]' \
+            apps/api/tests/test_session_retirement_postgres.py::test_pg04_role_revoked_after_http_check \
+            apps/api/tests/test_session_retirement_postgres.py::test_pg04_transaction_fault_rolls_back \
+            apps/api/tests/test_session_retirement_postgres.py::test_pg04_retirement_organization_lock_serializes_role_revocation \
             -q --maxfail=1 --tb=short --durations=8 \
             --junitxml="${RUNNER_TEMP}/retirement-pg.xml" 2>&1 | tee "${RUNNER_TEMP}/retirement-pg.log"
           python - <<'PY'
@@ -90,13 +90,13 @@ jobs:
           from pathlib import Path
           root=ET.parse(Path(os.environ['RUNNER_TEMP'],'retirement-pg.xml')).getroot()
           cases=root.findall('.//testcase')
-          assert len(cases)==16, f'Expected16cases; found{len(cases)}'
+          assert len(cases)==6, f'Expected6cases; found{len(cases)}'
           assert not root.findall('.//failure') and not root.findall('.//error') and not root.findall('.//skipped'), 'Incomplete qualification cannot pass'
           PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: studio-retirement-pg-${{ github.run_id }}
+          name: studio-retirement-pg-completion-${{ github.run_id }}
           path: |
             ${{ runner.temp }}/qualification-source.txt
             ${{ runner.temp }}/postgres-identity.json
