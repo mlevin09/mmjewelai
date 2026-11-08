@@ -591,6 +591,7 @@ export function EnrichmentWorkspace({
               />
             </label>
             <VoiceRecorder
+              key={`${organizationId}:${sessionId}:${ru}`}
               api={api}
               organizationId={organizationId}
               sessionId={sessionId}

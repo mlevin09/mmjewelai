@@ -202,3 +202,26 @@ git diff --check
 Model extra is unnecessary for normal tests. Codec tests use real FFmpeg and synthetic waveforms;
 RU/EN HTTP tests use a fake recognizer. macOS codec tests do not qualify Linux RLIMIT_AS. Cloud
 tests above are NOT TESTED and must never be inferred from unit-test PASS. No Full Regression.
+
+## Studio integration (PR #173; not yet deployed)
+
+Owner authorized the microphone-to-editable-text integration and preprod one-L4 operating costs
+on 2026-11-09. The browser records WebM/Ogg and sends bounded multipart audio to
+`POST /sessions/{session_id}/transcriptions?language=ru|en` on the existing authenticated API.
+Existing organization membership and session/retirement checks apply before any STT invocation.
+The API obtains a Google ID token server-side for the exact configured private `STT_SERVICE_URL`.
+Only schema version, status and text are returned to the browser; redirects, oversized/malformed
+upstream responses and credential failures fail closed with redacted errors.
+
+The proxy currently uses its existing requests/google-auth dependency graph; it does not install
+the model, CUDA or the standalone STT package into the API container. FastAPI's bounded multipart
+upload may spool transiently to the container's ephemeral temporary filesystem; request cleanup
+closes/removes the upload. Nothing stores audio as an Asset, database record or durable object.
+No audio or transcript is logged. The STT service itself continues decoding through pipes only.
+
+Transcription is appended to the editable Studio input; it does not submit a Message or update
+Product State. Users must review/edit and press the ordinary submit action. Recording errors,
+permission denial, silence and STT unavailability preserve manual text input. Changing session,
+organization or language tears down recording and ignores/aborts pending transcription results.
+MP4-only browsers remain unsupported. Fake browser/transport tests do not prove microphone,
+GPU inference, live internal routing or egress isolation. Those require separate live evidence.

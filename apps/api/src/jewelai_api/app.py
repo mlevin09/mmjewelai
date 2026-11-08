@@ -828,7 +828,7 @@ def create_app(
     async def transcribe_session_audio(
         session_id: UUID,
         organization_id: AuthorizedOrganization,
-        audio: UploadFile = File(...),
+        audio: Annotated[UploadFile, File()],
         language: str | None = None,
     ):
         """Return editable speech text without modifying a session or persisting audio."""
@@ -839,32 +839,39 @@ def create_app(
         from google.oauth2.id_token import fetch_id_token
 
         # AuthorizedOrganization validates tenant membership and the active session.
-        service_url = os.getenv("STT_SERVICE_URL", "")
-        if not re.fullmatch(r"https://[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.run\\.app", service_url):
-            return _error_response(503, "stt_unavailable", "Speech service unavailable")
-        content_type = (audio.content_type or "").split(";", 1)[0].strip().lower()
-        if content_type not in {"audio/wav", "audio/webm", "audio/ogg"}:
-            return _error_response(415, "unsupported_audio", "Unsupported speech format")
-        if language not in (None, "ru", "en"):
-            return _error_response(422, "unsupported_language", "Unsupported language")
         try:
+            service_url = os.getenv("STT_SERVICE_URL", "")
+            if not re.fullmatch(r"https://[a-z0-9-]+(?:\.[a-z0-9-]+)*\.run\.app", service_url):
+                return _error_response(503, "stt_unavailable", "Speech service unavailable")
+            content_type = (audio.content_type or "").split(";", 1)[0].strip().lower()
+            if content_type not in {"audio/wav", "audio/webm", "audio/ogg"}:
+                return _error_response(415, "unsupported_audio", "Unsupported speech format")
+            if language not in (None, "ru", "en"):
+                return _error_response(422, "unsupported_language", "Unsupported language")
             content = await audio.read(10 * 1024 * 1024 + 1)
             if not content or len(content) > 10 * 1024 * 1024:
                 return _error_response(413, "audio_too_large", "Speech recording exceeds limits")
+
             # Only the server receives Google service identity; no external inference API.
             def call_stt():
                 token = fetch_id_token(GoogleAuthRequest(), service_url)
-                response = requests.post(
+                with requests.post(
                     service_url + "/internal/v1/transcriptions",
                     params={"language": language} if language else None,
                     data=content,
                     headers={"Authorization": "Bearer " + token, "Content-Type": content_type},
                     timeout=55,
                     allow_redirects=False,
-                )
-                if response.status_code != 200 or len(response.content) > 65536:
-                    raise ValueError("stt_response_unavailable")
-                payload = response.json()
+                    stream=True,
+                ) as response:
+                    if response.status_code != 200:
+                        raise ValueError("stt_response_unavailable")
+                    body = bytearray()
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if len(body) + len(chunk) > 65536:
+                            raise ValueError("stt_response_unavailable")
+                        body.extend(chunk)
+                    payload = json.loads(body)
                 if (
                     not isinstance(payload, dict)
                     or payload.get("schema_version") != "1.0.0"
@@ -873,7 +880,7 @@ def create_app(
                     or len(payload["text"]) > 8192
                 ):
                     raise ValueError("invalid_stt_response")
-                return payload
+                return {key: payload[key] for key in ("schema_version", "status", "text")}
 
             try:
                 return await asyncio.to_thread(call_stt)

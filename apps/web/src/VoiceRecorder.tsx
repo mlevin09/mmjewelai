@@ -32,17 +32,20 @@ export function VoiceRecorder({
   onTranscript: (text: string) => void;
 }) {
   const [recording, setRecording] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [message, setMessage] = useState("");
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = useRef(true);
+  const request = useRef<AbortController | null>(null);
 
   useEffect(() => {
     active.current = true;
     return () => {
       active.current = false;
+      request.current?.abort();
       if (timeout.current) clearTimeout(timeout.current);
       recorder.current?.stream.getTracks().forEach((track) => track.stop());
       if (recorder.current?.state === "recording") recorder.current.stop();
@@ -64,7 +67,9 @@ export function VoiceRecorder({
   }
 
   async function start() {
-    if (!available || disabled || recording || transcribing) return;
+    if (!available || disabled || requesting || recording || transcribing)
+      return;
+    setRequesting(true);
     setMessage("");
     let capture: MediaStream | null = null;
     try {
@@ -79,21 +84,25 @@ export function VoiceRecorder({
       }
       const instance = new MediaRecorder(capture, { mimeType });
       const parts: Blob[] = [];
+      let recordingFailed = false;
       recorder.current = instance;
       stream.current = capture;
       instance.ondataavailable = (event) => {
         if (event.data.size) parts.push(event.data);
       };
       instance.onerror = () => {
+        recordingFailed = true;
         if (active.current)
           setMessage(
-            language === "ru" ? "Ошибка записи звука" : "Audio recording failed",
+            language === "ru"
+              ? "Ошибка записи звука"
+              : "Audio recording failed",
           );
         stop();
       };
       instance.onstop = () => {
         capture?.getTracks().forEach((track) => track.stop());
-        if (!active.current) return;
+        if (!active.current || recordingFailed) return;
         setRecording(false);
         const audio = new Blob(parts, { type: mimeType.split(";")[0] });
         if (!audio.size || audio.size > MAX_AUDIO_BYTES) {
@@ -107,10 +116,17 @@ export function VoiceRecorder({
         const form = new FormData();
         form.append("audio", audio, "speech.webm");
         setTranscribing(true);
+        const controller = new AbortController();
+        request.current = controller;
         void api
           .request<SpeechResult>(
             `/sessions/${sessionId}/transcriptions?language=${language}`,
-            { method: "POST", body: form, organizationId },
+            {
+              method: "POST",
+              body: form,
+              organizationId,
+              signal: controller.signal,
+            },
           )
           .then((result) => {
             if (!active.current) return;
@@ -147,8 +163,12 @@ export function VoiceRecorder({
       capture?.getTracks().forEach((track) => track.stop());
       if (active.current)
         setMessage(
-          language === "ru" ? "Не удалось открыть микрофон" : "Microphone unavailable",
+          language === "ru"
+            ? "Не удалось открыть микрофон"
+            : "Microphone unavailable",
         );
+    } finally {
+      if (active.current) setRequesting(false);
     }
   }
 
@@ -157,7 +177,7 @@ export function VoiceRecorder({
       <button
         type="button"
         className="quiet"
-        disabled={disabled || transcribing || !available}
+        disabled={disabled || requesting || transcribing || !available}
         aria-label={
           recording
             ? language === "ru"
