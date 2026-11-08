@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-stt"
+version = "1.0.0"
+description = "Private, offline speech transcription; no Product State authority"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "fastapi==0.121.1",
+  "httpx==0.28.1",
+  "google-auth==2.40.3",
+  "requests==2.32.5",
+  "imageio-ffmpeg==0.6.0",
+  "uvicorn==0.38.0",
+]
+
+[project.optional-dependencies]
+model = [
+  "qwen-asr==0.0.6",
+  "torch @ https://download.pytorch.org/whl/cu126/torch-2.10.0%2Bcu126-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=2a7a569206f07965eff69b28e147676540bb0ba6e1a39410802b6e4708cb8356",
+  "numpy==2.2.6",
+]
+test = ["pytest==8.4.2", "ruff==0.16.9"]
+build = ["hatchling==1.27.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jewelai_stt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
