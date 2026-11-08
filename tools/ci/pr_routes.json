@@ -1,5 +1,11 @@
 {
   "version": 1,
+  "isolated_components": {
+    "apps/stt": {
+      "evidence": "Standalone ephemeral STT has no API/domain/Parser/database imports. Complete native apps/stt/tests owns its source, package config, dependency locks and synthetic codec/recognizer fixtures. Test-only NumPy supports the mocked model boundary, without CUDA/Qwen/model weights. Shared backend edits retain ordinary risk gates.",
+      "test_dependencies": ["numpy==2.2.6"]
+    }
+  },
   "smoke": [
     "apps/api/tests/test_f05_positive_completion.py::test_positive_completion_minimal_http[J7]",
     "packages/prompts/tests/test_final_prompt.py::test_builds_deterministic_provider_neutral_outputs",
@@ -338,8 +344,10 @@
   "delegated_prefixes": [
     "apps/web/",
     ".github/workflows/web.yml",
-    "infra/terraform/preprod/services.tf",
-    "infra/terraform/preprod/README.md"
+    "infra/",
+    ".github/workflows/infra.yml",
+    ".github/workflows/deploy-preprod.yml",
+    ".github/workflows/deploy-production.yml"
   ],
   "delegated_check": "Web / Infrastructure (existing independent workflows; not certified by Runtime API)",
   "fixture_scopes": [
