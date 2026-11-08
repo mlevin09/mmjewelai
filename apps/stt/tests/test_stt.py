@@ -466,3 +466,20 @@ def test_empty_model_result_is_silence_without_claiming_a_language():
     assert response.status_code == 200
     assert response.json()["status"] == "silence"
     assert response.json()["language"] is None
+
+
+def test_non_address_dns_has_authoritative_private_fallback():
+    # This is a source safety guard, not evidence of live Cloud DNS behavior.
+    root = Path(__file__).resolve().parents[3]
+    source = (root / "infra/terraform/preprod/stt.tf").read_text()
+    block = source.split('resource "google_dns_managed_zone" "stt_inference_root" {', 1)[1]
+    block = block.split('resource "google_service_account" "stt" {', 1)[0]
+    assert "count       = local.stt_enabled ? 1 : 0" in block
+    assert "project     = var.project_id" in block
+    assert 'dns_name    = "."' in block
+    assert 'visibility  = "private"' in block
+    assert 'network_url = google_compute_network.stt["inference"].id' in block
+    assert 'google_compute_network.stt["caller"]' not in block
+    assert "forwarding_config" not in block and "peering_config" not in block
+    service = source.split('resource "google_cloud_run_v2_service" "stt" {', 1)[1]
+    assert "google_dns_managed_zone.stt_inference_root" in service.split("depends_on = [", 1)[1]

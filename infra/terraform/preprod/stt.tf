@@ -96,8 +96,8 @@ resource "google_dns_record_set" "stt_caller" {
   rrdatas      = ["199.36.153.4", "199.36.153.5", "199.36.153.6", "199.36.153.7"]
 }
 
-# Metadata DNS traffic is not governed by VPC firewalls: answer all runtime queries locally,
-# without forwarding attacker-controlled names to public authoritative DNS servers.
+# Metadata DNS traffic is not governed by VPC firewalls. This policy sinks A/AAAA;
+# the authoritative private root below prevents recursion for all other query types.
 resource "google_dns_response_policy" "stt" {
   count                = local.stt_enabled ? 1 : 0
   project              = var.project_id
@@ -124,6 +124,22 @@ resource "google_dns_response_policy_rule" "stt" {
       ttl     = 60
       rrdatas = ["::1"]
     }
+  }
+}
+
+# The response policy only answers configured RR types. Live qualification showed that
+# TXT/MX otherwise fall through to public recursion. This authoritative private root
+# supplies negative answers for every unmatched name/type, only on the inference VPC.
+# Keep caller DNS separate: it still needs Google identity and provider connectivity.
+resource "google_dns_managed_zone" "stt_inference_root" {
+  count       = local.stt_enabled ? 1 : 0
+  project     = var.project_id
+  name        = "jewelai-preprod-stt-offline-root"
+  dns_name    = "."
+  description = "Authoritative empty root: no public DNS fallback for offline STT."
+  visibility  = "private"
+  private_visibility_config {
+    networks { network_url = google_compute_network.stt["inference"].id }
   }
 }
 
@@ -185,7 +201,8 @@ resource "google_cloud_run_v2_service" "stt" {
   }
   depends_on = [
     google_compute_firewall.stt_deny_ipv4, google_compute_firewall.stt_deny_ipv6,
-    google_dns_response_policy_rule.stt, google_project_service.production,
+    google_dns_response_policy_rule.stt, google_dns_managed_zone.stt_inference_root,
+    google_project_service.production,
   ]
 }
 

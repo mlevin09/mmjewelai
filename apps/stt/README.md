@@ -1,7 +1,9 @@
 # Private self-hosted STT v1
 
-Status: implementation for independent review; **not built into an image, installed on GPU,
-deployed, or speech-accuracy qualified**. The developer host has no Docker engine or GPU.
+Status (2026-11-09): actual model image built/published and preprod GPU revision Ready.
+**Not speech-accuracy or Studio qualified**: live TXT/MX DNS isolation failed; the additive
+authoritative private-root fallback is pending review/deployment. No real speech was submitted.
+The developer host has no Docker engine or GPU.
 This service has no Parser, Knowledge, database, Asset or Product State dependency.
 
 ## Internal contract
@@ -225,3 +227,11 @@ permission denial, silence and STT unavailability preserve manual text input. Ch
 organization or language tears down recording and ignores/aborts pending transcription results.
 MP4-only browsers remain unsupported. Fake browser/transport tests do not prove microphone,
 GPU inference, live internal routing or egress isolation. Those require separate live evidence.
+
+Real build: `d24c2c2a-0d67-4fbf-8aeb-3b3a6db4402d`, image digest
+`sha256:f326673335ebb18b6b823e4927618be9ff534e88be21c91bfff4ab990087040a`, 11-file manifest
+SHA-256 `e2a90b064567e8731ec1c2d8e6dc3479b819241fe91c4fc434b12218324bd475`.
+Both frozen weight checksums and offline import passed. Deployment `42531993325` succeeded for
+already merged backend SHA `6d6e61e09d93bcbe2d44686d729533711c283345`; PR #173 UI/proxy was not merged.
+A random-name NXDOMAIN is not proof against DNS recursion. Known public TXT/MX controls must
+return local negative answers before any user audio or real speech qualification is allowed.
