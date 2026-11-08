@@ -12182,6 +12182,19 @@
         },
         "availability_overlay": {
           "$ref": "#/$defs/CanonicalAvailabilityOverlay"
+        },
+        "parser_evidence_version": {
+          "anyOf": [
+            {
+              "const": "1.3.0",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parser Evidence Version"
         }
       },
       "required": [

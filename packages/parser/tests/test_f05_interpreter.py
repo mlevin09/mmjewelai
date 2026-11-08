@@ -7,7 +7,7 @@ from jewelai_domain import load_domain_dictionary
 
 from jewelai_parser.full_message import (
     FullMessageParseResult,
-    FullMessageParseResultV1_2,
+    FullMessageParseResultV1_3,
     parse_full_message,
     read_full_message_parse_result,
     same_parse_evidence,
@@ -31,8 +31,8 @@ def dictionary():
 )
 def test_wire_formats_use_identical_current_extraction(dictionary, text, locale):
     new = parse_full_message(text, locale=locale, dictionary=dictionary)
-    assert type(new) is FullMessageParseResultV1_2
-    assert new.parse_version == "1.2.0"
+    assert type(new) is FullMessageParseResultV1_3
+    assert new.parse_version == "1.3.0"
     assert any(c.classification == "preservation" for c in new.candidates)
     # Frozen historical evidence is a data fixture, not another parsing operation.
     old = FullMessageParseResult(**new.model_dump(exclude={"parse_version"}))
@@ -57,7 +57,7 @@ def test_independent_positive_fact_survives_new_preservation_grammar(dictionary)
     )
 
 
-@pytest.mark.parametrize("version", [None, "1.0.0", "1.3.0"])
+@pytest.mark.parametrize("version", [None, "1.0.0", "1.4.0"])
 def test_evidence_reader_requires_an_explicit_supported_version(dictionary, version):
     payload = parse_full_message("A gold ring.", locale="en", dictionary=dictionary).model_dump(
         mode="json"

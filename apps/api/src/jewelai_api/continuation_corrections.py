@@ -25,6 +25,7 @@ from jewelai_domain.preservation_release import (
 )
 from jewelai_domain.revisions import revise_design
 from jewelai_parser import CandidateCertainty, CandidateClassification
+from jewelai_parser.full_message import FULL_MESSAGE_PARSE_VERSION, _source_governance
 from jewelai_prompts.continuation import continuation_cycle
 
 from .continuation_evaluation import canonical_native_result, evaluate_continuation_message
@@ -35,7 +36,14 @@ from .f04_planning import canonical_target, input_context
 from .parsed_enrichment import proposed_design_for_transition
 
 
-def prepare_correction(
+def prepare_correction(*args, _recorded_parse_version=None, **kwargs):
+    # Replaying a verified immutable record pins only its source-proof rules.
+    # New commands never supply this private argument and always parse CURRENT.
+    with _source_governance(_recorded_parse_version or FULL_MESSAGE_PARSE_VERSION):
+        return _prepare_correction(*args, _recorded_parse_version=_recorded_parse_version, **kwargs)
+
+
+def _prepare_correction(
     service,
     repo,
     native,
@@ -47,6 +55,7 @@ def prepare_correction(
     plan_id,
     created_at,
     committed_revision=None,
+    _recorded_parse_version=None,
 ):
     """Recompute actual source/proposal/transition evidence, including during replay."""
     from .continuation_runtime import message_source, request_hash
@@ -103,6 +112,7 @@ def prepare_correction(
             role_id=native.session.role_id,
             locale=native.session.locale,
             native_context=native_context,
+            _recorded_parse_version=_recorded_parse_version,
         )
 
     first = evaluate(before)
@@ -162,7 +172,7 @@ def prepare_correction(
                 correction_record_id=record_id,
                 source=source,
                 message_sha256=sha,
-                parse_version="1.2.0",
+                parse_version=first.parse_result.parse_version,
                 parse_hash=evidence_hash(first.parse_result),
                 proposal_hash=evidence_hash(first.parser_proposal),
                 source_candidate_ids=tuple(sorted(c.candidate_id for c in candidates)),

@@ -20,6 +20,7 @@ from jewelai_domain.preservation_release import (
 )
 from jewelai_domain.revisions import RevisionConflict, revise_design
 from jewelai_parser import ParserTarget
+from jewelai_parser.full_message import FULL_MESSAGE_PARSE_VERSION, _source_governance
 from jewelai_prompts.continuation import continuation_cycle
 
 from .clarification_answers import ClarificationAnswerError, _parser_proposal, _resolve_decision
@@ -73,7 +74,12 @@ def _next_native(service, repo, native, plan, after, *, cycle_id):
     return canonical_native_result(bound, after, plan.context, native_context=source_context)
 
 
-def prepare_answer(
+def prepare_answer(*args, _recorded_governance_version=None, **kwargs):
+    with _source_governance(_recorded_governance_version or FULL_MESSAGE_PARSE_VERSION):
+        return _prepare_answer(*args, **kwargs)
+
+
+def _prepare_answer(
     service, repo, native, plan, request, *, cycle_id, created_at, intents, committed_revision=None
 ):
     from .continuation_runtime import message_source, request_hash

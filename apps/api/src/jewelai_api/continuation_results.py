@@ -14,7 +14,7 @@ from jewelai_domain.preservation_release import KeepReleaseDecision, KeepRelease
 from jewelai_domain.questions import QuestionId
 from jewelai_domain.questions_v2 import QuestionIdV2
 from jewelai_parser import AnyParserProposal
-from jewelai_parser.full_message import FullMessageParseResultV1_2
+from jewelai_parser.full_message import FullMessageParseResultV1_2, FullMessageParseResultV1_3
 from jewelai_prompts.continuation import ContinuationEnrichmentResult
 from pydantic import Field, model_validator
 
@@ -51,7 +51,10 @@ class ContinuationCorrectionResult(StrictEvidenceModel):
     session_id: UUID
     source: MessageSource
     source_message_sha256: Sha256
-    source_parse: FullMessageParseResultV1_2
+    source_parse: Annotated[
+        FullMessageParseResultV1_2 | FullMessageParseResultV1_3,
+        Field(discriminator="parse_version"),
+    ]
     native_proposal: AnyParserProposal
     correction_evaluation: ParsedEvaluationV3
     post_transition_evaluation: ParsedEvaluationV3

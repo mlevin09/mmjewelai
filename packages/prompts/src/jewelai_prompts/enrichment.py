@@ -238,6 +238,9 @@ class StructuredPromptEnrichmentResultV2(StructuredPromptEnrichmentResult, Stric
     scope: EvidenceScope
     context: InputContext
     availability_overlay: CanonicalAvailabilityOverlay
+    parser_evidence_version: Literal["1.3.0"] | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
 
     @model_validator(mode="after")
     def validate_f04_context(self):

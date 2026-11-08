@@ -12,7 +12,13 @@ from jewelai_domain.continuation import ContinuationContext
 from jewelai_domain.preservation import contract_hash
 from jewelai_domain.rules import RuleDecision
 from jewelai_domain.rules_v2 import RuleDecisionV2
-from jewelai_parser.full_message import FullMessageParseResultV1_2, parse_full_message
+from jewelai_parser.full_message import (
+    FullMessageParseResultV1_2,
+    FullMessageParseResultV1_3,
+    _parse_recorded_message,
+    _source_governance,
+    parse_full_message,
+)
 from jewelai_prompts.enrichment import (
     StructuredPromptEnrichmentResult,
     StructuredPromptEnrichmentResultV2,
@@ -30,7 +36,10 @@ from .parsed_enrichment import (
 class ParsedEvaluationV3(ParsedCandidateEnrichmentResult):
     evaluation_version: Literal["3.0.0"]
     context: ContinuationContext
-    parse_result: FullMessageParseResultV1_2
+    parse_result: Annotated[
+        FullMessageParseResultV1_2 | FullMessageParseResultV1_3,
+        Field(discriminator="parse_version"),
+    ]
     enrichment_result: Annotated[
         StructuredPromptEnrichmentResult | StructuredPromptEnrichmentResultV2,
         Field(discriminator="enrichment_version"),
@@ -84,6 +93,7 @@ def evaluate_continuation_message(
     role_id,
     locale,
     native_context=None,
+    _recorded_parse_version=None,
 ):
     """Evaluate actual scoped text with the admitted interpreter and existing owners.
 
@@ -104,8 +114,10 @@ def evaluate_continuation_message(
         raise ValueError("Continuation evaluation requires exact scoped Message provenance")
     if context.parser_interpreter_id != "f05-1.2":
         raise ValueError("Explicit continuation interpreter is required")
-    parsed = parse_full_message(
+    parse = parse_full_message if _recorded_parse_version is None else _parse_recorded_message
+    parsed = parse(
         message.content,
+        **({"parse_version": _recorded_parse_version} if _recorded_parse_version else {}),
         locale=locale,
         dictionary=service.artifacts.dictionary,
         knowledge_runtime=verified_release.compiled_runtime,
@@ -116,7 +128,8 @@ def evaluate_continuation_message(
         if context.retained_base == "F":
             if native_context is None:
                 raise ValueError("F evaluation requires its actual native source context")
-            native = f04_enrichment(native, revision=revision, context=native_context)
+            with _source_governance(parsed.parse_version):
+                native = f04_enrichment(native, revision=revision, context=native_context)
         elif native_context is not None:
             raise ValueError("L cannot acquire a native F context")
         payload.update(

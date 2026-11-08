@@ -198,7 +198,7 @@ def test_real_behavioral_negative_boundary(catalogs):
         dictionary=artifacts.dictionary,
         knowledge_runtime=runtime,
     )
-    assert parsed.parse_version == "1.2.0"
+    assert parsed.parse_version == "1.3.0"
     assert any(
         c.normalized_values == ("gold",) and c.parser_update is not None for c in parsed.candidates
     )

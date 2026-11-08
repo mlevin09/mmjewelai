@@ -344,6 +344,16 @@
   "delegated_check": "Web / Infrastructure (existing independent workflows; not certified by Runtime API)",
   "fixture_scopes": [
     {
+      "resources": "packages/parser/tests/fixtures/",
+      "tests": "packages/parser/tests",
+      "evidence": "Frozen parser 1.1/1.2 provenance and source-verification fixture bytes are loaded by packages/parser/tests/test_full_message.py (test_real_prechange_studio_source_evidence_is_reverified_byte_identically). The complete packages/parser/tests scope owns parse-version governance, source spans, hash re-verification and positive/negative parser controls. This resource routing does not remove the separate Full Regression qualification for preservation_release.py."
+    },
+    {
+      "resources": "specs/prompts/canonical-preparation-schema.json",
+      "tests": "packages/prompts/tests",
+      "evidence": "Generated canonical preparation schema snapshot is compared byte-for-byte with canonical_json_schema() by packages/prompts/tests/test_canonical_schema.py. The complete prompts test scope owns the exact schema drift and historical compatibility checks; no test or gate is removed."
+    },
+    {
       "resources": "data/completion/",
       "tests": "packages/domain/tests",
       "evidence": "CompletionRegistry and selector/prompt projection are owned by complete Domain/Prompts tests. The complete apps/api/tests/completion namespace owns the actual checked-in proposed policy, loader/hash/activation refusal, contextual runtime completion and latest-state integration, plus all durable completion HTTP/PostgreSQL tests. No other runtime resource is mapped. Shared app.py/models.py Full qualification remains mandatory."

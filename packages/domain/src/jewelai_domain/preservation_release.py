@@ -68,7 +68,7 @@ class KeepReleaseIntent(StrictEvidenceModel):
     correction_record_id: UUID
     source: MessageSource
     message_sha256: Sha256
-    parse_version: Literal["1.2.0"]
+    parse_version: Literal["1.2.0", "1.3.0"]
     parse_hash: Sha256
     proposal_hash: Sha256
     source_candidate_ids: tuple[Text, ...] = Field(min_length=1)
