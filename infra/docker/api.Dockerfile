@@ -3,7 +3,6 @@ FROM python:3.12.14-slim-bookworm AS builder
 WORKDIR /build
 COPY packages packages
 COPY apps/api apps/api
-COPY apps/stt apps/stt
 RUN python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip wheel --no-cache-dir --wheel-dir /wheels \
       ./packages/domain ./packages/auth ./packages/auth_oidc \
@@ -11,7 +10,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
       ./packages/assets_gcs ./packages/generation_queue ./packages/generation_queue_gcp \
       ./packages/model_gateway ./packages/parser ./packages/persistence ./packages/prompts \
       ./packages/text_understanding_google \
-      ./apps/stt ./apps/api
+      ./apps/api
 
 FROM python:3.12.14-slim-bookworm AS runtime
 

@@ -831,31 +831,57 @@ def create_app(
         audio: UploadFile = File(...),
         language: str | None = None,
     ):
-        """Authenticated, organization/session-scoped ephemeral speech-to-editable-text proxy.
+        """Return editable speech text without modifying a session or persisting audio."""
+        import re
 
-        This route never creates a message or updates canonical design state.
-        Organization/session access is verified by AuthorizedOrganization before audio is read.
-        """
-        from jewelai_stt.audio import FORMATS, MAX_BYTES, SttError
-        from jewelai_stt.client import SttClient
+        import requests
+        from google.auth.transport.requests import Request as GoogleAuthRequest
+        from google.oauth2.id_token import fetch_id_token
 
+        # AuthorizedOrganization validates tenant membership and the active session.
         service_url = os.getenv("STT_SERVICE_URL", "")
-        if not service_url:
-            return _error_response(503, "stt_unavailable", "Speech recognition is unavailable")
+        if not re.fullmatch(r"https://[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.run\\.app", service_url):
+            return _error_response(503, "stt_unavailable", "Speech service unavailable")
         content_type = (audio.content_type or "").split(";", 1)[0].strip().lower()
-        if content_type not in FORMATS or language not in (None, "ru", "en"):
+        if content_type not in {"audio/wav", "audio/webm", "audio/ogg"}:
             return _error_response(415, "unsupported_audio", "Unsupported speech format")
+        if language not in (None, "ru", "en"):
+            return _error_response(422, "unsupported_language", "Unsupported language")
         try:
-            content = await audio.read(MAX_BYTES + 1)
-            if not content or len(content) > MAX_BYTES:
+            content = await audio.read(10 * 1024 * 1024 + 1)
+            if not content or len(content) > 10 * 1024 * 1024:
                 return _error_response(413, "audio_too_large", "Speech recording exceeds limits")
-            # Cloud Run ID token and private ingress; browser never receives STT credentials.
-            result = await asyncio.to_thread(
-                SttClient(service_url).transcribe, content, content_type, language
-            )
-            return result
-        except SttError as exc:
-            return _error_response(exc.status, exc.code, "Speech recognition failed")
+            # Only the server receives Google service identity; no external inference API.
+            def call_stt():
+                token = fetch_id_token(GoogleAuthRequest(), service_url)
+                response = requests.post(
+                    service_url + "/internal/v1/transcriptions",
+                    params={"language": language} if language else None,
+                    data=content,
+                    headers={"Authorization": "Bearer " + token, "Content-Type": content_type},
+                    timeout=55,
+                    allow_redirects=False,
+                )
+                if response.status_code != 200 or len(response.content) > 65536:
+                    raise ValueError("stt_response_unavailable")
+                payload = response.json()
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("schema_version") != "1.0.0"
+                    or payload.get("status") not in {"transcribed", "silence"}
+                    or not isinstance(payload.get("text"), str)
+                    or len(payload["text"]) > 8192
+                ):
+                    raise ValueError("invalid_stt_response")
+                return payload
+
+            try:
+                return await asyncio.to_thread(call_stt)
+            except requests.Timeout:
+                return _error_response(504, "stt_timeout", "Speech service timed out")
+            except (requests.RequestException, ValueError, TypeError, KeyError, Exception):
+                # Upstream text, credentials and internal error details are never returned.
+                return _error_response(503, "stt_unavailable", "Speech service unavailable")
         finally:
             await audio.close()
 

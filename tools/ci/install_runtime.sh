@@ -20,8 +20,7 @@ python -m pip install \
   -e './workers/generation[test]' \
   -e './packages/parser[test]' \
   -e './packages/text_understanding_google[test]' \
-  -e './apps/api[test]' \
-  -e './apps/stt'
+  -e './apps/api[test]'
 if test "$#" -eq 0; then
   # Existing full workflow: include any reviewed native app present on this exact source tree.
   python tools/ci/pr_selection.py --install-native-apps
