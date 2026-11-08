@@ -1,9 +1,7 @@
 # Risk-based PR CI (CI-RISK-BASED-001)
 
-Local review candidate; not activated, pushed or measured on GitHub. No product,
-product-test assertion, migration, provider or deployment changes. PR143/144 are
-not imported or modified. Only the reviewed CI utilities from local `d0000a8` are
-reused. This is pytest selection/reporting, not a new test framework.
+Issue #171 reliability repair keeps the existing native pytest selector/runner and required
+check identity. Product logic, provider/runtime deployments and branch protection are unchanged.
 
 ## Automatic PR gate
 
@@ -18,13 +16,15 @@ selects:
 1. Entire new/modified pytest files, including all new parametrized cases.
 2. Explicit component/dependent regression scopes from `pr_routes.json`.
 3. Reverse transitive imports of changed local test helpers.
-4. The four existing module-smoke targets in that same configuration.
+4. The four existing module-smoke targets when shared backend behavior is affected (not CI-only/STT).
 5. Mandatory authority, evidence, persistence and authorization scopes by risk.
 
 Selection is normalized so a whole directory/file subsumes child targets. Each
-suite retains its native pytest configuration. Native collection then proves
-that selected API cases belong to the full API inventory. Collection alone never
-runs fixtures/tests. Empty/duplicate/uncollectable selections, missing artifacts,
+suite retains its native pytest configuration. Only selected scopes are natively collected; the
+runner does not collect every API case for a narrow change. Source SHA, merge-base/changed paths,
+routing hash and selected collection/execution identities remain verified. Collection alone never
+runs fixtures/tests. A path-only saturation check refuses whole-API requests before collection;
+a validated exact-SHA Full receipt can supply its already-proven complete API case list. Empty/duplicate/uncollectable selections, missing artifacts,
 failed/skipped/incomplete tests or duplicate/missing phases fail. A whole-API
 selection requires manual Full Regression rather than silently launching the
 entire API suite. No selected test is removed to meet a time goal.
@@ -105,7 +105,7 @@ source SHA, complete API cases, complete unit case IDs/targets, all partitions,
 plan hash, run/attempt and authorization. A manually authorized lightweight gate
 recheck downloads that artifact and verifies read-only GitHub run metadata
 (repository, workflow, dispatch event, exact SHA, success and attempt), plus
-current native collection/selection equality. It does not rerun unchanged tests,
+selected native collection/receipt equality. It does not rerun unchanged tests,
 dispatch Full, write statuses or override unknown impact. Actions permission is
 read-only. Full receipt retention is30days, normal bounded artifacts3days.
 
@@ -164,3 +164,34 @@ execution only. Dependency setup and hosted total duration, 5–15m target, host
 critical checks/PG and full execution remain NOT MEASURED until authorized runs.
 Historical2071 baseline/2072 F06 inventory receipts and reviewed timing evidence
 are reused for unchanged API sources; they are not claimed as new product PASS.
+
+## Issue #171: no-tests and isolated applications
+
+Selection runs with the hosted runner's standard Python before conditional `setup-python`. For
+NOT_APPLICABLE/blocked selections no package install, pip cache action/post-action, migration or
+pytest execution is needed. The stable `runtime` job still runs and uploads an honest result.
+The existing PostgreSQL service container still starts with the job; it is not migrated or accessed
+for CI-only/STT/no-tests paths. This bounded repair does not replace its trusted service identity.
+Cached Python setup and cache-directory preparation run only when dependencies will be installed;
+selected dependencies keep pip caching. No global cache removal or continue-on-error is used.
+
+`isolated_components` explicitly registers a reviewed self-contained Python application once,
+with ownership evidence and optional exact-pinned lightweight test dependencies. It owns its
+complete native `<app>/tests` directory, package metadata, locks and fixtures. STT uses `[test]`
+and NumPy for the fake model boundary, never `[model]`, Torch/CUDA/Qwen or weights. Ordinary
+unregistered scopes still block. App-local pyproject changes do not become shared build changes;
+shared files/contracts in the same PR retain their existing critical/full gates. Full qualification
+also includes registered apps present in that exact tree; it cannot silently omit their cases.
+
+Web and infra/** are delegated to their existing independent checks; Runtime API does not certify
+those outcomes. CI-only changes run CI tooling tests with pytest/Ruff, without product smoke/API
+collection or backend dependencies. Backend-related selections retain their existing installer and
+critical regressions. A new component needs reviewed registration, not a guessed scope fallback.
+
+Final native receipts distinguish PASS (tests passed), NOT_APPLICABLE (zero tests required), FAIL
+(observed test failures) and BLOCKED (selection/environment/coverage/qualification unavailable).
+All include exact source SHA and scopes. A selector exception writes `pr-selection.blocked.json`
+with a bounded reason and no raw exception; artifact upload includes that receipt. A preceding
+setup/install failure gets a BLOCKED result rather than a secondary missing-artifact error.
+The GitHub job conclusion remains authoritative, including cancellation and post-action failures.
+No failed or skipped required test is converted into PASS. No manual Full run is dispatched.

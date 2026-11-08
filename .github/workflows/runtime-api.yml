@@ -70,11 +70,6 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || inputs.confirm_sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          cache: pip
-          cache-dependency-path: '**/pyproject.toml'
       - name: Select PR tests against the complete PR merge base
         id: selection
         env:
@@ -83,21 +78,29 @@ jobs:
         run: >-
           python tools/ci/pr_selection.py --base "${BASE_SHA}" --head "${HEAD_SHA}"
           --output "${{ runner.temp }}/pr-selection.json"
-      - name: Install the unchanged dependency/extras set once
+      - name: Prepare cache only for selected dependencies
         if: steps.selection.outputs.needs_tests == 'true'
-        run: bash tools/ci/install_runtime.sh
+        run: mkdir -p "$(python -m pip cache dir)"
+      - uses: actions/setup-python@v5
+        if: steps.selection.outputs.needs_tests == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: '**/pyproject.toml'
+      - name: Install dependencies for selected scopes
+        if: steps.selection.outputs.needs_tests == 'true'
+        run: bash tools/ci/install_runtime.sh "${RUNNER_TEMP}/pr-selection.json"
       - name: Existing backend lint and format checks
         if: steps.selection.outputs.needs_tests == 'true'
         run: |
-          python -m ruff check apps/api packages workers/generation tests tools/ci
-          python -m ruff format --check apps/api packages workers/generation tests tools/ci
+          python tools/ci/pr_selection.py --lint-manifest "${RUNNER_TEMP}/pr-selection.json"
       - name: Verify disposable PostgreSQL before any migration or test DDL
-        if: steps.selection.outputs.needs_tests == 'true'
+        if: steps.selection.outputs.needs_database == 'true'
         run: >-
           python -c "import sys; sys.path.insert(0, 'apps/api/tests');
           from disposable_postgres import verified_ci_postgres; verified_ci_postgres()"
       - name: Existing migration safety checks on the verified disposable service
-        if: steps.selection.outputs.needs_tests == 'true'
+        if: steps.selection.outputs.needs_database == 'true'
         run: |
           alembic -c packages/persistence/alembic.ini upgrade head
           alembic -c packages/persistence/alembic.ini check
@@ -130,13 +133,30 @@ jobs:
           fi
           python tools/ci/pr_checks.py --manifest "${RUNNER_TEMP}/pr-selection.json" \
             --output "${RUNNER_TEMP}/pr-results" "${QUALIFICATION[@]}"
+      - name: Record an environment failure if the checker could not run
+        if: always()
+        env:
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || inputs.confirm_sha }}
+        run: |
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          root = Path(os.environ["RUNNER_TEMP"])
+          result = root / "pr-results/pr-result.json"
+          if not result.exists() and not (root / "pr-selection.blocked.json").exists():
+              receipt = dict(status="BLOCKED", source_sha=os.environ["SOURCE_SHA"],
+                             reason="workflow_environment_incomplete", groups={})
+              result.parent.mkdir(parents=True, exist_ok=True)
+              result.write_text(json.dumps(receipt, indent=2) + "\n")
+              print(json.dumps(receipt))
+          PY
       - name: Retain bounded selected coverage and failures
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pr-risk-results-${{ github.run_attempt }}
           path: |
-            ${{ runner.temp }}/pr-selection.json
+            ${{ runner.temp }}/pr-selection*.json
             ${{ runner.temp }}/pr-results/
           retention-days: 3
           if-no-files-found: error

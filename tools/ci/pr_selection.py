@@ -10,6 +10,28 @@ import subprocess
 from pathlib import Path
 
 
+def isolated_components(config):
+    """Reviewed, self-contained apps opt in once; unknown scopes still fail closed."""
+    components = config.get("isolated_components", {})
+    if not isinstance(components, dict):
+        raise ValueError("invalid_isolated_component")
+    if any(
+        not re.fullmatch(r"apps/[a-z][a-z0-9_-]*", name)
+        or name == "apps/api"
+        or not isinstance(entry, dict)
+        or not isinstance(entry.get("evidence"), str)
+        or not entry["evidence"].strip()
+        or not isinstance(entry.get("test_dependencies", []), list)
+        or any(
+            not isinstance(dep, str) or not re.fullmatch(r"[a-zA-Z0-9_.-]+==[a-zA-Z0-9_.+]+", dep)
+            for dep in entry.get("test_dependencies", [])
+        )
+        for name, entry in components.items()
+    ):
+        raise ValueError("invalid_isolated_component")
+    return components
+
+
 def digest(value):
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
@@ -257,6 +279,11 @@ def suite_for(target):
         return "api", "apps/api/pyproject.toml"
     if path.startswith("tools/ci/tests"):
         return "ci", "apps/api/pyproject.toml"
+    if parts[0] == "apps" and len(parts) >= 3 and parts[2] == "tests":
+        config = json.loads(Path(__file__).with_name("pr_routes.json").read_text())
+        component = "/".join(parts[:2])
+        if component in isolated_components(config):
+            return component, component + "/pyproject.toml"
     if parts[0] in {"packages", "workers"} and len(parts) >= 3 and parts[2] == "tests":
         return "/".join(parts[:2]), "/".join(parts[:2]) + "/pyproject.toml"
     if path == "tests/test_openai_generation_pipeline.py":
@@ -272,6 +299,8 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
     targets, reasons, buckets, blocked, full = set(), {}, set(), [], []
     relevant, docs = False, True
     fixture_dependencies = {}
+    components = isolated_components(config)
+    backend_affected = False
 
     def add(target, reason):
         # Config may use a handful of file globs, never 2071 hand-classified IDs.
@@ -298,6 +327,16 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         if any(path.startswith(p) for p in config["delegated_prefixes"]):
             continue
         relevant = True
+        component = next((name for name in components if path.startswith(name + "/")), None)
+        if component:
+            # Entire owning scope, including configs/locks/fixtures; never a guessed reader.
+            add(component + "/tests", "isolated_component:" + component)
+            fixture_dependencies[path] = dict(
+                test_scopes=[component + "/tests"], coverage="complete_scope"
+            )
+            continue
+        ci_owned = path.startswith("tools/ci/") or path.startswith(".github/workflows/")
+        backend_affected |= not ci_owned
         is_fixture = bool(coverage["test_scopes"]) or (
             is_behavior_resource(path) and path not in config["build_files"]
         )
@@ -367,7 +406,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
             raise ValueError("unknown_routing_bucket")
         for target in config["buckets"][bucket]:
             add(target, "component_or_critical:" + bucket)
-    if relevant:
+    if backend_affected:
         for target in config["smoke"]:
             add(target, "module_smoke")
     if relevant and not targets:
@@ -393,6 +432,7 @@ def build_selection(root, changed, config, *, source_sha, merge_base):
         changed_files=sorted(set(changed)),
         docs_only=docs,
         relevant=relevant,
+        needs_database=any(suite not in {"ci", *components} for suite in suites),
         delegated_check=config["delegated_check"] if not relevant and not docs else None,
         buckets=sorted(buckets),
         full_regression_required=bool(full),
@@ -418,6 +458,9 @@ def validate_selection(manifest, root):
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
     if head != manifest["source_sha"]:
         raise ValueError("selection_source_mismatch")
+    base, changed = git_changes(root, manifest["merge_base"], head)
+    if base != manifest["merge_base"] or changed != manifest["changed_files"]:
+        raise ValueError("selection_changed_files_mismatch")
     if (
         digest(json.loads((root / "tools/ci/pr_routes.json").read_text()))
         != manifest["config_sha256"]
@@ -426,26 +469,104 @@ def validate_selection(manifest, root):
     return manifest
 
 
+def execution_environment(manifest, config):
+    """No inference extras or backend environment for isolated/CI-only selection."""
+    components = isolated_components(config)
+    suites = set(manifest["suites"])
+    backend = bool(suites - {"ci", *components})
+    apps = sorted(suites & components.keys())
+    packages = [arg for name in apps for arg in ("-e", f"./{name}[test]")]
+    packages += sorted(
+        {dep for name in apps for dep in components[name].get("test_dependencies", [])}
+    )
+    if "ci" in suites and not backend:
+        packages += ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+    roots = ["apps/api", "packages", "workers/generation", "tests", "tools/ci"] if backend else []
+    if "ci" in suites and "tools/ci" not in roots:
+        roots.append("tools/ci")
+    return dict(backend=backend, packages=packages, lint_roots=roots + apps)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base", required=True)
-    parser.add_argument("--head", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--base")
+    parser.add_argument("--head")
+    parser.add_argument("--output")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--install-manifest")
+    mode.add_argument("--lint-manifest")
+    mode.add_argument("--install-native-apps", action="store_true")
     args = parser.parse_args()
     root = Path.cwd()
-    base, changed = git_changes(root, args.base, args.head)
-    config = json.loads((root / "tools/ci/pr_routes.json").read_text())
-    selected = build_selection(root, changed, config, source_sha=args.head, merge_base=base)
+    if args.install_native_apps:
+        components = isolated_components(json.loads((root / "tools/ci/pr_routes.json").read_text()))
+        apps = [name for name in components if (root / name / "tests").is_dir()]
+        if apps:
+            packages = execution_environment(
+                {"suites": dict.fromkeys(apps)}, {"isolated_components": components}
+            )["packages"]
+            subprocess.run(
+                ["python", "-m", "pip", "install", *packages],
+                check=True,
+            )
+        return
+    if args.install_manifest or args.lint_manifest:
+        manifest = json.loads(Path(args.install_manifest or args.lint_manifest).read_text())
+        validate_selection(manifest, root)
+        plan = execution_environment(
+            manifest, json.loads((root / "tools/ci/pr_routes.json").read_text())
+        )
+        if args.install_manifest:
+            if plan["backend"]:
+                subprocess.run(["bash", "tools/ci/install_runtime.sh", "--backend"], check=True)
+            if plan["packages"]:
+                subprocess.run(["python", "-m", "pip", "install", *plan["packages"]], check=True)
+        elif plan["lint_roots"]:
+            subprocess.run(["python", "-m", "ruff", "check", *plan["lint_roots"]], check=True)
+            subprocess.run(
+                ["python", "-m", "ruff", "format", "--check", *plan["lint_roots"]], check=True
+            )
+        return
+    if not all((args.base, args.head, args.output)):
+        parser.error("--base, --head and --output are required for selection")
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        base, changed = git_changes(root, args.base, args.head)
+        if subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip() != args.head:
+            raise ValueError("selection_source_mismatch")
+        config = json.loads((root / "tools/ci/pr_routes.json").read_text())
+        selected = build_selection(root, changed, config, source_sha=args.head, merge_base=base)
+    except (ValueError, SyntaxError, OSError, subprocess.CalledProcessError) as error:
+        reason = str(error) if type(error) is ValueError else "source_or_configuration_unavailable"
+        if not re.fullmatch(r"[a-z_]{1,80}", reason):
+            reason = "invalid_selection_configuration"
+        receipt = dict(
+            status="BLOCKED",
+            source_sha=args.head if re.fullmatch("[0-9a-f]{40}", args.head) else None,
+            reason=reason,
+            scopes=[],
+        )
+        output.with_suffix(".blocked.json").write_text(json.dumps(receipt, indent=2) + "\n")
+        print(json.dumps(receipt))
+        raise SystemExit(1) from None
     output.write_text(json.dumps(selected, indent=2) + "\n")
     if os.getenv("GITHUB_OUTPUT"):
         with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
-            handle.write("needs_tests=" + str(selected["relevant"]).lower() + "\n")
+            runnable = not selected["blocked_reasons"]
+            handle.write("needs_tests=" + str(selected["relevant"] and runnable).lower() + "\n")
+            handle.write(
+                "needs_database=" + str(selected["needs_database"] and runnable).lower() + "\n"
+            )
     print(
         json.dumps(
             dict(
                 scope="targeted_pr",
+                source_sha=args.head,
+                status="BLOCKED"
+                if selected["blocked_reasons"]
+                else ("SELECTED" if selected["relevant"] else "NOT_APPLICABLE"),
+                suites=sorted(selected["suites"]),
                 buckets=selected["buckets"],
                 targets=sum(len(s["targets"]) for s in selected["suites"].values()),
                 full_required=selected["full_regression_required"],

@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
+if test "$#" -gt 0 && test "$1" != --backend; then
+  exec python tools/ci/pr_selection.py --install-manifest "$1"
+fi
 python -m pip install \
   -e './packages/domain[test]' \
   -e './packages/auth[test]' \
@@ -18,3 +21,7 @@ python -m pip install \
   -e './packages/parser[test]' \
   -e './packages/text_understanding_google[test]' \
   -e './apps/api[test]'
+if test "$#" -eq 0; then
+  # Existing full workflow: include any reviewed native app present on this exact source tree.
+  python tools/ci/pr_selection.py --install-native-apps
+fi

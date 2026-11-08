@@ -159,7 +159,8 @@ def test_parser_13_version_exception_is_exact_and_fails_closed(tmp_path):
 
 def test_frozen_parser13_risk_profile_is_strict_and_protects_core_checks():
     merge_base = "ef656c70f341940183905eca890b507ee2f457e8"
-    current = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    # Positive control is the reviewed immutable release, not an arbitrary later CI/feature HEAD.
+    current = "4ca9490acbb103758aa34103388e0890e12e991e"
     raw = subprocess.check_output(
         ["git", "diff", "--name-only", merge_base, current], cwd=ROOT, text=True
     )
