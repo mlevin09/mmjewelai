@@ -1083,7 +1083,21 @@ nav {
 }
 
 /* Transcripts stay editable in the existing design input; recording never submits a design. */
-.voice-recorder { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin: 0.5rem 0 1rem; }
-.voice-recorder .quiet { width: auto; min-width: 10rem; }
-.voice-recorder-hint { font-size: 0.875rem; color: var(--muted, #64748b); }
-.voice-recorder [aria-pressed="true"] { outline: 2px solid currentColor; }
+.voice-recorder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.5rem 0 1rem;
+}
+.voice-recorder .quiet {
+  width: auto;
+  min-width: 10rem;
+}
+.voice-recorder-hint {
+  font-size: 0.875rem;
+  color: var(--muted, #64748b);
+}
+.voice-recorder [aria-pressed="true"] {
+  outline: 2px solid currentColor;
+}

@@ -596,7 +596,14 @@ export function EnrichmentWorkspace({
               sessionId={sessionId}
               language={ru ? "ru" : "en"}
               disabled={busy}
-              onTranscript={(speech) => setText((current) => [current.trim(), speech].filter(Boolean).join(" ").slice(0, 2000))}
+              onTranscript={(speech) =>
+                setText((current) =>
+                  [current.trim(), speech]
+                    .filter(Boolean)
+                    .join(" ")
+                    .slice(0, 2000),
+                )
+              }
             />
             <button
               disabled={
