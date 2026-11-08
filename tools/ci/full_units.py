@@ -46,6 +46,15 @@ SCOPES = {
     "ci": dict(config="apps/api/pyproject.toml", targets=["tools/ci/tests"]),
 }
 
+# Full qualification must not silently omit a registered app after it is merged.
+_root = Path(__file__).resolve().parents[2]
+_config = json.loads((_root / "tools/ci/pr_routes.json").read_text())
+for _app in _config.get("isolated_components", {}):
+    if (_root / _app / "pyproject.toml").is_file() and list(
+        (_root / _app / "tests").rglob("test_*.py")
+    ):
+        SCOPES[_app] = dict(config=_app + "/pyproject.toml", targets=[_app + "/tests"])
+
 
 def audit_inventory(root):
     expected = {t for group in SCOPES.values() for t in group["targets"]}
@@ -56,6 +65,11 @@ def audit_inventory(root):
         if list(p.rglob("test_*.py"))
     }
     actual.update(p.relative_to(root).as_posix() for p in (root / "tests").glob("test_*.py"))
+    actual.update(
+        p.relative_to(root).as_posix()
+        for p in (root / "apps").glob("*/tests")
+        if p.parent.name != "api" and list(p.rglob("test_*.py"))
+    )
     actual.add("tools/ci/tests")
     if actual != expected:
         raise ValueError("full_unit_scope_drift_requires_explicit_configuration")

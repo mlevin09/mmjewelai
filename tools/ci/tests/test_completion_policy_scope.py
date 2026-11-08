@@ -35,7 +35,9 @@ def test_preprod_activation_delegates_only_existing_infrastructure_check_paths()
     assert "branches: [jewelai-v2]" in workflow and "- infra/**" in workflow
     assert "terraform -chdir=infra/terraform/preprod validate" in workflow
     assert "python infra/terraform/check_invariants.py" in workflow
-    assert selected("infra/terraform/preprod/new-behavior.tf")["blocked_reasons"]
+    # All infra/** changes already trigger Infrastructure; Runtime API does not certify Terraform.
+    delegated = selected("infra/terraform/preprod/new-behavior.tf")
+    assert not delegated["blocked_reasons"] and not delegated["suites"]
 
 
 def test_preprod_activation_still_requires_complete_completion_coverage():

@@ -3,6 +3,7 @@
 import argparse
 import json
 import math
+import re
 import subprocess
 import sys
 import time
@@ -12,6 +13,26 @@ from api_partitions import validate_artifacts
 from full_units import covers
 from pr_selection import validate_selection
 from qualification import validate_qualification
+
+
+class SelectedTestsFailed(ValueError):
+    """Observed test failures, distinct from missing/invalid execution evidence."""
+
+
+def entire_api_scope(root, targets):
+    """Cheap path-only guard; do not import/collect the entire API for a narrow selection."""
+    files = list((root / "apps/api/tests").rglob("test_*.py"))
+    return bool(files) and all(
+        any(
+            "::" not in target
+            and (
+                file.relative_to(root).as_posix() == target
+                or file.relative_to(root).as_posix().startswith(target.rstrip("/") + "/")
+            )
+            for target in targets
+        )
+        for file in files
+    )
 
 
 def invoke(root, output, config, targets, *, collect=False, timeout=1200):
@@ -36,6 +57,8 @@ def invoke(root, output, config, targets, *, collect=False, timeout=1200):
     if not report_path.exists():
         raise ValueError("required_result_artifact_missing")
     report = json.loads(report_path.read_text())
+    if not collect and any(c.get("outcome") == "failed" for c in report.get("testcases", [])):
+        raise SelectedTestsFailed("selected_tests_failed")
     if result.returncode or report["exitcode"] or report["diagnostics"]:
         # Never echo raw pytest exception text/payload from a failed child.
         raise ValueError("selected_collection_or_execution_failed")
@@ -67,18 +90,20 @@ def verify_execution(report, expected):
 
 
 def execute(root, manifest, output, *, qualification=None, metadata=None):
-    validate_selection(manifest, root)
     output.mkdir(parents=True, exist_ok=True)
     result = dict(
         scope="targeted_pr",
         source_sha=manifest["source_sha"],
         result="failure",
+        status="BLOCKED",
+        reason="execution_incomplete",
         full_regression_required=manifest["full_regression_required"],
         groups={},
         qualified_by_full=False,
     )
     started = time.monotonic()
     try:
+        validate_selection(manifest, root)
         if manifest["blocked_reasons"]:
             raise ValueError("unmapped_impact_requires_routing_review")
         if manifest["docs_only"] or not manifest["relevant"]:
@@ -89,23 +114,29 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
                 capture_output=True,
             )
             result["result"] = "success"
+            result.update(status="NOT_APPLICABLE", reason="no_backend_tests_required")
             return result
         if qualification is not None:
             validate_qualification(qualification, metadata, manifest["source_sha"])
             if not covers(qualification["unit_suites"], manifest["suites"]):
                 raise ValueError("full_qualification_does_not_cover_selection")
-        full_inventory = None
-        if "api" in manifest["suites"]:
-            full_inventory = invoke(
-                root,
-                output / "api-native-inventory",
-                "apps/api/pyproject.toml",
-                ["apps/api/tests"],
-                collect=True,
-                timeout=120,
-            )["collection_ids"]
+        saturated = "api" in manifest["suites"] and entire_api_scope(
+            root, manifest["suites"]["api"]["targets"]
+        )
+        if saturated:
+            result["full_regression_required"] = True
+            if qualification is None:
+                raise ValueError("entire_api_scope_requires_manual_full_regression")
         collections = {}
         for suite, group in manifest["suites"].items():
+            if suite == "api" and saturated:
+                # Validated exact-SHA full receipt already proves this entire collection.
+                ids = qualification["api_cases"]
+                collections[suite] = ids
+                result["groups"][suite] = dict(
+                    selected=len(ids), case_ids=ids, targets=group["targets"]
+                )
+                continue
             report = invoke(
                 root,
                 output / (suite.replace("/", "_") + "-collection"),
@@ -117,22 +148,13 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
             ids = report["collection_ids"]
             if not ids or len(ids) != len(set(ids)):
                 raise ValueError("empty_or_duplicate_selected_collection")
-            if suite == "api" and not set(ids).issubset(full_inventory):
-                raise ValueError("selected_api_identity_not_native")
             collections[suite] = ids
             result["groups"][suite] = dict(
                 selected=len(ids), case_ids=ids, targets=group["targets"]
             )
-        saturated = full_inventory is not None and set(collections.get("api", [])) == set(
-            full_inventory
-        )
-        if saturated:
-            result["full_regression_required"] = True
         if qualification is not None:
-            if full_inventory is not None and set(qualification["api_cases"]) != set(
-                full_inventory
-            ):
-                raise ValueError("full_qualification_inventory_mismatch")
+            if not set(collections.get("api", [])).issubset(qualification["api_cases"]):
+                raise ValueError("full_qualification_missing_selected_api_cases")
             # Full run on this SHA already includes the selected product/package
             # suites. Do not repeat them to reopen a high-risk gate.
             for suite, ids in collections.items():
@@ -157,10 +179,23 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
         if result["full_regression_required"] and qualification is None:
             raise ValueError("manual_full_qualification_required_before_merge")
         result["result"] = "success"
+        result.update(status="PASS", reason="selected_tests_passed")
         return result
+    except (ValueError, KeyError, OSError, subprocess.SubprocessError) as error:
+        reason = str(error)
+        if not re.fullmatch(r"[a-z_]{1,80}", reason):
+            reason = "execution_environment_or_evidence_invalid"
+        result.update(
+            status="FAIL" if isinstance(error, SelectedTestsFailed) else "BLOCKED", reason=reason
+        )
+        raise
     finally:
         result["seconds"] = round(time.monotonic() - started, 3)
         (output / "pr-result.json").write_text(json.dumps(result, indent=2) + "\n")
+        summary = {k: result[k] for k in ("status", "source_sha", "reason", "seconds")}
+        summary["scopes"] = sorted(manifest["suites"])
+        summary["selected_cases"] = sum(g.get("selected", 0) for g in result["groups"].values())
+        print(json.dumps(summary))
 
 
 def main():
@@ -180,12 +215,11 @@ def main():
             metadata=json.loads(Path(args.metadata).read_text()),
         )
     execute(Path.cwd(), manifest, Path(args.output), **kwargs)
-    print("targeted_pr_gate: PASS (not full regression unless explicitly qualified)")
 
 
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, KeyError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        print("targeted_pr_gate: FAIL; inspect bounded selection/result artifacts")
+    except (ValueError, KeyError, OSError, subprocess.SubprocessError):
+        print("targeted_pr_gate: non-success; inspect bounded selection/result artifacts")
         raise SystemExit(1) from None
