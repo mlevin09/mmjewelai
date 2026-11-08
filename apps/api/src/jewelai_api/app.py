@@ -879,7 +879,7 @@ def create_app(
                 return await asyncio.to_thread(call_stt)
             except requests.Timeout:
                 return _error_response(504, "stt_timeout", "Speech service timed out")
-            except (requests.RequestException, ValueError, TypeError, KeyError, Exception):
+            except Exception:
                 # Upstream text, credentials and internal error details are never returned.
                 return _error_response(503, "stt_unavailable", "Speech service unavailable")
         finally:

@@ -9,7 +9,12 @@ type SpeechResult = {
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const MAX_RECORDING_MS = 60_000;
-const RECORDING_TYPES = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/ogg"];
+const RECORDING_TYPES = [
+  "audio/webm;codecs=opus",
+  "audio/webm",
+  "audio/ogg;codecs=opus",
+  "audio/ogg",
+];
 
 export function VoiceRecorder({
   api,
@@ -44,7 +49,8 @@ export function VoiceRecorder({
     };
   }, []);
 
-  const available = typeof window !== "undefined" &&
+  const available =
+    typeof window !== "undefined" &&
     typeof MediaRecorder !== "undefined" &&
     !!navigator.mediaDevices?.getUserMedia &&
     RECORDING_TYPES.some((type) => MediaRecorder.isTypeSupported(type));
@@ -62,7 +68,9 @@ export function VoiceRecorder({
     setMessage("");
     let capture: MediaStream | null = null;
     try {
-      const mimeType = RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
+      const mimeType = RECORDING_TYPES.find((type) =>
+        MediaRecorder.isTypeSupported(type),
+      );
       if (!mimeType) throw new Error("unsupported_codec");
       capture = await navigator.mediaDevices.getUserMedia({ audio: true });
       if (!active.current) {
@@ -77,7 +85,10 @@ export function VoiceRecorder({
         if (event.data.size) parts.push(event.data);
       };
       instance.onerror = () => {
-        if (active.current) setMessage(language === "ru" ? "Ошибка записи звука" : "Audio recording failed");
+        if (active.current)
+          setMessage(
+            language === "ru" ? "Ошибка записи звука" : "Audio recording failed",
+          );
         stop();
       };
       instance.onstop = () => {
@@ -86,51 +97,102 @@ export function VoiceRecorder({
         setRecording(false);
         const audio = new Blob(parts, { type: mimeType.split(";")[0] });
         if (!audio.size || audio.size > MAX_AUDIO_BYTES) {
-          setMessage(language === "ru" ? "Запись пуста или слишком велика" : "Recording is empty or too large");
+          setMessage(
+            language === "ru"
+              ? "Запись пуста или слишком велика"
+              : "Recording is empty or too large",
+          );
           return;
         }
         const form = new FormData();
         form.append("audio", audio, "speech.webm");
         setTranscribing(true);
-        void api.request<SpeechResult>(
-          `/sessions/${sessionId}/transcriptions?language=${language}`,
-          { method: "POST", body: form, organizationId },
-        ).then((result) => {
-          if (!active.current) return;
-          if (result.schema_version !== "1.0.0" || !["transcribed", "silence"].includes(result.status) || typeof result.text !== "string" || result.text.length > 8192) {
-            throw new Error("invalid_transcription");
-          }
-          if (result.text.trim()) onTranscript(result.text.trim());
-          else setMessage(language === "ru" ? "Речь не распознана" : "No speech detected");
-        }).catch(() => {
-          if (active.current) setMessage(language === "ru" ? "Не удалось распознать речь. Текст можно ввести вручную." : "Transcription unavailable. You can still type.");
-        }).finally(() => {
-          if (active.current) setTranscribing(false);
-        });
+        void api
+          .request<SpeechResult>(
+            `/sessions/${sessionId}/transcriptions?language=${language}`,
+            { method: "POST", body: form, organizationId },
+          )
+          .then((result) => {
+            if (!active.current) return;
+            if (
+              result.schema_version !== "1.0.0" ||
+              !["transcribed", "silence"].includes(result.status) ||
+              typeof result.text !== "string" ||
+              result.text.length > 8192
+            ) {
+              throw new Error("invalid_transcription");
+            }
+            if (result.text.trim()) onTranscript(result.text.trim());
+            else
+              setMessage(
+                language === "ru" ? "Речь не распознана" : "No speech detected",
+              );
+          })
+          .catch(() => {
+            if (active.current)
+              setMessage(
+                language === "ru"
+                  ? "Не удалось распознать речь. Текст можно ввести вручную."
+                  : "Transcription unavailable. You can still type.",
+              );
+          })
+          .finally(() => {
+            if (active.current) setTranscribing(false);
+          });
       };
       instance.start();
       setRecording(true);
       timeout.current = setTimeout(() => stop(), MAX_RECORDING_MS);
     } catch {
       capture?.getTracks().forEach((track) => track.stop());
-      if (active.current) setMessage(language === "ru" ? "Не удалось открыть микрофон" : "Microphone unavailable");
+      if (active.current)
+        setMessage(
+          language === "ru" ? "Не удалось открыть микрофон" : "Microphone unavailable",
+        );
     }
   }
 
   return (
     <div className="voice-recorder">
-      <button type="button" className="quiet"
+      <button
+        type="button"
+        className="quiet"
         disabled={disabled || transcribing || !available}
-        aria-label={recording ? (language === "ru" ? "Остановить запись" : "Stop recording") : (language === "ru" ? "Голосовой ввод" : "Voice input")}
+        aria-label={
+          recording
+            ? language === "ru"
+              ? "Остановить запись"
+              : "Stop recording"
+            : language === "ru"
+              ? "Голосовой ввод"
+              : "Voice input"
+        }
         aria-pressed={recording}
-        onClick={() => recording ? stop() : void start()}>
-        {transcribing ? (language === "ru" ? "Распознаём…" : "Transcribing…") :
-          recording ? (language === "ru" ? "■ Остановить" : "■ Stop") :
-          (language === "ru" ? "🎙 Голосовой ввод" : "🎙 Voice input")}
+        onClick={() => (recording ? stop() : void start())}
+      >
+        {transcribing
+          ? language === "ru"
+            ? "Распознаём…"
+            : "Transcribing…"
+          : recording
+            ? language === "ru"
+              ? "■ Остановить"
+              : "■ Stop"
+            : language === "ru"
+              ? "🎙 Голосовой ввод"
+              : "🎙 Voice input"}
       </button>
       <span className="voice-recorder-hint" role="status" aria-live="polite">
-        {message || (recording ? (language === "ru" ? "Идёт запись (до 60 секунд)" : "Recording (up to 60 seconds)") :
-          !available ? (language === "ru" ? "Браузер не поддерживает запись WebM/Ogg" : "Browser does not support WebM/Ogg recording") : "")}
+        {message ||
+          (recording
+            ? language === "ru"
+              ? "Идёт запись (до 60 секунд)"
+              : "Recording (up to 60 seconds)"
+            : !available
+              ? language === "ru"
+                ? "Браузер не поддерживает запись WebM/Ogg"
+                : "Browser does not support WebM/Ogg recording"
+              : "")}
       </span>
     </div>
   );
