@@ -62,3 +62,19 @@ Next resource gate: approve one L4/4 CPU/16 GiB, min 0/max 1, approximate $1.046
 instance-hour plus DNS/registry/build usage; then qualify real GPU and network isolation.
 Next public-contract gate: session-authorized transient audio ingestion and user review of transcript
 before the existing Message flow. Precise proposal and limitations are in README.md.
+
+## Packaging and hosted CI follow-up
+
+Application wheel build initially failed because Hatchling requires an explicit direct-reference opt-in
+for the pinned CUDA wheel. Added only `tool.hatch.metadata.allow-direct-references=true`; the
+lightweight application wheel then built successfully. No model extra, GPU inference or container
+image build occurred. Wheel: jewelai_stt-1.0.0-py3-none-any.whl, 8517 bytes, SHA-256
+`1a02e53e31825e1a29cf3fbb411e3e88a0478cea91eaf9e24dbff8389a3de337`.
+
+Initial exact-head Runtime API run 42524670670 FAILED before test execution. Native selector
+`suite_for("apps/stt/tests/test_stt.py")` raises `unsupported_test_scope`; no selection artifact
+was created, so its dependent steps were SKIPPED. Existing selector has no registration for a new
+STT application. This is an OPEN CI integration gate, not a passing CI or evidence of an ASR failure.
+No selector bypass, broad regression, manual dispatch, required-check change or Full Regression
+was performed. CI registration/coverage must be reviewed before merge; Draft publication is not
+merge readiness. The corrective packaging commit triggers only ordinary automatic exact-head CI.

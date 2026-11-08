@@ -28,6 +28,9 @@ build = ["hatchling==1.27.0"]
 [tool.hatch.build.targets.wheel]
 packages = ["src/jewelai_stt"]
 
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
