@@ -1,0 +1,7 @@
+**
+!apps
+!apps/stt
+!apps/stt/**
+apps/stt/**/__pycache__
+apps/stt/.pytest_cache
+apps/stt/.ruff_cache

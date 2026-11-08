@@ -73,6 +73,17 @@ resource "google_cloud_run_v2_service" "api" {
     timeout                          = "60s"
     max_instance_request_concurrency = var.api_concurrency
 
+    dynamic "vpc_access" {
+      for_each = local.stt_enabled ? [1] : []
+      content {
+        egress = "PRIVATE_RANGES_ONLY"
+        network_interfaces {
+          network    = google_compute_network.stt["caller"].name
+          subnetwork = google_compute_subnetwork.stt["caller"].name
+        }
+      }
+    }
+
     scaling {
       min_instance_count = var.api_min_instances
       max_instance_count = var.api_max_instances
