@@ -1,5 +1,6 @@
 """FastAPI app factory and thin HTTP routing boundary."""
 
+import asyncio
 import json
 import os
 from collections.abc import Callable
@@ -822,6 +823,41 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.upgrade_session_schema_v1_1(session_id, organization_id, request)
+
+    @app.post("/sessions/{session_id}/transcriptions")
+    async def transcribe_session_audio(
+        session_id: UUID,
+        organization_id: AuthorizedOrganization,
+        audio: UploadFile = File(...),
+        language: str | None = None,
+    ):
+        """Authenticated, organization/session-scoped ephemeral speech-to-editable-text proxy.
+
+        This route never creates a message or updates canonical design state.
+        Organization/session access is verified by AuthorizedOrganization before audio is read.
+        """
+        from jewelai_stt.audio import FORMATS, MAX_BYTES, SttError
+        from jewelai_stt.client import SttClient
+
+        service_url = os.getenv("STT_SERVICE_URL", "")
+        if not service_url:
+            return _error_response(503, "stt_unavailable", "Speech recognition is unavailable")
+        content_type = (audio.content_type or "").split(";", 1)[0].strip().lower()
+        if content_type not in FORMATS or language not in (None, "ru", "en"):
+            return _error_response(415, "unsupported_audio", "Unsupported speech format")
+        try:
+            content = await audio.read(MAX_BYTES + 1)
+            if not content or len(content) > MAX_BYTES:
+                return _error_response(413, "audio_too_large", "Speech recording exceeds limits")
+            # Cloud Run ID token and private ingress; browser never receives STT credentials.
+            result = await asyncio.to_thread(
+                SttClient(service_url).transcribe, content, content_type, language
+            )
+            return result
+        except SttError as exc:
+            return _error_response(exc.status, exc.code, "Speech recognition failed")
+        finally:
+            await audio.close()
 
     @app.post("/sessions/{session_id}/messages", response_model=MessageResponse, status_code=201)
     def create_message(
