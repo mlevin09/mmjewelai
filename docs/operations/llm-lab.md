@@ -190,9 +190,10 @@ credentials, private keys, model weights or customer data.
 
 Archive size: 30,977 bytes. SHA-256:
 `69281b9c705ce1a5c87729fe874dd87d60b830851eff8ec590cd3702c4a5a86a`.
-The archive was verified locally and preserved in the operator's workspace.
-Private Drive publication awaits explicit Owner authorization after automatic
-approval review rejected infrastructure-metadata egress to that destination.
+The archive was verified locally and uploaded to the Owner-approved private Drive
+destination after explicit authorization. Drive readback confirmed its 30,977-byte
+size, destination and existing owner/writer permissions; sharing was unchanged.
+The private evidence link is delivered to the Owner outside this repository.
 The VM's `/opt/jewelai-llm-lab` also retains the installed scripts and raw synthetic
 qualification evidence. Nothing is uploaded to a public evidence host.
 
