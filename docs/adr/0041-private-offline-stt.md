@@ -117,3 +117,11 @@ preprod deployments therefore cannot clear the operational manual-zero hold. Upd
 allowlist requires review; this is not a new secret or IAM authority. The existing saved-plan,
 configuration fingerprint, WIF and Environment controls remain authoritative. See the
 [release handoff](../operations/stt-cpu-release-pr175.md) for image, tests and coordinator gates.
+
+
+The transition is two-phase: digest-bound `cpu-stage:` approval changes the template while
+preserving MANUAL/count0; `cpu-only:` activation is rejected unless a live service read proves
+that exact CPU image,2CPU/2GiB/request billing and no accelerator are already latest-created=Ready.
+This avoids enabling service-wide autoscaling while the previous GPU revision might still be
+serving. Both phases use the existing deployment inputs and exact-plan process, without workflow
+changes or automatic GPU rollback.

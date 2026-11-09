@@ -463,9 +463,12 @@ def test_stt_has_no_gpu_and_cpu_release_restores_automatic_min_zero():
     source = (Path(__file__).resolve().parents[3] / "infra/terraform/preprod/stt.tf").read_text()
     service = source.split('resource "google_cloud_run_v2_service" "stt" {', 1)[1]
     assert "nvidia.com/gpu" not in service
-    assert "node_selector" not in service
+    assert "node_selector {" not in service
     assert "gpu_zonal_redundancy_disabled" not in service
-    assert 'scaling_mode       = "AUTOMATIC"' in service
+    assert 'local.stt_cpu_activate ? "AUTOMATIC" : "MANUAL"' in service
+    assert "manual_instance_count=0" in "".join(service.split())
+    assert "CPU activation blocked" in service
+    assert "latest_created_revision" in service and "latest_ready_revision" in service
     assert 'cpu = "2", memory = "2Gi"' in service
     assert "cpu_idle = true" in service
 
@@ -589,9 +592,47 @@ def test_cpu_release_guard_native_saved_plan(tmp_path):
     root = Path(__file__).resolve().parents[3]
     source = (root / "infra/terraform/preprod/stt.tf").read_text()
     gate = source.split("# Two networks", 1)[0]
-    (tmp_path / "main.tf").write_text(
-        gate + '\noutput "selected_image" { value = var.stt_image }\n'
+    import re
+
+    readiness = (
+        source.split("condition = !local.stt_cpu_activate", 1)[1]
+        .split("error_message =", 1)[0]
+        .strip()
     )
+    readiness = ("!local.stt_cpu_activate" + readiness).replace(
+        "data.google_cloud_run_v2_service.stt_cpu_ready[0]",
+        'jsondecode(file("ready.json"))',
+    )
+    (tmp_path / "main.tf").write_text(
+        gate
+        + '\noutput "selected_image" { value = var.stt_image }\n'
+        + 'resource "terraform_data" "readiness" {\n lifecycle {\n precondition {\n'
+        + "condition = "
+        + readiness
+        + '\nerror_message = "CPU activation blocked"\n}\n}\n}\n'
+    )
+    image = re.search(r'stt_reviewed_cpu_image\s*=\s*"([^"]+)"', source)[1]
+    ready = {
+        "template": [
+            {
+                "containers": [
+                    {
+                        "image": image,
+                        "resources": [
+                            {
+                                "limits": {"cpu": "2", "memory": "2Gi"},
+                                "cpu_idle": True,
+                            }
+                        ],
+                    }
+                ],
+                "node_selector": [],
+            }
+        ],
+        "latest_created_revision": "cpu-1",
+        "latest_ready_revision": "cpu-1",
+    }
+    (tmp_path / "ready.json").write_text(json.dumps(ready))
     subprocess.run(
         tf + ["init", "-backend=false", "-input=false"],
         cwd=tmp_path,
@@ -646,3 +687,49 @@ def test_cpu_release_guard_native_saved_plan(tmp_path):
     assert allowed.returncode == 0, allowed.stderr
     plan = subprocess.check_output(tf + ["show", "-json", "cpu.tfplan"], cwd=tmp_path)
     assert json.loads(plan)["planned_values"]["outputs"]["selected_image"]["value"] == image
+
+    import copy
+
+    for change in ("gpu-image", "gpu-limit", "not-ready", "empty-ready", "wrong-memory"):
+        bad = copy.deepcopy(ready)
+        if change == "gpu-image":
+            bad["template"][0]["containers"][0]["image"] = historical
+        elif change == "gpu-limit":
+            bad["template"][0]["containers"][0]["resources"][0]["limits"]["nvidia.com/gpu"] = "1"
+        elif change == "not-ready":
+            bad["latest_ready_revision"] = "old-revision"
+        elif change == "empty-ready":
+            bad["latest_ready_revision"] = ""
+        else:
+            bad["template"][0]["containers"][0]["resources"][0]["limits"]["memory"] = "4Gi"
+        (tmp_path / "ready.json").write_text(json.dumps(bad))
+        rejected = subprocess.run(
+            tf
+            + [
+                "plan",
+                "-input=false",
+                "-lock=false",
+                "-no-color",
+                "-var=stt_image=" + image,
+                "-var=stt_resource_approval_reference=" + approval,
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        )
+        assert rejected.returncode != 0 and "CPU activation blocked" in rejected.stderr
+    # Staging can replace the template but cannot remove the manual-zero hold.
+    stage = subprocess.run(
+        tf
+        + [
+            "plan",
+            "-input=false",
+            "-lock=false",
+            "-var=stt_image=" + image,
+            "-var=stt_resource_approval_reference=" + approval.replace("cpu-only:", "cpu-stage:"),
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert stage.returncode == 0, stage.stderr

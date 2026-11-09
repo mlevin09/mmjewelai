@@ -21,12 +21,21 @@ The Terraform variable validation uses a code-reviewed allowlist containing only
 It also requires the exact paired CPU resource approval. This is an operational acknowledgement,
 not a secret or a replacement for GitHub Environment/WIF/coordinator authorization.
 
-After independent review, coordinator sets both existing preprod variables together:
+After independent review, coordinator uses two normal reviewed saved-plan deployments.
+First set both existing variables for **staging only**, retaining manual zero:
 
 ```text
 STT_IMAGE=europe-west1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/jewelai-stt@sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22
-STT_RESOURCE_APPROVAL_REFERENCE=cpu-only:2cpu:2g:min0:max1:sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22
+STT_RESOURCE_APPROVAL_REFERENCE=cpu-stage:2cpu:2g:min0:max1:sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22
 ```
+
+After stage-one CPU revision is Ready, coordinator changes only the approval prefix from
+`cpu-stage:` to `cpu-only:` for a separately reviewed activation plan. A live data-source
+precondition requires the exact image,2CPU/2GiB/request billing, no accelerator, a nonempty Ready
+revision and latest-created=latest-ready before AUTOMATIC is allowed. Direct GPU→AUTOMATIC fails
+**even with the correct CPU digest/activation approval**. Stage-one plan keeps MANUAL/count0 while
+replacing the template; stage-two cannot activate a stale/not-ready/GPU/wrong-resource service.
+This prevents an old GPU serving window during CPU revision creation. No workflow refactor.
 
 Historical GPU digest, historical approval, missing approval, mixed CPU/GPU pairs and any other
 image digest fail validation. A routine deployment retaining the old variables fails before apply;
@@ -34,8 +43,8 @@ it cannot clear manual-zero or mutate the historical STT template. Future CPU im
 reviewed allowlist update. Existing workflow fingerprint binds both inputs at plan and apply.
 No deployment workflow or required check is changed.
 
-The held live service remains manual scaling0. Only the reviewed CPU transition may replace its
-image/resources and set automatic min0/max1, concurrency1, request billing. Do not empty STT_IMAGE
+The held live service remains manual scaling0. Only reviewed stage-one may replace its
+image/resources under manual0; reviewed stage-two may enable automatic min0/max1 after readiness. Do not empty STT_IMAGE
 as a deletion shortcut. Failure fallback is voice disabled/manual typing, never GPU rollback.
 
 ## Real CPU qualification, separately from CI
@@ -92,13 +101,13 @@ an all-inclusive monthly price. Min0 means no permanent warm CPU commitment; col
 for this release has not been measured. Never substitute local model-ready time for that measure.
 Source: [Cloud Run pricing](https://cloud.google.com/run/pricing).
 
-## Saved full-platform preview (read-only, not an apply artifact)
+## Superseded single-step preview (WITHDRAWN; never apply)
 
 Full refreshed plan against the existing preprod state completed with **0 add/3 update/0 destroy**.
-Binary preview: `/tmp/stt-final/cpu-release.tfplan`, SHA256
+The earlier single-step binary was withdrawn/deleted when the two-phase guard was added. Its historical SHA256 was
 `ae686058461d3279543c0bfb7f1aba6124d042eba9d0e03eb3d3e994f8fd05aa`.
 It uses current live API/worker/web image digests, the reviewed CPU image and exact CPU approval.
-It is NOT the post-merge workflow plan and must never be applied locally. Full binary/JSON can
+It was NOT the post-merge workflow plan. Full binary/JSON can
 contain sensitive state and are not committed or published with general evidence.
 
 Changed addresses (all in project **mmjewellai-preprod**, despite historical resource labels):
@@ -147,3 +156,24 @@ See [provider quota configuration](https://github.com/hashicorp/terraform-provid
 Full-config historical-pair probe also rejected the GPU input. Terraform emits an errored
 partial diagnostic binary even on failure: its flags are errored=true, complete=false,
 applyable=false. Do not equate file existence with a usable saved plan; it is not a rollout artifact.
+
+
+## Final two-phase evidence (supersedes all single-step activation instructions)
+
+The actual live GPU service rejected the direct activation plan with `CPU activation blocked`.
+The final local native check evaluates the actual production precondition expression, replacing
+only the live read with ready/not-ready/GPU/wrong-memory/empty-revision fixtures. Exact-map
+normalization keeps JSON fixtures and provider typed maps equivalent, without permitting extra
+GPU resource keys. An initial source guard falsely matched a `.node_selector` data read; it now
+checks the forbidden provisioning block. Only those two focused cases were rerun:2PASS,2.44s.
+
+No real CPU readiness or stage-two successful live plan is claimed: neither stage has been applied.
+A Ready CPU fixture passes the activation expression; the actual current GPU service fails it.
+The coordinator must perform stage-one/review/readiness/stage-two through the ordinary saved-plan
+workflow. Stage-two authoritative plan cannot exist until actual CPU readiness is established.
+
+Final refreshed stage-one saved plan: `/tmp/stt-final/cpu-stage-final.tfplan`, SHA256
+`dc550bee50810d4d51b35481285020b62db2cf29ee41615d91b491dbfaf230ac`;0add/3update/0destroy (same two disclosed provider normalization diffs).
+STT after-state explicitly MANUAL/count0 with the pinned2CPU/2GiB CPU template, no node selector
+or GPU limit. No service autoscaling activation is included. Sensitive plan stays in private
+state/plan storage for review; it is not a GitHub artifact or a local apply instruction.

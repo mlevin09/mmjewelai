@@ -14,7 +14,7 @@ variable "stt_image" {
   validation {
     condition = var.stt_image == "" || (
       var.stt_image == local.stt_reviewed_cpu_image &&
-      var.stt_resource_approval_reference == local.stt_cpu_approval
+      contains([local.stt_cpu_approval, local.stt_cpu_stage_approval], var.stt_resource_approval_reference)
     )
     error_message = "STT release blocked: supply the reviewed CPU digest and its exact CPU-only resource approval together. Historical GPU configuration must remain at manual zero."
   }
@@ -31,6 +31,9 @@ locals {
   # This allowlist is reviewed with PR #175. Never infer CPU safety from a mutable tag.
   stt_reviewed_cpu_image = "europe-west1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/jewelai-stt@sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22"
   stt_cpu_approval       = "cpu-only:2cpu:2g:min0:max1:sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22"
+  stt_cpu_stage_approval = replace(local.stt_cpu_approval, "cpu-only:", "cpu-stage:")
+  stt_cpu_activate       = var.stt_resource_approval_reference == local.stt_cpu_approval
+
 }
 
 # Two networks prevent STT's DNS sink policy from breaking existing API provider calls.
@@ -160,6 +163,14 @@ resource "google_service_account" "stt" {
   display_name = "Offline STT; no project roles, secrets, database or Assets"
 }
 
+# Activation is a second reviewed plan: never clear the hold while creating CPU revision.
+data "google_cloud_run_v2_service" "stt_cpu_ready" {
+  count    = local.stt_enabled && local.stt_cpu_activate ? 1 : 0
+  project  = var.project_id
+  location = var.region
+  name     = "jewelai-preprod-stt"
+}
+
 resource "google_cloud_run_v2_service" "stt" {
   count                = local.stt_enabled ? 1 : 0
   project              = var.project_id
@@ -169,11 +180,26 @@ resource "google_cloud_run_v2_service" "stt" {
   invoker_iam_disabled = false
   deletion_protection  = true
 
-  # Explicitly clears the operational manual-zero GPU hold only with the reviewed CPU image.
+  lifecycle {
+    precondition {
+      condition = !local.stt_cpu_activate || try(
+        data.google_cloud_run_v2_service.stt_cpu_ready[0].template[0].containers[0].image == local.stt_reviewed_cpu_image &&
+        tomap(data.google_cloud_run_v2_service.stt_cpu_ready[0].template[0].containers[0].resources[0].limits) == tomap({ cpu = "2", memory = "2Gi" }) &&
+        data.google_cloud_run_v2_service.stt_cpu_ready[0].template[0].containers[0].resources[0].cpu_idle &&
+        length(data.google_cloud_run_v2_service.stt_cpu_ready[0].template[0].node_selector) == 0 &&
+        length(data.google_cloud_run_v2_service.stt_cpu_ready[0].latest_ready_revision) > 0 &&
+        data.google_cloud_run_v2_service.stt_cpu_ready[0].latest_created_revision == data.google_cloud_run_v2_service.stt_cpu_ready[0].latest_ready_revision,
+        false
+      )
+      error_message = "CPU activation blocked: first stage the exact CPU image under manual zero and verify its revision is Ready; GPU-to-AUTOMATIC in one apply is forbidden."
+    }
+  }
+
   scaling {
-    scaling_mode       = "AUTOMATIC"
-    min_instance_count = 0
-    max_instance_count = 1
+    scaling_mode          = local.stt_cpu_activate ? "AUTOMATIC" : "MANUAL"
+    manual_instance_count = 0
+    min_instance_count    = 0
+    max_instance_count    = 1
   }
 
   template {
