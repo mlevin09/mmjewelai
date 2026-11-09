@@ -1,6 +1,6 @@
 # ADR 0041: Private offline speech transcription before existing text intake
 
-Status: Backend deployed preprod 2026-11-09; isolation qualification blocked; DNS fallback correction pending review.
+Status: Private path qualified 2026-11-09; GPU disabled by Owner decision; CPU replacement proposed.
 Date: 2026-11-08.
 
 ## Context
@@ -77,3 +77,51 @@ The new zone is not yet deployed or live-qualified. Retest TXT/MX positive contr
 A/AAAA, external DNS/HTTPS/IP reachability and actual model startup/inference before enabling user
 speech. Platform metadata, image-pull, logging and response channels remain separately scoped.
 See [Cloud DNS resolution order](https://docs.cloud.google.com/dns/docs/vpc-name-res-order).
+
+## 2026-11-09 Owner decision: separate CPU-only STT
+
+After real RU/EN inference and isolation qualification on deployment
+`e3ceb499c65df239e7fd20f9d4685e6dcef1d820`, Owner rejected GPU cost for this feature,
+including GPU scale-to-zero as the long-term solution. The GPU service was explicitly placed
+in manual scaling zero; voice is temporarily unavailable and typed input remains available.
+Earlier GPU/DNS status above is historical evidence, not current activation guidance.
+
+Replace the executable Qwen/Torch/CUDA model path with pinned multilingual Whisper Small INT8
+through faster-whisper/CTranslate2, on a separate 2 vCPU/2 GiB service, request billing, min zero,
+max one. Keep the existing internal byte/text contract, private IAM/routing, offline artifacts,
+no audio persistence, editable transcript and explicit Submit. No Parser, text LLM, Product State,
+provider adapters or production configuration changes. Narrow spelling hints and local bundled VAD
+are ASR aids, never accepted jewelry requirements or post-recognition substitutions.
+
+Alternatives measured: Qwen0.6B FP32 needed approximately 6 GiB RAM; Whisper Base was faster but
+missed oval terminology. Unmodified Small still missed prong/pear terms. Consequently promotion
+requires real original-fixture and independent negative/no-speech qualification, not mocked tests.
+A second CPU ASR process on the API would compete with its request handling and authority runtime;
+retain independent sizing and lifecycle. Future resource sharing can be separately evaluated.
+
+The existing Terraform service removes GPU resources/selectors and explicitly restores automatic
+min-zero scaling only with the reviewed CPU image. Review and coordinator-controlled preprod
+deployment remain gates; the previous GPU image must not be reactivated. No permanent warm CPU
+instance is approved by this change. Cold-start delay and synthetic-to-human accuracy remain risks.
+See [current STT implementation and handoff](../../apps/stt/README.md) for pins and qualification.
+
+Sources: [faster-whisper CPU/VAD usage](https://github.com/SYSTRAN/faster-whisper),
+[pinned decoding API](https://github.com/SYSTRAN/faster-whisper/blob/v1.2.1/faster_whisper/transcribe.py).
+
+## PR #175 release-safety correction
+
+Automatic CPU scaling is conditional on a code-reviewed immutable CPU image allowlist and the
+exact digest-bound CPU resource approval supplied together. Historical GPU variables, mixed
+pairs and missing approval fail Terraform variable validation before apply. Routine unrelated
+preprod deployments therefore cannot clear the operational manual-zero hold. Updating the CPU
+allowlist requires review; this is not a new secret or IAM authority. The existing saved-plan,
+configuration fingerprint, WIF and Environment controls remain authoritative. See the
+[release handoff](../operations/stt-cpu-release-pr175.md) for image, tests and coordinator gates.
+
+
+The transition is two-phase: digest-bound `cpu-stage:` approval changes the template while
+preserving MANUAL/count0; `cpu-only:` activation is rejected unless a live service read proves
+that exact CPU image,2CPU/2GiB/request billing and no accelerator are already latest-created=Ready.
+This avoids enabling service-wide autoscaling while the previous GPU revision might still be
+serving. Both phases use the existing deployment inputs and exact-plan process, without workflow
+changes or automatic GPU rollback.
