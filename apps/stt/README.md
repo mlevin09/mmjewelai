@@ -143,3 +143,11 @@ so increasing the model/hardware was not selected. The balanced Small candidate 
 candidate, **not full STT acceptance**. Model peak RSS711544KiB; local model-ready1.633s. These are
 not Cloud Run cold HTTP or real-microphone measurements. See the PR evidence for all actual outputs.
 The standalone mocked/codec/security regression suite passed57 tests; this is separate evidence.
+
+## Reviewed CPU release transition
+
+Historical STT_IMAGE/approval values now fail Terraform validation, rather than silently clearing
+manual-zero. Only the code-reviewed CPU digest and exact digest-bound CPU-only approval may pass.
+The [PR175 release handoff](../../docs/operations/stt-cpu-release-pr175.md) records the immutable
+image, actual focused inference/codec/timeout evidence, retained RU failure and rollout sequence.
+No activation is performed by this implementation. Existing23/24 evidence remains unchanged.

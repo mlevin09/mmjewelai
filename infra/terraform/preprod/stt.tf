@@ -11,6 +11,13 @@ variable "stt_image" {
     ))
     error_message = "STT must use an immutable image in the exact preprod registry."
   }
+  validation {
+    condition = var.stt_image == "" || (
+      var.stt_image == local.stt_reviewed_cpu_image &&
+      var.stt_resource_approval_reference == local.stt_cpu_approval
+    )
+    error_message = "STT release blocked: supply the reviewed CPU digest and its exact CPU-only resource approval together. Historical GPU configuration must remain at manual zero."
+  }
 }
 
 variable "stt_resource_approval_reference" {
@@ -21,6 +28,9 @@ variable "stt_resource_approval_reference" {
 
 locals {
   stt_enabled = var.stt_image != ""
+  # This allowlist is reviewed with PR #175. Never infer CPU safety from a mutable tag.
+  stt_reviewed_cpu_image = "europe-west1-docker.pkg.dev/mmjewellai-preprod/jewelai-preprod/jewelai-stt@sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22"
+  stt_cpu_approval       = "cpu-only:2cpu:2g:min0:max1:sha256:baf8914f1e8c872bb94026877f026c3c73c281bd78a181f758d5d947b4340d22"
 }
 
 # Two networks prevent STT's DNS sink policy from breaking existing API provider calls.

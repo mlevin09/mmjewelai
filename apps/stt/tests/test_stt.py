@@ -555,3 +555,73 @@ def test_non_address_dns_has_authoritative_private_fallback():
     assert "forwarding_config" not in block and "peering_config" not in block
     service = source.split('resource "google_cloud_run_v2_service" "stt" {', 1)[1]
     assert "google_dns_managed_zone.stt_inference_root" in service.split("depends_on = [", 1)[1]
+
+
+def test_cpu_release_guard_native_saved_plan(tmp_path):
+    """Exercise the actual deployment variable gate, without GCP or shared state."""
+    import shutil
+    import subprocess
+
+    terraform = shutil.which("terraform")
+    if terraform is None:
+        pytest.skip("Terraform binary unavailable; run native release guard qualification")
+    root = Path(__file__).resolve().parents[3]
+    source = (root / "infra/terraform/preprod/stt.tf").read_text()
+    gate = source.split("# Two networks", 1)[0]
+    (tmp_path / "main.tf").write_text(
+        gate + '\noutput "selected_image" { value = var.stt_image }\n'
+    )
+    subprocess.run(
+        [terraform, "init", "-backend=false", "-input=false"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    import re
+
+    image = re.search(r'stt_reviewed_cpu_image\s*=\s*"([^"]+)"', source)[1]
+    approval = re.search(r'stt_cpu_approval\s*=\s*"([^"]+)"', source)[1]
+    assert image.endswith(approval.split("sha256:")[1])
+    historical = image.split("@sha256:")[0] + (
+        "@sha256:f326673335ebb18b6b823e4927618be9ff534e88be21c91bfff4ab990087040a"
+    )
+    for candidate, reference in [
+        (historical, "historical-owner-gpu-approval"),
+        (historical, approval),
+        (image, "historical-owner-gpu-approval"),
+        (image, ""),
+        (image[:-1] + ("0" if image[-1] != "0" else "1"), approval),
+    ]:
+        denied = subprocess.run(
+            [
+                terraform,
+                "plan",
+                "-input=false",
+                "-lock=false",
+                "-no-color",
+                "-var=stt_image=" + candidate,
+                "-var=stt_resource_approval_reference=" + reference,
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        )
+        assert denied.returncode != 0
+        assert "STT release blocked" in denied.stderr
+    allowed = subprocess.run(
+        [
+            terraform,
+            "plan",
+            "-input=false",
+            "-lock=false",
+            "-out=cpu.tfplan",
+            "-var=stt_image=" + image,
+            "-var=stt_resource_approval_reference=" + approval,
+        ],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+    assert allowed.returncode == 0, allowed.stderr
+    plan = subprocess.check_output([terraform, "show", "-json", "cpu.tfplan"], cwd=tmp_path)
+    assert json.loads(plan)["planned_values"]["outputs"]["selected_image"]["value"] == image

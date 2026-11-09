@@ -107,3 +107,13 @@ See [current STT implementation and handoff](../../apps/stt/README.md) for pins 
 
 Sources: [faster-whisper CPU/VAD usage](https://github.com/SYSTRAN/faster-whisper),
 [pinned decoding API](https://github.com/SYSTRAN/faster-whisper/blob/v1.2.1/faster_whisper/transcribe.py).
+
+## PR #175 release-safety correction
+
+Automatic CPU scaling is conditional on a code-reviewed immutable CPU image allowlist and the
+exact digest-bound CPU resource approval supplied together. Historical GPU variables, mixed
+pairs and missing approval fail Terraform variable validation before apply. Routine unrelated
+preprod deployments therefore cannot clear the operational manual-zero hold. Updating the CPU
+allowlist requires review; this is not a new secret or IAM authority. The existing saved-plan,
+configuration fingerprint, WIF and Environment controls remain authoritative. See the
+[release handoff](../operations/stt-cpu-release-pr175.md) for image, tests and coordinator gates.
