@@ -1,5 +1,7 @@
 # Architecture decision records
 
+- [0043 — Isolated CPU LLM lab (Owner-approved installation; documentation review pending)](0043-isolated-cpu-llm-lab.md)
+
 - [0042 — Parser 1.3 and historical source verification (Owner-approved; independent review pending)](0042-parser-13-source-verification.md)
 
 - [0041 — Non-destructive Design Session deletion (Owner-approved contract; review pending)](0041-non-destructive-session-retirement.md)
