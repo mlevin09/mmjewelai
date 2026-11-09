@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiClient, ApiError } from "./api";
+import { VoiceRecorder } from "./VoiceRecorder";
 import {
   decisions,
   EnrichmentClient,
@@ -589,6 +590,22 @@ export function EnrichmentWorkspace({
                 )}
               />
             </label>
+            <VoiceRecorder
+              key={`${organizationId}:${sessionId}:${ru}`}
+              api={api}
+              organizationId={organizationId}
+              sessionId={sessionId}
+              language={ru ? "ru" : "en"}
+              disabled={busy}
+              onTranscript={(speech) =>
+                setText((current) =>
+                  [current.trim(), speech]
+                    .filter(Boolean)
+                    .join(" ")
+                    .slice(0, 2000),
+                )
+              }
+            />
             <button
               disabled={
                 busy ||

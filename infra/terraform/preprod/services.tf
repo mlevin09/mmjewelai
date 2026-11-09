@@ -17,6 +17,7 @@ locals {
     GENERATION_TASK_SERVICE_ACCOUNT_EMAIL = google_service_account.runtime["task"].email
     GENERATION_TASK_OIDC_AUDIENCE         = google_cloud_run_v2_service.worker.uri
     GENERATION_PROFILES_JSON              = var.generation_profiles_json
+    STT_SERVICE_URL                       = local.stt_enabled ? google_cloud_run_v2_service.stt[0].uri : ""
     }, local.google_generation_enabled ? {
     TEXT_UNDERSTANDING_PROVIDER               = "google"
     GOOGLE_TEXT_UNDERSTANDING_MODEL           = "gemini-3.1-flash-lite"

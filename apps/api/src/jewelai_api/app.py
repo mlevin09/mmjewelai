@@ -1,5 +1,6 @@
 """FastAPI app factory and thin HTTP routing boundary."""
 
+import asyncio
 import json
 import os
 from collections.abc import Callable
@@ -822,6 +823,74 @@ def create_app(
         organization_id: AuthorizedOrganization,
     ):
         return service.upgrade_session_schema_v1_1(session_id, organization_id, request)
+
+    @app.post("/sessions/{session_id}/transcriptions")
+    async def transcribe_session_audio(
+        session_id: UUID,
+        organization_id: AuthorizedOrganization,
+        audio: Annotated[UploadFile, File()],
+        language: str | None = None,
+    ):
+        """Return editable speech text without modifying a session or persisting audio."""
+        import re
+
+        import requests
+        from google.auth.transport.requests import Request as GoogleAuthRequest
+        from google.oauth2.id_token import fetch_id_token
+
+        # AuthorizedOrganization validates tenant membership and the active session.
+        try:
+            service_url = os.getenv("STT_SERVICE_URL", "")
+            if not re.fullmatch(r"https://[a-z0-9-]+(?:\.[a-z0-9-]+)*\.run\.app", service_url):
+                return _error_response(503, "stt_unavailable", "Speech service unavailable")
+            content_type = (audio.content_type or "").split(";", 1)[0].strip().lower()
+            if content_type not in {"audio/wav", "audio/webm", "audio/ogg"}:
+                return _error_response(415, "unsupported_audio", "Unsupported speech format")
+            if language not in (None, "ru", "en"):
+                return _error_response(422, "unsupported_language", "Unsupported language")
+            content = await audio.read(10 * 1024 * 1024 + 1)
+            if not content or len(content) > 10 * 1024 * 1024:
+                return _error_response(413, "audio_too_large", "Speech recording exceeds limits")
+
+            # Only the server receives Google service identity; no external inference API.
+            def call_stt():
+                token = fetch_id_token(GoogleAuthRequest(), service_url)
+                with requests.post(
+                    service_url + "/internal/v1/transcriptions",
+                    params={"language": language} if language else None,
+                    data=content,
+                    headers={"Authorization": "Bearer " + token, "Content-Type": content_type},
+                    timeout=55,
+                    allow_redirects=False,
+                    stream=True,
+                ) as response:
+                    if response.status_code != 200:
+                        raise ValueError("stt_response_unavailable")
+                    body = bytearray()
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if len(body) + len(chunk) > 65536:
+                            raise ValueError("stt_response_unavailable")
+                        body.extend(chunk)
+                    payload = json.loads(body)
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("schema_version") != "1.0.0"
+                    or payload.get("status") not in {"transcribed", "silence"}
+                    or not isinstance(payload.get("text"), str)
+                    or len(payload["text"]) > 8192
+                ):
+                    raise ValueError("invalid_stt_response")
+                return {key: payload[key] for key in ("schema_version", "status", "text")}
+
+            try:
+                return await asyncio.to_thread(call_stt)
+            except requests.Timeout:
+                return _error_response(504, "stt_timeout", "Speech service timed out")
+            except Exception:
+                # Upstream text, credentials and internal error details are never returned.
+                return _error_response(503, "stt_unavailable", "Speech service unavailable")
+        finally:
+            await audio.close()
 
     @app.post("/sessions/{session_id}/messages", response_model=MessageResponse, status_code=201)
     def create_message(

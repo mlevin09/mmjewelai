@@ -1,6 +1,6 @@
 # ADR 0041: Private offline speech transcription before existing text intake
 
-Status: Proposed implementation of Owner-approved STT boundaries; resource activation pending.
+Status: Backend deployed preprod 2026-11-09; isolation qualification blocked; DNS fallback correction pending review.
 Date: 2026-11-08.
 
 ## Context
@@ -50,3 +50,30 @@ Sources: [private Cloud Run routing](https://docs.cloud.google.com/run/docs/secu
 [Direct VPC egress](https://docs.cloud.google.com/run/docs/configuring/vpc-direct-vpc),
 [IAM](https://docs.cloud.google.com/run/docs/authenticating/service-to-service),
 [Qwen runtime](https://github.com/QwenLM/Qwen3-ASR).
+
+## 2026-11-09 live qualification correction (pending deployment)
+
+Owner authorized the agreed GPU/build/storage costs and actual preprod installation. The pinned
+image was built and verified offline, and revision `jewelai-preprod-stt-00001-xrr` became Ready
+through audited deployment run `42531993325`, source `6d6e61e09d93bcbe2d44686d729533711c283345`.
+This is installation evidence, not successful speech or Studio qualification.
+
+An operational probe using the exact STT digest, identity, VPC and firewall tags confirmed that
+A/AAAA resolve to loopback and direct IPv4/IPv6/UDP DNS egress is blocked. However, known public
+TXT and MX records remained resolvable: the response policy does not stop fallback for RR types
+without local data. The original random-name TXT NXDOMAIN check was insufficient because public
+recursion can return the same negative result. Keep that failed evidence; use known-positive
+public TXT/MX controls in subsequent live checks. No audio was submitted after this failed gate.
+
+Add one authoritative, empty private root zone (`.`) visible **only** to the inference VPC.
+Retain the existing A/AAAA policy, workload firewall and separate caller DNS. Missing name/type
+answers must terminate locally rather than use public recursion. This is an additive correction
+to the approved no-runtime-DNS requirement, with no gateway, NAT, DNS forwarder or new public API.
+The API/caller network must never be attached to the root zone. Google documents that private
+zones terminate absent-name resolution and warns that root/catch-all private DNS overrides all
+names; that is intentional only for the isolated offline inference network.
+
+The new zone is not yet deployed or live-qualified. Retest TXT/MX positive controls, random names,
+A/AAAA, external DNS/HTTPS/IP reachability and actual model startup/inference before enabling user
+speech. Platform metadata, image-pull, logging and response channels remain separately scoped.
+See [Cloud DNS resolution order](https://docs.cloud.google.com/dns/docs/vpc-name-res-order).

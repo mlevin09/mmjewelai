@@ -1,7 +1,9 @@
 # Private self-hosted STT v1
 
-Status: implementation for independent review; **not built into an image, installed on GPU,
-deployed, or speech-accuracy qualified**. The developer host has no Docker engine or GPU.
+Status (2026-11-09): actual model image built/published and preprod GPU revision Ready.
+**Not speech-accuracy or Studio qualified**: live TXT/MX DNS isolation failed; the additive
+authoritative private-root fallback is pending review/deployment. No real speech was submitted.
+The developer host has no Docker engine or GPU.
 This service has no Parser, Knowledge, database, Asset or Product State dependency.
 
 ## Internal contract
@@ -202,3 +204,34 @@ git diff --check
 Model extra is unnecessary for normal tests. Codec tests use real FFmpeg and synthetic waveforms;
 RU/EN HTTP tests use a fake recognizer. macOS codec tests do not qualify Linux RLIMIT_AS. Cloud
 tests above are NOT TESTED and must never be inferred from unit-test PASS. No Full Regression.
+
+## Studio integration (PR #173; not yet deployed)
+
+Owner authorized the microphone-to-editable-text integration and preprod one-L4 operating costs
+on 2026-11-09. The browser records WebM/Ogg and sends bounded multipart audio to
+`POST /sessions/{session_id}/transcriptions?language=ru|en` on the existing authenticated API.
+Existing organization membership and session/retirement checks apply before any STT invocation.
+The API obtains a Google ID token server-side for the exact configured private `STT_SERVICE_URL`.
+Only schema version, status and text are returned to the browser; redirects, oversized/malformed
+upstream responses and credential failures fail closed with redacted errors.
+
+The proxy currently uses its existing requests/google-auth dependency graph; it does not install
+the model, CUDA or the standalone STT package into the API container. FastAPI's bounded multipart
+upload may spool transiently to the container's ephemeral temporary filesystem; request cleanup
+closes/removes the upload. Nothing stores audio as an Asset, database record or durable object.
+No audio or transcript is logged. The STT service itself continues decoding through pipes only.
+
+Transcription is appended to the editable Studio input; it does not submit a Message or update
+Product State. Users must review/edit and press the ordinary submit action. Recording errors,
+permission denial, silence and STT unavailability preserve manual text input. Changing session,
+organization or language tears down recording and ignores/aborts pending transcription results.
+MP4-only browsers remain unsupported. Fake browser/transport tests do not prove microphone,
+GPU inference, live internal routing or egress isolation. Those require separate live evidence.
+
+Real build: `d24c2c2a-0d67-4fbf-8aeb-3b3a6db4402d`, image digest
+`sha256:f326673335ebb18b6b823e4927618be9ff534e88be21c91bfff4ab990087040a`, 11-file manifest
+SHA-256 `e2a90b064567e8731ec1c2d8e6dc3479b819241fe91c4fc434b12218324bd475`.
+Both frozen weight checksums and offline import passed. Deployment `42531993325` succeeded for
+already merged backend SHA `6d6e61e09d93bcbe2d44686d729533711c283345`; PR #173 UI/proxy was not merged.
+A random-name NXDOMAIN is not proof against DNS recursion. Known public TXT/MX controls must
+return local negative answers before any user audio or real speech qualification is allowed.
