@@ -137,6 +137,13 @@ See [provider quota configuration](https://github.com/hashicorp/terraform-provid
 - D5: no GPU use/reactivation, paid ASR, warm CPU, Parser/Knowledge/LLM/production change, merge,
   apply or deployment. One Cloud Build execution (~172s),9 real inference attempts including the
   intentional stopped-process timeout and two codec requests. No Full Regression/broad API suite.
-- D6: report retained failures, hashes, source/runtime binding and actual CI separately. New native
-  test may SKIP where Terraform is unavailable; local native qualification is PASS, never infer
-  native guard execution merely from a green hosted job.
+- D6: report retained failures, hashes, source/runtime binding and actual CI separately. The initial new-head CI had57PASS/1SKIP because Terraform CLI was absent; its required gate
+  correctly FAILED. The corrected native test uses local Terraform or the existing CI Docker
+  worker with immutable official Terraform1.16.4 digest985cdc6c1d9b0a65b83377f666efd2f740b47f02ac55be1ced3d18f7d3b0e829.
+  No SKIP fallback remains: missing tools fail closed. Containerized plans have no network,
+  cloud credentials, provider downloads or shared state. No workflow or coverage gate changed.
+
+
+Full-config historical-pair probe also rejected the GPU input. Terraform emits an errored
+partial diagnostic binary even on failure: its flags are errored=true, complete=false,
+applyable=false. Do not equate file existence with a usable saved plan; it is not a rollout artifact.

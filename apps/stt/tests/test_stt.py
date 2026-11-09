@@ -559,12 +559,33 @@ def test_non_address_dns_has_authoritative_private_fallback():
 
 def test_cpu_release_guard_native_saved_plan(tmp_path):
     """Exercise the actual deployment variable gate, without GCP or shared state."""
+    import os
     import shutil
     import subprocess
 
     terraform = shutil.which("terraform")
-    if terraform is None:
-        pytest.skip("Terraform binary unavailable; run native release guard qualification")
+    if terraform is not None:
+        tf = [terraform]
+    else:
+        docker = shutil.which("docker")
+        assert docker is not None, "Native release qualification requires Terraform or Docker"
+        # Existing CI already supplies Docker. Only the tool is containerized; plans are
+        # provider-free, network-disabled and never receive cloud credentials or state.
+        tf = [
+            docker,
+            "run",
+            "--rm",
+            "--network=none",
+            "--platform=linux/amd64",
+            "--user",
+            f"{os.getuid()}:{os.getgid()}",
+            "-v",
+            str(tmp_path) + ":/workspace",
+            "-w",
+            "/workspace",
+            "hashicorp/terraform:1.16.4@sha256:"
+            "985cdc6c1d9b0a65b83377f666efd2f740b47f02ac55be1ced3d18f7d3b0e829",
+        ]
     root = Path(__file__).resolve().parents[3]
     source = (root / "infra/terraform/preprod/stt.tf").read_text()
     gate = source.split("# Two networks", 1)[0]
@@ -572,7 +593,7 @@ def test_cpu_release_guard_native_saved_plan(tmp_path):
         gate + '\noutput "selected_image" { value = var.stt_image }\n'
     )
     subprocess.run(
-        [terraform, "init", "-backend=false", "-input=false"],
+        tf + ["init", "-backend=false", "-input=false"],
         cwd=tmp_path,
         check=True,
         capture_output=True,
@@ -593,8 +614,8 @@ def test_cpu_release_guard_native_saved_plan(tmp_path):
         (image[:-1] + ("0" if image[-1] != "0" else "1"), approval),
     ]:
         denied = subprocess.run(
-            [
-                terraform,
+            tf
+            + [
                 "plan",
                 "-input=false",
                 "-lock=false",
@@ -609,8 +630,8 @@ def test_cpu_release_guard_native_saved_plan(tmp_path):
         assert denied.returncode != 0
         assert "STT release blocked" in denied.stderr
     allowed = subprocess.run(
-        [
-            terraform,
+        tf
+        + [
             "plan",
             "-input=false",
             "-lock=false",
@@ -623,5 +644,5 @@ def test_cpu_release_guard_native_saved_plan(tmp_path):
         text=True,
     )
     assert allowed.returncode == 0, allowed.stderr
-    plan = subprocess.check_output([terraform, "show", "-json", "cpu.tfplan"], cwd=tmp_path)
+    plan = subprocess.check_output(tf + ["show", "-json", "cpu.tfplan"], cwd=tmp_path)
     assert json.loads(plan)["planned_values"]["outputs"]["selected_image"]["value"] == image
