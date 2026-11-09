@@ -1,237 +1,145 @@
-# Private self-hosted STT v1
+# Private CPU speech transcription
 
-Status (2026-11-09): actual model image built/published and preprod GPU revision Ready.
-**Not speech-accuracy or Studio qualified**: live TXT/MX DNS isolation failed; the additive
-authoritative private-root fallback is pending review/deployment. No real speech was submitted.
-The developer host has no Docker engine or GPU.
-This service has no Parser, Knowledge, database, Asset or Product State dependency.
+## Current state and scope
 
-## Internal contract
+Owner chose a separate CPU-only service on 2026-11-09. The existing preprod GPU service
+was put into manual scaling **0** as an operational cost hold; voice input is temporarily
+unavailable, while typed Studio input remains available. This branch prepares its replacement;
+it does not deploy it or reactivate the old GPU image. Production is unchanged.
 
-`POST /internal/v1/transcriptions?language=ru|en` accepts **raw binary**, not JSON/multipart,
-under `Content-Type: audio/wav`, `audio/webm` (Opus), or `audio/ogg` (Opus).
-The hint is optional. Remote audio URLs, caller-selected destinations and other query parameters
-are rejected. MP4/M4A, streaming and Hebrew are not supported in this slice.
+Previous real qualification established that the private routing/DNS isolation and Qwen RU/EN
+inference worked. Whisper Small INT8 without hints preserved oval terminology but missed rare
+prong/pear terms in 3 of 8 synthetic cases. Those results are not CPU acceptance. The CPU candidate
+adds balanced orthographic hints and local VAD; accuracy must also be checked on independent
+negative, non-jewelry and no-speech controls. Synthetic speech does not qualify real microphones,
+accents, background noise or the final deployed Studio path.
 
-Cloud Run ingress is INTERNAL_ONLY; invoker IAM checking remains enabled. Only the existing API
-service account is granted `roles/run.invoker` on this service. The server-side client obtains a
-Google ID token through ADC/metadata, with the **exact service origin as audience**. No key JSON,
-shared bearer secret, external JWKS fetch in the STT container or browser access is required.
-Platform IAM is the authentication boundary: running uvicorn alone is NOT an authenticated service.
-Do not expose this container directly outside the controlled Cloud Run configuration.
+## Runtime and trust boundary
 
-Example response (synthetic text):
+One standalone service, separate from the API and text LLM, runs
+`Systran/faster-whisper-small` with faster-whisper/CTranslate2 INT8 on **CPU only**.
+It has no Parser, Knowledge, database, Asset or Product State dependency. Speech recognition
+returns an untrusted editable transcript. It never submits a Message or changes canonical state.
+The user reviews/edits and explicitly submits through the existing text path.
 
-```json
-{
-  "schema_version": "1.0.0",
-  "status": "transcribed",
-  "text": "I want a ring.",
-  "language": "en",
-  "duration_ms": 4200,
-  "processing_ms": 900,
-  "model": "Qwen/Qwen3-ASR-1.7B",
-  "model_revision": "7278e1e70fe206f11671096ffdd38061171dd6e5"
-}
-```
+A fixed balanced RU spelling list (metals, shapes, stone names and prong terminology; see
+`HOTWORDS` in `engine.py`) and EN hints (`pear cut`, `prong setting`) bias spelling only. There are no requirement templates, defaults or transcript
+replacements. When no RU/EN language hint is supplied, no terminology hint is injected.
+Silero VAD is bundled by the pinned faster-whisper package and runs locally. It reduces non-speech
+hallucination risk but does not guarantee perfect transcription. No network fallback exists.
 
-Digital/near-digital silence returns 200, `status=silence`, empty text and null language without
-inference. This is not a general VAD or a guarantee against hallucinations on noisy/non-speech audio.
-The user must be able to review/edit the transcript before submitting it to the existing text flow.
+`LocalEngine` verifies every model artifact, starts one subprocess with two CPU threads and one
+worker, and serializes inference. A 40-second inference timeout terminates the subprocess and
+fails readiness. Model initialization is bounded by 210 seconds; Cloud Run startup by 240 seconds.
+The libraries' stdout/stderr and exceptions are suppressed at the model boundary. Request PCM
+and result references are released before waiting for the next request, without claiming secure
+memory erasure. Runtime performs no model download or telemetry.
 
-Safe errors use `{"error":{"code":"…"}}`: invalid request 400; unsupported language/audio 422/415;
-byte/duration limit 413; upload timeout 408; busy 429; decode/inference timeout 504;
-model unavailable 503. No upstream body or exception string is returned. Cloud Run may return its
-own 401/403 before the application. The client redacts those as `stt_access_denied`.
+## Existing contract and privacy
 
-Limits: 10 MiB compressed input; 60 s decoded audio; mono 16 kHz float32 output; 8 s wall-clock
-decode limit; Linux decoder address-space limit 768 MiB / CPU limit 6 s; 40 s inference deadline;
-10 s upload deadline; one request at a time; 8192 output characters. Decoder accepts only pipe
-protocol and an explicit container format. No temporary audio files are used. Timeout terminates
-the model process and makes health fail, allowing Cloud Run liveness to replace the instance.
-Buffers are released after use, not cryptographically erased from memory. No audio/transcript
-logging, storage, upload to GCS or automatic Message/revision creation occurs.
+`POST /internal/v1/transcriptions?language=ru|en` accepts raw WAV, WebM/Opus or Ogg/Opus.
+The language hint is optional. Remote URLs, arbitrary destinations, other query parameters,
+MP4/M4A, streaming and Hebrew remain unsupported.
 
-`GET /health` is 200 only after model initialization, otherwise 503. Cloud Run startup budget is
-240 s. Readiness, cold-start duration, GPU peaks and CUDA driver compatibility require real GPU
-qualification; passing fake-engine tests is not that qualification.
+The existing schema `1.0.0` returns status/text/language, duration and processing milliseconds,
+and the actual model ID/revision. Empty decoded speech returns `silence` with empty text and
+null language. Errors remain redacted: invalid 400/422; unsupported audio 415; size/duration 413;
+upload timeout 408; busy 429; decode/inference timeout 504; model unavailable 503.
+No public API schema or database migration is introduced.
 
-## Reproducible build
+Limits remain 10 MiB compressed input, 60 seconds decoded mono 16 kHz float32 audio, eight-second
+decode timeout, six-second decoder CPU budget and Linux 768 MiB decoder address-space bound,
+ten-second upload timeout, concurrency one, and 8192 output characters. Decoding uses bounded
+pipes and explicit input/container protocols. No audio or transcript is logged or durably stored.
 
-* Python base: 3.12.14 slim-bookworm, linux/amd64 manifest
+The browser calls only the existing tenant/session-authorized API proxy. It gets no STT service
+credential. The API obtains an exact-audience Google ID token server-side. Multipart ingress may
+spool transiently to ephemeral storage and closes/removes the upload afterward. Studio appends
+the transcript to editable input without automatic submission. Manual typing survives STT errors.
+
+## Private deployment and GPU retirement
+
+`infra/terraform/preprod/stt.tf` retains the existing internal ingress, mandatory invoker IAM,
+API-only invoker grant, separate runtime identity, private caller routing, inference deny-all
+IPv4/IPv6 egress, authoritative empty private DNS root and A/AAAA sink. These are retained privacy
+controls, not a requirement to dedicate a GPU. There is no NAT, gateway, public STT endpoint,
+service-account key, database or Asset grant.
+
+The CPU service is **2 vCPU / 2 GiB, request billing, min 0, max 1, concurrency 1**. No GPU selector,
+GPU resource or CUDA/Torch dependency remains. No permanent warm instance is provisioned.
+Service-level AUTOMATIC scaling explicitly clears the operational manual-zero hold only when
+the reviewed CPU image is deployed. Never restore automatic scaling with the old Qwen GPU image.
+
+Deployment remains the existing audited preprod saved-plan flow. Before coordinator deployment:
+
+1. Independently review this branch and its CPU qualification evidence.
+2. Build/verify the exact CPU image from `infra/docker/stt.Dockerfile`; retain digest, manifest and
+   hash lock receipts. Point `STT_IMAGE` to that CPU digest and record CPU resource approval in
+   `STT_RESOURCE_APPROVAL_REFERENCE`; do not reuse the old GPU digest.
+3. Inspect the exact saved plan: same private service, 2 CPU/2 GiB, no GPU, automatic min 0/max 1,
+   IAM/network preserved. Apply only through existing checksum/configuration/generation bindings.
+4. Verify actual revision/resources, private IAM, DNS/egress isolation, real RU/EN microphone
+   transcripts, editable input and explicit Submit. Passing mocked tests does not prove these.
+
+Do not empty `STT_IMAGE` as a retirement shortcut: it would delete Terraform-managed protected
+resources. The old GPU revision/image is historical until reviewed cleanup; it must receive no
+traffic or allocations. Failure rollback is voice disabled/manual typing, not GPU reactivation.
+
+## Reproducible model and dependencies
+
+* Python 3.12.14 slim-bookworm linux/amd64 base digest:
   `sha256:1aaa65a85fda306ffb8b910824d4e93bdce61e212c7e87168123ea3073b41a1a`.
-* Model: `Qwen/Qwen3-ASR-1.7B`, revision above, Apache-2.0.
-* `qwen-asr==0.0.6`, `transformers==4.57.6`, `accelerate==1.12.0`,
-  `torch==2.10.0+cu126`, `numpy==2.2.6`; full transitive hashes in `requirements-linux.lock`.
-* CUDA wheel is a direct hash-pinned official PyTorch URL. No vLLM or ForcedAligner.
-* Qwen's package declares demo dependencies; they are locked but no demo/Gradio/Flask server runs.
-* `imageio-ffmpeg==0.6.0` supplies the local decoder binary. New dependencies belong only to STT.
+* Model `Systran/faster-whisper-small`, revision
+  `536b0662742c02347bc0e980a01041f333bce120`, MIT; `model.bin` 483546902 bytes,
+  SHA-256 `3e305921506d8872816023e4c273e75d2419fb89b24da97b4fe7bce14170d671`.
+* `faster-whisper==1.2.1`, `ctranslate2==4.8.5`, `huggingface-hub==0.36.2`, `numpy==2.2.6`;
+  transitive hashes in `requirements-linux.lock`. These replace Qwen/Torch/CUDA solely inside STT.
+  faster-whisper supplies the CPU decoder and bundled VAD; no new external inference service.
+* `imageio-ffmpeg==0.6.0` remains the bounded local audio decoder.
 
-Model weight SHA-256 values, verified against official Hugging Face metadata:
-
-| File | Bytes | SHA-256 |
-| --- | ---: | --- |
-| model-00001-of-00002.safetensors | 4220320824 | a4cd1f1a04d90b757dc7f7dd26254e69a013b19e80efe590a83c6a3bde8608d6 |
-| model-00002-of-00002.safetensors | 478200688 | 6e0b9d9e09e2e0238e7ef3cc8a484ab387e91b90f1900bedf88bc92d7929ccfc |
-
-The network-enabled **build** stage acquires only the exact snapshot, checks both known weight
-hashes and produces `/opt/model/manifest.json` binding every copied artifact. Startup verifies that
-manifest and weight hashes before loading a local directory with `local_files_only=True`. The image
-digest binds the manifest itself. Missing/tampered/unexpected files fail closed. Offline environment
-flags disable hub access and telemetry; they supplement network isolation, never replace it.
-
-On an approved Linux/amd64 Docker build host:
-
-```sh
-docker build --platform linux/amd64 -f infra/docker/stt.Dockerfile -t jewelai-stt:review .
-```
-
-Do not use this command as a claim that a build occurred. Before approval/promotion, retain build
-logs, manifest bytes/SHA-256, dependency lock SHA-256, image digest and license notices. The complete
-model manifest and STT image digest do not yet exist in this delivery. No model weights are in Git.
-Do not upload the large image, configure activation variables or provision resources before the
-resource/cost gate. Offline startup must later be exercised with a locally loaded image under
-`--network=none --gpus all`, followed by cloud-network qualification.
-
-Lock regeneration uses uv 0.9.5 (metadata resolution, not inference):
+Build acquires the exact snapshot and checks the known weight hash. The generated manifest binds
+every top-level artifact; startup verifies the manifest, file set, paths and all hashes before
+local-only model loading. The container digest binds the manifest. Missing/tampered artifacts fail
+closed. No model weights are committed. Offline flags supplement actual network denial.
 
 ```sh
 uv pip compile apps/stt/pyproject.toml --extra model --extra build \
   --python-version 3.12 --python-platform x86_64-unknown-linux-gnu \
   --generate-hashes --no-annotate --output-file apps/stt/requirements-linux.lock
-uv pip compile apps/stt/build-requirements.in --generate-hashes --no-annotate \
-  --output-file apps/stt/requirements-build.lock
+docker build --platform linux/amd64 -f infra/docker/stt.Dockerfile -t jewelai-stt:review .
 ```
 
-The initial Linux/CUDA dependency graph was resolved against the explicit official cu126 index;
-its Torch entry was then narrowed to the exact official cp312/Linux wheel URL/hash. Resolving a
-direct wheel again can download that 803 MiB wheel just for metadata; one such redundant local
-resolution was stopped. No model weights or GPU inference were involved. Build-tool hashes are
-separate so source-only Python dependencies build without unpinned build-isolation downloads.
-
-## Preproduction configuration and cost gate
-
-`infra/terraform/preprod/stt.tf` is part of the existing preprod state, not a new independently
-applied stack. Empty `stt_image` (default) creates **zero STT resources** and adds no API VPC block.
-Activation also requires non-empty `stt_resource_approval_reference`; it records Owner approval,
-not automatic authorization. No GitHub variables were changed by implementation.
-
-The existing preprod workflow reads optional `STT_IMAGE` and `STT_RESOURCE_APPROVAL_REFERENCE` and
-binds both into the plan/apply configuration fingerprint. Exact SHA, WIF, saved binary plan,
-checksum/object-generation checks and apply-without-replanning remain in place. There is no new
-deployment trigger or automatic model build/download in CI. No production workflow/config changes.
-
-Proposed resources after explicit approval:
-
-* One Cloud Run L4 (24 GB VRAM), 4 vCPU, 16 GiB RAM, min 0 / max 1 / concurrency 1,
-  instance billing, zonal redundancy off; no VM, NAT, connector, PSC or Load Balancer.
-* Caller VPC/subnet with Private Google Access and private `*.run.app` DNS pointing at
-  `199.36.153.4/30`; API uses PRIVATE_RANGES_ONLY Direct VPC. This follows Google's documented
-  direct internal Cloud Run route and preserves API's other Internet calls.
-* Separate inference VPC/subnet, IPV4_ONLY, no Private Google Access; STT uses ALL_TRAFFIC
-  Direct VPC, network tag with deny-all IPv4/IPv6 egress and DNS response-policy wildcard sink.
-  Separate networks prevent the inference DNS sink from breaking the API's external calls.
-* Runtime SA with no new project roles, secret grants or database/Asset access; invoker IAM
-  bound only to API identity. Cloud Run service agent handles image acquisition separately.
-
-Default run.app DNS hostname exists and is required for this route; it is **not publicly callable**
-when ingress and IAM are enforced. It is not a private-IP endpoint. Platform request/response
-handling, metadata, DNS, image pull and logging are distinct from container Internet egress.
-Metadata access cannot be claimed blocked by VPC firewall; no model credentials are needed there.
-The STT container does not send payloads to platform logging. Network claims remain NOT TESTED
-until the live negative tests below pass, including DNS types other than A/AAAA.
-
-2026-11-08 read-only quota check: no GPU Cloud Run service exists; Cloud Run L4 quota buckets did
-not return a positive effective allocation; Compute Engine GPUS_ALL_REGIONS=0. Regional Compute
-L4 quota=1 from preflight is not a usable global GPU grant. Cloud Run and Compute quotas differ.
-Google documents initial non-redundant Cloud Run quota auto-grant at first deploy; capacity/quota
-must be checked then, without substituting GCE or changing region silently.
-
-USD planning rate (public on-demand table, confirm Belgium billing SKU before spend):
-`3600 * (0.0001867 + 4*0.000018 + 16*0.000002) = $1.04652/allocated instance-hour`.
-100 allocated hours ≈ $104.65; 730 h ≈ $763.96. Startup and idle-before-scale-down count; these are
-not audio-hours. Private DNS zone adds about $0.20/month plus queries; registry/build/log storage
-adds usage costs (image size not measured). No recurring paid gateway is introduced. Pricing:
-[Cloud Run](https://cloud.google.com/run/pricing), [Cloud DNS](https://cloud.google.com/dns/pricing).
-
-## Required installation evidence (NOT TESTED)
-
-After independent review and explicit resource approval, use the existing audited preprod
-deployment-request flow with the pinned STT image. Inspect the saved plan before apply. Do not
-deploy this task automatically. Keep the text-only flow independent of STT failure.
-
-1. Confirm positive L4 quota/capacity, correct image/manifest and GPU startup/readiness.
-2. Synthetic real RU/EN clips → manually checked transcript; silence, invalid, overlong/oversized
-   input and model timeout; audio must not appear in logs or durable storage.
-3. Public caller denied with and without a valid credential; internal unauthorized identity denied;
-   API identity accepted. Local ASGI tests cannot prove platform IAM/network behavior.
-4. From the exact inference revision/network, test blocked external HTTPS, direct IPv4, IPv6,
-   external DNS/DoH/alternate DNS, and A/AAAA/TXT random-name resolution. Confirm the DNS sink does
-   not forward random names. Preserve sanitized outcome/status only. No customer audio.
-5. Cold start and inference with Internet blocked; no hub/model downloads or telemetry; measure
-   wall time, peak GPU/RAM and readiness against the configured bounds.
-6. Confirm existing API provider calls still work through the caller DNS/routing change.
-
-Any failed isolation check blocks exposure/integration. Rollback uses the previous reviewed image
-digest and saved-plan process; failed model startup leaves STT unhealthy. Do not simply empty the
-image variable to delete resources: deletion protection intentionally requires reviewed retirement.
-
-## Frontend handoff / exact pending contract decision
-
-The browser must never call the run.app STT endpoint or receive a service credential. The reusable
-`jewelai_stt.client.SttClient` is server-only and deliberately not installed/wired into the public API.
-
-Owner/coordinator decision package for the next integration: authorize a tenant/session-scoped
-browser-facing transcription endpoint, accepted WAV/WebM/OGG limits, transient-audio/no-durable-audio
-retention, and user transcript review/edit before existing Message submission. Suggested route:
-`POST /v1/sessions/{session_id}/transcriptions`, with existing organization/session authorization
-resolved **before** reading bytes. This route is a proposal, not implemented or approved here.
-No canonical changes, automatic decisions, audio Asset type or new persisted provenance type is
-needed for this internal slice. ChatGPT owns microphone/UI work and subsequent integration review.
-
-## Focused developer validation
+## Targeted verification
 
 ```sh
-python3 -m pip install './apps/stt[test]'
 python3 -m pytest -c apps/stt/pyproject.toml apps/stt/tests -q
 python3 -m ruff check apps/stt
 python3 -m ruff format --check apps/stt
-terraform fmt -check infra/terraform/preprod/stt.tf infra/terraform/preprod/services.tf
+terraform fmt -check infra/terraform/preprod/stt.tf
 python3 infra/terraform/check_invariants.py
 git diff --check
 ```
 
-Model extra is unnecessary for normal tests. Codec tests use real FFmpeg and synthetic waveforms;
-RU/EN HTTP tests use a fake recognizer. macOS codec tests do not qualify Linux RLIMIT_AS. Cloud
-tests above are NOT TESTED and must never be inferred from unit-test PASS. No Full Regression.
+Normal CI uses fake recognizers, real synthetic codec inputs and no model/network inference.
+Real model qualification is separately identified in the PR; it must include original fixture
+hashes, unseen controls, actual outputs, inference duration, offline execution and memory limits.
+macOS decoding tests do not qualify Linux RLIMIT_AS. No broad API suite or Full Regression is
+needed for this isolated model/resource change.
 
-## Studio integration (PR #173; not yet deployed)
+Previous measurement (unmodified Small, synthetic only): 2 CPU/2 GiB warm private HTTP
+3.069–3.890 seconds, peak process RSS 1009.4 MiB; true cold HTTP 15.368 seconds. Changes to hints,
+VAD and subprocess execution require candidate-specific evidence. Scale-to-zero does not remove
+cold starts. Keep user-visible latency and accuracy limitations explicit.
 
-Owner authorized the microphone-to-editable-text integration and preprod one-L4 operating costs
-on 2026-11-09. The browser records WebM/Ogg and sends bounded multipart audio to
-`POST /sessions/{session_id}/transcriptions?language=ru|en` on the existing authenticated API.
-Existing organization membership and session/retirement checks apply before any STT invocation.
-The API obtains a Google ID token server-side for the exact configured private `STT_SERVICE_URL`.
-Only schema version, status and text are returned to the browser; redirects, oversized/malformed
-upstream responses and credential failures fail closed with redacted errors.
+## CPU candidate evidence (2026-11-09; not a deployed qualification)
 
-The proxy currently uses its existing requests/google-auth dependency graph; it does not install
-the model, CUDA or the standalone STT package into the API container. FastAPI's bounded multipart
-upload may spool transiently to the container's ephemeral temporary filesystem; request cleanup
-closes/removes the upload. Nothing stores audio as an Asset, database record or durable object.
-No audio or transcript is logged. The STT service itself continues decoding through pipes only.
-
-Transcription is appended to the editable Studio input; it does not submit a Message or update
-Product State. Users must review/edit and press the ordinary submit action. Recording errors,
-permission denial, silence and STT unavailability preserve manual text input. Changing session,
-organization or language tears down recording and ignores/aborts pending transcription results.
-MP4-only browsers remain unsupported. Fake browser/transport tests do not prove microphone,
-GPU inference, live internal routing or egress isolation. Those require separate live evidence.
-
-Real build: `d24c2c2a-0d67-4fbf-8aeb-3b3a6db4402d`, image digest
-`sha256:f326673335ebb18b6b823e4927618be9ff534e88be21c91bfff4ab990087040a`, 11-file manifest
-SHA-256 `e2a90b064567e8731ec1c2d8e6dc3479b819241fe91c4fc434b12218324bd475`.
-Both frozen weight checksums and offline import passed. Deployment `42531993325` succeeded for
-already merged backend SHA `6d6e61e09d93bcbe2d44686d729533711c283345`; PR #173 UI/proxy was not merged.
-A random-name NXDOMAIN is not proof against DNS recursion. Known public TXT/MX controls must
-return local negative answers before any user audio or real speech qualification is allowed.
+Actual production engine/decoder/app in a Docker container with networking disabled, 2 CPU/2 GiB
+and the unprivileged runtime user: 24/24 HTTP 200, **23/24 content controls PASS**. This includes
+8 original byte-identical fixtures and 16 independent/negative/noise cases. Exact-token negation
+checks preserve RU/EN prohibitions; no ASR output replacement is performed. The remaining synthetic
+RU failure is `Оставь овальный камень…` → `Оставься вальный камень…`. Keep this FAIL visible.
+Small with the earlier narrow hints scored 16/18; Medium scored17/18 and was slower (6.7–9.4s),
+so increasing the model/hardware was not selected. The balanced Small candidate remains a review
+candidate, **not full STT acceptance**. Model peak RSS711544KiB; local model-ready1.633s. These are
+not Cloud Run cold HTTP or real-microphone measurements. See the PR evidence for all actual outputs.
+The standalone mocked/codec/security regression suite passed57 tests; this is separate evidence.

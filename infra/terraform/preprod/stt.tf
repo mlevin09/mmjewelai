@@ -16,7 +16,7 @@ variable "stt_image" {
 variable "stt_resource_approval_reference" {
   type        = string
   default     = ""
-  description = "Explicit Owner approval of the one-L4 configuration and recurring costs."
+  description = "Explicit Owner approval of the CPU-only configuration and recurring costs."
 }
 
 locals {
@@ -159,17 +159,22 @@ resource "google_cloud_run_v2_service" "stt" {
   invoker_iam_disabled = false
   deletion_protection  = true
 
+  # Explicitly clears the operational manual-zero GPU hold only with the reviewed CPU image.
+  scaling {
+    scaling_mode       = "AUTOMATIC"
+    min_instance_count = 0
+    max_instance_count = 1
+  }
+
   template {
     service_account                  = google_service_account.stt[0].email
     execution_environment            = "EXECUTION_ENVIRONMENT_GEN2"
-    gpu_zonal_redundancy_disabled    = true
     max_instance_request_concurrency = 1
     timeout                          = "60s"
     scaling {
       min_instance_count = 0
       max_instance_count = 1
     }
-    node_selector { accelerator = "nvidia-l4" }
     vpc_access {
       egress = "ALL_TRAFFIC"
       network_interfaces {
@@ -182,8 +187,8 @@ resource "google_cloud_run_v2_service" "stt" {
       image = var.stt_image
       ports { container_port = 8080 }
       resources {
-        limits   = { cpu = "4", memory = "16Gi", "nvidia.com/gpu" = "1" }
-        cpu_idle = false
+        limits   = { cpu = "2", memory = "2Gi" }
+        cpu_idle = true
       }
       startup_probe {
         period_seconds    = 10

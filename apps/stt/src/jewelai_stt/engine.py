@@ -7,9 +7,18 @@ import threading
 from pathlib import Path
 
 from .artifacts import verify_artifacts
-from .audio import SAMPLE_RATE, SttError
+from .audio import SttError
 
-LANGUAGES = {"Russian": "ru", "English": "en"}
+LANGUAGES = {"ru", "en"}
+# Orthographic hints only, never a template sentence or a transcript replacement.
+# New terms must be qualified against independent/no-speech controls before promotion.
+HOTWORDS = {
+    "ru": (
+        "золотой, серебряный, платиновый, овальный, круглый, квадратный, груша, "
+        "бриллиант, сапфир, рубин, изумруд, жемчужина, крапан, крапаны, крапановая закрепка"
+    ),
+    "en": "pear cut, prong setting",
+}
 
 
 def _model_process(connection, model_dir: str) -> None:
@@ -29,34 +38,41 @@ def _model_process(connection, model_dir: str) -> None:
             )
             verify_artifacts(Path(model_dir))
             import numpy as np
-            import torch
-            from qwen_asr import Qwen3ASRModel
+            from faster_whisper import WhisperModel
 
-            torch.set_num_threads(2)
-            model = Qwen3ASRModel.from_pretrained(
+            model = WhisperModel(
                 model_dir,
                 local_files_only=True,
-                dtype=torch.bfloat16,
-                device_map="cuda:0",
-                max_inference_batch_size=1,
-                max_new_tokens=1024,
+                device="cpu",
+                compute_type="int8",
+                cpu_threads=2,
+                num_workers=1,
             )
             connection.send(("ready",))
             while True:
                 pcm, language = connection.recv()
-                result = model.transcribe(
-                    audio=(np.frombuffer(pcm, dtype="<f4"), SAMPLE_RATE),
-                    language={"ru": "Russian", "en": "English"}.get(language),
-                )[0]
-                text = result.text.strip()
+                samples = np.frombuffer(pcm, dtype="<f4")
+                segments, info = model.transcribe(
+                    samples,
+                    language=language,
+                    task="transcribe",
+                    beam_size=5,
+                    best_of=1,
+                    temperature=0.0,
+                    condition_on_previous_text=False,
+                    hotwords=HOTWORDS.get(language),
+                    vad_filter=True,
+                    vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
+                )
+                text = " ".join(segment.text.strip() for segment in segments).strip()
                 if len(text) > 8192:
                     connection.send(("error",))
-                elif result.language not in LANGUAGES:
+                elif info.language not in LANGUAGES:
                     connection.send(("unsupported_language",))
                 else:
-                    connection.send(("result", text, LANGUAGES[result.language]))
+                    connection.send(("result", text, info.language))
                 # Do not retain the last caller's PCM/result while waiting for another request.
-                del pcm, language, result, text
+                del pcm, language, samples, segments, info, text
         except (EOFError, BrokenPipeError):
             return
         except Exception:

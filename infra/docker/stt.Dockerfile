@@ -13,7 +13,8 @@ FROM python:3.12.14-slim-bookworm@sha256:1aaa65a85fda306ffb8b910824d4e93bdce61e2
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_HUB_DISABLE_TELEMETRY=1 \
     DO_NOT_TRACK=1 TOKENIZERS_PARALLELISM=false \
-    HF_HOME=/tmp/huggingface HOME=/tmp
+    HF_HOME=/tmp/huggingface HOME=/tmp \
+    OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 OPENBLAS_NUM_THREADS=1
 COPY --from=build /usr/local /usr/local
 COPY --from=build /opt/model /opt/model
 RUN groupadd --gid 10001 jewelai && \

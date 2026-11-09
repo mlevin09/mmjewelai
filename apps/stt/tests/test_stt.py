@@ -31,7 +31,7 @@ def wav(seconds=0.1, *, silence=False):
 
 
 class FakeEngine:
-    """Contract fake, not evidence of Qwen speech recognition or accuracy."""
+    """Contract fake, not evidence of real speech recognition or accuracy."""
 
     ready = False
     calls = 0
@@ -270,11 +270,19 @@ def test_bundle_fail_closed(tmp_path, change):
         verify_artifacts(tmp_path, weights=weights)
 
 
-def test_worker_uses_only_verified_local_artifacts(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    ("text", "language"),
+    [("A platinum pearl bracelet.", "en"), ("Платиновый браслет с жемчугом.", "ru")],
+)
+def test_worker_uses_only_verified_local_cpu_artifacts(monkeypatch, tmp_path, text, language):
     calls = []
-    model = SimpleNamespace(
-        transcribe=lambda **kw: [SimpleNamespace(text="Test", language="English")]
-    )
+
+    def transcribe(audio, **kwargs):
+        calls.append(kwargs)
+        assert audio.size == 1
+        return iter([SimpleNamespace(text=text)]), SimpleNamespace(language=language)
+
+    model = SimpleNamespace(transcribe=transcribe)
 
     def load(path, **kwargs):
         calls.append((path, kwargs))
@@ -283,18 +291,8 @@ def test_worker_uses_only_verified_local_artifacts(monkeypatch, tmp_path):
     monkeypatch.setattr("jewelai_stt.engine.verify_artifacts", lambda p: calls.append(p))
     monkeypatch.setitem(
         sys.modules,
-        "torch",
-        SimpleNamespace(
-            bfloat16="BF16",
-            set_num_threads=lambda _: None,
-        ),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "qwen_asr",
-        SimpleNamespace(
-            Qwen3ASRModel=SimpleNamespace(from_pretrained=load),
-        ),
+        "faster_whisper",
+        SimpleNamespace(WhisperModel=load),
     )
 
     class Connection:
@@ -308,16 +306,79 @@ def test_worker_uses_only_verified_local_artifacts(monkeypatch, tmp_path):
             self.count += 1
             if self.count > 1:
                 assert "pcm" not in sys._getframe(1).f_locals
-                assert "result" not in sys._getframe(1).f_locals
+                assert "samples" not in sys._getframe(1).f_locals
+                assert "segments" not in sys._getframe(1).f_locals
                 raise EOFError
-            return array.array("f", [0.25]).tobytes(), "en"
+            return array.array("f", [0.25]).tobytes(), language
 
     connection = Connection()
     _model_process(connection, str(tmp_path))
     assert calls[0] == tmp_path
     assert calls[1][0] == str(tmp_path) and calls[1][1]["local_files_only"] is True
-    assert calls[1][1]["max_inference_batch_size"] == 1
-    assert connection.results == [("ready",), ("result", "Test", "en")]
+    assert calls[1][1]["device"] == "cpu"
+    assert calls[1][1]["compute_type"] == "int8"
+    assert calls[1][1]["cpu_threads"] == 2
+    assert calls[1][1]["num_workers"] == 1
+    assert calls[2]["vad_filter"] is True
+    assert calls[2]["condition_on_previous_text"] is False
+    assert ("pear" if language == "en" else "крапан") in calls[2]["hotwords"]
+    # Lexical hints never replace recognizer output or become application facts.
+    assert connection.results == [("ready",), ("result", text, language)]
+
+
+@pytest.mark.parametrize(
+    ("language_hint", "text", "detected", "expected"),
+    [
+        (None, "Open the window.", "en", ("result", "Open the window.", "en")),
+        ("ru", "", "ru", ("result", "", "ru")),
+        (None, "unrelated", "fr", ("unsupported_language",)),
+        ("en", "x" * 8193, "en", ("error",)),
+        ("en", None, "en", ("error",)),
+    ],
+    ids=["automatic-no-hints", "vad-empty", "unsupported", "bounded-output", "redacted-failure"],
+)
+def test_cpu_worker_bounds_and_no_implicit_hints(
+    monkeypatch, tmp_path, language_hint, text, detected, expected, caplog
+):
+    def transcribe(_audio, **options):
+        if language_hint is None:
+            assert options["hotwords"] is None
+        if text is None:
+            raise RuntimeError("PRIVATE_AUDIO PRIVATE_PROVIDER_PAYLOAD")
+        return iter([SimpleNamespace(text=text)]), SimpleNamespace(language=detected)
+
+    monkeypatch.setattr("jewelai_stt.engine.verify_artifacts", lambda _: None)
+    monkeypatch.setitem(
+        sys.modules,
+        "faster_whisper",
+        SimpleNamespace(WhisperModel=lambda *_a, **_kw: SimpleNamespace(transcribe=transcribe)),
+    )
+
+    class Connection:
+        results = []
+        count = 0
+
+        def send(self, value):
+            self.results.append(value)
+
+        def recv(self):
+            self.count += 1
+            if self.count > 1:
+                raise EOFError
+            return array.array("f", [0.25]).tobytes(), language_hint
+
+    connection = Connection()
+    _model_process(connection, str(tmp_path))
+    assert connection.results == [("ready",), expected]
+    assert "PRIVATE" not in caplog.text
+
+
+def test_cpu_dependency_lock_contains_no_gpu_runtime():
+    root = Path(__file__).resolve().parents[1]
+    lock = (root / "requirements-linux.lock").read_text().lower()
+    assert "faster-whisper==1.2.1" in lock and "ctranslate2==4.8.5" in lock
+    for package in ("torch==", "nvidia-", "qwen-asr", "download.pytorch.org", "triton=="):
+        assert package not in lock
 
 
 def test_timeout_terminates_model_and_fails_readiness():
@@ -396,6 +457,17 @@ def test_infrastructure_disabled_private_and_no_gateway():
         '"google_secret_manager_secret_version"',
     ):
         assert forbidden not in source
+
+
+def test_stt_has_no_gpu_and_cpu_release_restores_automatic_min_zero():
+    source = (Path(__file__).resolve().parents[3] / "infra/terraform/preprod/stt.tf").read_text()
+    service = source.split('resource "google_cloud_run_v2_service" "stt" {', 1)[1]
+    assert "nvidia.com/gpu" not in service
+    assert "node_selector" not in service
+    assert "gpu_zonal_redundancy_disabled" not in service
+    assert 'scaling_mode       = "AUTOMATIC"' in service
+    assert 'cpu = "2", memory = "2Gi"' in service
+    assert "cpu_idle = true" in service
 
 
 def test_deployment_fingerprint_binds_optional_stt_inputs():
