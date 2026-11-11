@@ -133,6 +133,28 @@ NB-08 owns a real contamination probe; no hidden canaries are inserted into appr
 
 ## Atomic artifacts and recovery
 
+### Opt-in NB-09D instruction experiment
+
+`plan`, `run`, and `resume` accept `--instruction-override /PRIVATE/variation.json`.
+Omitting it preserves historical plans, system messages, sampling records and payload hashes.
+This option is an explicitly registered experiment, not a free-form system-prompt replacement.
+The manifest must contain exactly `schema_version="1.0.0"`,
+`profile_id="NB09D_BREVITY_SYSTEM_PROMPT_V1"`, `base_runtime_sha256` (canonical runtime hash),
+`suffix` (the exact Owner-approved `BREVITY_SUFFIX` in `instructions.py`), and
+`suffix_sha256` (SHA-256 of its UTF-8 bytes). Unknown profiles, changed suffixes, stale corpus
+bindings, extra fields and malformed manifests fail before run creation or inference.
+
+Each selected session receives exactly one system message: its untouched original instruction,
+two newline characters, then the common suffix. No runtime/evaluator/source snapshot is edited.
+The plan records the manifest, its hash, session/instruction mapping, full effective instructions
+and original/effective UTF-8 hashes. `configuration_sha256` continues to identify sampling;
+the additional `experiment_configuration_sha256` identifies sampling plus prompt variation.
+Each request binds the profile, manifest and effective-system hashes alongside its ordinary
+payload hash. Inspect/export and resumed execution reject mismatched override provenance.
+Resume requires the same manifest explicitly; it never silently activates an experiment.
+The suffix introduces no gold, source metadata or scenario-specific answer hints into payloads.
+Profile D remains separate from the official native Stage 1 baseline.
+
 Run.json pins the plan. Requests/SESSION/TURN/ATTEMPT.json is fsynced BEFORE I/O; results/... is
 a separate immutable record. Temp-file+link+directory fsync prevents partial JSON or overwrite.
 Files600, new directories700; nonblocking flock permits one executor/run.

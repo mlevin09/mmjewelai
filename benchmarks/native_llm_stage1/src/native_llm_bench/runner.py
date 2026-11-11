@@ -6,6 +6,7 @@ from pathlib import Path
 
 from . import storage
 from .contracts import digest, execution_plan, load, require
+from .instructions import PROVENANCE_FIELDS, system_instruction
 from .transport import now, parse_response, request
 
 UNCERTAIN = {"TIMEOUT", "TRANSPORT", "INTERRUPTED_UNKNOWN"}
@@ -68,9 +69,18 @@ def execute(
     resume=None,
     retry_uncertain=False,
     rerun_of=None,
+    instruction_override=None,
     transport=request,
 ):
-    plan = execution_plan(corpus, config, manifest, seed, selected, exclude_holdouts)
+    plan = execution_plan(
+        corpus,
+        config,
+        manifest,
+        seed,
+        selected,
+        exclude_holdouts,
+        instruction_override=instruction_override,
+    )
     require(not (resume and rerun_of), "resume and rerun are distinct operations")
     prior = storage.read_run(rerun_of) if rerun_of else None
     if resume:
@@ -107,9 +117,8 @@ def execute(
         try:
             for sid in plan["session_order"]:
                 session = sessions[sid]
-                history = [
-                    {"role": "system", "content": corpus["instructions"][session["instruction_id"]]}
-                ]
+                system, provenance = system_instruction(corpus, session, plan)
+                history = [{"role": "system", "content": system}]
                 state = {
                     "status": "COMPLETED",
                     "completed_turns": 0,
@@ -134,7 +143,8 @@ def execute(
                             and req["attempt"] == number
                             and req["turn_index"] == index + 1
                             and req["payload"] == payload
-                            and req["request_sha256"] == digest(payload),
+                            and req["request_sha256"] == digest(payload)
+                            and {k: req[k] for k in PROVENANCE_FIELDS if k in req} == provenance,
                             "source/history/request integrity mismatch",
                         )
                         if not res_path.exists():
@@ -160,6 +170,7 @@ def execute(
                             "recorded_at": now(),
                             "payload": payload,
                             "request_sha256": digest(payload),
+                            **provenance,
                         }
                         storage.write(req_path, req)
                         state["turn_statuses"][tid] = "IN_FLIGHT_OUTCOME_UNKNOWN"

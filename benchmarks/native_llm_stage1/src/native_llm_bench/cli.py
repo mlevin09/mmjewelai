@@ -27,6 +27,11 @@ def parser():
         cmd.add_argument("--runtime", type=Path, required=True)
         cmd.add_argument("--config", type=Path, required=True)
         cmd.add_argument("--model-manifest", type=Path, required=True)
+        cmd.add_argument(
+            "--instruction-override",
+            type=Path,
+            help="opt-in registered experiment manifest; required again on resume",
+        )
         cmd.add_argument("--seed", type=int)
         cmd.add_argument("--sessions", help="comma-separated session IDs")
         cmd.add_argument("--exclude-holdouts", action=argparse.BooleanOptionalAction, default=None)
@@ -112,6 +117,9 @@ def run(args):
     if corpus["corpus_id"] == "jewelai.native.stage1":
         validate_stage1(corpus)
     config, manifest = Config(**load(args.config)), load(args.model_manifest)
+    instruction_override = load(args.instruction_override) if args.instruction_override else None
+    if args.instruction_override and instruction_override is None:
+        raise InvalidArtifact("instruction override must be a manifest, not null")
     selected = args.sessions.split(",") if args.sessions else None
     seed, exclude = args.seed, args.exclude_holdouts
     if args.command == "resume":
@@ -125,7 +133,15 @@ def run(args):
     seed = SEED if seed is None else seed
     exclude = bool(exclude)
     if args.command == "plan":
-        return execution_plan(corpus, config, manifest, seed, selected, exclude), 0
+        return execution_plan(
+            corpus,
+            config,
+            manifest,
+            seed,
+            selected,
+            exclude,
+            instruction_override=instruction_override,
+        ), 0
     summary = execute(
         corpus,
         config,
@@ -137,6 +153,7 @@ def run(args):
         resume=args.directory if args.command == "resume" else None,
         retry_uncertain=getattr(args, "retry_uncertain", False),
         rerun_of=getattr(args, "rerun_of", None),
+        instruction_override=instruction_override,
     )
     return summary, 0 if summary["status"] == "COMPLETED" else 2
 

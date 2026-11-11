@@ -136,6 +136,9 @@ def read_results(directory):
                     and request["request_sha256"] == digest(request["payload"]),
                     "request journal integrity failure",
                 )
+                from .instructions import validate_request_instruction
+
+                validate_request_instruction(run["plan"], request)
                 if res.exists():
                     expected_results.add(res)
                     result = load(res)

@@ -326,7 +326,16 @@ class XorShift32:
             values[i], values[j] = values[j], values[i]
 
 
-def execution_plan(corpus, config, manifest, seed=SEED, selected=None, exclude_holdouts=False):
+def execution_plan(
+    corpus,
+    config,
+    manifest,
+    seed=SEED,
+    selected=None,
+    exclude_holdouts=False,
+    *,
+    instruction_override=None,
+):
     validate_runtime(corpus)
     validate_manifest(manifest)
     config.validate(manifest)
@@ -359,7 +368,7 @@ def execution_plan(corpus, config, manifest, seed=SEED, selected=None, exclude_h
         for key in strata
         if i < len(buckets[key])
     ]
-    return {
+    plan = {
         "plan_version": VERSION,
         "corpus_id": corpus["corpus_id"],
         "corpus_version": corpus["corpus_version"],
@@ -379,3 +388,16 @@ def execution_plan(corpus, config, manifest, seed=SEED, selected=None, exclude_h
         "exclude_holdouts": exclude_holdouts,
         "output_reproducibility": "NOT_ESTABLISHED; scheduling determinism is not output equality",
     }
+    if instruction_override is not None:
+        from .instructions import instruction_variation
+
+        variation = instruction_variation(corpus, sessions, instruction_override)
+        plan["instruction_override"] = variation
+        experiment = {
+            "profile_id": variation["manifest"]["profile_id"],
+            "sampling_configuration": config.record(),
+            "instruction_override_sha256": variation["manifest_sha256"],
+        }
+        plan["experiment_configuration"] = experiment
+        plan["experiment_configuration_sha256"] = digest(experiment)
+    return plan
