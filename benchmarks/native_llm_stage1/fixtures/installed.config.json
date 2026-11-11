@@ -1,0 +1,13 @@
+{
+  "endpoint": "http://127.0.0.1:8080",
+  "model": "qwen3-1.7b-q4_k_m",
+  "context_tokens": 2048,
+  "temperature": 0,
+  "top_p": 1,
+  "top_k": 40,
+  "seed": 20261111,
+  "max_tokens": 128,
+  "repeat_penalty": 1,
+  "timeout_seconds": 120,
+  "max_attempts": 1
+}

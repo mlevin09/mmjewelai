@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-native-llm-bench"
+version = "1.0.0"
+description = "Isolated NB-07 direct loopback LLM benchmark; never a JewelAI dependency"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[project.scripts]
+native-llm-bench = "native_llm_bench.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/native_llm_bench"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

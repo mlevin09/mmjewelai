@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "corpus_id": "synthetic.native.stage1",
+  "corpus_version": "1.0.0",
+  "protocol_version": "NB-01/1.0",
+  "sources": [],
+  "instructions": {
+    "NEUTRAL": "Answer the user's requests in the user's language. Preserve the conversation context, state uncertainty honestly, and use no tools."
+  },
+  "sessions": [
+    {
+      "session_id": "SYN2",
+      "kind": "synthetic",
+      "language": "RU",
+      "domains": [
+        "synthetic"
+      ],
+      "role": "NEUTRAL",
+      "instruction_id": "NEUTRAL",
+      "holdout": false,
+      "turns": [
+        {
+          "turn_id": "SYN2.T1",
+          "language": "RU",
+          "text": "Запомни синтетическую метку ALPHA."
+        },
+        {
+          "turn_id": "SYN2.T2",
+          "language": "RU",
+          "text": "Какую метку я назвал?"
+        }
+      ]
+    },
+    {
+      "session_id": "SYN5",
+      "kind": "synthetic",
+      "language": "EN",
+      "domains": [
+        "synthetic"
+      ],
+      "role": "NEUTRAL",
+      "instruction_id": "NEUTRAL",
+      "holdout": false,
+      "turns": [
+        {
+          "turn_id": "SYN5.T1",
+          "language": "EN",
+          "text": "Remember synthetic marker BETA."
+        },
+        {
+          "turn_id": "SYN5.T2",
+          "language": "EN",
+          "text": "Use the label blue."
+        },
+        {
+          "turn_id": "SYN5.T3",
+          "language": "EN",
+          "text": "Actually change only the label to green."
+        },
+        {
+          "turn_id": "SYN5.T4",
+          "language": "EN",
+          "text": "Keep the marker unchanged."
+        },
+        {
+          "turn_id": "SYN5.T5",
+          "language": "EN",
+          "text": "State the current marker and label."
+        }
+      ]
+    }
+  ]
+}

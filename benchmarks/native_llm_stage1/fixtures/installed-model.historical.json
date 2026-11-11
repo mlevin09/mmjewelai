@@ -1,0 +1,12 @@
+{
+  "model_id": "qwen3-1.7b-q4_k_m",
+  "model_sha256": "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5",
+  "runtime_sha256": "eaf9c1c664cc0ae1f4dea4b171bb91aac8409fcfea0574c9b6bcc93792ce2400",
+  "runtime_commit": "cd959bae99ff4bed22bef2604f45241c09bbb8c8",
+  "quantization": "Q4_K_M",
+  "context_tokens": 2048,
+  "runtime_flags": null,
+  "verification_status": "HISTORICAL_NOT_REVERIFIED",
+  "verified_at": null,
+  "environment": "Historical 2026-11-09 llm-lab.md pins only. NB08 must verify current runtime."
+}

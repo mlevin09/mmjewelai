@@ -1,0 +1,12 @@
+{
+  "model_id": "synthetic-local-model",
+  "model_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "runtime_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "runtime_commit": "SYNTHETIC",
+  "quantization": "SYNTHETIC",
+  "context_tokens": 2048,
+  "runtime_flags": [],
+  "verification_status": "SYNTHETIC",
+  "verified_at": null,
+  "environment": "controlled fake HTTP only; not measured model performance"
+}
