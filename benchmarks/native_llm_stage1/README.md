@@ -108,6 +108,13 @@ user/actual completed assistant content + one new user turn. New sessions start 
 
 Request allowlist: model/messages/stream=false/temperature/top_p/optional top_k+seed/max_tokens/
 repeat_penalty/cache_prompt=false/chat_template_kwargs.enable_thinking=false.
+Optional `min_p` (finite number in [0,1]) and `presence_penalty` (finite number in [0,2])
+support bounded sampler experiments. Missing/null values omit these fields from both
+HTTP payloads and configuration records, preserving historical payload/config/plan hashes;
+explicit zero is retained. Booleans, strings, nonfinite and out-of-range values are rejected.
+The nonnegative presence range follows the [Qwen GGUF guidance](https://huggingface.co/Qwen/Qwen3-1.7B-GGUF#best-practices).
+Recorded request settings alone do not prove server application: verify the pinned server's
+live `/slots` parameters for actual experiment requests. Server flags/defaults stay unchanged.
 Supported by [the installed llama.cpp commit](https://github.com/ggml-org/llama.cpp/blob/cd959bae99ff4bed22bef2604f45241c09bbb8c8/tools/server/README.md);
 this is not a promise of arbitrary external-provider compatibility.
 Context configuration must match manifest; no fictitious per-request n_ctx setting is sent.

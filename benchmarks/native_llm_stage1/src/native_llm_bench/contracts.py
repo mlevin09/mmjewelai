@@ -217,6 +217,8 @@ class Config:
     repeat_penalty: float = 1
     timeout_seconds: float = 60
     max_attempts: int = 1
+    min_p: float | None = None
+    presence_penalty: float | None = None
 
     def validate(self, manifest):
         loopback_address(self.endpoint)
@@ -251,6 +253,17 @@ class Config:
             self.seed is None or type(self.seed) is int and 0 <= self.seed < 2**32,
             "invalid inference seed",
         )
+        for name, value, upper in (
+            ("min_p", self.min_p, 1),
+            ("presence_penalty", self.presence_penalty, 2),
+        ):
+            require(
+                value is None
+                or type(value) in (int, float)
+                and math.isfinite(value)
+                and 0 <= value <= upper,
+                f"invalid {name}",
+            )
         return self
 
     def payload(self, messages):
@@ -270,10 +283,20 @@ class Config:
             payload["seed"] = self.seed
         if self.top_k is not None:
             payload["top_k"] = self.top_k
+        if self.min_p is not None:
+            payload["min_p"] = self.min_p
+        if self.presence_penalty is not None:
+            payload["presence_penalty"] = self.presence_penalty
         return payload
 
     def record(self):
-        return asdict(self)
+        record = asdict(self)
+        # Historical config/plan hashes predate these optional fields. Preserve them,
+        # including the historical treatment of null seed/top_k, when controls are absent.
+        for name in ("min_p", "presence_penalty"):
+            if record[name] is None:
+                del record[name]
+        return record
 
 
 class XorShift32:
