@@ -2,6 +2,7 @@ import importlib.util
 import io
 import json
 import os
+import subprocess
 import tarfile
 from pathlib import Path
 from types import SimpleNamespace
@@ -223,3 +224,27 @@ def test_lease_hash_integrity_survives_backend_restart(configuration):
     path.write_text(json.dumps({"lease": {"phase": "RELEASED"}, "sha256": digest(original)}))
     with pytest.raises(InvalidArtifact, match="lease_integrity"):
         AccessLease(access["state"], access["authorization"]).read()
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--configure", "not-a-tunnel"],
+        ["--stage", "bundle", "bad-sha", "hosts"],
+        ["--configure"],
+        ["--configure", "tunnel_bad;false"],
+    ],
+)
+def test_installer_rejects_invalid_staging_and_configuration_before_changes(tmp_path, args):
+    # Only bypass the root guard; each invalid argument must exit before any install,
+    # service command or write. No Linux provisioning is simulated as a live result.
+    stub = tmp_path / "id"
+    stub.write_text('#!/bin/sh\nprintf "0\\n"\n')
+    stub.chmod(0o755)
+    result = subprocess.run(
+        ["bash", str(BACKEND / "install.sh"), *args],
+        env={**os.environ, "PATH": str(tmp_path) + ":" + os.environ["PATH"]},
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode != 0

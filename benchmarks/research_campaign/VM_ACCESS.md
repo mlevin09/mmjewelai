@@ -24,10 +24,16 @@ The control host runs while Qwen is off. Neither the Owner's Mac nor Codex parti
 in standard runtime. Earlier Mac helpers are historical provisioning artifacts, not the
 endpoint. No personal OAuth session is copied to the host.
 
-**Current status:** code/configuration implemented and locally tested; control host,
-new IAM and managed secrets NOT DEPLOYED. Workspace connection NOT VERIFIED.
-New recurring infrastructure and live IAM/secret/deployment activation require the
-consolidated authorization in the activation package.
+**Current status (2026-11-12):** Owner authorized activation; control host, scoped IAM,
+secret metadata and the runtime snapshot are deployed. Restricted SSH and disabled
+activation versions are installed. Real hosted stdio/managed-identity checks pass before
+and after control-host reboot. The Mac is not in that execution chain.
+
+The OpenAI tunnel secret still has no versions and no actual tunnel ID was supplied.
+The tunnel unit is intentionally disabled/inactive, not running with a fake identity.
+Workspace connection and live tunnel reconnection remain NOT VERIFIED. An OpenAI Tunnel
+ID plus Read+Use runtime credential/account association are required; a GCP access token
+or internal Codex session is not a supplied tunnel credential. No Qwen start is authorized.
 
 ## Safety and recovery
 
