@@ -3,6 +3,15 @@
 - Date: 2026-11-12
 - Status: Issue #176 implementation candidate; independent review and live activation pending.
 
+## Current Owner directive — simple operational access
+
+The subsequent Owner instruction supersedes using a campaign controller as the Agent's
+connection. The active connection is `jewelai_research.vm_access`: seven infrastructure
+tools with scoped non-root guest execution, ownership and automatic runtime shutdown.
+Research logic belongs to the existing Workspace Agent. The earlier campaign candidate
+below is retained in Git history/source for traceability and is not an activation
+prerequisite or part of this connection's runtime. See `benchmarks/research_campaign/VM_ACCESS.md`.
+
 ## Context
 
 The approved Research Agent should conduct one outcome-driven, adaptive campaign on the

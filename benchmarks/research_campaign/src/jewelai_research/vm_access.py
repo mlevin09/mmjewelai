@@ -1,0 +1,268 @@
+"""Private stdio VM access. Infrastructure only; no campaigns, profiles or scientific policy."""
+
+import argparse
+import contextlib
+import fcntl
+import json
+import os
+import shlex
+import subprocess
+import sys
+import time
+import uuid
+from pathlib import Path
+
+from native_llm_bench.contracts import canonical, digest, keys, load, require
+from native_llm_bench.storage import write
+
+from .contracts import TARGET
+from .leases import LeaseJournal
+from .lifecycle import GcpLab
+from .owned_lifecycle import fingerprint
+
+TOOLS = {
+    "vm_status": {},
+    "vm_start": {},
+    "vm_stop": {},
+    "vm_exec": {"command": {"type": "string", "maxLength": 32768}},
+    "vm_job": {"job_id": {"type": "string", "maxLength": 32}},
+    "vm_read": {"path": {"type": "string", "maxLength": 1024}},
+    "vm_write": {
+        "path": {"type": "string", "maxLength": 1024},
+        "content": {"type": "string", "maxLength": 65536},
+    },
+}
+
+
+class AccessLease(LeaseJournal):
+    """Reuse only the lifecycle journal interface; no Controller or experiment runtime."""
+
+    def __init__(self, root, authorization):
+        self.root, self.authorization = Path(root), Path(authorization)
+
+    def read(self):
+        p = self.root / "lease.json"
+        if not p.exists():
+            return None
+        r = load(p)
+        require(digest(r["lease"]) == r["sha256"], "lease_integrity")
+        return r["lease"]
+
+    def _save(self, lease):
+        write(self.root / "audit" / (uuid.uuid4().hex + ".json"), lease)
+        write(self.root / "lease.json", {"lease": lease, "sha256": digest(lease)}, replace=True)
+        return lease
+
+    def authorized(self):
+        a = load(self.authorization)
+        require(
+            a.get("target") == TARGET
+            and a.get("approved") is True
+            and type(a.get("expires_at")) is int
+            and time.time() < a["expires_at"]
+            and type(a.get("maximum_starts")) is int
+            and a["maximum_starts"] > 0,
+            "owner_start_authorization_required",
+        )
+        return a
+
+    def begin(self, envelope):
+        a = self.authorized()
+        old = self.read()
+        require(old is None or old["phase"] in {"RELEASED", "NO_START"}, "ownership_blocked")
+        starts = sum(x.name.endswith(".start") for x in self.root.glob("*.start"))
+        require(starts < a["maximum_starts"], "authorized_start_count_exhausted")
+        token = uuid.uuid4().hex
+        write(
+            self.root / (token + ".start"), {"at": time.time(), "authorization_sha256": digest(a)}
+        )
+        return self._save({"lease_id": token, "phase": "CHECKING", "at": time.time()})
+
+    def record(self, lease_id, phase, **facts):
+        old = self.read()
+        require(old and old["lease_id"] == lease_id, "lease_identity_mismatch")
+        return self._save({**old, **facts, "phase": phase, "at": time.time()})
+
+    def cancelled(self):
+        try:
+            self.authorized()
+            return False
+        except ValueError:
+            return True
+
+
+class VmAccess:
+    def __init__(self, config):
+        keys(config, ("gcloud", "state", "authorization", "ssh_key", "known_hosts", "guest_ready"))
+        self.config = config
+        self.root = Path(config["state"])
+        self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        require(self.root.stat().st_mode & 0o077 == 0, "private_state_required")
+        self.lease = AccessLease(self.root, config["authorization"])
+        self.cloud = GcpLab(config["gcloud"], activation_permit=True, exclusive_use=self.locked)
+        # No model tunnel or experiment layer. SSH is opened per scoped guest operation.
+        self.cloud.open = lambda: None
+
+    @contextlib.contextmanager
+    def locked(self):
+        fd = os.open(self.root / "vm.lock", os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            yield
+        finally:
+            os.close(fd)
+
+    def _guest(self, operation, arguments):
+        require(self.config["guest_ready"] is True, "non_root_guest_not_installed")
+        lease = self.lease.read()
+        require(lease and lease["phase"] == "OWNED", "owned_vm_required")
+        d = self.cloud.inspect()
+        require(
+            d["status"] == "RUNNING" and fingerprint(d) == lease["fingerprint"], "owned_vm_required"
+        )
+        require(not self.lease.cancelled(), "owner_start_authorization_required")
+        proxy = shlex.join(
+            [
+                self.config["gcloud"],
+                "compute",
+                "start-iap-tunnel",
+                TARGET["vm"],
+                "22",
+                "--listen-on-stdin",
+                "--project=" + TARGET["project"],
+                "--zone=" + TARGET["zone"],
+                "--verbosity=error",
+            ]
+        )
+        args = [
+            "ssh",
+            "-T",
+            "-i",
+            self.config["ssh_key"],
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "IdentitiesOnly=yes",
+            "-o",
+            "StrictHostKeyChecking=yes",
+            "-o",
+            "UserKnownHostsFile=" + self.config["known_hosts"],
+            "-o",
+            "HostKeyAlias=jewelai-llm-lab",
+            "-o",
+            "ConnectTimeout=15",
+            "-o",
+            "ProxyCommand=" + proxy,
+            "jewelai-research@" + TARGET["vm"],
+        ]
+        r = subprocess.run(
+            args,
+            input=canonical({"operation": operation, "arguments": arguments}),
+            capture_output=True,
+            timeout=35,
+            check=False,
+        )
+        require(r.returncode == 0 and len(r.stdout) <= 200000, "guest_request_failed")
+        return json.loads(r.stdout)
+
+    def call(self, name, arguments):
+        require(name in TOOLS, "unknown_tool")
+        keys(arguments, TOOLS[name])
+        if name == "vm_status":
+            d = self.cloud.inspect()
+            return {
+                "target": TARGET,
+                "status": d["status"],
+                "lease": self.lease.read(),
+                "maximum_runtime_seconds": d.get("scheduling", {})
+                .get("maxRunDuration", {})
+                .get("seconds"),
+                "guest_ready": self.config["guest_ready"],
+            }
+        if name == "vm_start":
+            self.lease.authorized()  # This file is host-only; tools cannot grant themselves access.
+            require(self.config["guest_ready"] is True, "non_root_guest_not_installed")
+            d = self.cloud.inspect()
+            scheduling = d.get("scheduling", {})
+            require(
+                scheduling.get("instanceTerminationAction") == "STOP"
+                and 0 < int(scheduling.get("maxRunDuration", {}).get("seconds", 0)) <= 1200,
+                "automatic_shutdown_not_verified",
+            )
+            self.cloud.start({"mode": "LIVE", "target": TARGET}, self.lease)
+            return {"status": "RUNNING", "lease": self.lease.read()}
+        if name == "vm_stop":
+            return self.cloud.stop(self.lease)  # remains available after authorization expires
+        with self.locked():
+            return self._guest(name.removeprefix("vm_"), arguments)
+
+
+def serve(access, source=sys.stdin, sink=sys.stdout):
+    """Private stdio only: authenticated tunnel owns invocation. Never bind a public listener."""
+    for line in source:
+        request = None
+        try:
+            require(len(line.encode()) <= 100000, "request_too_large")
+            request = json.loads(line)
+            method = request["method"]
+            if method.startswith("notifications/"):
+                continue
+            require(
+                request.get("jsonrpc") == "2.0" and type(request.get("id")) in (int, str),
+                "invalid_rpc",
+            )
+            if method == "initialize":
+                result = {
+                    "protocolVersion": "2025-06-18",
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "jewelai-vm-access", "version": "1.0.0"},
+                }
+            elif method == "ping":
+                result = {}
+            elif method == "tools/list":
+                result = {
+                    "tools": [
+                        {
+                            "name": n,
+                            "description": "Use the existing CPU research VM: " + n,
+                            "inputSchema": {
+                                "type": "object",
+                                "properties": p,
+                                "required": list(p),
+                                "additionalProperties": False,
+                            },
+                        }
+                        for n, p in TOOLS.items()
+                    ]
+                }
+            else:
+                require(method == "tools/call", "unknown_method")
+                p = request["params"]
+                value = access.call(p["name"], p["arguments"])
+                result = {
+                    "content": [{"type": "text", "text": canonical(value).decode()}],
+                    "structuredContent": value,
+                    "isError": False,
+                }
+            response = {"jsonrpc": "2.0", "id": request["id"], "result": result}
+        except Exception:
+            response = {
+                "jsonrpc": "2.0",
+                "id": request.get("id") if isinstance(request, dict) else None,
+                "error": {"code": -32602, "message": "vm_access_blocked"},
+            }
+        sink.write(canonical(response).decode() + "\n")
+        sink.flush()
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config", required=True)
+    args = parser.parse_args()
+    path = Path(args.config)
+    require(path.stat().st_mode & 0o077 == 0, "private_config_required")
+    serve(VmAccess(load(path)))
+
+
+if __name__ == "__main__":
+    main()
