@@ -7,6 +7,7 @@ from pathlib import Path
 from native_llm_bench.contracts import decode, require
 
 from .contracts import MODEL_SHA, RUNTIME_SHA, TARGET
+from .owned_lifecycle import OwnedLifecycle
 
 # Static command, never assembled from agent text. Hash actual files on each future start.
 ATTEST = """python3 - <<'PY'
@@ -27,65 +28,127 @@ print(json.dumps(result))
 PY"""
 
 
-class SyntheticLab:
-    """Explicit test double, never evidence of cloud or model execution."""
+class SyntheticLab(OwnedLifecycle):
+    """Explicit fake cloud; uses the SAME lease/operation ownership algorithm as GCP."""
 
     def __init__(self):
-        self.current = "TERMINATED"
-        self.starts = 0
-        self.stops = 0
+        self.current, self.starts, self.stops = "TERMINATED", 0, 0
+        self.last_start = "2026-01-01T00:00:00Z"
+        self.sleep = lambda _: None
 
-    def start(self, envelope):
+    def check_envelope(self, envelope):
         require(envelope["mode"] == "SYNTHETIC", "synthetic_only")
+
+    def check_instance(self, instance):
+        pass
+
+    def inspect(self):
+        return {"id": "123", "status": self.current, "lastStartTimestamp": self.last_start}
+
+    def request_start(self):
         self.starts += 1
         self.current = "RUNNING"
+        self.last_start = f"2026-01-01T00:{self.starts:02}:01Z"
+        return {"name": "synthetic-operation-" + str(self.starts)}
 
-    def stop(self):
+    def operation(self, name):
+        return {
+            "name": name,
+            "operationType": "start",
+            "targetId": "123",
+            "status": "DONE",
+            "targetLink": "https://compute.invalid/projects/{project}/zones/{zone}/instances/{vm}".format(
+                **TARGET
+            ),
+            "startTime": f"2026-01-01T00:{self.starts:02}:00Z",
+            "endTime": f"2026-01-01T00:{self.starts:02}:02Z",
+        }
+
+    def request_stop(self):
         self.stops += 1
         self.current = "TERMINATED"
 
-    def status(self):
-        return self.current
 
-
-class GcpLab:
-    """Deployment candidate, NOT activated. No credentials or target accepted from tool args.
-
-    Existing operator gcloud/IAP access only. Explicit permit supplied by future reviewed
-    hosting/activation composition; current CLI has NO live activation path. Proxy metering
-    cannot issue that permit. Commands are argv lists, and errors discard stdout/stderr.
-    """
+class GcpLab(OwnedLifecycle):
+    """Fixed existing VM only. Current CLI cannot issue a live activation permit."""
 
     def __init__(
-        self, gcloud, *, activation_permit=False, run=subprocess.run, sleep=time.sleep, tunnel=None
+        self,
+        gcloud,
+        *,
+        activation_permit=False,
+        run=subprocess.run,
+        sleep=time.sleep,
+        tunnel=None,
+        exclusive_use=None,
     ):
         self.gcloud, self.permit, self.run, self.sleep = gcloud, activation_permit, run, sleep
         self.tunnel = tunnel
+        self.exclusive_use = exclusive_use
+        self.fenced = False
 
-    def _command(self, operation):
+    def start(self, envelope, journal):
+        self.check_envelope(envelope)
+        require(self.exclusive_use is not None, "exclusive_vm_use_not_qualified")
+        with self.exclusive_use():
+            self.fenced = True
+            try:
+                return super().start(envelope, journal)
+            finally:
+                self.fenced = False
+
+    def stop(self, journal=None):
+        from .leases import LeaseJournal
+
+        require(isinstance(journal, LeaseJournal), "durable_lease_required")
+        lease = journal.read()
+        if not lease or lease["phase"] not in {"START_SUBMITTED", "OWNED", "STOP_INTENT"}:
+            return super().stop(journal)
+        if self.exclusive_use is None:
+            return journal.blocked("exclusive_vm_use_not_qualified")
+        with self.exclusive_use():
+            self.fenced = True
+            try:
+                return super().stop(journal)
+            finally:
+                self.fenced = False
+
+    def _command(self, operation, operation_name=None):
         require(self.permit, "live_activation_not_authorized")
-        require(operation in ("describe", "start", "stop"), "forbidden_gcp_operation")
-        args = [
-            self.gcloud,
-            "compute",
-            "instances",
-            operation,
-            TARGET["vm"],
+        require(operation in ("describe", "start", "stop", "operation"), "forbidden_gcp_operation")
+        if operation in {"start", "stop"}:
+            require(self.fenced, "exclusive_vm_use_not_qualified")
+        if operation == "operation":
+            import re
+
+            require(
+                isinstance(operation_name, str)
+                and re.fullmatch(r"[a-zA-Z0-9_-]{1,200}", operation_name),
+                "invalid_operation_identity",
+            )
+            args = [self.gcloud, "compute", "operations", "describe", operation_name]
+        else:
+            args = [self.gcloud, "compute", "instances", operation, TARGET["vm"]]
+        args += [
             "--project=" + TARGET["project"],
             "--zone=" + TARGET["zone"],
             "--format=json",
             "--quiet",
         ]
+        if operation in ("start", "stop"):
+            args.append("--async")
         result = self.run(args, capture_output=True, timeout=120, check=False)
         require(result.returncode == 0, "gcp_lifecycle_failed")
-        return decode(result.stdout)
+        data = decode(result.stdout)
+        if isinstance(data, list):
+            require(len(data) == 1, "unexpected_operation_count")
+            data = data[0]
+        return data
 
-    def status(self):
-        return self._command("describe")["status"]
-
-    def start(self, envelope):
+    def check_envelope(self, envelope):
         require(envelope["mode"] == "LIVE" and envelope["target"] == TARGET, "wrong_live_target")
-        d = self._command("describe")
+
+    def check_instance(self, d):
         require(
             d["name"] == TARGET["vm"]
             and d["machineType"].endswith("/e2-medium")
@@ -97,30 +160,26 @@ class GcpLab:
             ),
             "vm_configuration_mismatch",
         )
-        require(d["status"] == "TERMINATED", "vm_not_exclusively_stopped")
-        self._command("start")
-        for _ in range(12):
-            if self.status() == "RUNNING":
-                require(self.tunnel is not None, "private_tunnel_not_configured")
-                self.tunnel.open()
-                return
-            self.sleep(5)
-        require(False, "vm_start_not_verified")
 
-    def stop(self):
-        # Reissue the idempotent stop if the previous response was lost; verify independently.
+    def inspect(self):
+        return self._command("describe")
+
+    def request_start(self):
+        return self._command("start")
+
+    def operation(self, name):
+        return self._command("operation", name)
+
+    def request_stop(self):
+        return self._command("stop")
+
+    def open(self):
+        require(self.tunnel is not None, "private_tunnel_not_configured")
+        self.tunnel.open()
+
+    def close(self):
         if self.tunnel is not None:
-            try:
-                self.tunnel.close()
-            except Exception:
-                pass  # VM shutdown must still be attempted if local tunnel cleanup fails.
-        if self.status() != "TERMINATED":
-            self._command("stop")
-        for _ in range(12):
-            if self.status() == "TERMINATED":
-                return
-            self.sleep(5)
-        require(False, "vm_shutdown_not_verified")
+            self.tunnel.close()
 
 
 class PrivateTunnel:

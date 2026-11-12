@@ -25,7 +25,8 @@ def envelope(
         "allowed_sessions": [
             s["session_id"] for s in inputs.corpus["sessions"] if not s["holdout"]
         ],
-        "allowed_profiles": list(PROFILES),
+        "allowed_profiles": list(PROFILES)
+        + (list(inputs.policy["profiles"]) if inputs.policy else []),
         "scheduling_seed": 123,
         "inference_seed": 456,
         "period_start": start,
@@ -57,6 +58,7 @@ class SyntheticTransport:
         length = (
             self.truncate_control
             and config.temperature == 0
+            and config.max_tokens < 256
             and "Answer the user's actual question" not in str(payload)
         )
         # Deliberately predictable controlled response. Never described as Qwen inference.

@@ -10,8 +10,9 @@ from native_llm_bench.contracts import digest, load, require, sha256_file
 from native_llm_bench.instructions import system_instruction
 from native_llm_bench.runner import _validate_result, execute
 
-from .contracts import experiment_plan
+from .contracts import experiment_plan, experiment_runtime
 from .controller import TERMINAL
+from .leases import LeaseJournal, StartCancelled
 
 
 class CampaignStopped(RuntimeError):
@@ -19,10 +20,12 @@ class CampaignStopped(RuntimeError):
 
 
 class Worker:
-    def __init__(self, controller, lifecycle, transport):
+    def __init__(self, controller, lifecycle, transport, *, delivery=None):
         self.c = controller
         self.lifecycle = lifecycle
         self.transport = transport
+        self.delivery = delivery
+        self.cancellation = lambda: False
 
     def _event(self, cid, kind, body):
         with self.c.ledger.transaction() as db:
@@ -30,14 +33,13 @@ class Worker:
 
     def _cleanup(self, cid):
         # Cleanup runs even if source validation or the runner failed. Exceptions are bounded.
-        verified = False
+        journal = LeaseJournal(self.c, cid)
         try:
-            self.lifecycle.stop()
-            verified = self.lifecycle.status() == "TERMINATED"
+            receipt = self.lifecycle.stop(journal)
         except Exception:
-            pass
-        self._event(cid, "CLEANUP", {"verified_stopped": verified, "at": self.c.clock()})
-        return verified
+            receipt = journal.blocked("ownership_or_shutdown_verification_failed")
+        self._event(cid, "CLEANUP", {**receipt, "at": self.c.clock()})
+        return receipt["verified_stopped"]
 
     def once(self, cid):
         fd = os.open(self.c.ledger.root / ".worker.lock", os.O_CREAT | os.O_RDWR, 0o600)
@@ -54,14 +56,26 @@ class Worker:
         with self.c.ledger.transaction() as db:
             state = self.c.state(db, cid)
             if state["report"]:
-                return "FINALIZED"
+                finalized = True
+            else:
+                finalized = False
             # An interrupted worker may have issued requests. Do not resume/retry inference.
             running = [x for x in state["experiments"].values() if x["status"] == "RUNNING"]
-            expired = self.c.clock() >= self.c.limits(state)["deadline"]
+            expired = not finalized and self.c.clock() >= self.c.limits(state)["deadline"]
             stopped = state["stopped"] or expired
             if expired and not state["stopped"]:
                 self.c.ledger.append(db, cid, "STOP", {"reason": "deadline", "at": self.c.clock()})
             queued = [x for x in state["experiments"].values() if x["status"] == "QUEUED"]
+        if finalized:
+            if self.delivery is not None:
+                try:
+                    self.delivery.deliver(self.c, cid)
+                except Exception:
+                    self._event(
+                        cid, "DELIVERY_BLOCKED", {"reason": "private_delivery_not_verified"}
+                    )
+                    return "DELIVERY_BLOCKED"
+            return "FINALIZED"
         if running:
             try:
                 for x in running:
@@ -70,16 +84,28 @@ class Worker:
                 self._cleanup(cid)
             return "RECOVERED_UNKNOWN"
         if stopped:
+            unfinished = [x for x in state["experiments"].values() if x["status"] not in TERMINAL]
             try:
-                for x in state["experiments"].values():
-                    if x["status"] not in TERMINAL:
-                        self._finish(cid, x, "STOPPED", "campaign_stop")
+                for x in unfinished:
+                    self._finish(cid, x, "STOPPED", "campaign_stop")
             finally:
-                self._cleanup(cid)
+                if (
+                    unfinished
+                    or state["cleanup"] is None
+                    or (
+                        state["lease"]
+                        and state["lease"]["phase"] in {"START_SUBMITTED", "OWNED", "STOP_INTENT"}
+                    )
+                ):
+                    self._cleanup(cid)
             return "STOPPED"
         if not queued:
-            # Startup also reconciles cleanup after interruption before claim.
-            if not state["cleanup"] or not state["cleanup"]["verified_stopped"]:
+            # Only reconcile an actual unfinished lease. Idle polling is NEVER stop authority.
+            if state["lease"] and state["lease"]["phase"] not in {
+                "RELEASED",
+                "NO_START",
+                "BLOCKED",
+            }:
                 self._cleanup(cid)
             return "IDLE"
         x = queued[0]
@@ -88,7 +114,14 @@ class Worker:
         try:
             self.c.inputs.verify(state["envelope"])
             config, override, plan = experiment_plan(
-                state["envelope"], self.c.inputs, x["profile"], x["sessions"]
+                state["envelope"],
+                self.c.inputs,
+                x["profile"],
+                x["sessions"],
+                x.get("parameters", {}),
+            )
+            corpus, _ = experiment_runtime(
+                self.c.inputs, x["profile"], x.get("parameters", {}), x["sessions"]
             )
             require(digest(plan) == x["plan_sha256"], "registered_plan_changed")
             run_dir, _ = storage.create(self.c.directory(cid) / "runs", plan)
@@ -112,12 +145,16 @@ class Worker:
                         "at": self.c.clock(),
                     },
                 )
-            self.lifecycle.start(state["envelope"])
+            self.lifecycle.start(
+                state["envelope"], LeaseJournal(self.c, cid, cancellation=self.cancellation)
+            )
             require(self.lifecycle.status() == "RUNNING", "vm_not_running")
             attempts = 0
 
             def metered(cfg, payload):
                 nonlocal attempts
+                if self.cancellation():
+                    raise CampaignStopped
                 with self.c.ledger.transaction() as db:
                     current = self.c.state(db, cid)
                     try:
@@ -146,7 +183,7 @@ class Worker:
                 )
 
             summary = execute(
-                self.c.inputs.corpus,
+                corpus,
                 config,
                 self.c.inputs.manifest,
                 None,
@@ -159,7 +196,7 @@ class Worker:
                 transport=metered,
             )
             status, reason = summary["status"], "runner_terminal"
-        except CampaignStopped:
+        except (CampaignStopped, StartCancelled):
             status, reason = "STOPPED", "campaign_stop_or_deadline"
         except Exception:
             # Raw exception strings/bodies/credentials never become tool errors or ledger fields.
@@ -223,15 +260,19 @@ class Worker:
     def _verify_history(self, cid, x, run, directory):
         with self.c.ledger.connect() as db:
             envelope = self.c.state(db, cid)["envelope"]
-        config, _, expected = experiment_plan(envelope, self.c.inputs, x["profile"], x["sessions"])
+        parameters = x.get("parameters", {})
+        config, _, expected = experiment_plan(
+            envelope, self.c.inputs, x["profile"], x["sessions"], parameters
+        )
+        corpus, _ = experiment_runtime(self.c.inputs, x["profile"], parameters, x["sessions"])
         require(run["plan"] == expected, "runner_plan_integrity")
         require(
             run["runner"]["source_sha256"] == self.c.inputs.runner_sha, "runner_identity_integrity"
         )
-        sessions = {s["session_id"]: s for s in self.c.inputs.corpus["sessions"]}
+        sessions = {s["session_id"]: s for s in corpus["sessions"]}
         for sid in expected["session_order"]:
             session = sessions[sid]
-            system, _ = system_instruction(self.c.inputs.corpus, session, expected)
+            system, _ = system_instruction(corpus, session, expected)
             history = [{"role": "system", "content": system}]
             failed = False
             for turn in session["turns"]:
@@ -279,8 +320,9 @@ class Worker:
         """Supervisor entrypoint. Durable queue survives Workspace and worker interruptions."""
         # Each once() owns cleanup under the global worker lock, including BaseException.
         # Never stop the VM outside that lock while another worker may own it.
-        while stop is None or not stop.is_set():
+        self.cancellation = stop.is_set if stop is not None else lambda: False
+        while not self.cancellation():
             status = self.once(cid)
-            if status in ("FINALIZED", "STOPPED"):
+            if status in ("FINALIZED", "DELIVERY_BLOCKED"):
                 return
             time.sleep(poll_seconds)

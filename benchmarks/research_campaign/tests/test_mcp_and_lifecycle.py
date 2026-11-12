@@ -1,12 +1,14 @@
 import copy
 import http.client
 import json
+from contextlib import nullcontext
 from types import SimpleNamespace
 
 import pytest
 from conftest import hypothesis
 from native_llm_bench.contracts import InvalidArtifact
 
+from jewelai_research.leases import LeaseJournal
 from jewelai_research.lifecycle import ATTEST, GcpLab, PrivateTunnel
 from jewelai_research.mcp import OAuthIntrospection, Principal, dispatch
 
@@ -124,39 +126,6 @@ def test_oauth_introspection_network_failure_and_redirect_do_not_authenticate(mo
         )
 
 
-def test_fixed_vm_lifecycle_and_verified_shutdown_with_fake_gcloud(campaign):
-    state, commands = ["TERMINATED"], []
-    tunnel = SimpleNamespace(open=lambda: None, close=lambda: None)
-
-    def run(argv, **kwargs):
-        assert kwargs["check"] is False and "shell" not in kwargs
-        commands.append(argv)
-        if argv[3] == "start":
-            state[0] = "RUNNING"
-        elif argv[3] == "stop":
-            state[0] = "TERMINATED"
-        data = {
-            "name": "jewelai-llm-lab",
-            "status": state[0],
-            "machineType": "zones/b/e2-medium",
-            "networkInterfaces": [{"networkIP": "10.0.0.1"}],
-        }
-        return SimpleNamespace(returncode=0, stdout=json.dumps(data).encode())
-
-    lab = GcpLab("gcloud", activation_permit=True, run=run, sleep=lambda _: None, tunnel=tunnel)
-    e = copy.deepcopy(campaign.envelope)
-    e["mode"] = "LIVE"
-    lab.start(e)
-    assert lab.status() == "RUNNING"
-    lab.stop()
-    assert lab.status() == "TERMINATED"
-    assert {a[3] for a in commands} == {"describe", "start", "stop"}
-    assert all(
-        "--project=mmjewellai-preprod" in a and "--zone=europe-west1-b" in a for a in commands
-    )
-    assert all(a[4] == "jewelai-llm-lab" for a in commands)
-
-
 def test_lifecycle_default_permission_gate_and_wrong_vm_never_calls_gcp(campaign):
     def forbidden(*a, **k):
         pytest.fail("must not call cloud")
@@ -164,13 +133,13 @@ def test_lifecycle_default_permission_gate_and_wrong_vm_never_calls_gcp(campaign
     lab = GcpLab("gcloud", run=forbidden)
     with pytest.raises(InvalidArtifact, match="not_authorized"):
         lab.status()
-    with pytest.raises(InvalidArtifact, match="not_authorized"):
+    with pytest.raises(InvalidArtifact, match="durable_lease_required"):
         lab.stop()
     e = copy.deepcopy(campaign.envelope)
     e["mode"] = "LIVE"
     e["target"]["vm"] = "wrong"
     with pytest.raises(InvalidArtifact, match="wrong_live_target"):
-        lab.start(e)
+        lab.start(e, LeaseJournal(campaign.c, campaign.envelope["campaign_id"]))
 
 
 @pytest.mark.parametrize(
@@ -201,10 +170,10 @@ def test_unsafe_vm_configuration_blocks_start(campaign, extra):
         )
 
     e = copy.deepcopy(campaign.envelope)
-    e["mode"] = "LIVE"
-    lab = GcpLab("gcloud", activation_permit=True, run=run)
+    lab = GcpLab("gcloud", activation_permit=True, run=run, exclusive_use=nullcontext)
+    lab.check_envelope = lambda _: None  # fake-only composition, real ownership logic
     with pytest.raises(InvalidArtifact, match="vm_configuration_mismatch"):
-        lab.start(e)
+        lab.start(e, LeaseJournal(campaign.c, campaign.envelope["campaign_id"]))
     assert len(commands) == 1 and commands[0][3] == "describe"
 
 

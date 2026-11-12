@@ -10,6 +10,7 @@ from native_llm_bench.contracts import InvalidArtifact, canonical, load, require
 
 from .contracts import Inputs
 from .controller import Controller
+from .delivery import DriveClient, ReportDelivery
 from .lifecycle import SyntheticLab
 from .mcp import LocalToken, OAuthIntrospection, server
 from .synthetic import SyntheticTransport, envelope
@@ -23,6 +24,9 @@ def main():
     p.add_argument("--corpus", required=True)
     p.add_argument("--manifest", required=True)
     p.add_argument("--evaluator", help="Optional read-only byte hash pin, never sent to model")
+    p.add_argument(
+        "--experiment-policy", help="Operator-approved immutable experiment allowlist JSON"
+    )
     p.add_argument("--campaign", default="SYNTHETIC_CAMPAIGN")
     p.add_argument("--subject", default="synthetic-researcher")
     p.add_argument("--envelope", help="Trusted local operator file; never an MCP tool argument")
@@ -31,9 +35,10 @@ def main():
     p.add_argument("--resource", help="Reviewed external HTTPS resource URL ending /mcp")
     p.add_argument("--issuer")
     p.add_argument("--introspection-endpoint")
+    p.add_argument("--delivery-config", help="Explicit approved private Drive publication config")
     args = p.parse_args()
     try:
-        inputs = Inputs(args.corpus, args.manifest, args.evaluator)
+        inputs = Inputs(args.corpus, args.manifest, args.evaluator, args.experiment_policy)
         c = Controller(args.store, inputs)
         if args.command in ("init-synthetic", "activate"):
             e = (
@@ -72,7 +77,19 @@ def main():
             stop = threading.Event()
             for sig in (signal.SIGINT, signal.SIGTERM):
                 signal.signal(sig, lambda *_: stop.set())
-            Worker(c, SyntheticLab(), SyntheticTransport()).serve(args.campaign, stop=stop)
+            delivery = None
+            if args.delivery_config:
+                require(
+                    bool(os.environ.get("JEWELAI_RESEARCH_DRIVE_ACCESS_TOKEN")),
+                    "approved_drive_oauth_required",
+                )
+                delivery = ReportDelivery(
+                    load(args.delivery_config),
+                    DriveClient(lambda: os.environ["JEWELAI_RESEARCH_DRIVE_ACCESS_TOKEN"]),
+                )
+            Worker(c, SyntheticLab(), SyntheticTransport(), delivery=delivery).serve(
+                args.campaign, stop=stop
+            )
         else:
             print(c.verify_report(args.campaign).decode())
     except InvalidArtifact:

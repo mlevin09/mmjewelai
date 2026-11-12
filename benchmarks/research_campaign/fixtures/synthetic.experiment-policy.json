@@ -1,0 +1,134 @@
+{
+  "version": "1.0.0",
+  "policy_id": "SYNTHETIC_RESEARCH_SPACE_V1",
+  "baseline": {
+    "max_tokens": 256
+  },
+  "bounds": {
+    "temperature": {
+      "min": 0,
+      "max": 0.8
+    },
+    "top_p": {
+      "min": 0.5,
+      "max": 1
+    },
+    "min_p": {
+      "min": 0,
+      "max": 0.2
+    },
+    "max_tokens": {
+      "min": 64,
+      "max": 384
+    }
+  },
+  "instructions": {
+    "LANGUAGE_CLARITY_V1": {
+      "suffix": "SYNTHETIC RESEARCH CONDITION: preserve explicit quantities and respond in the latest user message language.",
+      "sha256": "4592b946aa6cb40b5b9c69672b5f9bfcc04f579ab5b0c1184fcf7d6edfd17b51"
+    }
+  },
+  "profiles": {
+    "RESEARCH_SAMPLING": {
+      "type": "sampling",
+      "controls": [
+        "temperature",
+        "top_p",
+        "min_p"
+      ],
+      "instruction_variants": [],
+      "languages": [
+        "RU",
+        "EN",
+        "MIXED"
+      ],
+      "turn_counts": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "TOKEN_BUDGET": {
+      "type": "completion_budget",
+      "controls": [
+        "max_tokens"
+      ],
+      "instruction_variants": [],
+      "languages": [
+        "RU",
+        "EN",
+        "MIXED"
+      ],
+      "turn_counts": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "EN_LONG_CONTEXT": {
+      "type": "locale_context",
+      "controls": [],
+      "instruction_variants": [],
+      "languages": [
+        "EN"
+      ],
+      "turn_counts": [
+        5
+      ]
+    },
+    "PROMPT_VARIANT": {
+      "type": "policy_template",
+      "controls": [],
+      "instruction_variants": [
+        "LANGUAGE_CLARITY_V1"
+      ],
+      "languages": [
+        "RU",
+        "EN",
+        "MIXED"
+      ],
+      "turn_counts": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "TEMPLATE_CHECK": {
+      "type": "template_observation",
+      "controls": [],
+      "instruction_variants": [],
+      "languages": [
+        "RU",
+        "EN",
+        "MIXED"
+      ],
+      "turn_counts": [
+        2,
+        3,
+        4,
+        5
+      ]
+    },
+    "STOP_EOS_CHECK": {
+      "type": "stop_eos_observation",
+      "controls": [
+        "max_tokens"
+      ],
+      "instruction_variants": [],
+      "languages": [
+        "RU",
+        "EN",
+        "MIXED"
+      ],
+      "turn_counts": [
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  }
+}

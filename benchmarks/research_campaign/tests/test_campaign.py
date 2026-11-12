@@ -292,7 +292,7 @@ def test_deadline_emergency_stop_and_unverified_cleanup_block_finalization(campa
     assert f.worker.once(f.envelope["campaign_id"]) == "STOPPED"
     assert not f.model.calls
     assert call(f, "get_experiment_results", experiment_id="E1")["status"] == "STOPPED"
-    f.lab.status = lambda: "RUNNING"
+    f.lab.current = "RUNNING"  # no campaign-owned lease: must never stop this instance
     f.worker.once(f.envelope["campaign_id"])
     with pytest.raises(InvalidArtifact, match="cleanup_not_verified"):
         call(f, "finalize_campaign", idempotency_key="final", conclusion="Stopped.")
@@ -369,7 +369,7 @@ def test_source_change_after_queue_fails_before_start_and_cleans_up(campaign):
     queue(f)
     f.inputs.paths[2].write_text("tampered gold")
     assert f.worker.once(f.envelope["campaign_id"]) == "UNKNOWN"
-    assert f.lab.starts == 0 and f.lab.stops == 1 and not f.model.calls
+    assert f.lab.starts == 0 and f.lab.stops == 0 and not f.model.calls
 
 
 def test_global_concurrency_one(campaign):
@@ -405,17 +405,17 @@ def test_each_independent_campaign_cap_is_enforced(campaign, tmp_path, limit, va
     assert call(f, "campaign_status")["limits"]["experiments"] == 1
 
 
-def test_failed_start_still_stops_and_never_logs_raw_error(campaign):
+def test_failed_unowned_start_does_not_stop_or_log_raw_error(campaign):
     f = campaign
     register(f)
     queue(f)
 
-    def fail(_):
+    def fail(_, journal):
         raise RuntimeError("PRIVATE_PROVIDER_BODY_AND_TOKEN")
 
     f.lab.start = fail
     assert f.worker.once(f.envelope["campaign_id"]) == "UNKNOWN"
-    assert f.lab.stops == 1 and not f.model.calls
+    assert f.lab.stops == 0 and not f.model.calls
     events = call(f, "list_ledger", offset=0, limit=100)
     assert "PRIVATE_PROVIDER_BODY_AND_TOKEN" not in json.dumps(events)
     assert "PRIVATE_PROVIDER_BODY_AND_TOKEN" not in json.dumps(
@@ -455,7 +455,9 @@ def test_recovery_cleanup_runs_even_when_raw_evidence_is_corrupt(campaign):
             {"experiment_id": "E1", "status": "RUNNING", "run_id": run["run_id"]},
         )
     (directory / "run.json").write_text("{}")
-    f.lab.current = "RUNNING"
+    from jewelai_research.leases import LeaseJournal
+
+    f.lab.start(f.envelope, LeaseJournal(f.c, f.envelope["campaign_id"]))
     with pytest.raises((InvalidArtifact, KeyError)):
         f.worker.once(f.envelope["campaign_id"])
     assert f.lab.current == "TERMINATED" and f.lab.stops == 1

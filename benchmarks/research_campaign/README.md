@@ -23,6 +23,12 @@ reservation ceiling, verifies shutdown, restarts readers and emits one immutable
 This **does not** verify a Workspace Agent's lifetime, tool confirmation settings, real
 Qwen quality, GCP shutdown or billed-dollar enforcement.
 
+The review-follow-up E2E also chooses five conditions through an operator-pinned policy,
+including new numeric treatments, completion budget, locale/context and approved prompt
+variants. A fake Drive E2E verifies private report delivery. **Issue #176 is not end-to-end
+live complete:** offline bridge, Workspace/Qwen qualification and actual private delivery
+are distinct gates; no synthetic evidence substitutes for the last two.
+
 ## Tools and authorization
 
 MCP Streamable HTTP `/mcp`, protocol negotiation `2025-03-26`, `2025-06-18`, `2025-11-25`;
@@ -79,14 +85,18 @@ automatically reissues inference**. A separately registered follow-up is a new c
 decision under the same campaign limits, with explicit evidence referencing the unknown
 experiment. Timeout is terminal for that attempt. Runner `max_attempts=1` intentionally
 prevents hidden retries. Recovery validates raw history, hashes, instructions and scope.
-If evidence is corrupted, recovery fails closed but still attempts verified shutdown.
+If evidence is corrupted, recovery fails closed and attempts shutdown only with proven
+campaign lifecycle ownership. Corrupt inference evidence never grants stop authority.
 
 SIGTERM is handled by the worker CLI and cleanup runs before exit. SIGKILL/host loss cannot
 execute Python cleanup: an external supervisor must restart the worker, which reconciles
-RUNNING claims and stops the VM. **No claim of an independent cloud watchdog or exact
+RUNNING claims and owned leases. Ambiguous ownership blocks shutdown.
+**No claim of an independent cloud watchdog or exact
 hard billing cap is made.** Current live activation is blocked for this reason too.
 
-## Sealed experimental space v1
+## Operator-allowlisted experimental space v1
+
+The original three profiles remain reproducible starter conditions:
 
 | Profile | Type | Difference from control |
 | --- | --- | --- |
@@ -98,8 +108,31 @@ All use existing Config defaults: context 2048, top_p=1, top_k=40, max_tokens=12
 repeat_penalty=1, no thinking/cache, timeout ≤60s. Inference seed and scheduling seed
 are independent envelope fields. Every profile and effective instruction is recorded and
 hashed by the runner. No model weights, arbitrary prompt overrides, role prompt replacement
-or template executor are introduced. More research profiles require a reviewed code change;
-this finite space lets the Agent choose **experiment types**, not only numeric grid points.
+or template executor are introduced. **These starter conditions use max_tokens=128;
+historical A/B/D used 256. They must not be compared as the same baseline.** Registration
+records the actual cap and explicitly marks historical equivalence NOT_ESTABLISHED.
+
+Load an operator-approved policy using `--experiment-policy` on init/serve/worker. Its
+version, canonical hash and actual file byte hash are pinned in the envelope. The Agent
+chooses `profile`, `sessions` and optional `parameters`, e.g. temperature=0.37 or
+max_tokens=320, inside stricter operator bounds and absolute controller limits. At most
+one numeric primary control changes per experiment. New profiles/treatments in this
+supported space do not require another code PR; there is no fixed execution grid.
+
+Supported types: sampling (temperature, top_p, top_k, min_p, repetition/presence penalty),
+completion budget, approved instruction variants, locale/context selection, template
+observation and stop/EOS observation. Language/context experiments select existing
+authorized sessions by locale and turn count, without fabricating/trimming history.
+Prompt variants append exact registered suffix bytes to preserved base instructions in
+a separately hashed in-memory runtime. The original corpus and runner stay unchanged.
+Agent-supplied freeform instructions, endpoints, commands and gold writes are rejected.
+Example: `fixtures/synthetic.experiment-policy.json` is TEST ONLY, not live approval.
+
+**Explicit capability limit:** template/stop-EOS experiments observe finish reasons,
+truncation, template errors and context behavior, optionally varying the completion cap.
+Changing executable chat templates, EOS token IDs, stop strings, runtime flags or weights
+is unsupported. If a campaign needs those controls, it has a **blocking product-contract
+extension**, not an OAuth/billing configuration issue. Do not call that optimization ready.
 
 ## Budget and activation: live is fail-closed
 
@@ -134,7 +167,8 @@ not silently deployed by this PR.
 ## Existing GCP path (implemented, fake-tested, NOT live-qualified)
 
 Only `mmjewellai-preprod/europe-west1-b/jewelai-llm-lab`, e2-medium CPU, no service account,
-GPU or public interface. `GcpLab` permits fixed describe/start/stop argv only, no shell or
+GPU or public interface. `GcpLab` permits fixed describe/start/stop and scoped read-only
+operation describe argv only, no shell or
 IAM mutations. Default permit is false. Only a future reviewed composition can supply it;
 the current CLI cannot activate live mode or select a live worker.
 
@@ -143,11 +177,33 @@ start-iap-tunnel ... 22 --listen-on-stdin` as a fixed SSH proxy, existing privat
 preverified known_hosts, strict host-key checks. It does **not** call `gcloud compute ssh`
 or add instance SSH metadata/keys. Fixed remote read-only attestation hashes actual pinned
 model and binary files before forwarding loopback 8080, then checks health. No raw command
-output enters tools/logs. Cleanup closes the local tunnel and issues stop, then polls the
-independent VM status until TERMINATED; failure remains `verified_stopped=false` and
+output enters tools/logs. Cleanup issues stop only for a proven owned lease, then polls
+independent status until TERMINATED; failure remains `verified_stopped=false` and
 prevents finalization. IAM denied/SSH identity unavailable must be reported, never repaired
 by broadening grants. Remote runtime flags and the supervised hosting lifecycle must be
 qualified in the separately authorized live activation; fake tests are not that evidence.
+
+### Lifecycle ownership
+
+Before start, append a campaign/lease identity, instance ID and START_INTENT. Persist the
+asynchronous start operation identity before adoption. Verify operation target ID/link,
+type/success/time bounds and the exact instance lastStartTimestamp, then append OWNED.
+Stop rechecks both instance ID and start generation. Missing/mismatched proof returns
+BLOCKED without stop, never verified cleanup. A pre-existing RUNNING VM, idle polling or
+failed pre-start inspection grants no ownership.
+
+Recovery of START_SUBMITTED rechecks that operation before owned cleanup. A lost start
+response before its identity was committed is ambiguous and cannot authorize automatic
+stop. Cancellation before RPC neither starts nor stops; stop during start reconciles
+proof first. Released receipts are historical: later unrelated VM activity is untouched.
+
+The local flock cannot fence other hosts/operators. Compute stop has no conditional
+lastStartTimestamp precondition; a qualified cooperative exclusive-use guard spanning
+inspect + mutation and covering all authorized VM actors is required before live use.
+GcpLab requires it in addition to activation permission; neither exists in default live
+composition. `nullcontext` is only a fake-GCP test guard. No IAM/metadata fencing mutation
+is introduced. Ambiguous start recovery also needs the external approved watchdog/Owner
+procedure, not speculative adoption of a RUNNING VM.
 
 ## Offline installation and reproducible execution
 
@@ -199,7 +255,7 @@ The connected GitHub/Drive sources do not grant Workspace tool installation or G
 After deployment is explicitly authorized, record the real URL/issuer and complete **one**
 bounded connection+activation action: install the plugin, authenticate the approved subject,
 discover seven tools, resume the designated campaign, prove >1 evidence-led experiment
-choice, budget stop, cleanup and final report. Until then real Workspace autonomous
+choice, budget stop, owned cleanup and readback-verified private final report. Until then real Workspace autonomous
 continuation/confirmation behavior is **NOT VERIFIED**. The durable worker survives
 accepted jobs; it does not invent a new Agent decision when Workspace reasoning is offline.
 
@@ -217,9 +273,28 @@ Suggested instruction addition for the existing Agent (activate only after autho
 ## Private report publication
 
 `report.json` is the single immutable self-contained campaign artifact with receipt hashes,
-verified raw evidence, measured counts, decisions, limits and cleanup. No automatic Drive
-upload is enabled. Existing intended private destination is Benchmark folder
-`1AQzcmYZJNRpPHx-PktnKGEBhZ7FKt9cj`. Only after explicit minimum write permission and approval
-of that exact new payload may the connected publication tool upload it; read back bytes
-and verify SHA-256/size before sharing the private link. No public sharing, automatic
-credential acquisition, gold publication or Drive fallback to runtime inputs.
+verified raw evidence, measured counts, decisions, limits and cleanup. Automatic delivery
+is implemented but **disabled by default**. Operator-only `--delivery-config` binds
+enabled=true, campaign ID, envelope hash, exact Benchmark folder
+`1AQzcmYZJNRpPHx-PktnKGEBhZ7FKt9cj`, maximum bytes and approved existing permission IDs.
+Explicit payload authorization and minimum OAuth write access remain necessary; connected
+Workspace Drive read access does not supply worker OAuth. The CLI reads the separately
+approved `JEWELAI_RESEARCH_DRIVE_ACCESS_TOKEN` environment only when configured; prefer
+`drive.file` rights on the explicitly granted folder. No credentials belong in Git.
+
+The worker remains available after inference stop to receive finalization. On finalized
+report, it verifies private folder access, allocates one file ID, commits it before upload,
+creates the file without sharing changes, verifies private access, downloads it, and
+compares exact bytes/size/SHA-256 with the immutable original (including trailing LF).
+Lost responses reconcile the same durable file ID; no blind duplicate uploads. Failure
+records a bounded gate and exits instead of repeated retries. Actual Drive/OAuth delivery
+has NOT been exercised; tests use a fake client. No public sharing or gold publication.
+
+## One future live acceptance
+
+Once the consolidated activation package (budget amount/period/accepted spend semantics,
+independent resource/wall-time/attempt watchdog, exclusive-use guard/supervisor, endpoint,
+OAuth/Workspace and private delivery rights) is authorized and configured, perform exactly
+one integrated qualification: actual discovery → one assignment → evidence-led experiments
+on pinned Qwen/runner → safe bounded stop → owned shutdown → one readback-verified private
+report. Until then live integration and issue completion remain NOT VERIFIED / BLOCKED.

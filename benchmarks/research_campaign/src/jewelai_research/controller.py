@@ -107,6 +107,9 @@ class Controller:
                 "finalize_campaign": {"idempotency_key", "conclusion"},
                 "stop_campaign": {"idempotency_key", "reason"},
             }.get(name, set())
+            if name == "propose_and_register_experiment" and "parameters" in args:
+                fields |= {"parameters"}
+                require(isinstance(args["parameters"], dict), "invalid_treatment")
             keys(args, fields)
             if name in READ:
                 return self._read(db, cid, state, name, args)
@@ -132,7 +135,24 @@ class Controller:
                 "finalized": bool(state["report"]),
                 "cleanup": state["cleanup"],
                 "limits": self.limits(state),
-                "profiles": {p: PROFILES[p] for p in state["envelope"]["allowed_profiles"]},
+                "profiles": {
+                    p: {
+                        **PROFILES,
+                        **(self.inputs.policy["profiles"] if self.inputs.policy else {}),
+                    }[p]
+                    for p in state["envelope"]["allowed_profiles"]
+                },
+                "experiment_policy": self.inputs.policy,
+                "lease": state["lease"],
+                "report_delivery": (
+                    {
+                        **(state["delivery"] or {}),
+                        "status": "BLOCKED",
+                        "failure": state["delivery_failure"],
+                    }
+                    if state["delivery_failure"]
+                    else state["delivery"]
+                ),
                 "sample_ids": state["envelope"]["allowed_sessions"],
                 "experiments": [
                     {k: x[k] for k in ("experiment_id", "profile", "status")}
@@ -212,7 +232,11 @@ class Controller:
         for earlier in h["evidence_experiments"]:
             require(self._experiment(state, earlier)["status"] in TERMINAL, "evidence_not_ready")
         _, _, plan = experiment_plan(
-            state["envelope"], self.inputs, args["profile"], args["sessions"]
+            state["envelope"],
+            self.inputs,
+            args["profile"],
+            args["sessions"],
+            args.get("parameters", {}),
         )
         turns = sum(len(ts) for ts in plan["turn_order"].values())
         limits, e = self.limits(state), state["envelope"]
@@ -227,6 +251,14 @@ class Controller:
         record = {
             "experiment_id": eid,
             "profile": args["profile"],
+            "parameters": args.get("parameters", {}),
+            "operator_policy_sha256": digest(self.inputs.policy),
+            "base_runtime_sha256": digest(self.inputs.corpus),
+            "effective_runtime_sha256": plan["runtime_artifact_sha256"],
+            "measurement_condition": {
+                "max_tokens": plan["configuration"]["max_tokens"],
+                "historical_A_B_D_equivalence": "NOT_ESTABLISHED; historical max_tokens=256",
+            },
             "sessions": args["sessions"],
             "hypothesis": h,
             "plan_sha256": digest(plan),
@@ -245,7 +277,14 @@ class Controller:
             all(x["status"] in TERMINAL for x in state["experiments"].values()),
             "experiments_not_terminal",
         )
-        require(state["cleanup"] and state["cleanup"]["verified_stopped"], "cleanup_not_verified")
+        require(
+            state["cleanup"]
+            and state["cleanup"]["verified_stopped"]
+            and state["lease"]
+            and state["lease"]["phase"] == "RELEASED"
+            and state["cleanup"].get("lease_id") == state["lease"]["lease_id"],
+            "cleanup_not_verified",
+        )
         report = {
             "version": VERSION,
             "campaign_id": cid,
@@ -255,6 +294,7 @@ class Controller:
             "pins": state["envelope"]["pins"],
             "limits": self.limits(state),
             "cleanup": state["cleanup"],
+            "lifecycle_lease": state["lease"],
             "experiments": list(state["experiments"].values()),
             "verified_receipts": [
                 self._read(

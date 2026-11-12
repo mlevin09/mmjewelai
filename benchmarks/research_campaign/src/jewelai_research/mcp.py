@@ -108,7 +108,7 @@ class OAuthIntrospection:
         return Principal(data["sub"], frozenset(data["scope"].split()))
 
 
-def tool_schema(name):
+def tool_schema(name, policy=None):
     string = {"type": "string", "minLength": 1, "maxLength": 4000}
     props = {"campaign_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,79}$"}}
     if name not in READ:
@@ -122,7 +122,10 @@ def tool_schema(name):
     if name == "propose_and_register_experiment":
         props.update(
             {
-                "profile": {"type": "string", "enum": list(PROFILES)},
+                "profile": {
+                    "type": "string",
+                    "enum": list(PROFILES) + (list(policy["profiles"]) if policy else []),
+                },
                 "sessions": {"type": "array", "items": string, "minItems": 1, "uniqueItems": True},
                 "hypothesis": {
                     "type": "object",
@@ -151,6 +154,23 @@ def tool_schema(name):
                 },
             }
         )
+        if policy:
+            props["parameters"] = {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    k: {
+                        "type": "integer" if k in {"top_k", "max_tokens"} else "number",
+                        "minimum": v["min"],
+                        "maximum": v["max"],
+                    }
+                    for k, v in policy["bounds"].items()
+                },
+            }
+            props["parameters"]["properties"]["instruction_variant"] = {
+                "type": "string",
+                "enum": list(policy["instructions"]),
+            }
     if name == "list_ledger":
         props.update(
             {
@@ -184,7 +204,7 @@ def tool_schema(name):
         "inputSchema": {
             "type": "object",
             "properties": props,
-            "required": list(props),
+            "required": [k for k in props if k != "parameters"],
             "additionalProperties": False,
         },
         "annotations": {
@@ -224,7 +244,11 @@ def dispatch(controller, principal, message):
     if method == "tools/list":
         require(READ_SCOPE in principal.scopes, "insufficient_scope")
         return {
-            "tools": [tool_schema(t) for t in TOOLS if t in READ or WRITE_SCOPE in principal.scopes]
+            "tools": [
+                tool_schema(t, controller.inputs.policy)
+                for t in TOOLS
+                if t in READ or WRITE_SCOPE in principal.scopes
+            ]
         }
     require(method == "tools/call", "unknown_method")
     require(set(params) == {"name", "arguments"}, "invalid_tool_parameters")

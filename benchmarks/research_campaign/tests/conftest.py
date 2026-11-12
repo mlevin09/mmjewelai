@@ -3,6 +3,7 @@ import http.client
 import json
 import shutil
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -83,8 +84,8 @@ def queue(f, eid="E1"):
     )
 
 
-@pytest.fixture
-def wire(campaign):
+@contextmanager
+def http_wire(campaign):
     token = "synthetic-test-token-not-a-live-credential"
     auth = LocalToken(hashlib.sha256(token.encode()).hexdigest(), campaign.principal.subject)
     s = server(campaign.c, auth)
@@ -118,3 +119,9 @@ def wire(campaign):
     s.shutdown()
     thread.join(timeout=5)
     s.server_close()
+
+
+@pytest.fixture
+def wire(campaign):
+    with http_wire(campaign) as w:
+        yield w

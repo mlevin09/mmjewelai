@@ -19,7 +19,10 @@ activation, source/manifest/model/profile pins and principal scopes. The existin
 remains unchanged. SQLite append-only hash-chained events and a separate globally locked
 worker preserve registered decisions, execution identity, reservations and raw results
 across tool/Agent interruptions. Unknown attempts retain their complete reservation and
-are never automatically retried. The Agent selects the next sealed experimental type;
+are never automatically retried. A versioned operator-pinned allowlist defines experiment
+types, bounded controls, locale/context samples and exact instruction suffix variants.
+The Agent selects treatments without a fixed three-profile grid; derived instruction
+runtimes retain separate base/effective hashes and preserve the original source. The Agent selects the next experimental type;
 the controller never executes freeform instructions, shell or model-produced commands.
 
 Use standard-library Streamable HTTP JSON responses and an OAuth protected-resource
@@ -28,13 +31,23 @@ Bearer test mode accepts synthetic campaigns only. No generic OAuth authorizatio
 cloud platform or new paid dependency is introduced. The only package dependency is the
 existing native benchmark runner, installed from its local source.
 
-GCP lifecycle code accepts only the existing fixed VM and describe/start/stop. Private
+GCP lifecycle code accepts only the existing fixed VM, describe/start/stop and read-only
+operation inspection. Durable leases bind operation, instance ID and start generation;
+idle/unowned/ambiguous paths never issue stop or claim verified cleanup. An external
+qualified exclusive-use guard must fence actors outside the local store before live use. Private
 IAP forwarding reuses existing SSH access without writing instance SSH metadata. Runtime
 fingerprints and independent stopped status are checked. All cloud execution remains
 disabled in current CLI composition. Live envelopes are rejected: proxy reservations
 cannot promise a hard dollar ceiling with delayed billing, retained disks, host failure
 and unmetered Workspace credits. Owner must resolve the activation budget/period and
 enforceable safety mechanism before a separately reviewed activation composition.
+
+Optional private report delivery uses a campaign/envelope-scoped outbox, approved folder
+and permissions, durable preallocated file identity and byte-identical download verification.
+No real upload or OAuth acquisition is performed in offline tests. New report payload and
+minimum write access require activation approval. The new starter max_tokens=128 differs
+from historical A/B/D's 256; equivalence is not assumed. Executable template/EOS changes
+remain unsupported; needing them is a product-contract extension, not a live config fix.
 
 ## Alternatives
 

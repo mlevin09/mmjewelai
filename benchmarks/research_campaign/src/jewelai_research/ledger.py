@@ -95,6 +95,9 @@ def projection(events):
         "stopped": False,
         "cleanup": None,
         "report": None,
+        "lease": None,
+        "delivery": None,
+        "delivery_failure": None,
     }
     for event in events[1:]:
         b, kind = event["body"], event["kind"]
@@ -106,6 +109,14 @@ def projection(events):
             result["stopped"] = True
         elif kind == "CLEANUP":
             result["cleanup"] = b
+        elif kind == "LEASE":
+            result["lease"] = b
+        elif kind == "DELIVERY":
+            result["delivery"] = b
+            if b["status"] == "DELIVERED":
+                result["delivery_failure"] = None
+        elif kind == "DELIVERY_BLOCKED":
+            result["delivery_failure"] = b
         elif kind == "FINALIZED":
             result["report"] = b
         elif kind == "CALL":

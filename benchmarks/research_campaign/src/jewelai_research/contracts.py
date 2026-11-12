@@ -64,12 +64,19 @@ def reserved(session):
 class Inputs:
     """Only runtime input enters inference. Evaluator bytes are pinned read-only, never loaded."""
 
-    def __init__(self, corpus_path, manifest_path, evaluator_path=None):
+    def __init__(self, corpus_path, manifest_path, evaluator_path=None, policy_path=None):
         from native_llm_bench.contracts import load
 
         self.paths = [Path(corpus_path), Path(manifest_path)]
         if evaluator_path is not None:
             self.paths.append(Path(evaluator_path))
+        self.policy = None
+        if policy_path is not None:
+            from .experiments import validate_policy
+
+            self.paths.append(Path(policy_path))
+            self.policy = validate_policy(load(policy_path))
+            require(not set(self.policy["profiles"]) & set(PROFILES), "reserved_profile_id")
         self.file_hashes = [sha256_file(p) for p in self.paths]
         self.corpus = validate_runtime(load(corpus_path))
         self.manifest = validate_manifest(load(manifest_path))
@@ -84,6 +91,7 @@ class Inputs:
             "runner_sha256": self.runner_sha,
             "controller_sha256": self.controller_sha,
             "profiles_sha256": PROFILE_SHA,
+            "experiment_policy_sha256": digest(self.policy),
         }
 
     def verify(self, envelope):
@@ -137,7 +145,7 @@ def validate_envelope(e, inputs):
     require(e["period_end"] > e["period_start"], "invalid_period")
     require(e["max_wall_seconds"] <= e["period_end"] - e["period_start"], "invalid_wall_limit")
     for name, allowed in (
-        ("allowed_profiles", PROFILES),
+        ("allowed_profiles", {**PROFILES, **(inputs.policy["profiles"] if inputs.policy else {})}),
         (
             "allowed_sessions",
             {s["session_id"] for s in inputs.corpus["sessions"] if not reserved(s)},
@@ -195,7 +203,17 @@ def validate_envelope(e, inputs):
     return copy.deepcopy(e)
 
 
-def experiment_plan(e, inputs, profile, sessions):
+def experiment_runtime(inputs, profile, parameters, sessions):
+    if profile in PROFILES:
+        require(not parameters, "legacy_profile_has_no_parameters")
+        return inputs.corpus, PROFILES[profile]["changes"]
+    from .experiments import prepare
+
+    require(inputs.policy is not None, "operator_policy_required")
+    return prepare(inputs.policy, inputs.corpus, profile, parameters, sessions)
+
+
+def experiment_plan(e, inputs, profile, sessions, parameters=None):
     require(profile in e["allowed_profiles"], "profile_not_authorized")
     require(
         isinstance(sessions, list)
@@ -205,7 +223,10 @@ def experiment_plan(e, inputs, profile, sessions):
         "sample_not_authorized",
     )
     config = Config(model=inputs.manifest["model_id"], seed=e["inference_seed"], max_attempts=1)
-    config = replace(config, **PROFILES[profile]["changes"])
+    corpus, changes = experiment_runtime(
+        inputs, profile, {} if parameters is None else parameters, sessions
+    )
+    config = replace(config, **changes)
     override = None
     if profile == "BREVITY_POLICY_V1":
         override = {
@@ -216,7 +237,7 @@ def experiment_plan(e, inputs, profile, sessions):
             "suffix_sha256": text_hash(BREVITY_SUFFIX),
         }
     plan = execution_plan(
-        inputs.corpus,
+        corpus,
         config,
         inputs.manifest,
         e["scheduling_seed"],
