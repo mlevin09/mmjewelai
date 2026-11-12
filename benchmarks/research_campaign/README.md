@@ -1,5 +1,10 @@
 # JewelAI research campaign bridge v1
 
+**Current operational entrypoint:** [backend-hosted VM Access](VM_ACCESS.md), superseding
+the interim Mac tunnel. The Owner selected simple infrastructure tools; the historical
+campaign candidate below is retained for traceability and is not in that runtime bundle.
+Backend provisioning/account activation remain gated; see [activation package](backend/ACTIVATION.md).
+
 Issue [#176](https://github.com/mlevin09/mmjewelai/issues/176). Research-only;
 **not an application service, provider adapter or production dependency**.
 PR base is `benchmark/native-llm-stage1`, preserving the Owner's benchmark isolation.

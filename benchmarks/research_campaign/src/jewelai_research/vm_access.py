@@ -70,7 +70,9 @@ class AccessLease(LeaseJournal):
         a = self.authorized()
         old = self.read()
         require(old is None or old["phase"] in {"RELEASED", "NO_START"}, "ownership_blocked")
-        starts = sum(x.name.endswith(".start") for x in self.root.glob("*.start"))
+        starts = sum(
+            load(x)["authorization_sha256"] == digest(a) for x in self.root.glob("*.start")
+        )
         require(starts < a["maximum_starts"], "authorized_start_count_exhausted")
         token = uuid.uuid4().hex
         write(
@@ -172,6 +174,10 @@ class VmAccess:
             with self.locked():
                 d = self.cloud.inspect()
                 lease = self.lease.read()
+                if lease and lease["phase"] == "START_SUBMITTED":
+                    # Read-only recovery of a recorded successful start, never a new RPC.
+                    self.cloud.adopt(self.lease)
+                    d, lease = self.cloud.inspect(), self.lease.read()
                 # A slow asynchronous stop is not a new VM lease or a failed shutdown.
                 # Reconcile only an already proven incarnation, without a cloud write.
                 if (

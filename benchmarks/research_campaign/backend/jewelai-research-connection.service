@@ -1,0 +1,43 @@
+[Unit]
+Description=Private Research Agent VM connection (no experiment controller)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=jewelai-mcp
+Group=jewelai-mcp
+WorkingDirectory=/var/lib/jewelai-research
+Environment=PYTHONPATH=/opt/jewelai-research/server
+Environment=CLOUDSDK_CONFIG=/var/lib/jewelai-research/gcloud
+Environment=CLOUDSDK_CORE_DISABLE_FILE_LOGGING=true
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 -m jewelai_research.backend run --config /etc/jewelai-research/backend.json
+Restart=always
+RestartSec=30
+TimeoutStopSec=20
+KillMode=control-group
+StateDirectory=jewelai-research
+StateDirectoryMode=0700
+RuntimeDirectory=jewelai-research
+RuntimeDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=768M
+TasksMax=64
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target

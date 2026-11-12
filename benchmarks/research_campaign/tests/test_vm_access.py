@@ -175,3 +175,32 @@ def test_prior_stop_timeout_reconciles_only_the_owned_stopped_incarnation(access
     access.cloud.request_stop = lambda: pytest.fail("readback must not mutate cloud")
     phase = access.call("vm_status", {})["lease"]["phase"]
     assert phase == ("RELEASED" if same else "BLOCKED")
+
+
+def test_status_recovers_recorded_start_without_duplicate_start(access):
+    import time
+    from pathlib import Path
+
+    from jewelai_research.contracts import TARGET
+    from jewelai_research.lifecycle import SyntheticLab
+
+    Path(access.config["authorization"]).write_text(
+        json.dumps(
+            {
+                "approved": True,
+                "target": TARGET,
+                "expires_at": int(time.time()) + 60,
+                "maximum_starts": 1,
+            }
+        )
+    )
+    lab = SyntheticLab()
+    access.cloud = lab
+    lease = access.lease.begin({})
+    operation = lab.request_start()
+    access.lease.record(
+        lease["lease_id"], "START_SUBMITTED", instance_id="123", operation_name=operation["name"]
+    )
+    assert access.call("vm_status", {})["lease"]["phase"] == "OWNED"
+    assert access.call("vm_status", {})["lease"]["phase"] == "OWNED"
+    assert lab.starts == 1 and lab.stops == 0

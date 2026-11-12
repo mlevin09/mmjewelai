@@ -1,92 +1,63 @@
-# Operational VM access — Owner directive, 2026-11-12
+# Backend-hosted VM access — current Owner directive, 2026-11-12
 
-This is the active connection entrypoint for **JewelAI — AI Research Agent**.
-The campaign controller is not in its execution chain. There are no experiment profiles,
-research algorithms, parameter selection or benchmark campaigns in this interface.
+The existing **JewelAI — AI Research Agent** owns research logic. Its seven tools are
+`vm_status`, `vm_start`, `vm_stop`, `vm_exec`, `vm_job`, `vm_read`, `vm_write`.
+No campaign controller, research profiles or experiment algorithm is in this connection.
 
-## Actual server-side setup
+## Standard runtime: no personal computer
 
-- Existing target only: `mmjewellai-preprod/europe-west1-b/jewelai-llm-lab`.
-- GCP-readback confirmed `TERMINATED`, no external IP or service account.
-- Configured and read back `scheduling.maxRunDuration.seconds=1200`,
-  `instanceTerminationAction=STOP`. This safeguard is enforced by Compute Engine even
-  when the Agent, tunnel or local host is unavailable. It is not a dollar billing cap.
-- Installed the checksum-verified official OpenAI tunnel-client v0.0.20 on the existing
-  Mac. No new paid hosting, public endpoint or IAM grant was created.
-- Private server: `~/Library/Application Support/JewelAIResearchVM/serve`.
-  It runs system Python independently of Codex. Its source snapshot contains only the VM
-  interface and reused infrastructure helpers; it does not load Controller/Worker or
-  experiment orchestration. It remains usable while the Qwen VM is off, provided this
-  existing Mac is awake/logged in. No claim of availability while that host is powered off.
-- Real installed MCP `vm_status` returned the stopped VM and its 1200-second limit.
-  A start request without Owner authorization was rejected before any start RPC.
+```text
+Existing OpenAI Workspace Agent
+ → workspace-associated private Secure MCP Tunnel
+ → official tunnel-client / systemd on jewelai-research-control
+ → existing stdio VM Access server
+ → fixed GCP lifecycle / IAP SSH
+ → jewelai-llm-lab / non-root jewelai-research / existing Qwen and Runner
+```
 
-Tools: `vm_status`, `vm_start`, `vm_exec`, `vm_job`, `vm_read`, `vm_write`, `vm_stop`.
-Agent chooses commands, scripts and research procedures. Local execution accepts no
-arbitrary target/project/SSH user. Guest commands execute as `jewelai-research` without
-sudo, GCP credentials, API scopes, forwarded agent or unrestricted project administration.
-Files are restricted to its work area and a read-only copy of the existing Runner.
-The original Qwen installation, Runner and historical benchmark files are not modified.
+Prepared backend: one `e2-micro`, Ubuntu 24.04, europe-west1-b, dedicated private VPC/subnet,
+no external VM IP and no public MCP/SSH listener. Outbound Cloud NAT reaches OpenAI/GCP.
+Only operator IAP SSH ingress is allowed. See [activation package](backend/ACTIVATION.md)
+for exact resources, scoped IAM, cost, commands, verification and rollback.
 
-Execution is asynchronous so a long VM command does not require a long MCP request.
-The non-root helper admits one job at a time, bounds memory/process/output consumption,
-and kills a job after 15 minutes. Compute independently stops the whole VM after 20.
-Start/stop reuse operation/incarnation ownership proof; an unrelated RUNNING VM is not
-adopted or stopped. Host-only authorization records the Owner's spending window/count;
-no MCP argument can authorize paid starts or modify that file. Expiry does not disable
-owned cleanup. These are infrastructure limits, not experiment policy.
+The control host runs while Qwen is off. Neither the Owner's Mac nor Codex participates
+in standard runtime. Earlier Mac helpers are historical provisioning artifacts, not the
+endpoint. No personal OAuth session is copied to the host.
 
-## Verified one-time non-root bootstrap
+**Current status:** code/configuration implemented and locally tested; control host,
+new IAM and managed secrets NOT DEPLOYED. Workspace connection NOT VERIFIED.
+New recurring infrastructure and live IAM/secret/deployment activation require the
+consolidated authorization in the activation package.
 
-On 2026-11-12 the Owner approved one start, up to 20 minutes / $1. The operator-only
-`bootstrap-vm-access.sh` installed the root-owned forced-command helper and dedicated
-account/public key, with a read-only Runner copy. Actual MCP backend checks verified:
+## Safety and recovery
 
-- `uid=1002(jewelai-research)`, no sudo; original Runner copy read-only.
-- A 28-byte synthetic file was written and read through the restricted SSH path.
-- Job `05156ca90d324f7ba54d13bece3c4ff2` completed with exit code 0.
-- Existing Qwen `/health` returned `ok`; no Qwen generation or benchmark was run.
-- Temporary bootstrap files/key were removed; GCP readback confirmed `TERMINATED`.
-  The owned lease reconciled to `RELEASED`. Authorization was disabled after this start.
+- Fixed target only: mmjewellai-preprod/europe-west1-b/jewelai-llm-lab.
+- Qwen retains maxRunDuration=1200 and instanceTerminationAction=STOP: a time safeguard,
+  not a hard dollar billing cap.
+- Starts require an explicit Owner authorization window/count in Secret Manager; initial
+  activation is disabled. MCP arguments cannot grant paid access.
+- Ownership proofs, audit and per-authorization start counts persist on protected boot
+  disk across host/process restart. Never reset state to recover a failed call.
+- Recorded starts recover through read-only operation evidence; ambiguous starts never
+  retry. Stop submits once, reports STOPPING until the same incarnation is TERMINATED.
+- One control host/store only. Local flock and operation/instance/start proof require
+  cooperative external operators, not a cloud-atomic fence against administrators.
+- systemd reconnects the tunnel after failure/reboot, not experiments or VM starts.
+  Secret Manager supplies the restricted SSH key, activation record and Read+Use tunnel
+  key to private tmpfs files. Access is rechecked per operation; owned cleanup remains
+  available after authorization expiry/revocation.
+- Guest user jewelai-research has no sudo/cloud identity. Root-owned forced-command SSH,
+  pinned host key, private work area, read-only Runner copy and 15-minute async jobs remain.
+- No credentials in Git, Terraform state, argv or logs. Research scripts execute on the
+  guest, never the control host. No public HTTP fallback or application/provider change.
+- Private plugin/workspace permissions must be restricted by the Owner and attached only
+  to the existing Agent. stdio does not independently attest a cryptographic Agent ID.
 
-This proves the backend, not the actual Workspace Agent connection. No additional start
-is authorized. The tested client handles spaces in strict host-key paths. Stop is
-asynchronous: it submits once, reports STOPPING, and `vm_status` verifies RELEASED only
-when the exact owned incarnation is TERMINATED. It does not mistake a shutdown taking
-longer than a minute for a lost lease or submit another stop RPC.
+## Historical evidence — not backend/Agent acceptance
 
-## Exact one-time OpenAI account connection
-
-No login, Agent URL or new Agent is required from Codex. Account-side configuration must
-be performed by the Owner when it is not accessible through authorized tools.
-
-1. In [Platform tunnel settings](https://platform.openai.com/settings/organization/tunnels),
-   create/reuse a private tunnel named **JewelAI VM Access**, associated with the ChatGPT
-   workspace containing the existing Agent. Tunnel operator needs Read+Manage; its
-   restricted runtime key needs Read+Use. Do not supply an admin key to the daemon.
-2. Run the installed helper locally:
-
-   ```sh
-   python3 "$HOME/Library/Application Support/JewelAIResearchVM/connect-private-vm-tunnel.py"
-   ```
-
-   Enter that tunnel ID and its
-   runtime key into the hidden prompt; never send the key in chat. The helper stores the
-   key in a separate 0600 file in a 0700 private directory, writes only a `file:` secret
-   reference into the profile, runs official client `doctor`, and installs a macOS
-   LaunchAgent. No VM is started. The tunnel daemon is not supervised by Codex.
-3. In the existing **JewelAI — AI Research Agent**, add a private custom MCP plugin:
-   name **JewelAI VM Access**; Connection **Tunnel**; select the same tunnel ID;
-   visibility **Only me**. No additional application auth is needed for this stdio
-   target: private tunnel access is authenticated by OpenAI account/workspace permissions.
-   Do not expose the server through an unauthenticated HTTP URL. Attach these seven tools
-   to the existing Agent; do not create another Agent or enable unrelated computer access.
-
-This is a one-time setup flow, not a claim that an unconfigured tunnel can be installed
-with one click. Exact remote tunnel ID/health is unavailable until the Owner performs
-the account action and supplies the restricted runtime credential through the local helper.
-
-Only after the local runtime is healthy and discovery succeeds, request the one approved
-VM-start window for a real connectivity acceptance: Agent start → non-root execution →
-one minimal Qwen command → read result → owned stop. No benchmark or parameter study.
-READY requires those actual Agent outcomes; local stdio/synthetic tests do not establish it.
+At 16b3452 one separately approved start installed guest restrictions. The old local
+backend verified uid 1002 jewelai-research, sudo denial, read-only Runner, a 28-byte file
+round trip, and job 05156ca90d324f7ba54d13bece3c4ff2 exit 0. Qwen health returned ok;
+no inference or benchmark ran. Bootstrap access was removed, VM TERMINATED, lease RELEASED.
+That one-start authorization is consumed. The unchanged guest path reuses this evidence;
+it does not prove the new backend or actual Workspace Agent. Source/history is retained.

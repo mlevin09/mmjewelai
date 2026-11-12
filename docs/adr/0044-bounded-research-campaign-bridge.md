@@ -5,6 +5,32 @@
 
 ## Current Owner directive — simple operational access
 
+The final Owner requirement replaces the interim Mac-hosted composition: the connection
+must run on a backend independent of both the personal computer and the stopped inference
+VM. An isolated, single `e2-micro` control VM with a private NIC, outbound Cloud NAT,
+metadata service-account credentials, Secret Manager payloads and systemd supervision is
+prepared under `benchmarks/research_campaign/backend`. Research commands still run only
+on the original non-root inference account. The control identity can mutate only that
+existing inference VM's start/stop lifecycle, not the project or its own infrastructure.
+Project-wide permissions are read-only CLI discovery/operation inspection; IAP is scoped
+to the target instance's SSH port. Persistent disk retains the ownership journal and
+per-authorization start count. No campaign controller is included in the installed bundle.
+
+Alternatives: the interim personal Mac fails the availability requirement; the inference
+VM cannot receive its own start request while off; ordinary request-billed/scale-to-zero
+application Cloud Run services do not supervise an idle long-polling tunnel. An additional
+always-on Cloud Run worker would also incur recurring cost and require durable external
+state. A small control VM directly reuses the tested private stdio/SSH boundary without
+changing the application. Its additional VPC/NAT cost is explicit in the activation package.
+
+This prepares a new recurring resource and least-privilege IAM/secret metadata; **none is
+applied without separate activation authorization**. Secret values never enter Terraform,
+the source bundle or logs. Workspace/tunnel association remains an account-side gate; no
+claim of per-Agent identity enforcement is made for stdio. Private plugin permissions
+must be restricted and assigned only to the existing Agent by the Owner. Local locking
+assumes one control host and cooperative external operators, not a cloud-atomic fence.
+No new Python dependency, public endpoint, research framework or Benchmark Runner change.
+
 The subsequent Owner instruction supersedes using a campaign controller as the Agent's
 connection. The active connection is `jewelai_research.vm_access`: seven infrastructure
 tools with scoped non-root guest execution, ownership and automatic runtime shutdown.
