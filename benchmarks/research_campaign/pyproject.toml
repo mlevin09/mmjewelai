@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jewelai-research-campaign"
+version = "1.0.0"
+description = "Private, bounded MCP research controller; not a JewelAI application dependency"
+requires-python = ">=3.12"
+dependencies = ["jewelai-native-llm-bench==1.0.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[project.scripts]
+jewelai-research = "jewelai_research.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jewelai_research"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "../native_llm_stage1/src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

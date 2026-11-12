@@ -1,0 +1,6 @@
+/private/
+/runs/
+/exports/
+*.sqlite3*
+*.egg-info/
+.ruff_cache/
