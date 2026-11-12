@@ -36,14 +36,24 @@ adopted or stopped. Host-only authorization records the Owner's spending window/
 no MCP argument can authorize paid starts or modify that file. Expiry does not disable
 owned cleanup. These are infrastructure limits, not experiment policy.
 
-## Remaining non-root bootstrap (requires an approved VM start)
+## Verified one-time non-root bootstrap
 
-`bootstrap-vm-access.sh` is an operator-only setup script, not an Agent tool. It installs
-the root-owned forced-command guest helper and the dedicated account/SSH public key,
-with a read-only Runner copy. It must be run only after explicit Owner approval to start
-this existing VM. Then verify identity, sudo denial, protected source permissions,
-private SSH host key and an actual guest round trip before setting `guest_ready=true`.
-Until then the installed server rejects remote execution and Agent-initiated starts.
+On 2026-11-12 the Owner approved one start, up to 20 minutes / $1. The operator-only
+`bootstrap-vm-access.sh` installed the root-owned forced-command helper and dedicated
+account/public key, with a read-only Runner copy. Actual MCP backend checks verified:
+
+- `uid=1002(jewelai-research)`, no sudo; original Runner copy read-only.
+- A 28-byte synthetic file was written and read through the restricted SSH path.
+- Job `05156ca90d324f7ba54d13bece3c4ff2` completed with exit code 0.
+- Existing Qwen `/health` returned `ok`; no Qwen generation or benchmark was run.
+- Temporary bootstrap files/key were removed; GCP readback confirmed `TERMINATED`.
+  The owned lease reconciled to `RELEASED`. Authorization was disabled after this start.
+
+This proves the backend, not the actual Workspace Agent connection. No additional start
+is authorized. The tested client handles spaces in strict host-key paths. Stop is
+asynchronous: it submits once, reports STOPPING, and `vm_status` verifies RELEASED only
+when the exact owned incarnation is TERMINATED. It does not mistake a shutdown taking
+longer than a minute for a lost lease or submit another stop RPC.
 
 ## Exact one-time OpenAI account connection
 
@@ -54,7 +64,13 @@ be performed by the Owner when it is not accessible through authorized tools.
    create/reuse a private tunnel named **JewelAI VM Access**, associated with the ChatGPT
    workspace containing the existing Agent. Tunnel operator needs Read+Manage; its
    restricted runtime key needs Read+Use. Do not supply an admin key to the daemon.
-2. Run the installed `connect-private-vm-tunnel.py` locally. Enter that tunnel ID and its
+2. Run the installed helper locally:
+
+   ```sh
+   python3 "$HOME/Library/Application Support/JewelAIResearchVM/connect-private-vm-tunnel.py"
+   ```
+
+   Enter that tunnel ID and its
    runtime key into the hidden prompt; never send the key in chat. The helper stores the
    key in a separate 0600 file in a 0700 private directory, writes only a `file:` secret
    reference into the profile, runs official client `doctor`, and installs a macOS

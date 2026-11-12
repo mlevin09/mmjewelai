@@ -146,7 +146,7 @@ class VmAccess:
             "-o",
             "StrictHostKeyChecking=yes",
             "-o",
-            "UserKnownHostsFile=" + self.config["known_hosts"],
+            "UserKnownHostsFile=" + shlex.quote(self.config["known_hosts"]),
             "-o",
             "HostKeyAlias=jewelai-llm-lab",
             "-o",
@@ -169,7 +169,24 @@ class VmAccess:
         require(name in TOOLS, "unknown_tool")
         keys(arguments, TOOLS[name])
         if name == "vm_status":
-            d = self.cloud.inspect()
+            with self.locked():
+                d = self.cloud.inspect()
+                lease = self.lease.read()
+                # A slow asynchronous stop is not a new VM lease or a failed shutdown.
+                # Reconcile only an already proven incarnation, without a cloud write.
+                if (
+                    lease
+                    and (
+                        lease["phase"] == "STOP_INTENT"
+                        or (
+                            lease["phase"] == "BLOCKED"
+                            and lease.get("reason") == "owned_shutdown_not_verified"
+                        )
+                    )
+                    and d["status"] == "TERMINATED"
+                    and fingerprint(d) == lease.get("fingerprint")
+                ):
+                    self.lease.record(lease["lease_id"], "RELEASED")
             return {
                 "target": TARGET,
                 "status": d["status"],
@@ -192,7 +209,33 @@ class VmAccess:
             self.cloud.start({"mode": "LIVE", "target": TARGET}, self.lease)
             return {"status": "RUNNING", "lease": self.lease.read()}
         if name == "vm_stop":
-            return self.cloud.stop(self.lease)  # remains available after authorization expires
+            # Cloud stop is asynchronous. Return promptly and let vm_status verify its
+            # completion; never submit a second RPC because shutdown exceeds one minute.
+            with self.locked():
+                lease = self.lease.read()
+                require(
+                    lease and lease["phase"] in {"OWNED", "STOP_INTENT", "RELEASED"},
+                    "ownership_not_proven",
+                )
+                if lease["phase"] == "RELEASED":
+                    return {"verified_stopped": True, "status": "RELEASED"}
+                d = self.cloud.inspect()
+                require(fingerprint(d) == lease.get("fingerprint"), "vm_ownership_changed")
+                if d["status"] == "TERMINATED":
+                    self.lease.record(lease["lease_id"], "RELEASED")
+                    return {"verified_stopped": True, "status": "RELEASED"}
+                require(d["status"] in {"RUNNING", "STOPPING"}, "owned_vm_not_stoppable")
+                if lease["phase"] == "OWNED" and d["status"] == "RUNNING":
+                    self.lease.record(lease["lease_id"], "STOP_INTENT")
+                    self.cloud.fenced = True
+                    try:
+                        operation = self.cloud.request_stop()
+                    finally:
+                        self.cloud.fenced = False
+                    self.lease.record(
+                        lease["lease_id"], "STOP_INTENT", stop_operation=operation.get("name")
+                    )
+                return {"verified_stopped": False, "status": "STOPPING"}
         with self.locked():
             return self._guest(name.removeprefix("vm_"), arguments)
 

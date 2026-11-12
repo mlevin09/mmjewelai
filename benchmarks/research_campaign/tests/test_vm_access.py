@@ -99,3 +99,79 @@ def test_lease_tampering_fails_closed(access):
     write(access.root / "lease.json", {"lease": {"phase": "OWNED"}, "sha256": digest({})})
     with pytest.raises(InvalidArtifact, match="lease_integrity"):
         access.lease.read()
+
+
+def test_strict_host_key_path_with_spaces_stays_one_path(access, monkeypatch):
+    import shlex
+    from types import SimpleNamespace
+
+    from jewelai_research import vm_access
+
+    access.config.update(guest_ready=True, known_hosts="/private/verified hosts/known_hosts")
+    identity = {"instance_id": "123", "last_start": "2026-11-12T00:00:00Z"}
+    access.lease.read = lambda: {"phase": "OWNED", "fingerprint": identity}
+    access.lease.cancelled = lambda: False
+    access.cloud.inspect = lambda: {
+        "status": "RUNNING",
+        "id": "123",
+        "lastStartTimestamp": identity["last_start"],
+    }
+
+    def run(args, **kwargs):
+        option = next(s for s in args if s.startswith("UserKnownHostsFile="))
+        assert shlex.split(option.split("=", 1)[1]) == [access.config["known_hosts"]]
+        assert "StrictHostKeyChecking=yes" in args
+        assert args[-1] == "jewelai-research@jewelai-llm-lab"
+        return SimpleNamespace(returncode=0, stdout=b'{"content":"ok"}')
+
+    monkeypatch.setattr(vm_access.subprocess, "run", run)
+    assert access.call("vm_read", {"path": "result.txt"}) == {"content": "ok"}
+
+
+def owned(access, phase="OWNED", **facts):
+    identity = {"instance_id": "123", "last_start": "2026-11-12T00:00:00Z"}
+    access.lease._save({"lease_id": "test", "phase": phase, "fingerprint": identity, **facts})
+    return {"id": "123", "lastStartTimestamp": identity["last_start"]}
+
+
+def test_slow_stop_is_submitted_once_and_reconciled_without_new_rpc(access):
+    instance = owned(access)
+    access.cloud.inspect = lambda: {**instance, "status": "RUNNING"}
+    calls = []
+
+    def stop():
+        assert access.cloud.fenced
+        calls.append("stop")
+        return {"name": "owned-stop"}
+
+    access.cloud.request_stop = stop
+    assert access.call("vm_stop", {}) == {"status": "STOPPING", "verified_stopped": False}
+    assert not access.cloud.fenced
+    assert access.call("vm_stop", {})["status"] == "STOPPING"
+    access.cloud.inspect = lambda: {**instance, "status": "STOPPING"}
+    assert access.call("vm_stop", {})["status"] == "STOPPING"
+    access.cloud.inspect = lambda: {**instance, "status": "TERMINATED"}
+    assert access.call("vm_status", {})["lease"]["phase"] == "RELEASED"
+    assert access.call("vm_stop", {})["verified_stopped"]
+    assert calls == ["stop"]
+
+
+def test_stop_cannot_adopt_another_incarnation(access):
+    instance = owned(access)
+    access.cloud.inspect = lambda: {**instance, "status": "RUNNING", "id": "999"}
+    access.cloud.request_stop = lambda: pytest.fail("must not stop unowned VM")
+    with pytest.raises(InvalidArtifact, match="vm_ownership_changed"):
+        access.call("vm_stop", {})
+
+
+@pytest.mark.parametrize("same", [True, False])
+def test_prior_stop_timeout_reconciles_only_the_owned_stopped_incarnation(access, same):
+    instance = owned(access, "BLOCKED", reason="owned_shutdown_not_verified")
+    access.cloud.inspect = lambda: {
+        **instance,
+        "status": "TERMINATED",
+        "id": "123" if same else "999",
+    }
+    access.cloud.request_stop = lambda: pytest.fail("readback must not mutate cloud")
+    phase = access.call("vm_status", {})["lease"]["phase"]
+    assert phase == ("RELEASED" if same else "BLOCKED")
