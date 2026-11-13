@@ -1,10 +1,29 @@
-# Backend-hosted VM access — current Owner directive, 2026-11-12
+# Research Agent access — current Owner correction, 2026-11-13
+
+**No OpenAI Tunnel, no Mac runtime, no manually transferred keys.** Owner superseded the
+earlier tunnel architecture in [comment 6851806625](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6851806625)
+and [security correction 6852026177](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6852026177).
+Do not follow the historical tunnel/key activation procedure below.
+
+The replacement candidate is an authenticated Agent GitHub request, a separably scoped
+read-only Actions/WIF status job, and a GitHub receipt. **It is not implemented or active.**
+Its prerequisite is proof of read/write through the existing Agent's GitHub app, not the
+Codex GitHub connection. Current session has no exposed Workspace Agents inspection/run
+tools; discovery did not return a matching plugin, and no authorized Agent UI was available.
+Agent-side GitHub availability/permissions remain NOT VERIFIED, not a confirmed denial.
+No request workflow or IAM bridge is created before this prerequisite is satisfied.
+
+The protected deploy-ref WIF and privileged preprod/production deployers must not be
+reused or widened. No public comment commands, arbitrary shell, paid starts, new recurring
+infrastructure or replacement Agent. Existing control resources may remain safely staged.
+
+## Historical implementation — superseded, not current setup instructions
 
 The existing **JewelAI — AI Research Agent** owns research logic. Its seven tools are
 `vm_status`, `vm_start`, `vm_stop`, `vm_exec`, `vm_job`, `vm_read`, `vm_write`.
 No campaign controller, research profiles or experiment algorithm is in this connection.
 
-## Standard runtime: no personal computer
+## Superseded tunnel runtime
 
 ```text
 Existing OpenAI Workspace Agent

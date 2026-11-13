@@ -1,4 +1,15 @@
-# Backend activation package and operational handoff
+# Historical backend activation package — superseded 2026-11-13
+
+**Do not activate/configure an OpenAI Tunnel or request its keys/ID.** Owner replaced this
+direction in PR #177 [comment 6851806625](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6851806625)
+and [comment 6852026177](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6852026177).
+The applied-resource receipts below remain historical evidence, not permission to run
+the listed commands now. Existing resources may remain safely staged; no new infrastructure.
+
+The GitHub/Actions status-only alternative is gated on actual Agent GitHub read/write
+proof. That is NOT VERIFIED: the current session cannot inspect or invoke the existing
+Workspace Agent. Do not substitute Codex's successful GitHub access, loosen deploy WIF,
+reuse an administrative deployer, or create workflow plumbing before that gate passes.
 
 Prepared in existing PR #177. Owner subsequently authorized the control-host package,
 specified IAM/secrets and deployment. The exact saved plan (18 creates, no deletes/updates)

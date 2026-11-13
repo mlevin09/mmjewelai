@@ -3,7 +3,22 @@
 - Date: 2026-11-12
 - Status: Issue #176 implementation candidate; independent review and live activation pending.
 
-## Current Owner directive — simple operational access
+## Current Owner correction — 2026-11-13
+
+Owner rejects all OpenAI Tunnel variants, personal-computer runtime and manual Platform
+key handoff. PR #177 comments [6851806625](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6851806625)
+and [6852026177](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6852026177)
+supersede the tunnel decision below. Historical source/resources/evidence are retained;
+no new resources or tunnel activation are authorized by this correction.
+
+An asynchronous GitHub/Actions read-only status integration may be implemented only after
+actual existing Agent GitHub write/read access is established. It must use separately
+scoped read-only trust, not the administrative preprod/production deployer or a weakened
+deploy-ref provider. Public repository comments are not executable commands. Current
+Agent access is unverified because its inspection/run interface is unavailable in the
+current session. No claim of Agent GitHub permission denial or connectivity is made.
+
+## Historical Owner directive — simple operational access (superseded)
 
 The final Owner requirement replaces the interim Mac-hosted composition: the connection
 must run on a backend independent of both the personal computer and the stopped inference
