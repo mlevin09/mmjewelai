@@ -58,10 +58,21 @@ class AccessLease(LeaseJournal):
         require(
             a.get("target") == TARGET
             and a.get("approved") is True
-            and type(a.get("expires_at")) is int
-            and time.time() < a["expires_at"]
-            and type(a.get("maximum_starts")) is int
-            and a["maximum_starts"] > 0,
+            and (
+                (
+                    a.get("shutdown_policy") == "completion"
+                    and isinstance(a.get("operation_id"), str)
+                    and 1 <= len(a["operation_id"]) <= 80
+                    and a.get("native_runner") is True
+                )
+                or (
+                    "shutdown_policy" not in a
+                    and type(a.get("expires_at")) is int
+                    and time.time() < a["expires_at"]
+                    and type(a.get("maximum_starts")) is int
+                    and a["maximum_starts"] > 0
+                )
+            ),
             "owner_start_authorization_required",
         )
         return a
@@ -73,12 +84,22 @@ class AccessLease(LeaseJournal):
         starts = sum(
             load(x)["authorization_sha256"] == digest(a) for x in self.root.glob("*.start")
         )
-        require(starts < a["maximum_starts"], "authorized_start_count_exhausted")
+        require(
+            a.get("shutdown_policy") == "completion" or starts < a["maximum_starts"],
+            "authorized_start_count_exhausted",
+        )
         token = uuid.uuid4().hex
         write(
             self.root / (token + ".start"), {"at": time.time(), "authorization_sha256": digest(a)}
         )
-        return self._save({"lease_id": token, "phase": "CHECKING", "at": time.time()})
+        return self._save(
+            {
+                "lease_id": token,
+                "phase": "CHECKING",
+                "at": time.time(),
+                "operation_id": a.get("operation_id"),
+            }
+        )
 
     def record(self, lease_id, phase, **facts):
         old = self.read()
@@ -160,6 +181,9 @@ class VmAccess:
         r = subprocess.run(
             args,
             input=canonical({"operation": operation, "arguments": arguments}),
+            # ssh executes ProxyCommand with SHELL. The service account keeps its
+            # nologin login shell; only this fixed IAP subprocess needs /bin/sh.
+            env={**os.environ, "SHELL": "/bin/sh"},
             capture_output=True,
             timeout=35,
             check=False,
@@ -167,7 +191,7 @@ class VmAccess:
         require(r.returncode == 0 and len(r.stdout) <= 200000, "guest_request_failed")
         return json.loads(r.stdout)
 
-    def call(self, name, arguments):
+    def call(self, name, arguments, *, expected_lease=None):
         require(name in TOOLS, "unknown_tool")
         keys(arguments, TOOLS[name])
         if name == "vm_status":
@@ -203,15 +227,30 @@ class VmAccess:
                 "guest_ready": self.config["guest_ready"],
             }
         if name == "vm_start":
-            self.lease.authorized()  # This file is host-only; tools cannot grant themselves access.
+            approval = self.lease.authorized()  # Protected host-only policy.
             require(self.config["guest_ready"] is True, "non_root_guest_not_installed")
             d = self.cloud.inspect()
             scheduling = d.get("scheduling", {})
-            require(
-                scheduling.get("instanceTerminationAction") == "STOP"
-                and 0 < int(scheduling.get("maxRunDuration", {}).get("seconds", 0)) <= 1200,
-                "automatic_shutdown_not_verified",
-            )
+            if approval.get("shutdown_policy") == "completion":
+                require(
+                    not scheduling.get("maxRunDuration") and not scheduling.get("terminationTime"),
+                    "premature_shutdown_still_configured",
+                )
+            else:
+                require(
+                    scheduling.get("instanceTerminationAction") == "STOP"
+                    and 0 < int(scheduling.get("maxRunDuration", {}).get("seconds", 0)) <= 1200,
+                    "automatic_shutdown_not_verified",
+                )
+            with self.locked():
+                lease = self.lease.read()
+                if d["status"] == "RUNNING" and lease and lease["phase"] == "OWNED":
+                    require(
+                        fingerprint(d) == lease["fingerprint"]
+                        and lease.get("operation_id") == approval.get("operation_id"),
+                        "vm_ownership_changed",
+                    )
+                    return {"status": "RUNNING", "lease": lease}
             self.cloud.start({"mode": "LIVE", "target": TARGET}, self.lease)
             return {"status": "RUNNING", "lease": self.lease.read()}
         if name == "vm_stop":
@@ -219,6 +258,10 @@ class VmAccess:
             # completion; never submit a second RPC because shutdown exceeds one minute.
             with self.locked():
                 lease = self.lease.read()
+                require(
+                    expected_lease is None or (lease and lease["lease_id"] == expected_lease),
+                    "finish_lease_changed",
+                )
                 require(
                     lease and lease["phase"] in {"OWNED", "STOP_INTENT", "RELEASED"},
                     "ownership_not_proven",
@@ -231,7 +274,11 @@ class VmAccess:
                     self.lease.record(lease["lease_id"], "RELEASED")
                     return {"verified_stopped": True, "status": "RELEASED"}
                 require(d["status"] in {"RUNNING", "STOPPING"}, "owned_vm_not_stoppable")
-                if lease["phase"] == "OWNED" and d["status"] == "RUNNING":
+                retry_stop = lease["phase"] == "STOP_INTENT" and not lease.get("stop_operation")
+                if lease.get("stop_operation") and d["status"] == "RUNNING":
+                    op = self.cloud.operation(lease["stop_operation"])
+                    retry_stop = op.get("status") == "DONE" and bool(op.get("error"))
+                if (lease["phase"] == "OWNED" or retry_stop) and d["status"] == "RUNNING":
                     self.lease.record(lease["lease_id"], "STOP_INTENT")
                     self.cloud.fenced = True
                     try:

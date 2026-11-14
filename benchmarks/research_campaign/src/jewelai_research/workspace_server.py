@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import anyio
@@ -71,6 +72,28 @@ def application(config):
         callback_url=CALLBACK,
     )
     app = create_app(oauth, native_actions=actions, auth_provider=auth)
+    original_lifespan = app.router.lifespan_context
+
+    async def finish_pending():
+        while True:
+            try:
+                await anyio.to_thread.run_sync(actions.reconcile_finish)
+            except Exception:
+                # Leave the immutable finish intent for retry; never log payloads.
+                pass
+            await anyio.sleep(10)
+
+    @asynccontextmanager
+    async def lifespan(application):
+        async with original_lifespan(application):
+            async with anyio.create_task_group() as group:
+                group.start_soon(finish_pending)
+                try:
+                    yield
+                finally:
+                    group.cancel_scope.cancel()
+
+    app.router.lifespan_context = lifespan
     app.routes[:] = [
         r
         for r in app.routes

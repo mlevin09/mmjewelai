@@ -95,12 +95,12 @@ class NativeBackendAccess(VmAccess):
         private_file(self.config["ssh_key"], self.secrets.read("ssh"))
         private_file(self.config["authorization"], canonical(authorization))
 
-    def call(self, name, arguments):
+    def call(self, name, arguments, *, expected_lease=None):
         require(name in {"vm_status", "vm_start", "vm_stop"}, "native_lifecycle_only")
         if name != "vm_stop":
             with self.locked():
                 self._refresh()
-        return super().call(name, arguments)
+        return super().call(name, arguments, expected_lease=expected_lease)
 
     def _guest(self, operation, arguments):
         require(

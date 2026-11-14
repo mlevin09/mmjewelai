@@ -120,6 +120,7 @@ def test_strict_host_key_path_with_spaces_stays_one_path(access, monkeypatch):
     def run(args, **kwargs):
         option = next(s for s in args if s.startswith("UserKnownHostsFile="))
         assert shlex.split(option.split("=", 1)[1]) == [access.config["known_hosts"]]
+        assert kwargs["env"]["SHELL"] == "/bin/sh"
         assert "StrictHostKeyChecking=yes" in args
         assert args[-1] == "jewelai-research@jewelai-llm-lab"
         return SimpleNamespace(returncode=0, stdout=b'{"content":"ok"}')
@@ -145,6 +146,7 @@ def test_slow_stop_is_submitted_once_and_reconciled_without_new_rpc(access):
         return {"name": "owned-stop"}
 
     access.cloud.request_stop = stop
+    access.cloud.operation = lambda name: {"status": "RUNNING"}
     assert access.call("vm_stop", {}) == {"status": "STOPPING", "verified_stopped": False}
     assert not access.cloud.fenced
     assert access.call("vm_stop", {})["status"] == "STOPPING"
@@ -204,3 +206,49 @@ def test_status_recovers_recorded_start_without_duplicate_start(access):
     assert access.call("vm_status", {})["lease"]["phase"] == "OWNED"
     assert access.call("vm_status", {})["lease"]["phase"] == "OWNED"
     assert lab.starts == 1 and lab.stops == 0
+
+
+def test_completion_authorization_has_no_time_or_start_count_cutoff(access):
+    from native_llm_bench.storage import write
+
+    from jewelai_research.contracts import TARGET
+
+    write(
+        access.config["authorization"],
+        {
+            "approved": True,
+            "target": TARGET,
+            "shutdown_policy": "completion",
+            "operation_id": "R1",
+            "native_runner": True,
+        },
+        replace=True,
+    )
+    access.lease.begin({})
+    access.lease.record(access.lease.read()["lease_id"], "RELEASED")
+    access.lease.begin({})
+    assert not access.lease.cancelled()
+    access.config["guest_ready"] = True
+    access.cloud.inspect = lambda: {"scheduling": {"maxRunDuration": {"seconds": "420"}}}
+    with pytest.raises(InvalidArtifact, match="premature_shutdown"):
+        access.call("vm_start", {})
+
+
+def test_failed_stop_request_can_recover_only_same_owned_incarnation(access):
+    instance = owned(access)
+    access.cloud.inspect = lambda: {**instance, "status": "RUNNING"}
+    access.cloud.request_stop = lambda: (_ for _ in ()).throw(OSError("unavailable"))
+    with pytest.raises(OSError):
+        access.call("vm_stop", {})
+    assert access.lease.read()["phase"] == "STOP_INTENT"
+    access.cloud.request_stop = lambda: {"name": "recovered"}
+    assert access.call("vm_stop", {})["status"] == "STOPPING"
+    assert access.lease.read()["stop_operation"] == "recovered"
+
+
+def test_finish_stop_intent_cannot_race_into_new_lease(access):
+    instance = owned(access)
+    access.cloud.inspect = lambda: {**instance, "status": "RUNNING"}
+    access.cloud.request_stop = lambda: pytest.fail("must not stop replacement lease")
+    with pytest.raises(InvalidArtifact, match="finish_lease_changed"):
+        access.call("vm_stop", {}, expected_lease="previous-campaign")

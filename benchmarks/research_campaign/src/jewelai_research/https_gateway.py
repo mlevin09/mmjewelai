@@ -110,8 +110,13 @@ def create_app(
                 description={
                     "native_runner_catalog": "Read pinned samples and existing Runner controls.",
                     "native_runner_vm_status": "Read VM/owned-lease state without starting it.",
-                    "native_runner_start": "Start the pinned VM inside an Owner run window.",
+                    "native_runner_start": "Start the pinned VM under Owner authorization.",
                     "native_runner_stop": "Stop only the VM incarnation owned by this connection.",
+                    "native_runner_finish": (
+                        "Finish the whole research operation, save verified results/report, "
+                        "then stop. Never call after just one experiment. Active jobs block "
+                        "completion; failed/cancelled preserves recovery evidence."
+                    ),
                     "native_runner_submit": "Submit a bounded job to the existing Native Runner.",
                     "native_runner_status": "Read job status without restart or resubmission.",
                     "native_runner_result": "Read an immutable Runner export in bounded chunks.",
@@ -145,6 +150,7 @@ def create_app(
                                     "native_runner_submit",
                                     "native_runner_start",
                                     "native_runner_stop",
+                                    "native_runner_finish",
                                 }
                                 else []
                             ),

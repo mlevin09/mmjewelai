@@ -77,7 +77,8 @@ def _validate(data):
     )
     _root(data["job_id"])
     require(
-        type(data["deadline"]) is int and 0 < data["deadline"] - time.time() <= 900,
+        data["deadline"] is None
+        or (type(data["deadline"]) is int and 0 < data["deadline"] - time.time() <= 900),
         "native_job_deadline_invalid",
     )
     keys(data["paths"], ("runtime", "manifest"))
@@ -183,12 +184,45 @@ def status(job_id):
     require(request["job_id"] == job_id, "native_job_scope")
     if (root / "receipt.json").exists():
         return load(root / "receipt.json")
+    if request["deadline"] is None:
+        # Actual process identity, not elapsed campaign time. Never mistake a reused
+        # PID or a new VM boot for the original worker.
+        started = root / "started.json"
+        live = False
+        if started.exists():
+            worker = load(started)
+            live = (
+                bool(worker.get("process"))
+                and process_identity(worker.get("pid")) == worker["process"]
+            )
+        else:
+            # Submission may still be launching; an explicit recovery is required
+            # after a crash in this gap, never an automatic paid replay.
+            live = time.time() - (root / "request.json").stat().st_mtime < 30
+    else:
+        live = time.time() < request["deadline"]
     return {
         "job_id": job_id,
-        "status": "RUNNING" if time.time() < request["deadline"] else "UNKNOWN",
+        "status": "RUNNING" if live else "UNKNOWN",
         "plan_sha256": request["plan_sha256"],
         "runner_sha256": request["runner_sha256"],
     }
+
+
+def process_identity(pid):
+    if type(pid) is not int or pid <= 0:
+        return None
+    try:
+        # comm can contain spaces/parentheses; fields after the final ')' are stable.
+        fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+        if fields[0] == "Z":
+            return None
+        return {
+            "boot": Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+            "ticks": fields[19],
+        }
+    except (OSError, IndexError):
+        return None
 
 
 class DeadlineExpired(BaseException):
@@ -209,7 +243,14 @@ def run_job(job_id, *, transport=native_request):
         # Persist intent before any inference. Process restart cannot replay a paid job.
         if (root / "started.json").exists():
             return {"job_id": job_id, "status": "UNKNOWN"}
-        storage.write(root / "started.json", {"at": time.time()})
+        storage.write(
+            root / "started.json",
+            {
+                "at": time.time(),
+                "pid": os.getpid(),
+                "process": process_identity(os.getpid()),
+            },
+        )
         data = load(root / "request.json")
         receipt = {
             "job_id": job_id,
@@ -238,21 +279,25 @@ def run_job(job_id, *, transport=native_request):
 
             def bounded(cfg, payload):
                 nonlocal attempts
-                remaining = data["deadline"] - time.time()
-                require(remaining > 0, "native_job_deadline_reached")
+                remaining = None if data["deadline"] is None else data["deadline"] - time.time()
+                require(remaining is None or remaining > 0, "native_job_deadline_reached")
                 require(
                     attempts < sum(len(t) for t in plan["turn_order"].values()),
                     "native_attempt_ceiling",
                 )
                 attempts += 1
                 return transport(
-                    replace(cfg, timeout_seconds=min(cfg.timeout_seconds, remaining)), payload
+                    cfg
+                    if remaining is None
+                    else replace(cfg, timeout_seconds=min(cfg.timeout_seconds, remaining)),
+                    payload,
                 )
 
             previous = signal.signal(
                 signal.SIGALRM, lambda *_: (_ for _ in ()).throw(DeadlineExpired())
             )
-            signal.alarm(max(1, math.ceil(data["deadline"] - time.time())))
+            if data["deadline"] is not None:
+                signal.alarm(max(1, math.ceil(data["deadline"] - time.time())))
             try:
                 summary = execute(
                     corpus,

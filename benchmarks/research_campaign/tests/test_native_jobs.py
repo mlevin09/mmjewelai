@@ -386,3 +386,125 @@ def test_native_bundle_reuses_runner_and_excludes_campaign_algorithm(tmp_path):
             FIXTURES.parent / "src/native_llm_bench/runner.py"
         )
         assert not any(x in p for p in files for x in ("controller", "worker", "synthetic"))
+
+
+def completion(b):
+    storage.write(
+        b.path,
+        {
+            "approved": True,
+            "target": TARGET,
+            "shutdown_policy": "completion",
+            "operation_id": "R1-test",
+            "native_runner": True,
+        },
+        replace=True,
+    )
+    b.access.lease._save({"lease_id": "research-lease", "phase": "OWNED"})
+
+
+def test_completion_saves_results_before_stop_and_recovers_after_restart(bridge):
+    b = bridge
+    completion(b)
+    first = b.actions.call(b.principal, "native_runner_submit", b.args)
+    request = b.requests[-1][1]
+    assert request["deadline"] is None
+    with pytest.raises(InvalidArtifact, match="still_active"):
+        b.actions.call(
+            b.principal, "native_runner_finish", {"outcome": "completed", "report": "done"}
+        )
+    b.access.call.assert_not_called()
+    receipt = runner_guest.run_job(
+        first["job_id"], transport=SyntheticTransport(truncate_control=False)
+    )
+    assert receipt["status"] == "COMPLETED"
+    b.access.call.assert_not_called()  # A single experiment never finishes the campaign.
+    b.access.call.side_effect = None
+    b.access.call.return_value = {"verified_stopped": False, "status": "STOPPING"}
+    result = b.actions.call(
+        b.principal,
+        "native_runner_finish",
+        {"outcome": "completed", "report": "Private research report"},
+    )
+    assert not result["verified_stopped"]
+    export = b.actions.ledger.root / (first["job_id"] + ".export.json")
+    assert sha256_file(export) == receipt["export_sha256"]
+    with pytest.raises(InvalidArtifact, match="already_finished"):
+        b.actions.call(b.principal, "native_runner_submit", {**b.args, "idempotency_key": "after"})
+    restored = NativeRunnerActions(b.access, b.inputs, b.paths, guest_ready=True)
+    b.access.call.return_value = {"verified_stopped": True, "status": "RELEASED"}
+    assert restored.reconcile_finish()["verified_stopped"]
+    count = b.access.call.call_count
+    assert restored.reconcile_finish()["verified_stopped"]
+    assert b.access.call.call_count == count
+    b.access._guest = lambda *a: pytest.fail("stopped VM must not be required for archived reads")
+    assert (
+        restored.call(b.principal, "native_runner_status", {"job_id": first["job_id"]})["status"]
+        == "COMPLETED"
+    )
+    assert (
+        restored.call(
+            b.principal, "native_runner_result", {"job_id": first["job_id"], "offset": 0}
+        )["sha256"]
+        == receipt["export_sha256"]
+    )
+
+
+def test_completion_worker_liveness_not_elapsed_time_or_reused_pid(bridge, monkeypatch):
+    b = bridge
+    completion(b)
+    first = b.actions.call(b.principal, "native_runner_submit", b.args)
+    root = runner_guest._root(first["job_id"])
+    storage.write(root / "started.json", {"pid": 123, "process": {"boot": "boot", "ticks": "10"}})
+    monkeypatch.setattr(
+        runner_guest, "process_identity", lambda pid: {"boot": "boot", "ticks": "10"}
+    )
+    monkeypatch.setattr(runner_guest.time, "time", lambda: 99999999999)
+    assert runner_guest.status(first["job_id"])["status"] == "RUNNING"
+    monkeypatch.setattr(
+        runner_guest, "process_identity", lambda pid: {"boot": "new", "ticks": "10"}
+    )
+    assert runner_guest.status(first["job_id"])["status"] == "UNKNOWN"
+    b.access.call.side_effect = None
+    b.access.call.return_value = {"verified_stopped": True, "status": "RELEASED"}
+    assert b.actions.call(
+        b.principal,
+        "native_runner_finish",
+        {"outcome": "failed", "report": "Worker lost; retain guest files"},
+    )["verified_stopped"]
+
+
+def test_completion_other_subject_and_read_only_cannot_finish(bridge):
+    b = bridge
+    completion(b)
+    b.actions.call(b.principal, "native_runner_submit", b.args)
+    reader = SimpleNamespace(subject=b.principal.subject, scopes=[READ_SCOPE])
+    with pytest.raises(InvalidArtifact, match="execution_scope"):
+        b.actions.call(reader, "native_runner_finish", {"outcome": "failed", "report": "end"})
+    other = SimpleNamespace(subject="other", scopes=[READ_SCOPE, EXECUTE_SCOPE])
+    with pytest.raises(InvalidArtifact, match="native_job_not_found"):
+        b.actions.call(other, "native_runner_finish", {"outcome": "failed", "report": "end"})
+    b.access.call.assert_not_called()
+
+
+def test_completion_export_tamper_cannot_commit_finish_or_stop(bridge):
+    b = bridge
+    completion(b)
+    first = b.actions.call(b.principal, "native_runner_submit", b.args)
+    runner_guest.run_job(first["job_id"], transport=SyntheticTransport(truncate_control=False))
+    guest = b.access._guest
+
+    def tamper(op, args):
+        result = guest(op, args)
+        if op == "native_result":
+            result["data_base64"] = base64.b64encode(b"tampered").decode()
+        return result
+
+    b.access._guest = tamper
+    with pytest.raises(InvalidArtifact, match="native_export_integrity"):
+        b.actions.call(
+            b.principal, "native_runner_finish", {"outcome": "completed", "report": "end"}
+        )
+    b.access.call.assert_not_called()
+    with b.actions.ledger.transaction() as db:
+        assert not any(e["kind"] == "FINISH" for e in b.actions.ledger.read(db, "native-runner"))

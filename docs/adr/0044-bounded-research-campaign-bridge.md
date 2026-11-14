@@ -203,3 +203,40 @@ or Qwen quality. Endpoint/tunnel, OAuth/account access, independent supervision 
 Owner's budget activation remain external gates. See the package README for exact setup,
 tool contracts, limitations and targeted commands. No application, IAM, shared database,
 workflow, production deployment or professional Knowledge changes are included.
+
+## Owner-authorized completion lifecycle — 2026-11-14
+
+The installation-only 420-second cutoff and former 1200-second research ceiling
+must not terminate R1. For an explicit host-protected `shutdown_policy: completion`
+authorization, `operation_id` binds the operation; no clock expiry, start/job count
+or aggregate job deadline is substituted. Legacy bounded authorizations retain
+their existing checks. Authentication, the fixed CPU target, source/plan/model
+pins, exclusive ownership and no automatic replay after ambiguous dispatch remain.
+The existing Runner's per-request timeout is caller-selectable within its existing
+validation bounds; it is a failed-request protection, not a campaign shutdown.
+
+The Agent alone chooses experiments and declares the whole operation terminal via
+`native_runner_finish(outcome, report)`. Active jobs block finish. Verified exports,
+receipts and the report are saved privately on the existing control host before
+STOP intent. Failure/cancellation retains guest evidence on the existing disk.
+A small retry loop in the existing service reconciles only this explicit durable
+finish intent, including after service restart, and verifies TERMINATED. It never
+chooses an experiment or treats a single finished job as campaign completion.
+The stop call checks the recorded lease inside the VM lock so a stale finish intent
+cannot stop a replacement operation. Explicit emergency STOP remains available.
+Archived results remain readable with the original subject authorization after STOP.
+Unknown/lost workers require explicit recovery or failed/cancelled completion; they
+are not automatically retried. Process identity uses boot ID, PID and start ticks,
+not elapsed campaign time. This does not promise detection of every scientifically
+unproductive but live process; the Agent/operator retains responsibility for that.
+
+Alternative rejected: replacing qualification timers with another arbitrary campaign
+ceiling. Tradeoff: the Agent must explicitly finish/cancel the operation, or the
+Owner must emergency-stop it. Healthy operations remain available while awaiting
+the Agent, as explicitly authorized. OAuth credential expiry/refresh remains intact;
+credential lifetime does not trigger VM shutdown.
+
+Live qualification also exposed a service-user transport defect: OpenSSH used its
+`nologin` shell for ProxyCommand. Set `SHELL=/bin/sh` only on the fixed SSH child;
+do not change the service account's login shell, IAM or forced-command restrictions.
+No native Runner, model, corpus, scientific protocol or production code changes.
