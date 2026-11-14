@@ -13,8 +13,10 @@ install -d -o root -g root -m 755 /opt/jewelai-research-source
 install -d -o root -g root -m 755 /usr/local/libexec
 cp -a /tmp/native_llm_stage1 /opt/jewelai-research-source/
 cp -a /tmp/jewelai_research /opt/jewelai-research-source/
-chown -R root:root /opt/jewelai-research-source
-chmod -R a-w /opt/jewelai-research-source
+chown -R root:jewelai-research /opt/jewelai-research-source
+# cp -a can retain 0700 staging directories. Grant the dedicated research group
+# read/traverse only; keep source immutable and inaccessible to other accounts.
+chmod -R u=rX,g=rX,o= /opt/jewelai-research-source
 install -o root -g root -m 755 /tmp/jewelai-vm-access-guest.py /usr/local/libexec/jewelai-vm-access-guest.py
 install -d -o jewelai-research -g jewelai-research -m 700 /home/jewelai-research/work
 chown root:root /home/jewelai-research
