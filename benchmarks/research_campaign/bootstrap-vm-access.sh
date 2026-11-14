@@ -5,12 +5,14 @@ test "$(id -u)" = 0
 test -f /tmp/jewelai-vm-access-guest.py
 test -f /tmp/jewelai-research.pub
 test -d /tmp/native_llm_stage1/src/native_llm_bench
+test -d /tmp/jewelai_research
 id jewelai-research >/dev/null 2>&1 || useradd --create-home --shell /bin/bash jewelai-research
 passwd --lock jewelai-research >/dev/null
 test "$(id -Gn jewelai-research)" = jewelai-research
 install -d -o root -g root -m 755 /opt/jewelai-research-source
 install -d -o root -g root -m 755 /usr/local/libexec
 cp -a /tmp/native_llm_stage1 /opt/jewelai-research-source/
+cp -a /tmp/jewelai_research /opt/jewelai-research-source/
 chown -R root:root /opt/jewelai-research-source
 chmod -R a-w /opt/jewelai-research-source
 install -o root -g root -m 755 /tmp/jewelai-vm-access-guest.py /usr/local/libexec/jewelai-vm-access-guest.py

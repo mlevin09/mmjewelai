@@ -82,6 +82,43 @@ class BackendAccess(VmAccess):
         return super().call(name, arguments)
 
 
+class NativeBackendAccess(VmAccess):
+    """Existing keyless/SSH boundary for narrow Runner actions, without Tunnel access."""
+
+    def __init__(self, config, secrets):
+        super().__init__(config)
+        self.secrets = secrets
+
+    def _refresh(self):
+        authorization = json.loads(self.secrets.read("authorization"))
+        require(isinstance(authorization, dict), "invalid_activation")
+        private_file(self.config["ssh_key"], self.secrets.read("ssh"))
+        private_file(self.config["authorization"], canonical(authorization))
+
+    def call(self, name, arguments):
+        require(name in {"vm_status", "vm_start", "vm_stop"}, "native_lifecycle_only")
+        if name != "vm_stop":
+            with self.locked():
+                self._refresh()
+        return super().call(name, arguments)
+
+    def _guest(self, operation, arguments):
+        require(
+            operation in {"native_submit", "native_status", "native_result"},
+            "native_guest_operation_required",
+        )
+        # NativeRunnerActions already holds the existing exclusive VM lock.
+        self._refresh()
+        if operation == "native_submit":
+            from native_llm_bench.contracts import digest
+
+            require(
+                arguments.get("approval_sha256") == digest(self.lease.authorized()),
+                "native_approval_changed_before_dispatch",
+            )
+        return super()._guest(operation, arguments)
+
+
 def prepare(config, secrets):
     keys(config, ("gcloud", "client", "runtime", "state", "known_hosts", "tunnel_id"))
     require(

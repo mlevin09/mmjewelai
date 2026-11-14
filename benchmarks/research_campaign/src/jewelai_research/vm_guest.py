@@ -34,6 +34,12 @@ def limits():
 
 
 def handle(op, args):
+    if op in {"native_submit", "native_status", "native_result"}:
+        # Root-owned operator installation only. No caller-selected module or path.
+        sys.path[:0] = [str(SOURCE), str(SOURCE / "native_llm_stage1/src")]
+        from jewelai_research.runner_guest import handle as native_handle
+
+        return native_handle(op, args)
     if op == "write":
         p = checked(args["path"], writable=True)
         data = args["content"].encode()

@@ -22,10 +22,27 @@ PACKAGES = {
 }
 
 
-def build(output):
+def build(output, *, native_runner=False):
+    packages = dict(PACKAGES)
+    if native_runner:
+        root, names = packages["jewelai_research"]
+        packages["jewelai_research"] = (
+            root,
+            (
+                *names,
+                "native_jobs",
+                "runner_guest",
+                "vm_guest",
+                "ledger",
+                "https_auth",
+                "https_gateway",
+            ),
+        )
+        root, names = packages["native_llm_bench"]
+        packages["native_llm_bench"] = (root, (*names, "__main__", "cli", "corpus", "runner"))
     files = {
         package + "/" + name + ".py": (root / (name + ".py")).read_bytes()
-        for package, (root, names) in PACKAGES.items()
+        for package, (root, names) in packages.items()
         for name in names
     }
     manifest = {
@@ -47,4 +64,6 @@ def build(output):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output")
-    print(build(parser.parse_args().output))
+    parser.add_argument("--native-runner", action="store_true")
+    args = parser.parse_args()
+    print(build(args.output, native_runner=args.native_runner))

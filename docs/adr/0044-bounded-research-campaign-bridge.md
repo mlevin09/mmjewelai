@@ -3,6 +3,38 @@
 - Date: 2026-11-12
 - Status: Issue #176 implementation candidate; independent review and live activation pending.
 
+## Current Owner correction — existing Native Runner action, 2026-11-14
+
+PR #177 [coordinator 6874961749](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6874961749)
+supersedes the status-import blocker below: the Owner/coordinator records an actual
+Research Agent `get_instance_basic_info` success. Preserve that managed Compute
+connection; it does not expose guest execution. Workspace code execution is supported.
+
+The narrow optional `NativeRunnerActions` composition reuses the existing non-root
+SSH/ownership boundary and calls the unchanged `native_llm_bench.runner.execute` on
+the guest. The caller chooses hypotheses, eligible sessions and existing numeric
+Runner controls. No Controller/Worker, profiles or optimizer is instantiated. The
+authenticated MCP exposes catalog, VM status/start/stop, submit, job status and
+bounded immutable export reads; never generic shell/file-write tools. Status-only
+HTTPS mode remains the default. The opt-in source bundle excludes campaign logic.
+
+Execution requires a host-protected, unexpired Owner approval with spending amount,
+start/job/turn/time ceilings and a separately verified guest installation. The
+existing 1200-second Compute STOP safeguard, exclusive ownership and append-only
+journals remain in force. Dispatch ambiguity consumes its reservation, blocks new
+jobs and cannot automatically reissue inference. Guest execution verifies actual
+model/runtime file hashes, source/plan pins and a deadline. These ceilings bound
+execution; they are not guaranteed dollar billing caps.
+
+This is implemented/tested preparation, **not deployment or Agent-called acceptance**.
+The existing private control host has no externally reachable execution MCP endpoint;
+its paused Tunnel service is not reused. The optional HTTPS adapter still requires
+a real compatible resource-bound OAuth access-token issuer. Existing managed Google
+API authorization is not silently repurposed for custom guest execution. No new
+issuer, OAuth client, ingress, IAM or server is provisioned here. Qwen remains off;
+real installation/inference requires the current run authorization and a reachable,
+authenticated Agent execution connection. Local synthetic tests prove neither.
+
 ## Current Owner correction — HTTPS read-only connection, 2026-11-14
 
 The Owner confirmed Custom MCP/OAuth support in the existing Agent and selected
