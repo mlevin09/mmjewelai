@@ -55,10 +55,16 @@ Environment=PYTHONPATH=/opt/jewelai-research/runner
 Environment=JEWELAI_WORKSPACE_CONFIG=/etc/jewelai-research/workspace.json
 Environment=HOME=/var/lib/jewelai-research
 Environment=CLOUDSDK_CONFIG=/var/lib/jewelai-research/gcloud
+Environment=CLOUDSDK_CORE_DISABLE_FILE_LOGGING=true
+Environment=PYTHONDONTWRITEBYTECODE=1
 ExecStart=/opt/jewelai-research/runner/venv/bin/python -m jewelai_research.workspace_server
 Restart=on-failure
 RestartSec=5
 UMask=0077
+StateDirectory=jewelai-research
+StateDirectoryMode=0700
+RuntimeDirectory=jewelai-research
+RuntimeDirectoryMode=0700
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
