@@ -3,6 +3,31 @@
 - Date: 2026-11-12
 - Status: Issue #176 implementation candidate; independent review and live activation pending.
 
+## Authorized execution deployment — 2026-11-14
+
+The Owner explicitly authorizes finishing/deploying the minimum execution interface
+in PR #177. Reuse the existing Identity Platform account, not a new Google OAuth
+client or external IdP. The official MCP SDK implements OAuth authorization-code,
+S256 and token/revocation routes; the control host binds consent to the existing
+Owner UID after Google verifies a fresh Firebase ID token. Passwords go directly
+from browser to Identity Platform. Locally issued opaque, resource-bound tokens
+are stored only as hashes, rotate on refresh and grant only Runner scopes.
+
+The existing private control VM retains the journals and execution authority. A
+scale-to-zero HTTPS entrance has no GCP API roles, forwards only allowlisted paths
+over pinned TLS and identifies itself with a Google-issued, audience-bound workload
+ID token. One /26 subnet enables direct VPC ingress; only its tagged entrance can
+reach the control TLS listener. No new VM, external IP, load balancer, database,
+Google OAuth client or application change. Product/production identities are not
+reused. This replaces the earlier dependency on an unavailable external issuer;
+the historical RS-only mode remains unchanged.
+
+Public client `jewelai-research-agent` is preregistered only for ChatGPT's exact
+stable callback, with PKCE and explicit Owner consent; there is no DCR or arbitrary
+redirect registration. Identity issuance does not authorize paid compute: protected
+run approval and guest verification remain mandatory. No real job is claimed until
+the actual Agent connects and an explicitly authorized live run succeeds.
+
 ## Current Owner correction — existing Native Runner action, 2026-11-14
 
 PR #177 [coordinator 6874961749](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6874961749)

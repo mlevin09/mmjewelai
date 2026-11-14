@@ -36,6 +36,8 @@ def build(output, *, native_runner=False):
                 "ledger",
                 "https_auth",
                 "https_gateway",
+                "workspace_auth",
+                "workspace_server",
             ),
         )
         root, names = packages["native_llm_bench"]

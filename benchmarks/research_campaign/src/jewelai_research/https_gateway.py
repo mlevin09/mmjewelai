@@ -11,7 +11,8 @@ from urllib.parse import urlsplit
 
 import anyio
 from mcp import types
-from mcp.server.auth.settings import AuthSettings
+from mcp.server.auth.provider import ProviderTokenVerifier
+from mcp.server.auth.settings import AuthSettings, ClientRegistrationOptions, RevocationOptions
 from mcp.server.lowlevel import Server
 from mcp.server.transport_security import TransportSecuritySettings
 from pydantic import AnyHttpUrl
@@ -79,8 +80,14 @@ class ComputeStatus:
             raise StatusUnavailable("vm_status_unavailable") from None
 
 
-def create_app(config: OAuthConfig, *, fetch=None, status_reader=None, native_actions=None):
-    verifier = OAuthTokenVerifier(config, **({"fetch": fetch} if fetch else {}))
+def create_app(
+    config: OAuthConfig, *, fetch=None, status_reader=None, native_actions=None, auth_provider=None
+):
+    verifier = (
+        ProviderTokenVerifier(auth_provider)
+        if auth_provider
+        else OAuthTokenVerifier(config, **({"fetch": fetch} if fetch else {}))
+    )
     status_reader = status_reader or ComputeStatus()
     schema = {"type": "object", "properties": {}, "additionalProperties": False}
     tool = types.Tool(
@@ -203,8 +210,15 @@ def create_app(config: OAuthConfig, *, fetch=None, status_reader=None, native_ac
             resource_server_url=config.resource_url,
             required_scopes=[required_scope],
             validate_token_resource=True,
+            client_registration_options=(
+                ClientRegistrationOptions(enabled=False, valid_scopes=[READ_SCOPE, EXECUTE_SCOPE])
+                if auth_provider
+                else None
+            ),
+            revocation_options=RevocationOptions(enabled=True) if auth_provider else None,
         ),
         token_verifier=verifier,
+        auth_server_provider=auth_provider,
         transport_security=TransportSecuritySettings(
             allowed_hosts=[host, host + ":443"], allowed_origins=["https://" + host]
         ),
@@ -212,7 +226,9 @@ def create_app(config: OAuthConfig, *, fetch=None, status_reader=None, native_ac
     if native_actions is not None:
         from mcp.server.auth.routes import create_protected_resource_routes
 
-        app.routes[:] = [r for r in app.routes if not r.path.startswith("/.well-known/")]
+        app.routes[:] = [
+            r for r in app.routes if not r.path.startswith("/.well-known/oauth-protected-resource")
+        ]
         app.routes.extend(
             create_protected_resource_routes(
                 resource_url=AnyHttpUrl(config.resource_url),
