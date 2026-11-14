@@ -1,5 +1,9 @@
 # Historical backend activation package — superseded 2026-11-13
 
+Current direction: [HTTPS read-only MCP](../https/README.md), without Tunnel or
+GitHub/Actions workaround. This historical control-host package is not the new
+gateway deployment procedure. Its existing runtime/state are preserved.
+
 **Do not activate/configure an OpenAI Tunnel or request its keys/ID.** Owner replaced this
 direction in PR #177 [comment 6851806625](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6851806625)
 and [comment 6852026177](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6852026177).

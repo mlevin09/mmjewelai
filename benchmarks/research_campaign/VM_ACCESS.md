@@ -1,4 +1,12 @@
-# Research Agent access — current Owner correction, 2026-11-13
+# Research Agent access — current Owner correction, 2026-11-14
+
+The Owner now selects **HTTPS MCP + OAuth**, initially only read-only `vm_status`.
+See [implementation, configuration and actual readiness](https/README.md).
+The GitHub/Actions alternative below is superseded and must not be activated.
+The new path has no Tunnel dependency. Live deployment and Agent connection remain
+blocked on a compatible real OAuth issuer/client configuration, not Agent UI access.
+
+## Historical correction — 2026-11-13
 
 **No OpenAI Tunnel, no Mac runtime, no manually transferred keys.** Owner superseded the
 earlier tunnel architecture in [comment 6851806625](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6851806625)

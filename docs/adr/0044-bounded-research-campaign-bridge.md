@@ -3,7 +3,37 @@
 - Date: 2026-11-12
 - Status: Issue #176 implementation candidate; independent review and live activation pending.
 
-## Current Owner correction — 2026-11-13
+## Current Owner correction — HTTPS read-only connection, 2026-11-14
+
+The Owner confirmed Custom MCP/OAuth support in the existing Agent and selected
+HTTPS Streamable HTTP. This supersedes the unimplemented GitHub/Actions alternative
+below. The first public slice is only `vm_status`, using official Python MCP SDK
+2.3.0 and a separately configured real authorization server. It does not instantiate
+the seven-tool `BackendAccess` or read its obsolete Tunnel secret. Existing SSH,
+Owner activation, lease and audit behavior are unchanged; no VM starts are added.
+
+The resource server checks signed MCP-audience access tokens, exact issuer, expiry,
+client, approved subject and scope before lazy read-only ADC/Compute access. Real
+authorization-code/S256 discovery is required at startup. Client registration,
+consent and callbacks remain the real issuer's responsibility; no synthetic issuer,
+Google ID-token substitution or self-built authorization platform is deployed.
+Public metadata and an offline test issuer do not prove live OAuth/Agent access.
+
+The existing product Identity Platform discovery lacks the OAuth authorization/token
+and PKCE capability needed for this connection. A compatible registered issuer/client
+configuration is the explicit outstanding dependency. No new cloud deployment or
+paid resource is created while it is absent. The prepared non-root gateway image
+can use separate scale-to-zero Cloud Run with a dedicated instance-GET-only identity;
+neither the existing control identity nor any application deployer is suitable.
+
+Dependencies are isolated in the research package's `https` extra: the maintained
+official SDK replaces handwritten protocol/auth plumbing for this path; google-auth
+provides keyless ADC, PyJWT/cryptography verify public issuer signatures, and Uvicorn
+serves ASGI. They are not application dependencies. See
+`benchmarks/research_campaign/https/README.md` for exact configuration, hosting
+constraints, tests and the remaining live acceptance gate.
+
+## Historical Owner correction — 2026-11-13
 
 Owner rejects all OpenAI Tunnel variants, personal-computer runtime and manual Platform
 key handoff. PR #177 comments [6851806625](https://github.com/mlevin09/mmjewelai/pull/177#issuecomment-6851806625)

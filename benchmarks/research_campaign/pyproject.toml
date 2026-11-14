@@ -11,9 +11,19 @@ dependencies = ["jewelai-native-llm-bench==1.0.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+# ADR 0044: isolated official-SDK resource server, not an application dependency.
+https = [
+    "mcp==2.3.0",
+    "google-auth[requests]==2.58.0",
+    "PyJWT[crypto]==2.15.1",
+    "cryptography==48.0.1",
+    "certifi==2026.10.23",
+    "uvicorn==0.38.0",
+]
 
 [project.scripts]
 jewelai-research = "jewelai_research.cli:main"
+jewelai-research-https = "jewelai_research.https_gateway:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jewelai_research"]
