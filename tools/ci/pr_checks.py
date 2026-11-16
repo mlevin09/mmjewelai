@@ -18,6 +18,7 @@ from qualification import validate_qualification
 class SelectedTestsFailed(ValueError):
     """Observed test failures, distinct from missing/invalid execution evidence."""
 
+
 # Guardrail, not a test exemption: oversized scopes are BLOCKED for routing review.
 # Full qualification remains a separate explicitly authorized workflow.
 MAX_AUTOMATIC_PR_CASES = 800
