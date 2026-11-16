@@ -79,3 +79,16 @@ selected cases=0. PostgreSQL этим прогоном не квалифицир
 blocked=[], full_required=true, 72 API targets. Existing selector: 42 PASS (34.23s);
 новая проверка archive/builder PASS (3.46s). Full Regression не запускался. Hosted CI должен
 подтвердить новый точный HEAD; старый source commit не выдаётся за новый PASS.
+
+## Исправление import path native wrapper
+
+На `530eaa1269c7a8d0fa0c59cfeeae0cddfe80640d` прошли проверка disposable PostgreSQL,
+фактическая миграция и Alembic safety checks. Затем collection, не тесты, остановился:
+entrypoint native script не включал корень checkout, `tests.current_roles` не импортировался.
+Локальный bounded RED: ModuleNotFoundError, wrapper exitcode=2, collected=0 для
+`test_parsed_enrichment.py`. API/domain conftest добавляет только фиксированный корень checkout
+в test import path; production/алгоритмы CI не меняются. GREEN того же wrapper: 72 API cases
+collected (27.27s), 76 test_roles cases collected (4.06s). Это COLLECTION receipts, не PASS выполнения.
+
+Выполнение неизменённого native wrapper: EN/RU HTTP lifecycle + no-role-file-fallback:
+**3 PASS**, exitcode=0, 32.49s. Выполнялись только три кейса, не полный API.

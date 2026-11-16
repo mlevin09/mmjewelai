@@ -78,3 +78,18 @@ gates are changed. Local selection preflight: blocked=[], full_required=true, 72
 Existing CI selector tests: 42 PASS (34.23s); new archive/builder proof: PASS (3.46s).
 Full Regression is not dispatched. Fresh hosted CI remains an exact-new-HEAD gate, not an
 inferred PASS from the previous source commit.
+
+## Native wrapper import-path correction
+
+On exact HEAD `530eaa1269c7a8d0fa0c59cfeeae0cddfe80640d`, disposable PostgreSQL identity,
+actual migration execution and Alembic safety checks passed. Runtime collection then failed,
+not tests: the native script entrypoint lacked checkout root, making `tests.current_roles`
+unimportable. Local bounded RED reproduced `ModuleNotFoundError` and wrapper exitcode=2,
+collected=0 on `test_parsed_enrichment.py`. API/domain test conftest now adds only the fixed
+checkout root to test import paths. No production or CI algorithm change.
+
+GREEN with the unchanged native wrapper: that API module collects 72 cases (27.27s),
+`test_roles.py` collects 76 (4.06s). These are COLLECTION receipts, not execution PASS.
+
+Unchanged native wrapper execution: EN/RU HTTP lifecycle + no-role-file-fallback: **3 PASS**,
+exitcode=0, 32.49s. Only these three cases ran; no full API execution.

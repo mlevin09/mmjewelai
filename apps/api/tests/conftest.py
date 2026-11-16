@@ -1,3 +1,4 @@
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,6 +19,10 @@ from jewelai_api.generation import GenerationProfile, GenerationProfileRegistry
 from jewelai_api.settings import RuntimeSettings
 
 ROOT = Path(__file__).resolve().parents[3]
+# The native CI wrapper executes from tools/ci, unlike python -m pytest.
+# Make only this checkout's shared test package importable; no runtime fallback.
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 NOW = datetime(2026, 9, 24, 12, 0, tzinfo=UTC)
 
 
