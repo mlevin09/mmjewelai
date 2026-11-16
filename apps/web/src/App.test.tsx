@@ -197,7 +197,9 @@ describe("current Studio role selection", () => {
       screen.getByRole("option", { name: "CAD-дизайнер" }),
     ).toBeInTheDocument();
     await userEvent.selectOptions(select, "RR-C10");
-    await userEvent.click(screen.getByRole("button", { name: "Start session" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Start session" }),
+    );
     await waitFor(() =>
       expect(submitted).toEqual({ role_id: "RR-C10", locale: "ru" }),
     );
