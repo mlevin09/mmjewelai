@@ -108,8 +108,15 @@ describe("current Studio role selection", () => {
   it("shows nine backend roles with their names and submits the canonical role ID", async () => {
     oidc.currentUser = { access_token: "access-token" };
     const roleIds = [
-      "RR-C25", "RR-C18", "RR-C09", "RR-C10", "RR-C11",
-      "RR-C12", "RR-C06", "RR-C17", "RR-C23",
+      "RR-C25",
+      "RR-C18",
+      "RR-C09",
+      "RR-C10",
+      "RR-C11",
+      "RR-C12",
+      "RR-C06",
+      "RR-C17",
+      "RR-C23",
     ];
     const roles = roleIds.map((role_id, index) => ({
       role_id,
@@ -129,7 +136,11 @@ describe("current Studio role selection", () => {
           principal_id: "actor",
           display_name: "Tester",
           memberships: [
-            { organization_id: "organization-one", organization_name: "JewelAI", role: "owner" },
+            {
+              organization_id: "organization-one",
+              organization_name: "JewelAI",
+              role: "owner",
+            },
           ],
         }),
       ),
@@ -144,22 +155,33 @@ describe("current Studio role selection", () => {
       http.get("http://localhost:8000/projects/project-one/sessions", () =>
         HttpResponse.json({ sessions: [] }),
       ),
-      http.post("http://localhost:8000/projects/project-one/sessions", async ({ request }) => {
-        submitted = (await request.json()) as { role_id: string; locale: string };
-        return HttpResponse.json({
-          session_id: "new-session",
-          project_id: "project-one",
-          ...submitted,
-        }, { status: 201 });
-      }),
+      http.post(
+        "http://localhost:8000/projects/project-one/sessions",
+        async ({ request }) => {
+          submitted = (await request.json()) as {
+            role_id: string;
+            locale: string;
+          };
+          return HttpResponse.json(
+            {
+              session_id: "new-session",
+              project_id: "project-one",
+              ...submitted,
+            },
+            { status: 201 },
+          );
+        },
+      ),
     );
     renderApp("/organizations/organization-one/projects/project-one");
 
-    const select = (await screen.findByRole("combobox", {
+    const select = await screen.findByRole("combobox", {
       name: "Conversation role",
-    })) as HTMLSelectElement;
+    });
     await waitFor(() => expect(select).toHaveValue("RR-C25"));
-    expect(Array.from(select.options, (option) => option.value)).toEqual(roleIds);
+    expect(
+      Array.from(select.querySelectorAll("option"), (option) => option.value),
+    ).toEqual(roleIds);
     expect(
       screen.getByRole("option", { name: "Частный покупатель (RR-C25)" }),
     ).toBeInTheDocument();
@@ -168,7 +190,8 @@ describe("current Studio role selection", () => {
     ).toBeInTheDocument();
 
     await userEvent.selectOptions(
-      screen.getByRole("combobox", { name: "Language" }), "ru",
+      screen.getByRole("combobox", { name: "Language" }),
+      "ru",
     );
     expect(
       screen.getByRole("option", { name: "CAD-дизайнер (RR-C10)" }),
@@ -205,7 +228,14 @@ describe("design session deletion", () => {
       ),
       http.get("http://localhost:8000/ui/catalog", () =>
         HttpResponse.json({
-          roles: [{ role_id: "RR-C25", name_ru: "Частный покупатель", name_en: null, revision: 1 }],
+          roles: [
+            {
+              role_id: "RR-C25",
+              name_ru: "Частный покупатель",
+              name_en: null,
+              revision: 1,
+            },
+          ],
           locales: ["en", "ru"],
         }),
       ),
@@ -688,7 +718,14 @@ describe("text intake", () => {
       http.get("http://localhost:8000/ui/catalog", () =>
         HttpResponse.json({
           roles_artifact_version: "1.0.0",
-          roles: [{ role_id: "RR-C25", name_ru: "Частный покупатель", name_en: null, revision: 1 }],
+          roles: [
+            {
+              role_id: "RR-C25",
+              name_ru: "Частный покупатель",
+              name_en: null,
+              revision: 1,
+            },
+          ],
           locales: ["en", "ru"],
           generation_profiles: [],
         }),
