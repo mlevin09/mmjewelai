@@ -611,7 +611,7 @@ function ProjectSessions() {
           >
             {catalog.data?.roles.map((item) => (
               <option key={item.role_id} value={item.role_id}>
-                {roleLabel(item.role_id, catalog.data.roles, locale)} ({item.role_id})
+                {roleLabel(item.role_id, catalog.data?.roles, locale)} ({item.role_id})
               </option>
             ))}
           </select>
