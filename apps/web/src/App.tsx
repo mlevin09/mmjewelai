@@ -496,6 +496,9 @@ function ProjectSessions() {
     }
     if (!locale && catalog.data?.locales[0]) setLocale(catalog.data.locales[0]);
   }, [catalog.data, locale, role]);
+  const deletingRoleName = deleting
+    ? roleLabel(deleting.role_id, catalog.data?.roles, deleting.locale)
+    : null;
   const create = useMutation({
     mutationFn: () =>
       api.request<Session>(`/projects/${projectId}/sessions`, {
@@ -523,7 +526,9 @@ function ProjectSessions() {
               to={`/organizations/${organizationId}/sessions/${session.session_id}`}
             >
               <span className="badge">{session.locale}</span>
-              <h2>{roleLabel(session.role_id, catalog.data?.roles, session.locale)}</h2>
+              <h2>
+                {roleLabel(session.role_id, catalog.data?.roles, session.locale)}
+              </h2>
               <span>Revision workspace →</span>
             </Link>
             {canDelete && (
@@ -567,9 +572,7 @@ function ProjectSessions() {
         >
           <h2 id="delete-session-title">Delete this design session?</h2>
           <p>
-            {roleLabel(deleting.role_id, catalog.data?.roles, deleting.locale)} ·{" "}
-            {deleting.locale} ·{" "}
-            {deleting.session_id}
+            {deletingRoleName} · {deleting.locale} · {deleting.session_id}
           </p>
           <p>
             The session will no longer be accessible. Its history and images are
@@ -611,7 +614,7 @@ function ProjectSessions() {
           >
             {catalog.data?.roles.map((item) => (
               <option key={item.role_id} value={item.role_id}>
-                {roleLabel(item.role_id, catalog.data?.roles, locale)} ({item.role_id})
+                {roleLabel(item.role_id, catalog.data?.roles, locale)}
               </option>
             ))}
           </select>
@@ -972,7 +975,11 @@ function VisualizationWorkspace() {
       <div className="workspace-heading">
         <div>
           <p className="eyebrow">
-            {roleLabel(session.data.role_id, catalog.data?.roles, session.data.locale)}
+            {roleLabel(
+              session.data.role_id,
+              catalog.data?.roles,
+              session.data.locale,
+            )}
           </p>
           <h1>Design revision {revision.data.revision}</h1>
         </div>
