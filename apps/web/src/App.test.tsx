@@ -105,7 +105,7 @@ describe("authentication shell", () => {
 });
 
 describe("current Studio role selection", () => {
-  it("shows nine backend role names and submits the canonical role ID", async () => {
+  it("shows nine role names and submits the canonical ID", async () => {
     oidc.currentUser = { access_token: "access-token" };
     const roleIds = [
       "RR-C25",
