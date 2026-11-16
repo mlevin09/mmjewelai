@@ -1,0 +1,10 @@
+{
+  "artifact_version": "1.0.0",
+  "contract_version": "1.1.0",
+  "object": "gs://mmjewellai-preprod-tfstate/knowledge-releases/preprod/dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57/6f6d9b114efbdb923795f4f10776dc2a89b00e293d551a6e0c07a020e3395e6a.zip",
+  "object_generation": "1794851467699526",
+  "object_sha256": "6f6d9b114efbdb923795f4f10776dc2a89b00e293d551a6e0c07a020e3395e6a",
+  "package_id": "jewelai.preprod.recovered_core",
+  "runtime_sha256": "dca0d4ae27155552745072a818f37a741be5983711ffbab834e198357133de57",
+  "validation_report_sha256": "c3260a3e86dba45f796fb6db1004fc07384fe9e20310623cbba519fff52da12c"
+}
