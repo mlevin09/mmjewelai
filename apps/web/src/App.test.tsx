@@ -104,6 +104,108 @@ describe("authentication shell", () => {
   });
 });
 
+describe("current Studio role selection", () => {
+  it("shows nine role names and submits the canonical ID", async () => {
+    oidc.currentUser = { access_token: "access-token" };
+    const roleIds = [
+      "RR-C25",
+      "RR-C18",
+      "RR-C09",
+      "RR-C10",
+      "RR-C11",
+      "RR-C12",
+      "RR-C06",
+      "RR-C17",
+      "RR-C23",
+    ];
+    const roles = roleIds.map((role_id, index) => ({
+      role_id,
+      name_ru:
+        role_id === "RR-C25"
+          ? "Частный покупатель"
+          : role_id === "RR-C10"
+            ? "CAD-дизайнер"
+            : `Тестовая роль ${index + 1}`,
+      name_en: role_id === "RR-C10" ? "CAD designer" : null,
+      revision: 1,
+    }));
+    let submitted: { role_id: string; locale: string } | null = null;
+    server.use(
+      http.get("http://localhost:8000/me", () =>
+        HttpResponse.json({
+          principal_id: "actor",
+          display_name: "Tester",
+          memberships: [
+            {
+              organization_id: "organization-one",
+              organization_name: "JewelAI",
+              role: "owner",
+            },
+          ],
+        }),
+      ),
+      http.get("http://localhost:8000/ui/catalog", () =>
+        HttpResponse.json({
+          roles_artifact_version: "1.0.0",
+          roles,
+          locales: ["en", "ru"],
+          generation_profiles: [],
+        }),
+      ),
+      http.get("http://localhost:8000/projects/project-one/sessions", () =>
+        HttpResponse.json({ sessions: [] }),
+      ),
+      http.post(
+        "http://localhost:8000/projects/project-one/sessions",
+        async ({ request }) => {
+          submitted = (await request.json()) as {
+            role_id: string;
+            locale: string;
+          };
+          return HttpResponse.json(
+            {
+              session_id: "new-session",
+              project_id: "project-one",
+              ...submitted,
+            },
+            { status: 201 },
+          );
+        },
+      ),
+    );
+    renderApp("/organizations/organization-one/projects/project-one");
+
+    const select = await screen.findByRole("combobox", {
+      name: "Conversation role",
+    });
+    await waitFor(() => expect(select).toHaveValue("RR-C25"));
+    expect(
+      Array.from(select.querySelectorAll("option"), (option) => option.value),
+    ).toEqual(roleIds);
+    expect(
+      screen.getByRole("option", { name: "Частный покупатель" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "CAD designer" }),
+    ).toBeInTheDocument();
+
+    await userEvent.selectOptions(
+      screen.getByRole("combobox", { name: "Language" }),
+      "ru",
+    );
+    expect(
+      screen.getByRole("option", { name: "CAD-дизайнер" }),
+    ).toBeInTheDocument();
+    await userEvent.selectOptions(select, "RR-C10");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Start session" }),
+    );
+    await waitFor(() =>
+      expect(submitted).toEqual({ role_id: "RR-C10", locale: "ru" }),
+    );
+  });
+});
+
 describe("design session deletion", () => {
   beforeEach(cleanup);
   afterEach(cleanup);
@@ -128,7 +230,14 @@ describe("design session deletion", () => {
       ),
       http.get("http://localhost:8000/ui/catalog", () =>
         HttpResponse.json({
-          roles: [{ role_id: "retail_client" }],
+          roles: [
+            {
+              role_id: "RR-C25",
+              name_ru: "Частный покупатель",
+              name_en: null,
+              revision: 1,
+            },
+          ],
           locales: ["en", "ru"],
         }),
       ),
@@ -138,7 +247,7 @@ describe("design session deletion", () => {
             session_id,
             project_id: "project-one",
             locale: "en",
-            role_id: "retail_client",
+            role_id: "RR-C25",
           })),
         }),
       ),
@@ -611,7 +720,14 @@ describe("text intake", () => {
       http.get("http://localhost:8000/ui/catalog", () =>
         HttpResponse.json({
           roles_artifact_version: "1.0.0",
-          roles: [{ role_id: "retail_client" }],
+          roles: [
+            {
+              role_id: "RR-C25",
+              name_ru: "Частный покупатель",
+              name_en: null,
+              revision: 1,
+            },
+          ],
           locales: ["en", "ru"],
           generation_profiles: [],
         }),
@@ -620,7 +736,7 @@ describe("text intake", () => {
         HttpResponse.json({
           session_id: "session-one",
           project_id: "project-one",
-          role_id: "retail_client",
+          role_id: "RR-C25",
           locale: "en",
           created_at: "2026-09-29T00:00:00Z",
           updated_at: "2026-09-29T00:00:00Z",

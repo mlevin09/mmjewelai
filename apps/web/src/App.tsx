@@ -491,9 +491,17 @@ function ProjectSessions() {
   const [role, setRole] = useState("");
   const [locale, setLocale] = useState("");
   useEffect(() => {
-    if (!role && catalog.data?.roles[0]) setRole(catalog.data.roles[0].role_id);
+    if (
+      catalog.data &&
+      !catalog.data.roles.some((item) => item.role_id === role)
+    ) {
+      setRole(catalog.data.roles[0]?.role_id ?? "");
+    }
     if (!locale && catalog.data?.locales[0]) setLocale(catalog.data.locales[0]);
   }, [catalog.data, locale, role]);
+  const deletingRoleName = deleting
+    ? roleLabel(deleting.role_id, catalog.data?.roles, deleting.locale)
+    : null;
   const create = useMutation({
     mutationFn: () =>
       api.request<Session>(`/projects/${projectId}/sessions`, {
@@ -521,7 +529,13 @@ function ProjectSessions() {
               to={`/organizations/${organizationId}/sessions/${session.session_id}`}
             >
               <span className="badge">{session.locale}</span>
-              <h2>{humanize(session.role_id)}</h2>
+              <h2>
+                {roleLabel(
+                  session.role_id,
+                  catalog.data?.roles,
+                  session.locale,
+                )}
+              </h2>
               <span>Revision workspace →</span>
             </Link>
             {canDelete && (
@@ -565,8 +579,7 @@ function ProjectSessions() {
         >
           <h2 id="delete-session-title">Delete this design session?</h2>
           <p>
-            {humanize(deleting.role_id)} · {deleting.locale} ·{" "}
-            {deleting.session_id}
+            {deletingRoleName} · {deleting.locale} · {deleting.session_id}
           </p>
           <p>
             The session will no longer be accessible. Its history and images are
@@ -608,7 +621,7 @@ function ProjectSessions() {
           >
             {catalog.data?.roles.map((item) => (
               <option key={item.role_id} value={item.role_id}>
-                {humanize(item.role_id)}
+                {roleLabel(item.role_id, catalog.data?.roles, locale)}
               </option>
             ))}
           </select>
@@ -626,7 +639,14 @@ function ProjectSessions() {
             ))}
           </select>
         </label>
-        <button disabled={!role || !locale || create.isPending} type="submit">
+        <button
+          disabled={
+            !catalog.data?.roles.some((item) => item.role_id === role) ||
+            !locale ||
+            create.isPending
+          }
+          type="submit"
+        >
           {create.isPending ? "Starting session…" : "Start session"}
         </button>
         {create.isError && (
@@ -961,7 +981,13 @@ function VisualizationWorkspace() {
       <Breadcrumbs organizationId={organizationId} />
       <div className="workspace-heading">
         <div>
-          <p className="eyebrow">{humanize(session.data.role_id)}</p>
+          <p className="eyebrow">
+            {roleLabel(
+              session.data.role_id,
+              catalog.data?.roles,
+              session.data.locale,
+            )}
+          </p>
           <h1>Design revision {revision.data.revision}</h1>
         </div>
         <span className="badge">{session.data.locale.toUpperCase()}</span>
@@ -1482,6 +1508,18 @@ function Breadcrumbs({ organizationId }: { organizationId: string }) {
 function submitName(event: FormEvent, submit: () => void): void {
   event.preventDefault();
   submit();
+}
+
+function roleLabel(
+  roleId: string,
+  roles: UiCatalog["roles"] | undefined,
+  locale: string,
+): string {
+  const role = roles?.find((item) => item.role_id === roleId);
+  if (!role) return roleId;
+  const primary = locale === "ru" ? role.name_ru : role.name_en;
+  const secondary = locale === "ru" ? role.name_en : role.name_ru;
+  return primary?.trim() || secondary?.trim() || roleId;
 }
 
 function humanize(value: string): string {

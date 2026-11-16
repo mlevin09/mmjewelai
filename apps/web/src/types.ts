@@ -157,7 +157,12 @@ export interface DictionaryOption {
 
 export interface UiCatalog {
   roles_artifact_version: string;
-  roles: Array<{ role_id: string }>;
+  roles: Array<{
+    role_id: string;
+    name_ru: string;
+    name_en: string | null;
+    revision: number;
+  }>;
   locales: Array<"en" | "ru">;
   generation_profiles: Array<{
     profile_id: string;
