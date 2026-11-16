@@ -42,12 +42,12 @@ def upgrade():
     )
     import json
     from datetime import UTC, datetime
-    from pathlib import Path
+    from importlib.resources import files
 
     from jewelai_persistence.models import RoleRow
 
     records = json.loads(
-        (Path(__file__).parents[2] / "src/jewelai_persistence/role_seed.json").read_text()
+        files("jewelai_persistence").joinpath("role_seed.json").read_text(encoding="utf-8")
     )
     op.create_check_constraint(
         "ck_roles_id",
