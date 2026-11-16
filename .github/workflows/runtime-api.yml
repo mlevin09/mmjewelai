@@ -160,7 +160,8 @@ jobs:
         if: always()
         run: |
           if test -f "${RUNNER_TEMP}/pr-results/summary.md"; then
-            cat "${RUNNER_TEMP}/pr-results/summary.md" >> "${GITHUB_STEP_SUMMARY}"
+            # The summary is already bounded and redacted; expose case IDs on FAIL.
+            cat "${RUNNER_TEMP}/pr-results/summary.md" | tee -a "${GITHUB_STEP_SUMMARY}"
           fi
       - name: Retain bounded selected coverage and failures
         if: always()
