@@ -491,7 +491,10 @@ function ProjectSessions() {
   const [role, setRole] = useState("");
   const [locale, setLocale] = useState("");
   useEffect(() => {
-    if (catalog.data && !catalog.data.roles.some((item) => item.role_id === role)) {
+    if (
+      catalog.data &&
+      !catalog.data.roles.some((item) => item.role_id === role)
+    ) {
       setRole(catalog.data.roles[0]?.role_id ?? "");
     }
     if (!locale && catalog.data?.locales[0]) setLocale(catalog.data.locales[0]);
@@ -527,7 +530,11 @@ function ProjectSessions() {
             >
               <span className="badge">{session.locale}</span>
               <h2>
-                {roleLabel(session.role_id, catalog.data?.roles, session.locale)}
+                {roleLabel(
+                  session.role_id,
+                  catalog.data?.roles,
+                  session.locale,
+                )}
               </h2>
               <span>Revision workspace →</span>
             </Link>
