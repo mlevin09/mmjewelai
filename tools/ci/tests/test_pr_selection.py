@@ -401,4 +401,6 @@ def test_automatic_risk_budget_rejects_oversized_selection_before_execution():
     with pytest.raises(ValueError, match="automatic_pr_risk_budget_exceeded"):
         pr_checks.enforce_automatic_case_budget({"api": [str(i) for i in range(801)]}, None)
     pr_checks.enforce_automatic_case_budget({"api": [str(i) for i in range(800)]}, None)
-    pr_checks.enforce_automatic_case_budget({"api": [str(i) for i in range(801)]}, {"verified": True})
+    pr_checks.enforce_automatic_case_budget(
+        {"api": [str(i) for i in range(801)]}, {"verified": True}
+    )
