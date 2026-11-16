@@ -93,3 +93,31 @@ GREEN with the unchanged native wrapper: that API module collects 72 cases (27.2
 
 Unchanged native wrapper execution: EN/RU HTTP lifecycle + no-role-file-fallback: **3 PASS**,
 exitcode=0, 32.49s. Only these three cases ran; no full API execution.
+
+
+## Selected CI execution and migration-fixture correction
+
+Exact HEAD `5229cd35f9f7a423bd12fc9deb87ff39a5cc4c9b`: Domain, Web and
+Infrastructure passed. Runtime API #43868459903 **FAILED**: 661 PASS, 9 FAIL,
+1 interrupted case, 1,385 unexecuted/incomplete out of 2,055 selected API cases;
+execution hit the existing 1,200-second limit. Other selected suites were collected,
+not executed. Full qualification remains required and was not dispatched.
+
+Artifact `14228695746` (1,197,433 bytes), SHA-256
+`9df8934174e37ed77c26e3080f136c2dcd2bfb4ccfe47813a68ac0792a2610ef`:
+
+- New Roles PostgreSQL test: ValueError before migration because percent-encoded
+  `%3D` is rejected by Alembic ConfigParser interpolation. Bounded local RED/GREEN
+  confirms literal `=` round-trips both ConfigParser and SQLAlchemy URL parsing.
+- Eight F04 PostgreSQL cases failed during their shared migration fixture setup.
+  That fixture expected the earlier completion downgrade refusal. New Roles retention
+  refuses first because the retained session already references RR-C25. Assertions now
+  require the exact new guard and still compare retained schema/data. Existing completion
+  and tombstone guard regressions invoke their specific historical guards directly,
+  so the new refusal does not mask their safety assertions. Frozen migration code is unchanged.
+- Add Roles retention-unit negatives and reuse the existing EN customer/RU CAD HTTP
+  lifecycle on the independently verified PostgreSQL fixture. Local SQL cases still SKIP;
+  only actual hosted execution can qualify their database behavior.
+
+No production code, CI algorithm, timeout, PostgreSQL identity gate or coverage requirement
+was changed in this correction. The original CI failure is retained; it is not a PASS.

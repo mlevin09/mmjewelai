@@ -6,11 +6,14 @@ from uuid import uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.script import ScriptDirectory
 from conftest import ROOT
 from disposable_postgres import verified_ci_postgres
 from jewelai_persistence import create_database_engine, create_session_factory
 from jewelai_persistence.roles import database_role_registry, import_roles
 from sqlalchemy import inspect, text
+from test_current_roles import test_role_http_journey_restart_and_cas as _role_journey
+from test_generation_preparations_postgres import engine as engine
 
 
 @pytest.mark.postgres
@@ -25,7 +28,9 @@ def test_roles_migration_and_import_postgres(monkeypatch):
     with control.begin() as db:
         db.execute(text(f'CREATE SCHEMA "{schema}"'))
     # Bind search_path on the same verified cluster; no arbitrary external database URL.
-    scoped = url + "?options=-csearch_path%3D" + schema
+    # Keep '=' literal: Alembic's ConfigParser treats percent-encoded '%3D' as
+    # interpolation syntax before it can connect to PostgreSQL.
+    scoped = url + "?options=-csearch_path=" + schema
     engine = create_database_engine(scoped)
     monkeypatch.setenv("DATABASE_URL", scoped)
     cfg = Config(str(ROOT / "packages/persistence/alembic.ini"))
@@ -73,3 +78,55 @@ def test_roles_migration_and_import_postgres(monkeypatch):
         with control.begin() as db:
             db.execute(text(f'DROP SCHEMA "{schema}" CASCADE'))
         control.dispose()
+
+
+def test_roles_scoped_url_roundtrips_alembic_config():
+    from sqlalchemy.engine import make_url
+
+    url = "postgresql+psycopg://localhost/jewelai_test?options=-csearch_path=roles_" + "a" * 32
+    cfg = Config()
+    cfg.set_main_option("sqlalchemy.url", url)
+    assert cfg.get_main_option("sqlalchemy.url") == url
+    assert make_url(url).query["options"] == "-csearch_path=roles_" + "a" * 32
+
+
+@pytest.mark.parametrize("retained", ("referenced_session", "modified_role"))
+def test_roles_downgrade_refuses_before_destructive_operations(monkeypatch, retained):
+    migration = (
+        ScriptDirectory.from_config(Config(str(ROOT / "packages/persistence/alembic.ini")))
+        .get_revision("0021_roles_foundation")
+        .module
+    )
+
+    class RetainedData:
+        def scalar(self, statement):
+            return (
+                1
+                if ("JOIN roles" in str(statement)) == (retained == "referenced_session")
+                else None
+            )
+
+    class NoDestructiveOperations:
+        def get_bind(self):
+            return RetainedData()
+
+        def __getattr__(self, name):
+            pytest.fail("Roles retention guard attempted a destructive operation: " + name)
+
+    monkeypatch.setattr(migration, "op", NoDestructiveOperations())
+    with pytest.raises(RuntimeError, match="Current Roles data requires reviewed retention"):
+        migration.downgrade()
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(
+    ("role", "locale", "content"),
+    [
+        ("RR-C25", "en", "I want a ring with an emerald."),
+        ("RR-C10", "ru", "Хочу кольцо с изумрудом."),
+    ],
+)
+def test_current_role_http_journey_postgres(
+    client, app, engine, text_understanding_provider, role, locale, content
+):
+    _role_journey(client, app, engine, text_understanding_provider, role, locale, content)

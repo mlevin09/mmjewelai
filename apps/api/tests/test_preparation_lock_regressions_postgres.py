@@ -46,9 +46,14 @@ def _version(engine):
 
 
 def _downgrade():
-    command.downgrade(
-        Config(str(ROOT / "packages/persistence/alembic.ini")), "0015_reference_verification"
+    # Exercise the original completion refusal itself, rather than allowing a
+    # newer Roles retention guard to mask this existing no-DDL regression proof.
+    migration = (
+        ScriptDirectory.from_config(Config(str(ROOT / "packages/persistence/alembic.ini")))
+        .get_revision("0019_prompt_completion")
+        .module
     )
+    migration.downgrade()
 
 
 def test_downgrade_refuses_before_using_any_alembic_database_operation(monkeypatch):
@@ -133,7 +138,10 @@ def _observe_postgres(engine, capfd, schedule):
 
 
 def _assert_preserved(before, after):
-    assert before["version"] == after["version"] == "0019_prompt_completion"
+    head = ScriptDirectory.from_config(
+        Config(str(ROOT / "packages/persistence/alembic.ini"))
+    ).get_current_head()
+    assert before["version"] == after["version"] == head
     assert before["objects"] == after["objects"]  # includes constraints, triggers and functions
     for table, rows in before["rows"].items():
         assert all(row in after["rows"][table] for row in rows)

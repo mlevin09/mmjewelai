@@ -92,3 +92,31 @@ collected (27.27s), 76 test_roles cases collected (4.06s). Это COLLECTION rec
 
 Выполнение неизменённого native wrapper: EN/RU HTTP lifecycle + no-role-file-fallback:
 **3 PASS**, exitcode=0, 32.49s. Выполнялись только три кейса, не полный API.
+
+
+## Выполнение выбранных CI-тестов и исправление migration fixtures
+
+Точный HEAD `5229cd35f9f7a423bd12fc9deb87ff39a5cc4c9b`: Domain, Web и
+Infrastructure прошли. Runtime API #43868459903 **FAIL**: 661 PASS, 9 FAIL,
+1 прерванный случай, 1 385 незавершённых/невыполненных из 2 055 выбранных API cases;
+достигнут существующий лимит 1 200 секунд. Остальные выбранные suites только собраны,
+не выполнены. Full qualification остаётся обязательной и не запускалась.
+
+Артефакт `14228695746` (1 197 433 байта), SHA-256
+`9df8934174e37ed77c26e3080f136c2dcd2bfb4ccfe47813a68ac0792a2610ef`:
+
+- Новый PostgreSQL-тест Roles: ValueError до миграции, поскольку `%3D` отвергается
+  интерполяцией Alembic ConfigParser. Локальный RED/GREEN подтверждает, что буквальный
+  `=` корректно проходит ConfigParser и разбор URL SQLAlchemy.
+- Восемь F04 PostgreSQL cases упали в общей migration fixture. Она ожидала старый отказ
+  completion downgrade; теперь раньше срабатывает Roles retention, поскольку сохранённая
+  сессия ссылается на RR-C25. Assertions требуют точный новый guard и сохраняют сравнение
+  данных/схемы. Отдельные проверки старых completion/tombstone guards вызывают именно
+  свои исторические guards, не позволяя новому отказу скрыть прежние защиты.
+  Замороженный код миграций не изменён.
+- Добавлены отрицательные unit-проверки Roles retention и повторное использование EN/RU
+  HTTP lifecycle на независимо верифицированной PostgreSQL fixture. Локальные SQL cases
+  остаются SKIP; квалификация БД требует фактического hosted выполнения.
+
+Production-код, алгоритмы CI, timeout, PostgreSQL identity gate и требования покрытия
+этим исправлением не изменены. Исходный CI FAIL сохранён и не объявлен PASS.
