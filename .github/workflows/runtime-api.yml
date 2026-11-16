@@ -80,8 +80,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: pip
-          cache-dependency-path: '**/pyproject.toml'
       - name: Select PR tests against the complete PR merge base
         id: selection
         env:
@@ -93,6 +91,12 @@ jobs:
       - name: Prepare cache only for selected dependencies
         if: steps.selection.outputs.needs_tests == 'true'
         run: mkdir -p "$(python -m pip cache dir)"
+      - uses: actions/setup-python@v5
+        if: steps.selection.outputs.needs_tests == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: '**/pyproject.toml'
       - name: Install dependencies for selected scopes
         if: steps.selection.outputs.needs_tests == 'true'
         run: bash tools/ci/install_runtime.sh "${RUNNER_TEMP}/pr-selection.json"
