@@ -26,6 +26,11 @@ on:
         required: true
         type: string
 
+# Cancel superseded PR commits; never cancel a manually authorized exact-SHA recheck.
+concurrency:
+  group: runtime-api-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   actions: read # Read a supplied full-run receipt; never dispatch or write statuses.
