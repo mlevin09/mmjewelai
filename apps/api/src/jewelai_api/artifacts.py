@@ -2,7 +2,7 @@
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from jewelai_domain import (
@@ -36,6 +36,18 @@ class RuntimeArtifacts:
     versions: ArtifactVersions
     source_root: Path | None = None
     artifact_hashes: tuple[tuple[str, str], ...] = ()
+
+
+def bind_runtime_roles(artifacts: RuntimeArtifacts, roles: RoleRegistry) -> RuntimeArtifacts:
+    """Use one transaction reader for catalog, rules and questions; no definition cache."""
+    if artifacts.roles is roles:
+        return artifacts
+    return replace(
+        artifacts,
+        roles=roles,
+        questions=artifacts.questions.with_roles(roles),
+        rules=artifacts.rules.with_roles(roles),
+    )
 
 
 def load_runtime_artifacts(

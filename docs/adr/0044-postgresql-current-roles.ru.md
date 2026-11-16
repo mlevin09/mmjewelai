@@ -38,6 +38,14 @@ Downgrade отказывается удалять роли, используем
 чтения контекста. Исторические определения не воспроизводятся. Полные исходные документы
 и хеши импорта сохранены; английские названия без утверждённого источника остаются null.
 
+Внутри существующего unit of work Roles используют тот же non-owning Session reader,
+что и canonical history. Rules/Questions получают request-local bindings; глобальные
+artifacts не перенастраиваются. Кешируется только binding reader, не определения/revisions.
+Это предотвращает закрытие/rollback чужой SQLite StaticPool connection вторым Session.
+Чтение роли не делает commit/rollback записей caller, в том числе при ошибке валидации
+каталога. Standalone reads владеют своим factory context; внутри транзакции caller обязан
+использовать её locked reader, а не открывать независимый factory-bound registry.
+
 Studio UI, providers, активация Knowledge, выполнение shared migration и deployment исключены.
 PostgreSQL должен пройти существующий независимый disposable-DB gate; SQLite не квалифицирует
 ARRAY/JSONB и фактическую FK-миграцию.

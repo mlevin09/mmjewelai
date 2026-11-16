@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Iterator, Mapping
+from copy import copy
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
@@ -284,6 +285,12 @@ class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
     @property
     def artifact_version(self) -> str:
         return self._bundle.artifact_version
+
+    def with_roles(self, roles: RoleRegistry):
+        """Request-local binding; preserve the immutable catalog and its global instance."""
+        bound = copy(self)
+        bound._roles = roles
+        return bound
 
     def __getitem__(self, question_id: QuestionId) -> QuestionEntry:
         return self._entries[question_id]

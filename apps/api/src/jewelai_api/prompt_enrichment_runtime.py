@@ -70,7 +70,12 @@ from jewelai_prompts.downstream_preparation import (
 )
 from jewelai_prompts.final_prompt_v3 import CanonicalFinalPromptAssemblyV3
 
-from .artifacts import ArtifactConfigurationError, RuntimeArtifacts, session_runtime_artifacts
+from .artifacts import (
+    ArtifactConfigurationError,
+    RuntimeArtifacts,
+    bind_runtime_roles,
+    session_runtime_artifacts,
+)
 from .clarification import (
     ClarificationImportance,
     ClarificationPlan,
@@ -274,6 +279,7 @@ class PromptEnrichmentRuntimeService:
         def verify(repository, record):
             bound = copy(self)
             bound.repository = repository
+            bound.artifacts = bind_runtime_roles(self.artifacts, repository.current_role_registry)
             completed.append(build(bound, record))
 
         commit(**kwargs, verify=verify)
@@ -284,6 +290,8 @@ class PromptEnrichmentRuntimeService:
         try:
             session = repository.get_design_session(session_id, organization_id)
             artifacts = session_runtime_artifacts(self.artifacts, session)
+            if repository is not self.repository:
+                artifacts = bind_runtime_roles(artifacts, repository.current_role_registry)
         except (NotFoundError, OwnershipMismatchError) as exc:
             raise PromptEnrichmentRuntimeError(
                 PromptEnrichmentRuntimeErrorCode.SESSION_NOT_FOUND,
@@ -298,6 +306,7 @@ class PromptEnrichmentRuntimeService:
             return self
         bound = copy(self)
         bound.artifacts = artifacts
+        bound.repository = repository
         return bound
 
     @property
@@ -1393,6 +1402,7 @@ def build_final_prompt_snapshot(
 ) -> FinalPromptSnapshot:
     """Restore one consistent organization-scoped durable snapshot for Step #12."""
 
+    artifacts = bind_runtime_roles(artifacts, repository.current_role_registry)
     session = repository.get_design_session(session_id, organization_id)
     revision = repository.get_current_revision(session_id, organization_id)
     cycles = repository.list_enrichment_cycles(session_id, organization_id)

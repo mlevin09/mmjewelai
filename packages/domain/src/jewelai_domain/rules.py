@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Iterator, Mapping
+from copy import copy
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
@@ -539,6 +540,13 @@ class RuleRegistry(Mapping[str, Rule]):
         self._evaluation_order = tuple(
             sorted(bundle.rules, key=lambda item: (-item.priority, item.tie_order, item.rule_id))
         )
+
+    def with_roles(self, roles: RoleRegistry):
+        """Bind reads to the caller's scope without mutating shared rules/questions."""
+        bound = copy(self)
+        bound._roles = roles
+        bound._questions = self._questions.with_roles(roles)
+        return bound
 
     @staticmethod
     def _validate_dictionary_reference(dictionary, target, value, declared_category):

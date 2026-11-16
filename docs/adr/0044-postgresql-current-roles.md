@@ -38,6 +38,14 @@ and persona-to-system-prompt conversion. Current-role edits intentionally affect
 context reads. Historical role definitions are not replayed. Full original source documents
 and import hashes are retained; English labels remain null where no approved label exists.
 
+Within an existing unit of work, current Roles use the same non-owning Session reader as
+canonical history. Rules and Questions receive request-local bindings; global artifacts
+are never rebound. Only the reader binding is cached, never definitions/revisions. This
+avoids a second Session closing/rolling back the caller's SQLite StaticPool connection.
+Role reads do not commit or roll back the caller's writes, including catalog-validation
+failure. Standalone reads retain ordinary factory ownership; callers inside a transaction
+must use its locked reader rather than opening an unrelated factory-bound registry.
+
 No Studio UI, providers, Knowledge activation, shared migration execution or deployment
 is included. PostgreSQL execution must pass the existing independent disposable-DB gate;
 SQLite checks cannot qualify ARRAY/JSONB or the actual FK migration.

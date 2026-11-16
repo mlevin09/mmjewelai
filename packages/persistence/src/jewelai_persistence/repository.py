@@ -5,6 +5,7 @@ import json
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import cached_property
 from uuid import UUID
 
 from jewelai_assets import (
@@ -356,6 +357,17 @@ class UserCorrectionRecord:
 class PersistenceRepository:
     def __init__(self, session_factory: sessionmaker[Session]):
         self._session_factory = session_factory
+
+    @cached_property
+    def current_role_registry(self):
+        """Cache only the reader binding, never definitions or their revisions.
+
+        A locked_reader supplies its existing non-owning Session context here,
+        so role reads cannot close/rollback the caller's transaction.
+        """
+        from .roles import database_role_registry
+
+        return database_role_registry(self._session_factory)
 
     def create_organization(
         self, organization_id: UUID, name: str, created_at: datetime
