@@ -395,3 +395,10 @@ def test_workflow_manual_only_and_required_runtime_not_skipped():
     isolated = full.split("  api_isolated:", 1)[1].split("  # Keep", 1)[0]
     assert "TEST_POSTGRES_URL" not in isolated
     assert "if: always()" in full
+
+def test_automatic_risk_budget_rejects_oversized_selection_before_execution():
+    # Missing exact-SHA qualification cannot authorize thousands of test bodies.
+    with pytest.raises(ValueError, match="automatic_pr_risk_budget_exceeded"):
+        pr_checks.enforce_automatic_case_budget({"api": [str(i) for i in range(801)]}, None)
+    pr_checks.enforce_automatic_case_budget({"api": [str(i) for i in range(800)]}, None)
+    pr_checks.enforce_automatic_case_budget({"api": [str(i) for i in range(801)]}, {"verified": True})
