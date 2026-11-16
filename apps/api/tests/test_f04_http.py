@@ -14,6 +14,7 @@ from conftest import ROOT, create_hierarchy
 from test_p010_symmetry_runtime import p010_bundle
 from test_prompt_enrichment_composition import _client, _release
 from test_prompt_enrichment_http import _message
+from tests.current_roles import current_roles
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.schemas import CreateSessionRequest
@@ -21,7 +22,7 @@ from jewelai_api.settings import ArtifactVersions
 
 
 @contextmanager
-def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail_client"):
+def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="RR-C25"):
     config, _, _ = _release(tmp_path, bundle=p010_bundle() if binding else None)
     client, app, provider = _client(engine, config)
     runtime = app.state.prompt_enrichment_service
@@ -52,7 +53,7 @@ def f04_session(engine, tmp_path, *, binding=False, locale="en", role_id="retail
         # upgrade a legacy session or expose a client-controlled profile field.
         creator = copy(app.state.service)
         creator.artifacts = load_runtime_artifacts(
-            ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0")
+            ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"), roles=current_roles()
         )
         session = creator.create_session(
             UUID(project), UUID(org), CreateSessionRequest(role_id=role_id, locale=locale)
@@ -502,12 +503,12 @@ def restart(ctx, engine):
 @pytest.mark.parametrize(
     "role_id",
     [
-        "retail_client",
-        "sales_manager",
-        "buyer",
-        "marketing",
-        "jewelry_designer",
-        "industrial_designer",
+        "RR-C25",
+        "RR-C18",
+        "RR-C17",
+        "RR-C23",
+        "RR-C09",
+        "RR-C10",
     ],
 )
 def test_f04_exact_role_locale_question_http(engine, tmp_path, locale, text, role_id):
@@ -518,7 +519,9 @@ def test_f04_exact_role_locale_question_http(engine, tmp_path, locale, text, rol
             for q in state["clarification_questions"]
             if q["semantic_question_id"] == "METAL_MATERIAL"
         )
-        artifacts = load_runtime_artifacts(ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"))
+        artifacts = load_runtime_artifacts(
+            ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"), roles=current_roles()
+        )
         expected = artifacts.questions.render("METAL_MATERIAL", role_id, locale).wording
         assert q["text"] == expected.format(
             options=(" или " if locale == "ru" else " or ").join(o["label"] for o in q["options"])

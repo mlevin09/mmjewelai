@@ -147,6 +147,9 @@ class SessionListResponse(ApiModel):
 
 class RoleCatalogItem(ApiModel):
     role_id: str
+    name_ru: str
+    name_en: str | None
+    revision: int
 
 
 class GenerationProfileSummary(ApiModel):

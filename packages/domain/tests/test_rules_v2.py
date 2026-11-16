@@ -8,11 +8,11 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 from test_rules import satisfied_revision
+from tests.current_roles import current_roles
 
 from jewelai_domain import (
     load_domain_dictionary,
     load_question_catalog,
-    load_role_profiles,
     load_rules,
 )
 from jewelai_domain.clarification_state import (
@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def registry():
-    roles = load_role_profiles(ROOT / "data/roles/v1.0.0.json")
+    roles = current_roles()
     dictionary = load_domain_dictionary(ROOT / "data/dictionary/v1.0.0.json")
     questions = load_question_catalog(
         ROOT / "data/questions/v2.0.0.json", roles=roles, dictionary=dictionary
@@ -133,10 +133,10 @@ def test_f04_material_rule_is_contextual_and_legacy_gaps_are_unchanged():
     revision = DesignRevision.model_validate(data)
     before = revision.model_dump_json()
     assert rules.required_targets == tuple(SchemaTarget)
-    assert rules.evaluate(revision, "retail_client").decision == "ready"
+    assert rules.evaluate(revision, "RR-C25").decision == "ready"
     decision = rules.evaluate(
         revision,
-        "retail_client",
+        "RR-C25",
         unresolved_context=material_context(revision),
     )
     assert decision.question_id == "METAL_MATERIAL"

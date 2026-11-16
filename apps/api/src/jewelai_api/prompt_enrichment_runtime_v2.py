@@ -782,6 +782,13 @@ def _history(service, repo, session_id, organization_id):
 
 
 def _history_frame(service, repo, session_id, organization_id):
+    from copy import copy
+
+    from .artifacts import bind_runtime_roles
+
+    service = copy(service)
+    service.repository = repo
+    service.artifacts = bind_runtime_roles(service.artifacts, repo.current_role_registry)
     session = repo.get_design_session(session_id, organization_id)
     cycles = repo.list_enrichment_cycles(session_id, organization_id)
     if not cycles:

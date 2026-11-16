@@ -261,6 +261,10 @@ def migration_context(request, engine):
         engine = create_database_engine(database_url)
         Base.metadata.drop_all(engine)
         Base.metadata.create_all(engine)
+        from jewelai_persistence import create_session_factory
+        from jewelai_persistence.roles import import_roles
+
+        import_roles(create_session_factory(engine))
     try:
         service = build_service(engine)
         organization, _, session = create_persisted_session(service)

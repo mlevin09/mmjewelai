@@ -220,7 +220,7 @@ def test_cross_session_asset_cannot_reach_signer(client, app, asset_access_signe
     other = client.post(
         f"/projects/{project_id}/sessions",
         headers={"X-Organization-ID": organization_id},
-        json={"role_id": "retail_client", "locale": "en"},
+        json={"role_id": "RR-C25", "locale": "en"},
     ).json()
     response = client.post(
         f"/sessions/{other['session_id']}/assets/{asset.asset_id}/access",

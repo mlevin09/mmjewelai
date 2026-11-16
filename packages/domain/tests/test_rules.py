@@ -6,8 +6,9 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
+from tests.current_roles import current_roles
 
-from jewelai_domain import load_domain_dictionary, load_question_catalog, load_role_profiles
+from jewelai_domain import load_domain_dictionary, load_question_catalog
 from jewelai_domain.models import DesignRevision
 from jewelai_domain.rules import (
     AssumeDecision,
@@ -38,7 +39,7 @@ def rules_data():
 
 @pytest.fixture
 def roles():
-    return load_role_profiles(ROLES)
+    return current_roles()
 
 
 @pytest.fixture
@@ -253,7 +254,6 @@ def test_dictionary_references_are_validated(
 @pytest.mark.parametrize(
     ("field", "message"),
     [
-        ("role_artifact_version", "role artifact version"),
         ("dictionary_artifact_version", "dictionary artifact version"),
         ("question_artifact_version", "question artifact version"),
     ],
@@ -338,7 +338,7 @@ def test_side_stone_groups_bind_and_sort_by_stable_group_id(ring, questions, eng
         if gap.target.value == "side_stones[*].quantity"
     ]
     assert [gap.group_id for gap in side_gaps] == ["a_group", "z_group"]
-    decision = engine.evaluate(revision, "retail_client")
+    decision = engine.evaluate(revision, "RR-C25")
     assert decision.decision == "ask"
     assert decision.concrete_target == "side_stones.a_group.quantity"
 
@@ -354,7 +354,7 @@ def test_ring_emerald_three_carat_missing_shape_asks_without_inventing_dimension
         "locked": False,
     }
     revision = changed_revision(ring, "center_stone.shape", unknown)
-    decision = engine.evaluate(revision, "retail_client")
+    decision = engine.evaluate(revision, "RR-C25")
     assert decision.decision == "ask"
     assert decision.question_id.value == "CENTER_STONE_SHAPE"
     assert decision.target.value == "center_stone.shape"
@@ -367,7 +367,7 @@ def test_ring_emerald_three_carat_missing_shape_asks_without_inventing_dimension
 
 def test_retail_with_matching_sourced_fact_proposes_schema_valid_derived_state(ring, engine):
     fact = knowledge_fact()
-    decision = engine.evaluate(ring, "retail_client", knowledge_facts=(fact,))
+    decision = engine.evaluate(ring, "RR-C25", knowledge_facts=(fact,))
     assert isinstance(decision, DeriveDecision)
     assert decision.target.value == "center_stone.dimensions"
     state = decision.proposed_change.state
@@ -385,19 +385,20 @@ def test_retail_with_matching_sourced_fact_proposes_schema_valid_derived_state(r
     assert knowledge_trace.source_ids == ("synthetic-kb-record",)
 
 
-def test_industrial_designer_asks_exact_dimensions_even_with_kb_fact(ring, engine):
-    decision = engine.evaluate(ring, "industrial_designer", knowledge_facts=(knowledge_fact(),))
-    assert decision.decision == "ask"
-    assert decision.question_id.value == "CENTER_STONE_DIMENSIONS"
-    assert decision.reason_code.value == "EXACT_MEASUREMENT_REQUIRED"
-    assert decision.proposed_change is None
+def test_current_roles_share_source_backed_derivation_baseline(ring, engine):
+    for role_id in ("RR-C25", "RR-C10"):
+        decision = engine.evaluate(ring, role_id, knowledge_facts=(knowledge_fact(),))
+        assert isinstance(decision, DeriveDecision)
+        assert decision.proposed_change.state.origin == "derived"
+        assert not decision.proposed_change.state.confirmed
+        assert not decision.proposed_change.state.locked
 
 
 def test_locked_metal_conflict_blocks_without_overwrite(ring, engine):
     before = ring.model_dump_json()
     decision = engine.evaluate(
         ring,
-        "retail_client",
+        "RR-C25",
         proposed_update=ProposedDomainUpdate(target="metal.color", value="yellow"),
     )
     assert isinstance(decision, BlockDecision)
@@ -409,7 +410,7 @@ def test_locked_metal_conflict_blocks_without_overwrite(ring, engine):
 
 
 def test_no_fact_or_nonmatching_fact_never_derives(ring, engine):
-    without = engine.evaluate(ring, "retail_client")
+    without = engine.evaluate(ring, "RR-C25")
     assert without.decision == "ask"
     assert without.question_id.value == "CENTER_STONE_DIMENSIONS"
     assert without.reason_code.value == "NO_VALID_KB_MATCH"
@@ -422,7 +423,7 @@ def test_no_fact_or_nonmatching_fact_never_derives(ring, engine):
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         }
     )
-    decision = engine.evaluate(ring, "retail_client", knowledge_facts=(nonmatching,))
+    decision = engine.evaluate(ring, "RR-C25", knowledge_facts=(nonmatching,))
     assert decision.decision == "ask"
     assert decision.proposed_change is None
 
@@ -436,7 +437,7 @@ def test_same_material_and_weight_with_different_shape_never_derives(ring, engin
             "center_stone_weight": {"value": 3.0, "unit": "ct"},
         }
     )
-    decision = engine.evaluate(ring, "retail_client", knowledge_facts=(different_shape,))
+    decision = engine.evaluate(ring, "RR-C25", knowledge_facts=(different_shape,))
     assert decision.decision == "ask"
     assert decision.proposed_change is None
 
@@ -459,13 +460,13 @@ def test_knowledge_fact_requires_source_uncertainty_and_valid_dictionary_context
         }
     )
     with pytest.raises(ValueError, match="wrong category"):
-        engine.evaluate(ring, "retail_client", knowledge_facts=(invalid,))
+        engine.evaluate(ring, "RR-C25", knowledge_facts=(invalid,))
 
 
 def test_fully_satisfied_required_scope_is_ready_and_byte_stable(ring, engine, questions):
     revision = satisfied_revision(ring)
-    first = engine.evaluate(revision, "retail_client")
-    second = engine.evaluate(revision, "retail_client")
+    first = engine.evaluate(revision, "RR-C25")
+    second = engine.evaluate(revision, "RR-C25")
     assert first.decision == "ready"
     assert first == second
     assert first.model_dump_json() == second.model_dump_json()
@@ -479,16 +480,16 @@ def test_catalog_order_does_not_change_decision_or_trace(
 ):
     rules_data["rules"].reverse()
     reordered = build_engine(rules_data, roles, dictionary, questions)
-    assert reordered.evaluate(ring, "retail_client") == engine.evaluate(ring, "retail_client")
+    assert reordered.evaluate(ring, "RR-C25") == engine.evaluate(ring, "RR-C25")
 
 
 def test_runtime_conflict_returns_explicit_bounded_block(
     rules_data, roles, dictionary, questions, ring
 ):
     exact = rule(rules_data, "ask_exact_center_stone_dimensions")
-    exact["conditions"][1] = {"kind": "role_is", "role_id": "retail_client"}
+    exact["conditions"][1] = {"kind": "role_is", "role_id": "RR-C25"}
     conflict_engine = build_engine(rules_data, roles, dictionary, questions)
-    decision = conflict_engine.evaluate(ring, "retail_client", knowledge_facts=(knowledge_fact(),))
+    decision = conflict_engine.evaluate(ring, "RR-C25", knowledge_facts=(knowledge_fact(),))
     assert isinstance(decision, BlockDecision)
     assert decision.reason_code.value == "RULE_CONFLICT"
     assert decision.conflict_rule_ids == (
@@ -501,7 +502,7 @@ def test_runtime_conflict_aggregates_three_rules_in_stable_sorted_order(
     rules_data, roles, dictionary, questions, ring
 ):
     exact = rule(rules_data, "ask_exact_center_stone_dimensions")
-    exact["conditions"][1] = {"kind": "role_is", "role_id": "retail_client"}
+    exact["conditions"][1] = {"kind": "role_is", "role_id": "RR-C25"}
 
     third = deepcopy(exact)
     third["rule_id"] = "block_conflicting_center_stone_dimensions"
@@ -518,7 +519,7 @@ def test_runtime_conflict_aggregates_three_rules_in_stable_sorted_order(
     rules_data["rules"].append(third)
 
     conflict_engine = build_engine(rules_data, roles, dictionary, questions)
-    decision = conflict_engine.evaluate(ring, "retail_client", knowledge_facts=(knowledge_fact(),))
+    decision = conflict_engine.evaluate(ring, "RR-C25", knowledge_facts=(knowledge_fact(),))
     assert isinstance(decision, BlockDecision)
     assert decision.reason_code.value == "RULE_CONFLICT"
     assert decision.conflict_rule_ids == (
@@ -535,7 +536,7 @@ def assumption_rule(data):
             "rule_id": "approved_test_assumption",
             "priority": 1100,
             "tie_order": 95,
-            "conditions": [{"kind": "role_is", "role_id": "retail_client"}],
+            "conditions": [{"kind": "role_is", "role_id": "RR-C25"}],
             "action": {
                 "kind": "assume",
                 "value": "yellow",
@@ -557,7 +558,7 @@ def test_assume_contract_uses_rule_source_and_rationale_but_seed_has_no_assumpti
     assumption_rule(rules_data)
     assumption_engine = build_engine(rules_data, roles, dictionary, questions)
     revision = changed_revision(ring, "metal.color", None)
-    decision = assumption_engine.evaluate(revision, "retail_client")
+    decision = assumption_engine.evaluate(revision, "RR-C25")
     assert isinstance(decision, AssumeDecision)
     assert decision.proposed_change.state.origin == "assumed"
     assert decision.proposed_change.state.source.rule_id == "approved_test_assumption"
@@ -571,7 +572,7 @@ def test_derive_or_assume_can_never_overwrite_a_locked_target(
 ):
     assumption_rule(rules_data)
     assumption_engine = build_engine(rules_data, roles, dictionary, questions)
-    decision = assumption_engine.evaluate(ring, "retail_client")
+    decision = assumption_engine.evaluate(ring, "RR-C25")
     assert isinstance(decision, BlockDecision)
     assert decision.reason_code.value == "LOCKED_FIELD_CONFLICT"
     assert decision.proposed_change is None

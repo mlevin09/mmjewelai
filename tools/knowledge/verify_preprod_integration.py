@@ -37,7 +37,7 @@ def verify(release_root: Path, repository_root: Path):
         raise ValueError("Professional Knowledge release verification failed")
     artifacts = load_runtime_artifacts(repository_root, ArtifactVersions(**manifest["versions"]))
     actual = [dict(name=k, file_sha256=v) for k, v in artifacts.artifact_hashes]
-    if actual != manifest["consumer_artifacts"]:
+    if actual != [r for r in manifest["consumer_artifacts"] if r["name"] != "roles"]:
         raise ValueError("Consumer artifact bytes do not match the integration manifest")
     if artifacts.parametric_knowledge.sha256 != manifest["parametric"]["typed_runtime_sha256"]:
         raise ValueError("Parametric runtime identity mismatch")

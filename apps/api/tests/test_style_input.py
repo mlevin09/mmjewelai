@@ -41,7 +41,7 @@ STYLE_INPUTS = (
 def style_session(engine, tmp_path, request):
     with ExitStack() as stack:
 
-        def create(route="corrections", role="retail_client", locale="en"):
+        def create(route="corrections", role="RR-C25", locale="en"):
             if route == "corrections":
                 return request.getfixturevalue("ready_session")(role, locale)
             service = build_service(engine)
@@ -100,7 +100,7 @@ def _submit(ctx, text, route="corrections", **overrides):
 
 @pytest.mark.parametrize("text", STYLE_INPUTS)
 @pytest.mark.parametrize("route", ("initial", "corrections"))
-@pytest.mark.parametrize("role", ("retail_client", "jewelry_designer"))
+@pytest.mark.parametrize("role", ("RR-C25", "RR-C09"))
 def test_minimalist_wording_http(style_session, text, route, role, request):
     locale = "ru" if text.startswith("Хочу") else "en"
     ctx = style_session(route, role, locale)

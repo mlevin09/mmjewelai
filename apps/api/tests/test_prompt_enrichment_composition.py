@@ -228,7 +228,7 @@ def test_enabled_composition_qualifies_release_and_runs_restart_safe_full_http_c
             session_response = first.post(
                 f"/projects/{project_id}/sessions",
                 headers={"X-Organization-ID": organization_id},
-                json={"role_id": "retail_client", "locale": session_locale},
+                json={"role_id": "RR-C25", "locale": session_locale},
             )
             assert session_response.status_code == 201
         session = session_response.json()

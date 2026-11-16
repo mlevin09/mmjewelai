@@ -140,13 +140,7 @@
           "title": "Answer Contract"
         },
         "wording": {
-          "items": {
-            "$ref": "#/$defs/RoleWording"
-          },
-          "maxItems": 6,
-          "minItems": 6,
-          "title": "Wording",
-          "type": "array"
+          "$ref": "#/$defs/LocalizedQuestionText"
         },
         "examples": {
           "items": {
@@ -248,35 +242,6 @@
       ],
       "title": "ReviewStatus",
       "type": "string"
-    },
-    "RoleId": {
-      "enum": [
-        "retail_client",
-        "sales_manager",
-        "buyer",
-        "marketing",
-        "jewelry_designer",
-        "industrial_designer"
-      ],
-      "title": "RoleId",
-      "type": "string"
-    },
-    "RoleWording": {
-      "additionalProperties": false,
-      "properties": {
-        "role_id": {
-          "$ref": "#/$defs/RoleId"
-        },
-        "text": {
-          "$ref": "#/$defs/LocalizedQuestionText"
-        }
-      },
-      "required": [
-        "role_id",
-        "text"
-      ],
-      "title": "RoleWording",
-      "type": "object"
     },
     "SchemaTarget": {
       "description": "The complete bounded target vocabulary for Question Catalog v1.",

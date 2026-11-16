@@ -7,6 +7,9 @@ from uuid import UUID, uuid4
 import pytest
 from alembic import command
 from alembic.config import Config
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
+from alembic.script import ScriptDirectory
 from conftest import NOW, ROOT, create_hierarchy
 from jewelai_persistence.models import DesignSessionRow, GenerationRunRow
 from sqlalchemy import event, select, text, update
@@ -36,9 +39,11 @@ def test_pg01_migration_constraints_and_tombstone_downgrade(client, engine, monk
     # engine has already verified real container/cluster and upgraded populated0015→head.
     org, _, created = create_hierarchy(client)
     sid = UUID(created.json()["session_id"])
+    cfg = Config(str(ROOT / "packages/persistence/alembic.ini"))
     with engine.connect() as db:
         assert (
-            db.scalar(text("SELECT version_num FROM alembic_version")) == "0020_session_retirement"
+            db.scalar(text("SELECT version_num FROM alembic_version"))
+            == ScriptDirectory.from_config(cfg).get_current_head()
         )
         before = db.execute(
             select(DesignSessionRow.__table__).where(DesignSessionRow.session_id == sid)
@@ -63,9 +68,13 @@ def test_pg01_migration_constraints_and_tombstone_downgrade(client, engine, monk
         retired = db.execute(
             select(DesignSessionRow.__table__).where(DesignSessionRow.session_id == sid)
         ).one()
-    cfg = Config(str(ROOT / "packages/persistence/alembic.ini"))
+    # Verify the tombstone guard directly; Roles now refuses an ordinary
+    # head downgrade earlier because this session references a current role.
+    migration = ScriptDirectory.from_config(cfg).get_revision("0020_session_retirement").module
     with pytest.raises(RuntimeError, match="tombstones"):
-        command.downgrade(cfg, "0019_prompt_completion")
+        with engine.begin() as db:
+            with Operations.context(MigrationContext.configure(db)):
+                migration.downgrade()
     command.upgrade(cfg, "head")
     command.current(cfg)
     command.check(cfg)

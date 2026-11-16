@@ -36,7 +36,7 @@ from jewelai_api.prompt_enrichment_runtime import (
 def ready_session(engine, tmp_path):
     with ExitStack() as stack:
 
-        def create(role="retail_client", locale="en", *, missing_dimensions=False):
+        def create(role="RR-C25", locale="en", *, missing_dimensions=False):
             service = build_service(engine)
             runtime, store, active, report = _runtime(service, tmp_path / str(uuid4()))
             client, provider = _client(engine, runtime)
@@ -210,7 +210,7 @@ def _assert_current_ready(ctx, state):
     assert restarted.get_current_state(UUID(ctx.sid), UUID(ctx.org)) == state
 
 
-@pytest.mark.parametrize("role", ("retail_client", "jewelry_designer"))
+@pytest.mark.parametrize("role", ("RR-C25", "RR-C09"))
 @pytest.mark.parametrize(
     ("locale", "text"),
     (

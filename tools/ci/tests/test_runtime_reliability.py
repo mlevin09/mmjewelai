@@ -179,12 +179,17 @@ def test_no_tests_cli_works_without_site_packages_and_cache(tmp_path):
     assert receipt["status"] == "NOT_APPLICABLE" and not receipt["groups"]
     assert not (tmp_path / "absent-cache").exists()
     workflow = (ROOT / ".github/workflows/runtime-api.yml").read_text()
-    setup = workflow.split("      - uses: actions/setup-python@v5", 1)[1].split("      - name:", 1)[
-        0
-    ]
-    assert "if: steps.selection.outputs.needs_tests == 'true'" in setup
-    assert "cache: pip" in setup  # retained where dependencies really get installed
-    assert workflow.index("id: selection") < workflow.index("uses: actions/setup-python")
+    # AST-based ownership needs the same interpreter on every run, including no-tests.
+    before, after = workflow.split("      - name: Select PR tests", 1)
+    assert "uses: actions/setup-python@v5" in before
+    assert "python-version: '3.12'" in before
+    assert "cache: pip" not in before
+    assert "if: steps.selection.outputs.needs_tests == 'true'" in after
+    setup_after = after.split("      - uses: actions/setup-python@v5", 1)[1].split(
+        "      - name:", 1
+    )[0]
+    assert "if: steps.selection.outputs.needs_tests == 'true'" in setup_after
+    assert "cache: pip" in setup_after  # only when native test deps are selected
 
 
 def test_selector_failure_keeps_safe_receipt_and_no_secondary_artifact_error(tmp_path):

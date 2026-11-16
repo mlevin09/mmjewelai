@@ -81,6 +81,7 @@ from test_p010_symmetry_runtime import (
 )
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
+from tests.current_roles import current_roles
 
 
 @pytest.mark.parametrize("binding", (False, True))
@@ -288,7 +289,7 @@ def engine(monkeypatch, capfd):
     try:
         command.upgrade(cfg, "0015_reference_verification")
         # Insert an actual old session/revision before the additive upgrade, retain exact bytes.
-        client, _ = _client(scoped)
+        client, _ = _client(scoped, role_registry=current_roles())
         with client:
             repository = client.app.state.service.repository
             with monkeypatch.context() as checkpoint:
@@ -308,9 +309,10 @@ def engine(monkeypatch, capfd):
         if target == "head":
             command.check(cfg)
         command.current(cfg)
-        # Unsupported online downgrade refuses even with empty retained tables.
+        # The current Roles guard now refuses first: the retained session references
+        # RR-C25. Historical preparation downgrade guards have separate direct tests.
         retained = retention_snapshot(scoped)
-        with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
+        with pytest.raises(RuntimeError, match="Current Roles data requires reviewed retention"):
             command.downgrade(cfg, "0015_reference_verification")
         assert retention_snapshot(scoped) == retained
         if target == "head":
@@ -321,7 +323,7 @@ def engine(monkeypatch, capfd):
                 db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
                 == old_bytes
             )
-        client, _ = _client(scoped)
+        client, _ = _client(scoped, role_registry=current_roles())
         with client:
             after = client.get(f"/sessions/{sid}", headers={"X-Organization-ID": org})
         assert after.status_code == 200 and after.json() == before.json()
@@ -505,7 +507,7 @@ def test_postgres_immutability_and_scope_foreign_keys(ready_session, engine):
                 db.execute(GenerationPreparationRow.__table__.insert().values(**invalid))
     assert counts(engine) == (1, 1, 0, 0)
     before = retention_snapshot(engine)
-    with pytest.raises(RuntimeError, match="online downgrade is unsupported"):
+    with pytest.raises(RuntimeError, match="Current Roles data requires reviewed retention"):
         command.downgrade(
             Config(str(ROOT / "packages/persistence/alembic.ini")), "0015_reference_verification"
         )

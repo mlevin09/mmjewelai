@@ -1,13 +1,12 @@
 import inspect
 import json
-from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 from jsonschema import Draft202012Validator
-from pydantic import ValidationError
+from tests.current_roles import current_roles
 
 from jewelai_domain import (
     Design,
@@ -17,12 +16,10 @@ from jewelai_domain import (
     UnknownRoleError,
     UnsupportedLocaleError,
     confirm_field,
-    load_role_profiles,
     lock_field,
     revise_design,
 )
 from jewelai_domain.models import MessageSource
-from jewelai_domain.roles import RoleProfileBundle
 from jewelai_domain.roles_schema import role_profiles_json_schema
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -34,113 +31,50 @@ SOURCE = MessageSource(message_id="role-invariant-test", recorded_at=NOW)
 
 
 @pytest.fixture
-def catalog_data():
-    return json.loads(CATALOG.read_text())
-
-
-@pytest.fixture
 def registry():
-    return load_role_profiles(CATALOG)
+    return current_roles()
 
 
-def test_committed_role_schema_matches_generator_and_validates_catalog(catalog_data):
-    generated = role_profiles_json_schema()
-    assert json.loads(SCHEMA.read_text()) == generated
-    Draft202012Validator.check_schema(generated)
-    Draft202012Validator(generated).validate(catalog_data)
+def test_all_21_current_roles_and_context(registry):
+    assert len(registry) == 21
+    assert set(registry) == set(RoleId)
+    private = registry.get_profile("RR-C25")
+    professional = registry.get_profile("RR-C10")
+    assert private.role_data["registry_entry"] != professional.role_data["registry_entry"]
+    assert private.role_data["passport"]["maturity"] == "DRAFT_NOT_OWNER_APPROVED"
+    assert professional.authorization_effect == "none"
 
 
-def test_loads_all_six_canonical_roles_in_stable_order(registry):
-    assert tuple(registry) == tuple(RoleId)
-    assert [role.value for role in registry] == [
+@pytest.mark.parametrize(
+    "role_id",
+    [
         "retail_client",
         "sales_manager",
         "buyer",
         "marketing",
         "jewelry_designer",
         "industrial_designer",
-    ]
-    assert registry.artifact_version == "1.0.0"
-
-
-def test_lookup_is_deterministic_and_versions_are_pinned(registry):
-    first = registry.get_profile("buyer")
-    second = load_role_profiles(CATALOG).get_profile(RoleId.BUYER)
-    assert first == second
-    assert first.artifact_version == "1.0.0"
-    assert first.schema_version == "1.0.0"
-    assert first.design_schema_version == "1.0.0"
-
-
-@pytest.mark.parametrize("role_id", RoleId)
-def test_every_role_uses_shared_domain_contract_without_authority(registry, role_id):
-    profile = registry.get_profile(role_id)
-    assert profile.design_schema_version == "1.0.0"
-    assert profile.authorization_effect == "none"
-    assert profile.question_policy.selection == "deterministic_rules"
-    assert profile.default_policy.mode == "no_unapproved_defaults"
-    assert profile.question_policy.budget == "product_review_required"
-
-
-def test_retail_and_industrial_policies_are_distinct(registry):
-    retail = registry.get_profile(RoleId.RETAIL_CLIENT)
-    industrial = registry.get_profile(RoleId.INDUSTRIAL_DESIGNER)
-    assert (retail.vocabulary.value, retail.detail_level.value) == ("plain", "essential")
-    assert (industrial.vocabulary.value, industrial.detail_level.value) == (
-        "technical_engineering",
-        "engineering",
-    )
-    assert industrial.derivation_policy.mode.value == "request_exact_when_required"
-
-
-@pytest.mark.parametrize(
-    ("requested", "resolved"),
-    [("en", "en"), ("EN-us", "en"), ("ru_RU", "ru")],
+        "RR-C01",
+        "RR-C99",
+    ],
 )
-def test_locale_resolution_is_explicit_and_deterministic(registry, requested, resolved):
-    assert registry.resolve_locale("retail_client", requested) == resolved
-
-
-def test_unsupported_locale_is_rejected(registry):
-    with pytest.raises(UnsupportedLocaleError, match="Unsupported locale"):
-        registry.resolve_locale("retail_client", "fr-CA")
-
-
-@pytest.mark.parametrize("role_id", ["administrator", "Retail_Client", "industrial-designer"])
-def test_unknown_or_noncanonical_lookup_is_rejected(registry, role_id):
-    with pytest.raises(UnknownRoleError, match="Unknown canonical role"):
+def test_unknown_legacy_and_merged_ids_rejected(registry, role_id):
+    with pytest.raises(UnknownRoleError):
         registry.get_profile(role_id)
 
 
-def test_duplicate_roles_are_rejected(catalog_data):
-    catalog_data["profiles"][-1] = deepcopy(catalog_data["profiles"][0])
-    with pytest.raises(ValidationError, match="unique"):
-        RoleProfileBundle.model_validate(catalog_data)
+def test_locale_resolution(registry):
+    assert registry.resolve_locale("RR-C25", "ru_RU") == "ru"
+    with pytest.raises(UnsupportedLocaleError):
+        registry.resolve_locale("RR-C25", "fr")
 
 
-def test_unknown_catalog_role_is_rejected(catalog_data):
-    catalog_data["profiles"][0]["role_id"] = "administrator"
-    with pytest.raises(ValidationError):
-        RoleProfileBundle.model_validate(catalog_data)
-
-
-def test_invalid_policy_value_is_rejected(catalog_data):
-    catalog_data["profiles"][0]["question_policy"]["budget"] = "unlimited"
-    with pytest.raises(ValidationError):
-        RoleProfileBundle.model_validate(catalog_data)
-
-
-def test_invalid_policy_combination_is_rejected_by_python_and_schema(catalog_data):
-    catalog_data["profiles"][0]["detail_level"] = "engineering"
-    with pytest.raises(ValidationError, match="Policy combination"):
-        RoleProfileBundle.model_validate(catalog_data)
-    assert list(Draft202012Validator(role_profiles_json_schema()).iter_errors(catalog_data))
-
-
-def test_role_cannot_define_authorization_privileges(catalog_data):
-    catalog_data["profiles"][0]["permissions"] = ["edit_locked_fields"]
-    with pytest.raises(ValidationError, match="Extra inputs"):
-        RoleProfileBundle.model_validate(catalog_data)
+def test_current_schema(registry):
+    schema = role_profiles_json_schema()
+    assert json.loads(SCHEMA.read_text()) == schema
+    Draft202012Validator.check_schema(schema)
+    for role_id in registry:
+        Draft202012Validator(schema).validate(registry[role_id].model_dump(mode="json"))
 
 
 def transition_args(revision):
@@ -192,3 +126,32 @@ def test_role_api_has_no_domain_transition_or_authorization_parameters():
         parameters = inspect.signature(operation).parameters
         assert "role" not in parameters
         assert "permissions" not in parameters
+
+
+def test_original_roles_archive_and_deterministic_seed(tmp_path):
+    """Complete source-fixture ownership: validate original bytes and rebuild all imported data."""
+    import hashlib
+    import subprocess
+    import sys
+    from zipfile import ZipFile
+
+    source_root = ROOT / "data/roles/sources"
+    manifest = json.loads((source_root / "source-import-manifest.json").read_text())
+    archive = source_root / manifest["archive_file"]
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == manifest["archive_sha256"]
+    with ZipFile(archive) as z:
+        for name, record in manifest["files"].items():
+            raw = z.read(name)
+            assert len(raw) == record["bytes"]
+            assert hashlib.sha256(raw).hexdigest() == record["sha256"]
+    output = tmp_path / "roles.json"
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools/roles/build_seed.py"), "--output", str(output)],
+        check=True,
+        timeout=15,
+        capture_output=True,
+    )
+    assert (
+        output.read_bytes()
+        == (ROOT / "packages/persistence/src/jewelai_persistence/role_seed.json").read_bytes()
+    )

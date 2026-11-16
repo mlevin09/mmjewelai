@@ -39,6 +39,7 @@ from jewelai_prompts import (
     enrich_prompt_with_active_release,
     load_prompt_templates,
 )
+from tests.current_roles import current_roles
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.clarification import (
@@ -86,7 +87,7 @@ def templates():
 
 @pytest.fixture(scope="module")
 def runtime_artifacts():
-    return load_runtime_artifacts(ROOT, ArtifactVersions())
+    return load_runtime_artifacts(ROOT, ArtifactVersions(), roles=current_roles())
 
 
 @pytest.fixture
@@ -541,7 +542,7 @@ def test_combined_collision_and_halo_preserve_matrix_and_final_constraints(
                 prompt_template_artifact_version=templates.artifact_version,
                 enrichment_version=result.enrichment_result.enrichment_version,
             ),
-            rule_decision=runtime_artifacts.rules.evaluate(revision, "retail_client"),
+            rule_decision=runtime_artifacts.rules.evaluate(revision, "RR-C25"),
             constraint_evidence=evidence,
         )
         final = assemble_internal_final_prompt(
@@ -562,7 +563,7 @@ def test_combined_collision_and_halo_preserve_matrix_and_final_constraints(
     assert revision.model_dump_json() == before
 
 
-@pytest.mark.parametrize("role_id", ("retail_client", "jewelry_designer"))
+@pytest.mark.parametrize("role_id", ("RR-C25", "RR-C09"))
 def test_combined_four_turn_halo_history_uses_collision_release(
     engine, tmp_path, monkeypatch, role_id, collision_release
 ):
@@ -1013,7 +1014,7 @@ def test_explicit_release_never_falls_forward_and_result_is_deterministic(
     )
 
 
-def _plan(revision, enrichment, runtime_artifacts, *, role_id="retail_client"):
+def _plan(revision, enrichment, runtime_artifacts, *, role_id="RR-C25"):
     return plan_clarifications(
         revision,
         enrichment,

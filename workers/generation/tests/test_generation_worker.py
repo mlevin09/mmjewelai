@@ -226,6 +226,9 @@ def durable_metadata(run_id=RUN_ID, *, created_at=NOW):
 def persisted(tmp_path):
     engine = create_database_engine(f"sqlite+pysqlite:///{tmp_path / 'worker.db'}")
     Base.metadata.create_all(engine)
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     repository = PersistenceRepository(create_session_factory(engine))
     repository.create_organization(ORG_ID, "Organization", NOW)
     repository.create_project(PROJECT_ID, ORG_ID, "Project", NOW)
@@ -235,7 +238,7 @@ def persisted(tmp_path):
     session = DesignSessionRow(
         session_id=SESSION_ID,
         project_id=PROJECT_ID,
-        role_id="retail_client",
+        role_id="RR-C25",
         locale="en",
         created_at=NOW,
         updated_at=NOW,

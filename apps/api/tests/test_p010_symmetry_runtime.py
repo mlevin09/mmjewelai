@@ -115,7 +115,7 @@ def exercise_p010_rejected_http(
         response = client.post(
             f"/projects/{project}/sessions",
             headers={"X-Organization-ID": org},
-            json={"role_id": "retail_client", "locale": "ru-RU" if "кольцо" in text else "en-US"},
+            json={"role_id": "RR-C25", "locale": "ru-RU" if "кольцо" in text else "en-US"},
         )
         assert response.status_code == 201
         sid = response.json()["session_id"]
@@ -693,7 +693,7 @@ def exercise_keep_correction_sequence(
         response = client.post(
             f"/projects/{project}/sessions",
             headers=headers,
-            json={"role_id": "retail_client", "locale": "ru-RU"},
+            json={"role_id": "RR-C25", "locale": "ru-RU"},
         )
         assert response.status_code == 201
         sid = response.json()["session_id"]
@@ -1040,7 +1040,7 @@ def exercise_p010_http(engine, tmp_path, monkeypatch):
         response = client.post(
             f"/projects/{project}/sessions",
             headers={"X-Organization-ID": org},
-            json={"role_id": "retail_client", "locale": "ru-RU"},
+            json={"role_id": "RR-C25", "locale": "ru-RU"},
         )
         assert response.status_code == 201
         sid = response.json()["session_id"]

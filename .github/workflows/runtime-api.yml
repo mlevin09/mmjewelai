@@ -75,6 +75,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || inputs.confirm_sha }}
           fetch-depth: 0
           persist-credentials: false
+      # AST declaration/hash ownership must run on the same Python version
+      # used by reference qualification and all selected native tests.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Select PR tests against the complete PR merge base
         id: selection
         env:
@@ -159,7 +164,8 @@ jobs:
         if: always()
         run: |
           if test -f "${RUNNER_TEMP}/pr-results/summary.md"; then
-            cat "${RUNNER_TEMP}/pr-results/summary.md" >> "${GITHUB_STEP_SUMMARY}"
+            # The summary is already bounded and redacted; expose case IDs on FAIL.
+            cat "${RUNNER_TEMP}/pr-results/summary.md" | tee -a "${GITHUB_STEP_SUMMARY}"
           fi
       - name: Retain bounded selected coverage and failures
         if: always()

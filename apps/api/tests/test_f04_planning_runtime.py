@@ -12,6 +12,7 @@ from test_parsed_enrichment import NOW, ROOT
 from test_parsed_enrichment import collision_release as collision_release
 from test_parsed_enrichment import dictionary as dictionary
 from test_parsed_enrichment import ring as ring
+from tests.current_roles import current_roles
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.clarification_v2 import InitialTrigger
@@ -33,7 +34,9 @@ from jewelai_api.settings import ArtifactVersions
     ],
 )
 def test_f04_real_parsing_to_plan(text, kind, ring, collision_release):
-    artifacts = load_runtime_artifacts(ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"))
+    artifacts = load_runtime_artifacts(
+        ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"), roles=current_roles()
+    )
     data = ring.model_dump(mode="json")
     data["design"] = {}
     revision = DesignRevision.model_validate(data)
@@ -98,7 +101,7 @@ def test_f04_real_parsing_to_plan(text, kind, ring, collision_release):
         authoritative,
         result,
         artifacts=artifacts,
-        role_id="retail_client",
+        role_id="RR-C25",
         plan_id=plan,
         cycle_id=cycle,
         cycle_number=1,

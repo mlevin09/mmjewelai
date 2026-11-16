@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 from test_professional_knowledge_http import real_config as real_config
+from tests.current_roles import current_roles
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools/knowledge"))
@@ -116,7 +117,9 @@ def test_real_release_verifier_and_mismatched_consumers(real_config):
     report = json.loads(real_config.validation_report_path.read_bytes())
     from jewelai_domain.knowledge_activation_v1_1 import ProductionValidationReportV1_1
 
-    artifacts = load_runtime_artifacts(ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"))
+    artifacts = load_runtime_artifacts(
+        ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"), roles=current_roles()
+    )
     manifest = dict(
         semantic={
             **{

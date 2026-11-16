@@ -19,6 +19,7 @@ from jewelai_domain.knowledge_storage_v1_1 import KnowledgeArtifactStoreV1_1
 from jewelai_domain.models import DesignRevision
 from jewelai_parser import KnowledgeLibraryMatcher, ResolvedKnowledgeMatch, parse_full_message
 from jewelai_prompts import EnrichmentProposal, enrich_prompt
+from tests.current_roles import current_roles
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.parametric_enrichment import select_parametric_references
@@ -40,7 +41,9 @@ def catalogs():
         }
     )
     runtime = compile_knowledge_library_v1_1(candidate)[0]
-    artifacts = load_runtime_artifacts(ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"))
+    artifacts = load_runtime_artifacts(
+        ROOT, ArtifactVersions(questions="2.0.0", rules="2.0.0"), roles=current_roles()
+    )
     return candidate, runtime, artifacts
 
 

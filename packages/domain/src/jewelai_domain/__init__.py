@@ -138,7 +138,6 @@ from .roles import (
     RoleRegistry,
     UnknownRoleError,
     UnsupportedLocaleError,
-    load_role_profiles,
 )
 from .rules import (
     RULES_SCHEMA_VERSION,
@@ -246,7 +245,6 @@ __all__ = [
     "load_parametric_knowledge",
     "load_question_catalog",
     "load_rules",
-    "load_role_profiles",
     "promote_knowledge_runtime",
     "qualify_knowledge_release",
     "revise_design",

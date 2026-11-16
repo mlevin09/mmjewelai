@@ -22,6 +22,7 @@ from jewelai_persistence import create_session_factory
 from jewelai_persistence.models import AuthPrincipalRow
 from jewelai_text_understanding_google import TextUnderstandingInvalidResponseError
 from sqlalchemy import select
+from tests.current_roles import current_roles
 
 from jewelai_api.artifacts import ArtifactConfigurationError, load_runtime_artifacts
 from jewelai_api.generation import GenerationProfile, GenerationProfileRegistry
@@ -74,7 +75,7 @@ def test_health_organization_project_session_and_scope(client):
     assert session.status_code == 201
     body = session.json()
     assert body["project_id"] == project_id
-    assert body["role_id"] == "retail_client"
+    assert body["role_id"] == "RR-C25"
     assert body["locale"] == "ru"
     assert set(body["artifacts"].values()) == {"1.0.0"}
 
@@ -106,12 +107,15 @@ def test_ui_catalog_projects_sessions_and_dictionary_options_are_scoped(client):
     assert catalog.status_code == 200
     body = catalog.json()
     assert [item["role_id"] for item in body["roles"]] == [
-        "retail_client",
-        "sales_manager",
-        "buyer",
-        "marketing",
-        "jewelry_designer",
-        "industrial_designer",
+        "RR-C25",
+        "RR-C18",
+        "RR-C09",
+        "RR-C10",
+        "RR-C11",
+        "RR-C12",
+        "RR-C06",
+        "RR-C17",
+        "RR-C23",
     ]
     assert body["locales"] == ["en", "ru"]
     assert body["generation_profiles"] == [
@@ -136,7 +140,7 @@ def test_ui_catalog_projects_sessions_and_dictionary_options_are_scoped(client):
     second_session = client.post(
         f"/projects/{project_id}/sessions",
         headers=headers,
-        json={"role_id": "buyer", "locale": "en"},
+        json={"role_id": "RR-C17", "locale": "en"},
     ).json()
     sessions = client.get(f"/projects/{project_id}/sessions", headers=headers)
     session_ids = [item["session_id"] for item in sessions.json()["sessions"]]
@@ -493,17 +497,17 @@ def test_membership_role_does_not_replace_conversational_role(client):
             **auth("test-retail-client"),
             "X-Organization-ID": organization["organization_id"],
         },
-        json={"role_id": "industrial_designer", "locale": "en"},
+        json={"role_id": "RR-C10", "locale": "en"},
     )
     assert session.status_code == 201
-    assert session.json()["role_id"] == "industrial_designer"
+    assert session.json()["role_id"] == "RR-C10"
 
 
 @pytest.mark.parametrize(
     ("role_id", "locale", "error"),
     [
         ("administrator", "en", "invalid_role"),
-        ("retail_client", "de", "unsupported_locale"),
+        ("RR-C25", "de", "unsupported_locale"),
     ],
 )
 def test_session_rejects_invalid_role_and_locale(client, role_id, locale, error):
@@ -620,7 +624,7 @@ def test_runtime_evaluation_renders_ask_persists_event_and_does_not_mutate(clien
     assert result["revision_id"] == edited["revision_id"]
     assert result["decision"]["decision"] == "ask"
     assert result["decision"]["question_id"] == "CENTER_STONE_SHAPE"
-    assert result["rendered_question"]["role_id"] == "retail_client"
+    assert result["rendered_question"]["role_id"] == "RR-C25"
     assert result["rendered_question"]["locale"] == "en"
 
     after = client.get(f"/sessions/{session['session_id']}", headers=headers).json()
@@ -990,7 +994,7 @@ def test_parser_proposal_scope_cross_session_message_and_staleness(client):
     foreign_session = client.post(
         f"/projects/{foreign_project['project_id']}/sessions",
         headers={"X-Organization-ID": foreign["organization_id"]},
-        json={"role_id": "retail_client", "locale": "en"},
+        json={"role_id": "RR-C25", "locale": "en"},
     ).json()
     foreign_message = client.post(
         f"/sessions/{foreign_session['session_id']}/messages",
@@ -1014,7 +1018,7 @@ def test_parser_proposal_scope_cross_session_message_and_staleness(client):
     second = client.post(
         f"/projects/{project['project_id']}/sessions",
         headers=headers,
-        json={"role_id": "industrial_designer", "locale": "en"},
+        json={"role_id": "RR-C10", "locale": "en"},
     ).json()
     wrong_message = client.post(
         f"/sessions/{second['session_id']}/parser-proposals",
@@ -1068,9 +1072,9 @@ def test_parser_proposal_scope_cross_session_message_and_staleness(client):
 
 def test_artifact_loader_requires_explicit_existing_version():
     with pytest.raises(ArtifactConfigurationError, match="missing"):
-        load_runtime_artifacts(ROOT, ArtifactVersions(rules="9.9.9"))
+        load_runtime_artifacts(ROOT, ArtifactVersions(rules="9.9.9"), roles=current_roles())
     with pytest.raises(ArtifactConfigurationError, match="missing"):
-        load_runtime_artifacts(ROOT, ArtifactVersions(prompts="9.9.9"))
+        load_runtime_artifacts(ROOT, ArtifactVersions(prompts="9.9.9"), roles=current_roles())
 
 
 def ready_design():
@@ -1130,7 +1134,7 @@ def test_prompt_compile_requires_ready_without_question_side_effect(client, app)
 
 
 def test_ready_prompt_compile_get_list_scope_and_request_strictness(client, app):
-    organization_id, _, response = create_hierarchy(client, role_id="industrial_designer")
+    organization_id, _, response = create_hierarchy(client, role_id="RR-C10")
     session = response.json()
     headers = {"X-Organization-ID": organization_id}
     revisions_url = f"/sessions/{session['session_id']}/revisions"
@@ -1543,7 +1547,7 @@ def test_generation_run_api_rejects_untrusted_profile_configuration_and_cross_sc
     second_session = client.post(
         f"/projects/{second_project['project_id']}/sessions",
         headers=headers,
-        json={"role_id": "retail_client", "locale": "en"},
+        json={"role_id": "RR-C25", "locale": "en"},
     ).json()
     wrong_session = client.post(
         f"/sessions/{second_session['session_id']}/generation-runs",

@@ -89,6 +89,10 @@ def test_isolated_historical_check_upgrade_downgrade_does_not_change_current_sch
     spec.loader.exec_module(migration)
     engine = create_engine(url)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     columns = [
         (c["name"], str(c["type"]), c["nullable"])
         for c in inspect(engine).get_columns("design_session")

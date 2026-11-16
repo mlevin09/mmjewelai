@@ -36,7 +36,7 @@ def capacity_session(engine, tmp_path, count, decoration, locale, rich=False):
         session = service.create_session(
             project.project_id,
             organization.organization_id,
-            CreateSessionRequest(role_id="retail_client", locale="ru-RU"),
+            CreateSessionRequest(role_id="RR-C25", locale="ru-RU"),
         )
     repository = service.repository
     current = repository.get_current_revision(session.session_id, organization.organization_id)

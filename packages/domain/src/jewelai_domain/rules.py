@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Iterator, Mapping
+from copy import copy
 from enum import StrEnum
 from pathlib import Path
 from types import MappingProxyType
@@ -493,13 +494,12 @@ class RuleRegistry(Mapping[str, Rule]):
         self,
         bundle: RulesBundle,
         *,
-        roles: RoleRegistry,
+        roles: RoleRegistry | None,
         dictionary: DictionaryRegistry,
         questions: QuestionCatalog,
     ):
         bundle = self._bundle_type.model_validate(bundle)
         expected_versions = (
-            ("role", bundle.role_artifact_version, roles.artifact_version),
             ("dictionary", bundle.dictionary_artifact_version, dictionary.artifact_version),
             ("question", bundle.question_artifact_version, questions.artifact_version),
         )
@@ -540,6 +540,13 @@ class RuleRegistry(Mapping[str, Rule]):
         self._evaluation_order = tuple(
             sorted(bundle.rules, key=lambda item: (-item.priority, item.tie_order, item.rule_id))
         )
+
+    def with_roles(self, roles: RoleRegistry):
+        """Bind reads to the caller's scope without mutating shared rules/questions."""
+        bound = copy(self)
+        bound._roles = roles
+        bound._questions = self._questions.with_roles(roles)
+        return bound
 
     @staticmethod
     def _validate_dictionary_reference(dictionary, target, value, declared_category):
@@ -630,6 +637,10 @@ class RuleRegistry(Mapping[str, Rule]):
         unresolved_context=None,
     ) -> RuleDecision:
         revision = validate_design_revision(revision)
+        if self._roles is None:
+            from .roles import RoleCatalogUnavailableError
+
+            raise RoleCatalogUnavailableError("Current role registry is required for execution")
         profile = self._roles.get_profile(role_id)
         facts = tuple(AvailableKnowledgeFact.model_validate(item) for item in knowledge_facts)
         for fact in facts:
@@ -834,7 +845,8 @@ class RuleRegistry(Mapping[str, Rule]):
                 detail=f"role={profile.role_id.value}; expected={condition.role_id.value}",
             )
         if isinstance(condition, RoleDerivationCondition):
-            actual = profile.derivation_policy.mode
+            # Legacy condition spelling is retained, but no Role Definition controls it.
+            actual = DerivationMode.SOURCED_WITH_UNCERTAINTY
             return ConditionTrace(
                 condition_kind=condition.kind,
                 outcome=actual == condition.mode,

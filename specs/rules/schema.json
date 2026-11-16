@@ -300,12 +300,27 @@
     },
     "RoleId": {
       "enum": [
-        "retail_client",
-        "sales_manager",
-        "buyer",
-        "marketing",
-        "jewelry_designer",
-        "industrial_designer"
+        "RR-C02",
+        "RR-C04",
+        "RR-C06",
+        "RR-C09",
+        "RR-C10",
+        "RR-C11",
+        "RR-C12",
+        "RR-C14",
+        "RR-C15",
+        "RR-C16",
+        "RR-C17",
+        "RR-C18",
+        "RR-C20",
+        "RR-C21",
+        "RR-C26",
+        "RR-C22",
+        "RR-C27",
+        "RR-C28",
+        "RR-C23",
+        "RR-C24",
+        "RR-C25"
       ],
       "title": "RoleId",
       "type": "string"

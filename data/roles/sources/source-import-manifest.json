@@ -1,0 +1,68 @@
+{
+  "archive_id": "1L5eTL9wj1XyTwURkCFD6lVWMKsphToCY",
+  "archive_sha256": "a2fc0f063a07fd51299bff9368139c077fea5998d65ba7b9c2c1e8a2e1fc69bb",
+  "files": {
+    "JewelAI_Role_Registry_v1.0_Approved_RU.md": {
+      "bytes": 22824,
+      "sha256": "d0ae4f869ab24b3fc1df6553528f6a4ea1df90294fa34380de0f3401e5aeedcc"
+    },
+    "JewelAI_Core_Role_Set_v1.0_Editorial_Update_RU.md": {
+      "bytes": 7813,
+      "sha256": "24159ea47b55e929e9cf35c9158d91effef5e30cedcf35f1dab2af14d6962623"
+    },
+    "ROLE_PASSPORT_STANDARD_v1.1_RU.md": {
+      "bytes": 6163,
+      "sha256": "d555b51472791eea9f514bdfde0a5d023322f5d28bf9e7c68f1973cd92e8270a"
+    },
+    "ROLE_PASSPORT_STANDARD_ADDENDUM_v1.1-A1_RU.md": {
+      "bytes": 4705,
+      "sha256": "f050ff00fb22188d294fd701c303a681794eb04c52027e9b30ce8b5f5bb1b57c"
+    },
+    "COMPACT_PERSONA_CARDS_36_v0.5_RU.md": {
+      "bytes": 112501,
+      "sha256": "7000b81606378ff7f1ef19dea4c47c695f5f196f3253eba52e9aa1ddf30f8abe"
+    },
+    "MANIFEST_v0.5_RU.md": {
+      "bytes": 2619,
+      "sha256": "557130f743a1c251247014f08b7a8edd9a406e5cbe1dd1c4bda8c5f55b7fa6d8"
+    },
+    "ROLE_PASSPORT_RR-C12_v0.5_RU.md": {
+      "bytes": 39667,
+      "sha256": "4472ee01dfad5d21c3edd15dcf0c9bd0d9caa8a3258b077312c3edec47b5f19f"
+    },
+    "ROLE_PASSPORT_RR-C25_v0.5_RU.md": {
+      "bytes": 41363,
+      "sha256": "101902dcaa467eecc068dc17d05cb95dc5b20d423560c58e41151b718791101e"
+    },
+    "ROLE_PASSPORT_RR-C17_v0.5_RU.md": {
+      "bytes": 38383,
+      "sha256": "58c5b7822e0b3926c5e274c1857c304511af69c805abf8b3e9c2f60763620e93"
+    },
+    "ROLE_PASSPORT_RR-C06_v0.5_RU.md": {
+      "bytes": 47198,
+      "sha256": "3f26b8fd06097ad527be8754dbc97641a81007fcc4b3127d03c66c572c2012d8"
+    },
+    "ROLE_PASSPORT_RR-C10_v0.5_RU.md": {
+      "bytes": 40390,
+      "sha256": "e1269a6abcc2ed48b3d3ad837f2562cbc22e706edaf0d82cf582a6b0ed9e778f"
+    },
+    "ROLE_PASSPORT_RR-C09_v0.5_RU.md": {
+      "bytes": 39997,
+      "sha256": "21ab25297066c3ce8976c9822c2abb365c6f4a948e9a802092d726785cff6495"
+    },
+    "ROLE_PASSPORT_RR-C18_v0.5_RU.md": {
+      "bytes": 40971,
+      "sha256": "c350f7ade1c1a0c09406a64f82a2fdb9ff62a136a0654aca329e3e7b1e15fbc5"
+    },
+    "ROLE_PASSPORT_RR-C23_v0.5_RU.md": {
+      "bytes": 44482,
+      "sha256": "ed56d86918c899d95a2622791728e7a48046eb999aaac09f8fb94af83ff27faa"
+    },
+    "ROLE_PASSPORT_RR-C11_v0.5_RU.md": {
+      "bytes": 45710,
+      "sha256": "2317f22de5be491efe3658035ff4791ef812d68273bfcca51181eff1107e33f4"
+    }
+  },
+  "archive_file": "original-role-sources.zip",
+  "files_scope": "unchanged members inside the original source archive"
+}
