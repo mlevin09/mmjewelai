@@ -105,7 +105,7 @@ describe("authentication shell", () => {
 });
 
 describe("current Studio role selection", () => {
-  it("shows nine backend roles with their names and submits the canonical role ID", async () => {
+  it("shows nine backend role names and submits the canonical role ID", async () => {
     oidc.currentUser = { access_token: "access-token" };
     const roleIds = [
       "RR-C25",
@@ -183,10 +183,10 @@ describe("current Studio role selection", () => {
       Array.from(select.querySelectorAll("option"), (option) => option.value),
     ).toEqual(roleIds);
     expect(
-      screen.getByRole("option", { name: "Частный покупатель (RR-C25)" }),
+      screen.getByRole("option", { name: "Частный покупатель" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("option", { name: "CAD designer (RR-C10)" }),
+      screen.getByRole("option", { name: "CAD designer" }),
     ).toBeInTheDocument();
 
     await userEvent.selectOptions(
@@ -194,7 +194,7 @@ describe("current Studio role selection", () => {
       "ru",
     );
     expect(
-      screen.getByRole("option", { name: "CAD-дизайнер (RR-C10)" }),
+      screen.getByRole("option", { name: "CAD-дизайнер" }),
     ).toBeInTheDocument();
     await userEvent.selectOptions(select, "RR-C10");
     await userEvent.click(screen.getByRole("button", { name: "Start session" }));
