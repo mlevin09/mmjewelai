@@ -18,6 +18,16 @@ from qualification import validate_qualification
 class SelectedTestsFailed(ValueError):
     """Observed test failures, distinct from missing/invalid execution evidence."""
 
+# Guardrail, not a test exemption: oversized scopes are BLOCKED for routing review.
+# Full qualification remains a separate explicitly authorized workflow.
+MAX_AUTOMATIC_PR_CASES = 800
+
+
+def enforce_automatic_case_budget(collections, qualification, *, limit=MAX_AUTOMATIC_PR_CASES):
+    """Refuse runaway PR test execution before invoking any selected test body."""
+    if qualification is None and sum(len(case_ids) for case_ids in collections.values()) > limit:
+        raise ValueError("automatic_pr_risk_budget_exceeded")
+
 
 def entire_api_scope(root, targets):
     """Cheap path-only guard; do not import/collect the entire API for a narrow selection."""
@@ -152,6 +162,7 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
             result["groups"][suite] = dict(
                 selected=len(ids), case_ids=ids, targets=group["targets"]
             )
+        enforce_automatic_case_budget(collections, qualification)
         if qualification is not None:
             if not set(collections.get("api", [])).issubset(qualification["api_cases"]):
                 raise ValueError("full_qualification_missing_selected_api_cases")
