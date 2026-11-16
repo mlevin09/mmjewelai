@@ -58,3 +58,7 @@ remain. Historical serialized user data is not rewritten or purged.
 
 Hosted exact-head CI, including PostgreSQL execution, remains a separate recorded gate in the
 Draft PR. No claim of PostgreSQL qualification is made from SQLite results or source inspection.
+
+Original sources are stored inside the byte-identical `data/roles/sources/original-role-sources.zip`;
+its import manifest identifies individual members. Original Markdown hard-break whitespace is
+preserved without suppressing Git whitespace checks or changing source bytes.

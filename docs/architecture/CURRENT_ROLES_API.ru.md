@@ -45,3 +45,7 @@ Membership организации и scope сессии обязательны �
 Они не квалифицируют PostgreSQL ARRAY/JSONB, фактический Alembic и FK. PostgreSQL тест использует
 существующий fresh-container/cluster/job safety gate перед DDL. Общие данные не удалялись.
 Существующие записи со старыми ID сохранены, но не поддерживаются.
+
+Оригиналы находятся внутри побайтно сохранённого `data/roles/sources/original-role-sources.zip`;
+import manifest идентифицирует отдельные файлы архива. Исходные Markdown hard-break пробелы
+сохранены без отключения Git whitespace checks и без изменения исходных байтов.

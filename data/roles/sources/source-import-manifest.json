@@ -62,5 +62,7 @@
       "bytes": 45710,
       "sha256": "2317f22de5be491efe3658035ff4791ef812d68273bfcca51181eff1107e33f4"
     }
-  }
+  },
+  "archive_file": "original-role-sources.zip",
+  "files_scope": "unchanged members inside the original source archive"
 }

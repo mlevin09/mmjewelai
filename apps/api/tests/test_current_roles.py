@@ -164,15 +164,17 @@ def test_seed_sources_and_transactional_import(engine):
     seed = json.loads(
         (ROOT / "packages/persistence/src/jewelai_persistence/role_seed.json").read_text()
     )
-    sources = ROOT / "data/roles/sources"
+    from zipfile import ZipFile
+
+    sources = ZipFile(ROOT / "data/roles/sources/original-role-sources.zip")
     for record in seed:
         for kind in ("registry", "passport"):
             source = record["role_data"].get(kind)
             if source is not None:
-                raw = (sources / source["source_id"]).read_bytes()
+                raw = sources.read(source["source_id"])
                 assert raw.decode() == source["content"]
                 assert hashlib.sha256(raw).hexdigest() == source["sha256"]
-        cards = (sources / "COMPACT_PERSONA_CARDS_36_v0.5_RU.md").read_text()
+        cards = sources.read("COMPACT_PERSONA_CARDS_36_v0.5_RU.md").decode()
         for persona in record["role_data"]["personas"]:
             assert persona["content"] in cards
     factory = create_session_factory(engine)

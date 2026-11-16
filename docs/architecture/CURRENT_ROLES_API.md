@@ -45,3 +45,7 @@ tenant denial, source fidelity, update visibility, malformed-data rejection and 
 They cannot qualify PostgreSQL ARRAY/JSONB, actual Alembic execution or FK validation. The
 PostgreSQL test uses the existing fresh-container/cluster/job safety gate before any DDL.
 No shared data was purged. Existing records with old IDs remain stored but are unsupported.
+
+Original sources are stored inside the byte-identical `data/roles/sources/original-role-sources.zip`;
+its import manifest identifies individual members. Original Markdown hard-break whitespace is
+preserved without suppressing Git whitespace checks or changing source bytes.

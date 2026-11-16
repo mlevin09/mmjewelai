@@ -61,3 +61,7 @@ current-session integrity, dictionary/provenance/authorization assertions сох
 
 Hosted exact-head CI и PostgreSQL execution — отдельный gate Draft PR. SQLite и code inspection
 не выдаются за PostgreSQL qualification. Точные команды пяти domain-файлов находятся в EN MASTER.
+
+Оригиналы находятся внутри побайтно сохранённого `data/roles/sources/original-role-sources.zip`;
+import manifest идентифицирует отдельные файлы архива. Исходные Markdown hard-break пробелы
+сохранены без отключения Git whitespace checks и без изменения исходных байтов.

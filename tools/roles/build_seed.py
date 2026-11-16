@@ -7,12 +7,13 @@ import hashlib
 import json
 import re
 from pathlib import Path
+from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[2]
-src = ROOT / "data/roles/sources"
+archive = ZipFile(ROOT / "data/roles/sources/original-role-sources.zip")
 out = ROOT / "packages/persistence/src/jewelai_persistence"
-registry = (src / "JewelAI_Role_Registry_v1.0_Approved_RU.md").read_text()
-cards = (src / "COMPACT_PERSONA_CARDS_36_v0.5_RU.md").read_text()
+registry = archive.read("JewelAI_Role_Registry_v1.0_Approved_RU.md").decode()
+cards = archive.read("COMPACT_PERSONA_CARDS_36_v0.5_RU.md").decode()
 rows = []
 for line in registry.splitlines():
     if not re.match(r"^\| RR-C\d+ \|", line) or "`MERGED_INTO`" in line:
@@ -31,9 +32,9 @@ aliases = {
 
 
 def doc(path, maturity):
-    b = path.read_bytes()
+    b = archive.read(path)
     return {
-        "source_id": path.name,
+        "source_id": path,
         "sha256": hashlib.sha256(b).hexdigest(),
         "language": "ru",
         "maturity": maturity,
@@ -44,18 +45,16 @@ def doc(path, maturity):
 records = []
 for rid, name, line in rows:
     data = {
-        "registry": doc(
-            src / "JewelAI_Role_Registry_v1.0_Approved_RU.md", "OWNER_CONFIRMED_COMPOSITION"
-        ),
+        "registry": doc("JewelAI_Role_Registry_v1.0_Approved_RU.md", "OWNER_CONFIRMED_COMPOSITION"),
         "registry_entry": line,
         "personas": [],
         "source_date": "2026-11-12",
         "authorization_effect": "none",
     }
-    path = src / f"ROLE_PASSPORT_{rid}_v0.5_RU.md"
-    if path.exists():
+    path = f"ROLE_PASSPORT_{rid}_v0.5_RU.md"
+    if path in archive.namelist():
         data["passport"] = doc(path, "DRAFT_NOT_OWNER_APPROVED")
-        headings = re.findall(r"^## (\d+)\.", path.read_text(), re.M)
+        headings = re.findall(r"^## (\d+)\.", archive.read(path).decode(), re.M)
         assert headings == [str(i) for i in range(1, 14)], (rid, headings)
         group = re.search(r"^## " + rid + r" —.*?(?=^## RR-C|\Z)", cards, re.M | re.S).group()
         variants = re.findall(r"^### (" + rid + r"/P\d) —(.*?)(?=^### |\Z)", group, re.M | re.S)
@@ -68,7 +67,7 @@ for rid, name, line in rows:
                     "maturity": "PROTO_PERSONA_MODELING_HYPOTHESIS",
                     "source_id": "COMPACT_PERSONA_CARDS_36_v0.5_RU.md",
                     "source_sha256": hashlib.sha256(
-                        (src / "COMPACT_PERSONA_CARDS_36_v0.5_RU.md").read_bytes()
+                        archive.read("COMPACT_PERSONA_CARDS_36_v0.5_RU.md")
                     ).hexdigest(),
                 }
             )
