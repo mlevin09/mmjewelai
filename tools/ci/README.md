@@ -5,6 +5,18 @@ check identity. Product logic, provider/runtime deployments and branch protectio
 
 ## Automatic PR gate
 
+The Runtime API workflow cancels superseded automatic runs when a newer commit
+arrives in the same PR. Explicit manual exact-SHA rechecks are not cancelled.
+Before running any selected test bodies, automatic PR CI collects the selected
+native cases and **blocks** plans containing more than 800 test cases as
+`automatic_pr_risk_budget_exceeded`. This is deliberately not a PASS, a test
+skip, or a way to bypass Full qualification: the selected scope must be
+reviewed and safely narrowed based on actual dependencies, or the separately
+authorized Full qualification must prove the exact SHA. No suite can run for
+20 minutes merely because the selector expanded a narrow PR into thousands
+of cases; unowned/unsafe impact remains red and explicit.
+
+
 `Runtime API` / job `runtime` keeps its existing required-check identity. Every PR
 against `jewelai-v2` receives a gate, including docs-only PRs; no workflow path
 filter or conditional required job can leave a missing/skipped check. There is
