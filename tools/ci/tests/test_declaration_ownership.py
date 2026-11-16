@@ -17,7 +17,7 @@ from test_fixture_routing import scratch_repo
 
 ROOT = Path(__file__).resolve().parents[3]
 BASE = "262acb810f81cb75e6be0fa6d26361c7cdae0fdc"
-ROLES = "fe5ec8466d2d6ca63a1fcb69483043aa0bbc3869"
+ROLES = "19a86556f693dfe188ab89769c06f9600cd4cf40"
 CONFIG = json.loads((ROOT / "tools/ci/pr_routes.json").read_text())
 
 
@@ -37,13 +37,14 @@ def test_real_roles_diff_has_explained_bounded_owners(roles_tree, monkeypatch):
     result = pr_selection.build_selection(
         roles_tree, paths, CONFIG, source_sha=ROLES, merge_base=base
     )
-    assert len(paths) == 77
+    assert len(paths) == 81
     assert result["blocked_reasons"] == []
     assert result["needs_database"] and result["full_regression_required"]
     chosen = {t for g in result["suites"].values() for t in g["targets"]}
     assert {
         "apps/api/tests/test_current_roles.py",
         "apps/api/tests/test_current_roles_postgres.py",
+        "apps/api/tests/test_role_transaction_reads.py",
         "apps/api/tests/test_f04_postgres.py",
         "packages/domain/tests/test_canonical_lock_policy.py",
     } <= chosen

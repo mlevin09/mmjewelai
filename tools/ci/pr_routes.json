@@ -1049,6 +1049,42 @@
           "sessions",
           "state_safety"
         ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime.py",
+        "declarations": [
+          "@module",
+          "PromptEnrichmentRuntimeService._commit_verified",
+          "PromptEnrichmentRuntimeService._for_session",
+          "build_final_prompt_snapshot"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "sessions"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime_v2.py",
+        "declarations": [
+          "_history_frame"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "sessions"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/repository.py",
+        "declarations": [
+          "@module",
+          "PersistenceRepository.current_role_registry"
+        ],
+        "components": [
+          "roles",
+          "state_safety"
+        ]
       }
     ],
     "resources": [

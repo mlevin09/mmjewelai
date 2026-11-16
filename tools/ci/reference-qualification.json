@@ -1,6 +1,6 @@
 {
   "assignment": "CI-RISK-002",
-  "source_sha": "fe5ec8466d2d6ca63a1fcb69483043aa0bbc3869",
+  "source_sha": "19a86556f693dfe188ab89769c06f9600cd4cf40",
   "base_sha": "262acb810f81cb75e6be0fa6d26361c7cdae0fdc",
   "purpose": "One native hosted execution of actual ROLES-001 source using the candidate selector; not a Full Regression or release qualification. No product source modification."
 }
