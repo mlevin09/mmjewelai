@@ -26,6 +26,11 @@ on:
         required: true
         type: string
 
+# Cancel superseded PR commits; never cancel a manually authorized exact-SHA recheck.
+concurrency:
+  group: runtime-api-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   actions: read # Read a supplied full-run receipt; never dispatch or write statuses.
@@ -150,6 +155,12 @@ jobs:
               result.write_text(json.dumps(receipt, indent=2) + "\n")
               print(json.dumps(receipt))
           PY
+      - name: Publish bounded risk summary
+        if: always()
+        run: |
+          if test -f "${RUNNER_TEMP}/pr-results/summary.md"; then
+            cat "${RUNNER_TEMP}/pr-results/summary.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
       - name: Retain bounded selected coverage and failures
         if: always()
         uses: actions/upload-artifact@v4

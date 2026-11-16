@@ -294,6 +294,10 @@ def suite_for(target):
 
 
 def build_selection(root, changed, config, *, source_sha, merge_base):
+    if config.get("version") == 2:
+        from pr_impact import select
+
+        return select(root, changed, config, source_sha=source_sha, merge_base=merge_base)
     if config.get("version") != 1:
         raise ValueError("unsupported_routing_version")
     targets, reasons, buckets, blocked, full = set(), {}, set(), [], []
@@ -466,6 +470,11 @@ def validate_selection(manifest, root):
         != manifest["config_sha256"]
     ):
         raise ValueError("routing_changed")
+    config = json.loads((root / "tools/ci/pr_routes.json").read_text())
+    if config.get("version") == 2 and manifest != build_selection(
+        root, changed, config, source_sha=head, merge_base=base
+    ):
+        raise ValueError("selection_ownership_proof_mismatch")
     return manifest
 
 
