@@ -831,6 +831,10 @@ def test_postgres_concurrent_initial_orchestration_commits_one_complete_history(
     pg_engine = create_database_engine(database_url)
     Base.metadata.drop_all(pg_engine)
     Base.metadata.create_all(pg_engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(pg_engine))
     try:
         service = build_service(pg_engine)
         organization, _, session = create_persisted_session(service)
@@ -883,6 +887,10 @@ def test_postgres_concurrent_persisted_answers_commit_one_cycle_and_plan(tmp_pat
     pg_engine = create_database_engine(database_url)
     Base.metadata.drop_all(pg_engine)
     Base.metadata.create_all(pg_engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(pg_engine))
     try:
         service = build_service(pg_engine)
         organization, _, session = create_persisted_session(service)
@@ -960,6 +968,10 @@ def test_postgres_answer_listing_uses_one_consistent_session_snapshot(tmp_path):
     pg_engine = create_database_engine(database_url)
     Base.metadata.drop_all(pg_engine)
     Base.metadata.create_all(pg_engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(pg_engine))
     try:
         service = build_service(pg_engine)
         organization, _, session = create_persisted_session(service)
@@ -1028,6 +1040,10 @@ def test_postgres_conflicting_corrections_commit_no_partial_constraint_history(t
     pg_engine = create_database_engine(database_url)
     Base.metadata.drop_all(pg_engine)
     Base.metadata.create_all(pg_engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(pg_engine))
     try:
         service = build_service(pg_engine)
         organization, _, session = create_persisted_session(service)

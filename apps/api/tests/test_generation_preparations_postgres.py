@@ -81,6 +81,7 @@ from test_p010_symmetry_runtime import (
 )
 from test_pr133_review_regressions import assert_preparation_roundtrip
 from test_prompt_enrichment_http import _client
+from tests.current_roles import current_roles
 
 
 @pytest.mark.parametrize("binding", (False, True))
@@ -288,7 +289,7 @@ def engine(monkeypatch, capfd):
     try:
         command.upgrade(cfg, "0015_reference_verification")
         # Insert an actual old session/revision before the additive upgrade, retain exact bytes.
-        client, _ = _client(scoped)
+        client, _ = _client(scoped, role_registry=current_roles())
         with client:
             repository = client.app.state.service.repository
             with monkeypatch.context() as checkpoint:
@@ -321,7 +322,7 @@ def engine(monkeypatch, capfd):
                 db.scalar(text("SELECT snapshot::text FROM specification_revision LIMIT 1"))
                 == old_bytes
             )
-        client, _ = _client(scoped)
+        client, _ = _client(scoped, role_registry=current_roles())
         with client:
             after = client.get(f"/sessions/{sid}", headers={"X-Organization-ID": org})
         assert after.status_code == 200 and after.json() == before.json()

@@ -60,6 +60,7 @@ from jewelai_prompts import compile_prompt
 from pydantic import ValidationError
 from sqlalchemy import event, func, inspect, select, update
 from sqlalchemy.exc import IntegrityError
+from tests.current_roles import current_roles
 
 from jewelai_api.artifacts import load_runtime_artifacts
 from jewelai_api.schemas import CreateSessionRequest
@@ -91,7 +92,7 @@ class MemoryObjectStore:
 
 def build_service(engine):
     repository = PersistenceRepository(create_session_factory(engine))
-    artifacts = load_runtime_artifacts(ROOT, ArtifactVersions())
+    artifacts = load_runtime_artifacts(ROOT, ArtifactVersions(), roles=current_roles())
 
     class UnusedAssetAccessSigner:
         def sign_read(self, object_key, expires_at):
@@ -117,7 +118,7 @@ def create_persisted_session(service):
     session = service.create_session(
         project.project_id,
         organization.organization_id,
-        CreateSessionRequest(role_id="retail_client", locale="en-US"),
+        CreateSessionRequest(role_id="RR-C25", locale="en-US"),
     )
     return organization, project, session
 
@@ -1060,6 +1061,10 @@ def test_postgres_visualization_iteration_flushes_runs_before_dispatch_outboxes(
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     try:
         service = build_service(engine)
         organization, _, session = create_persisted_session(service)
@@ -1108,6 +1113,10 @@ def test_postgres_last_owner_mutations_are_serialized():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     repository = PersistenceRepository(create_session_factory(engine))
     owners = tuple(
         repository.get_or_create_principal(
@@ -1151,6 +1160,10 @@ def test_postgres_concurrent_principal_creation_resolves_one_identity():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     identity = VerifiedIdentity(issuer="https://issuer.test", subject="racing-principal")
     identifiers = (
         UUID("49494949-4949-4949-8949-494949494949"),
@@ -1647,6 +1660,10 @@ def test_postgres_concurrent_compare_and_swap_allows_exactly_one_writer():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
     current = service.repository.get_current_revision(
@@ -1685,6 +1702,10 @@ def test_postgres_concurrent_generation_claim_allows_exactly_one_worker():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
     run_id = UUID("15151515-1515-4515-8515-151515151515")
@@ -1726,6 +1747,10 @@ def test_postgres_concurrent_outbox_redrive_uses_one_logical_task_identity():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
     run_id = UUID("17171717-1717-4717-8717-171717171717")
@@ -1769,6 +1794,10 @@ def test_postgres_concurrent_retry_creates_one_child_and_outbox():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
     parent_id = UUID(int=1911)
@@ -1831,6 +1860,10 @@ def test_postgres_stale_recovery_and_completion_have_one_terminal_winner():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
     run_id = UUID(int=1931)
@@ -1904,6 +1937,10 @@ def test_postgres_concurrent_metadata_adoption_converges_to_one_ready_asset():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, project, session = create_persisted_session(service)
     run_id = UUID(int=1941)
@@ -1969,6 +2006,10 @@ def test_postgres_concurrent_generated_output_mapping_allows_one_asset():
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, project, session = create_persisted_session(service)
     run_id = UUID("29292929-2929-4929-8929-292929292929")

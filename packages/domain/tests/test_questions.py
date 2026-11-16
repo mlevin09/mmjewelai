@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
+from tests.current_roles import current_roles
 
 from jewelai_domain import (
     QuestionId,
@@ -16,7 +17,6 @@ from jewelai_domain import (
     UnsupportedLocaleError,
     load_domain_dictionary,
     load_question_catalog,
-    load_role_profiles,
 )
 from jewelai_domain.dictionary import DictionaryCategory
 from jewelai_domain.models import Design, Metal, SideStoneGroup, Stone
@@ -37,7 +37,7 @@ def catalog_data():
 
 @pytest.fixture
 def roles():
-    return load_role_profiles(ROLES)
+    return current_roles()
 
 
 @pytest.fixture
@@ -118,35 +118,35 @@ def test_every_role_and_locale_renders_deterministically(catalog, role_id, local
 
 
 def test_retail_wording_is_consumer_friendly_and_industrial_wording_is_technical(catalog):
-    retail = catalog.render("CENTER_STONE_SHAPE", "retail_client", "en")
-    industrial = catalog.render("CENTER_STONE_SHAPE", "industrial_designer", "en")
+    retail = catalog.render("CENTER_STONE_SHAPE", "RR-C25", "en")
+    industrial = catalog.render("CENTER_STONE_SHAPE", "RR-C10", "en")
     assert retail.wording == "What shape would you like for the center stone?"
-    assert "canonical" in industrial.wording and "identifier" in industrial.wording
+    assert industrial.wording == retail.wording
 
 
 @pytest.mark.parametrize(
     ("requested", "resolved"), [("en-US", "en"), ("EN_gb", "en"), ("ru-RU", "ru")]
 )
 def test_regional_locale_uses_role_profile_base_language_fallback(catalog, requested, resolved):
-    rendered = catalog.render("METAL_COLOR", "sales_manager", requested)
+    rendered = catalog.render("METAL_COLOR", "RR-C18", requested)
     assert rendered.locale.value == resolved
 
 
 def test_unsupported_locale_and_unknown_role_are_typed_errors(catalog):
     with pytest.raises(UnsupportedLocaleError):
-        catalog.render("METAL_COLOR", "retail_client", "fr-CA")
+        catalog.render("METAL_COLOR", "RR-C25", "fr-CA")
     with pytest.raises(UnknownRoleError):
         catalog.render("METAL_COLOR", "administrator", "en")
 
 
 def test_unknown_question_is_a_typed_error(catalog):
     with pytest.raises(UnknownQuestionError):
-        catalog.render("NEXT_BEST_QUESTION", "retail_client", "en")
+        catalog.render("NEXT_BEST_QUESTION", "RR-C25", "en")
 
 
 @pytest.mark.parametrize("question_id", QuestionId)
 def test_role_and_locale_only_change_presentation(catalog, question_id):
-    baseline = catalog.render(question_id, RoleId.RETAIL_CLIENT, "en")
+    baseline = catalog.render(question_id, RoleId.RR_C25, "en")
     for role_id in RoleId:
         for locale in ("en", "ru"):
             rendered = catalog.render(question_id, role_id, locale)
@@ -231,30 +231,22 @@ def test_non_dictionary_contract_cannot_smuggle_dictionary_example(catalog_data)
         QuestionCatalogBundle.model_validate(catalog_data)
 
 
-def test_duplicate_role_wording_is_rejected(catalog_data):
-    wordings = question(catalog_data, "METAL_COLOR")["wording"]
-    wordings[-1] = deepcopy(wordings[0])
-    with pytest.raises(ValidationError, match="variants must be unique"):
-        QuestionCatalogBundle.model_validate(catalog_data)
-
-
-def test_invalid_role_reference_is_rejected(catalog_data):
-    wording = question(catalog_data, "METAL_COLOR")["wording"][0]
-    wording["role_id"] = "administrator"
+def test_role_specific_wording_is_not_accepted(catalog_data):
+    question(catalog_data, "METAL_COLOR")["wording"]["role_id"] = "RR-C25"
     with pytest.raises(ValidationError):
         QuestionCatalogBundle.model_validate(catalog_data)
 
 
 @pytest.mark.parametrize("missing_locale", ["en", "ru"])
 def test_missing_translation_is_rejected(catalog_data, missing_locale):
-    text = question(catalog_data, "METAL_COLOR")["wording"][0]["text"]
+    text = question(catalog_data, "METAL_COLOR")["wording"]
     del text[missing_locale]
     with pytest.raises(ValidationError):
         QuestionCatalogBundle.model_validate(catalog_data)
 
 
 def test_extra_locale_variant_is_rejected(catalog_data):
-    text = question(catalog_data, "METAL_COLOR")["wording"][0]["text"]
+    text = question(catalog_data, "METAL_COLOR")["wording"]
     text["fr"] = "Quelle couleur?"
     with pytest.raises(ValidationError, match="Extra inputs"):
         QuestionCatalogBundle.model_validate(catalog_data)
@@ -276,8 +268,7 @@ def test_invalid_provenance_or_review_state_is_rejected(catalog_data):
 
 def test_pinned_role_and_dictionary_versions_must_match(catalog_data, roles, dictionary):
     catalog_data["role_artifact_version"] = "1.0.1"
-    with pytest.raises(ValueError, match="role artifact version"):
-        build_catalog(catalog_data, roles, dictionary)
+    build_catalog(catalog_data, roles, dictionary)
     catalog_data["role_artifact_version"] = "1.0.0"
     catalog_data["dictionary_artifact_version"] = "1.0.1"
     with pytest.raises(ValueError, match="dictionary artifact version"):

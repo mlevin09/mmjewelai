@@ -382,6 +382,10 @@ def test_postgres_concurrent_enrichment_commit_allows_exactly_one_writer(tmp_pat
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     service = build_service(engine)
     organization, _, session = create_persisted_session(service)
     revision = service.repository.get_current_revision(

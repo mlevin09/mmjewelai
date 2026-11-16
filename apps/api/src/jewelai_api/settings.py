@@ -18,6 +18,7 @@ from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
 from jewelai_text_understanding_google import GoogleTextUnderstandingConfig
 
 from .generation import GenerationProfile
+from .role_selection import STUDIO_ROLE_IDS
 
 DEFAULT_ASSET_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 MAX_ASSET_UPLOAD_BYTES = 100 * 1024 * 1024
@@ -67,6 +68,7 @@ class PromptEnrichmentRuntimeConfig:
 
 @dataclass(frozen=True)
 class RuntimeSettings:
+    studio_role_ids: tuple[str, ...] = STUDIO_ROLE_IDS
     database_url: str = "sqlite+pysqlite:///./jewelai-v2.db"
     repository_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[4])
     artifacts: ArtifactVersions = field(default_factory=ArtifactVersions)
@@ -89,6 +91,12 @@ class RuntimeSettings:
     completion_policy_sha256: str | None = None
 
     def __post_init__(self) -> None:
+        from jewelai_domain.roles import RoleId
+
+        if len(self.studio_role_ids) != 9 or len(set(self.studio_role_ids)) != 9:
+            raise ValueError("Studio requires nine unique role selections")
+        for role_id in self.studio_role_ids:
+            RoleId(role_id)
         if self.completion_policy_path is not None and (
             self.completion_policy_sha256 is None
             or len(self.completion_policy_sha256) != 64

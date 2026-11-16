@@ -111,6 +111,9 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
 ):
     engine = create_database_engine(f"sqlite+pysqlite:///{tmp_path / 'pipeline.db'}")
     Base.metadata.create_all(engine)
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     session_factory = create_session_factory(engine)
     repository = PersistenceRepository(session_factory)
     repository.create_organization(ORG_ID, "Organization", NOW)
@@ -122,7 +125,7 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
         DesignSessionRow(
             session_id=SESSION_ID,
             project_id=PROJECT_ID,
-            role_id="retail_client",
+            role_id="RR-C25",
             locale="en",
             created_at=NOW,
             updated_at=NOW,
@@ -294,6 +297,9 @@ def test_fake_openai_output_becomes_ready_generated_asset_without_binary_persist
 def test_stale_run_explicit_retry_becomes_independent_ready_asset(tmp_path):
     engine = create_database_engine(f"sqlite+pysqlite:///{tmp_path / 'retry-pipeline.db'}")
     Base.metadata.create_all(engine)
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     repository = PersistenceRepository(create_session_factory(engine))
     repository.create_organization(ORG_ID, "Organization", NOW)
     repository.create_project(PROJECT_ID, ORG_ID, "Project", NOW)
@@ -304,7 +310,7 @@ def test_stale_run_explicit_retry_becomes_independent_ready_asset(tmp_path):
         DesignSessionRow(
             session_id=SESSION_ID,
             project_id=PROJECT_ID,
-            role_id="retail_client",
+            role_id="RR-C25",
             locale="en",
             created_at=NOW,
             updated_at=NOW,

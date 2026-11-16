@@ -6,8 +6,9 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
+from tests.current_roles import current_roles
 
-from jewelai_domain import load_domain_dictionary, load_role_profiles
+from jewelai_domain import load_domain_dictionary
 from jewelai_domain.questions import QuestionCatalogBundle, QuestionId, SchemaTarget
 from jewelai_domain.questions_v2 import (
     QuestionCatalogBundleV2,
@@ -19,7 +20,7 @@ from jewelai_domain.questions_v2 import (
 ROOT = Path(__file__).resolve().parents[3]
 
 APPROVED_WORDING = {
-    "retail_client": (
+    "RR-C25": (
         "Which metal would you like for the product body: {options}?",
         "Какой металл вы выбираете для основы изделия: {options}?",
     ),
@@ -39,7 +40,7 @@ APPROVED_WORDING = {
         "Select the product-body metal: {options}.",
         "Выберите металл основы изделия: {options}.",
     ),
-    "industrial_designer": (
+    "RR-C10": (
         "Specify the material of the product body: {options}.",
         "Укажите материал основы изделия: {options}.",
     ),
@@ -71,13 +72,12 @@ def test_f04_schema_and_frozen_v1_dispatch():
 def test_f04_exact_six_role_wording(locale):
     catalog = QuestionCatalogV2(
         QuestionCatalogBundleV2.model_validate(data()),
-        roles=load_role_profiles(ROOT / "data/roles/v1.0.0.json"),
+        roles=current_roles(),
         dictionary=load_domain_dictionary(ROOT / "data/dictionary/v1.0.0.json"),
     )
-    for role in data()["entries"][-1]["wording"]:
-        actual = catalog.render("METAL_MATERIAL", role["role_id"], locale)
-        assert actual.wording == role["text"][locale]
-        assert actual.wording == APPROVED_WORDING[role["role_id"]][0 if locale == "en" else 1]
+    for role in current_roles():
+        actual = catalog.render("METAL_MATERIAL", role, locale)
+        assert actual.wording == data()["entries"][-1]["wording"][locale]
         assert actual.target == SchemaTargetV2.METAL_MATERIAL
         assert actual.answer_contract.dictionary_category == "metal_material"
 

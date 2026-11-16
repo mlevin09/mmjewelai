@@ -22,6 +22,7 @@ from test_f04_http import f04_session
 from test_f04_http import initial as initial_f
 from test_f05_history import READY
 from test_prompt_enrichment_http import _client, _message
+from tests.current_roles import current_roles
 
 from jewelai_api import prompt_enrichment_runtime, prompt_enrichment_runtime_v2
 from jewelai_api.prompt_enrichment_runtime import PromptEnrichmentRuntimeService
@@ -315,7 +316,9 @@ def _restart_probe(config_path, output_path):
     engine = create_database_engine(config["database_url"])
     runtime = PromptEnrichmentRuntimeService(
         PersistenceRepository(create_session_factory(engine)),
-        load_runtime_artifacts(ROOT, ArtifactVersions(**config["artifact_versions"])),
+        load_runtime_artifacts(
+            ROOT, ArtifactVersions(**config["artifact_versions"]), roles=current_roles()
+        ),
         KnowledgeArtifactStoreV1_1(config["store_root"]),
         knowledge_package_id=config["package_id"],
         knowledge_artifact_version=config["artifact_version"],

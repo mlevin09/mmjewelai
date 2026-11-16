@@ -6,6 +6,10 @@ This is a design baseline, not an implemented backend. See [repository audit](do
 
 ## Product and boundary
 
+ROLES-001 supersedes the historical six-role baseline below: current professional roles are
+PostgreSQL-backed, with 21 canonical identities and nine Studio selections. See
+[ADR 0044](docs/adr/0044-postgresql-current-roles.md). Historical prose is not a runtime catalog.
+
 Build a reusable jewelry design intake and prompt orchestration core for six roles: retail_client, sales_manager, buyer, marketing, jewelry_designer, industrial_designer.
 One canonical design state serves all roles. Roles change vocabulary, depth and question policy, not separate engines or authorization.
 The eventual internet-accessible A/B MVP includes UI, authentication, API, durable jobs and image generation; those are later phases.

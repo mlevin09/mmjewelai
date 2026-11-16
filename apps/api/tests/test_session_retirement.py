@@ -55,7 +55,7 @@ def test_retirement_preserves_completed_native_history_and_restart(engine, tmp_p
         sibling = ctx.client.post(
             f"/projects/{ctx.legacy['project_id']}/sessions",
             headers=ctx.headers,
-            json={"role_id": "retail_client", "locale": "en"},
+            json={"role_id": "RR-C25", "locale": "en"},
         ).json()
         path = f"/sessions/{ctx.sid}"
         assert ctx.client.delete(path, headers=ctx.headers).status_code == 204

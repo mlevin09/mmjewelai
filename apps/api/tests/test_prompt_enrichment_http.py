@@ -18,7 +18,7 @@ from jewelai_api import create_app
 from jewelai_api.settings import RuntimeSettings
 
 
-def _client(engine, runtime=None):
+def _client(engine, runtime=None, *, role_registry=None):
     text_provider = FakeTextUnderstandingProvider()
     application = create_app(
         RuntimeSettings(database_url="sqlite+pysqlite://", repository_root=ROOT),
@@ -30,6 +30,7 @@ def _client(engine, runtime=None):
         generation_task_publisher=FakeGenerationTaskPublisher(),
         text_understanding_provider=text_provider,
         prompt_enrichment_service=runtime,
+        role_registry=role_registry,
     )
     client = TestClient(application)
     client.headers["Authorization"] = "Bearer test-owner-a"

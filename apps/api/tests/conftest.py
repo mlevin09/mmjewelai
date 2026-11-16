@@ -102,6 +102,10 @@ def engine(tmp_path):
         f"sqlite+pysqlite:///{database}", connect_args={"check_same_thread": False}
     )
     Base.metadata.create_all(value)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(value))
     try:
         yield value
     finally:
@@ -170,7 +174,7 @@ def client(app):
         yield value
 
 
-def create_hierarchy(client, *, role_id="retail_client", locale="en"):
+def create_hierarchy(client, *, role_id="RR-C25", locale="en"):
     organization = client.post("/organizations", json={"name": "Organization A"})
     assert organization.status_code == 201
     organization_id = organization.json()["organization_id"]

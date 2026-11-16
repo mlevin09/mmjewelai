@@ -14,9 +14,11 @@ from sqlalchemy import (
     Integer,
     LargeBinary,
     String,
+    Text,
     UniqueConstraint,
     Uuid,
 )
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -84,6 +86,13 @@ class DesignSessionRow(Base):
     __tablename__ = "design_session"
     __table_args__ = (
         UniqueConstraint("session_id", "project_id", name="uq_design_session_project"),
+        ForeignKeyConstraint(
+            ["role_id"],
+            ["roles.role_id"],
+            name="fk_design_session_current_role",
+            ondelete="RESTRICT",
+            postgresql_not_valid=True,
+        ),
         CheckConstraint(
             "(deleted_at IS NULL AND deleted_by_principal_id IS NULL) OR "
             "(deleted_at IS NOT NULL AND deleted_by_principal_id IS NOT NULL)",
@@ -825,3 +834,32 @@ class PromptCompletionRow(Base):
     payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class RoleRow(Base):
+    __tablename__ = "roles"
+    __table_args__ = (
+        CheckConstraint(
+            "role_id IN ('RR-C02', 'RR-C04', 'RR-C06', 'RR-C09', 'RR-C10', 'RR-C11'"
+            ", 'RR-C12', 'RR-C14', 'RR-C15', 'RR-C16', 'RR-C17', 'RR-C18', 'RR-C20'"
+            ", 'RR-C21', 'RR-C26', 'RR-C22', 'RR-C27', 'RR-C28', 'RR-C23', 'RR-C24'"
+            ", 'RR-C25')",
+            name="ck_roles_id",
+        ),
+        CheckConstraint("trim(name_ru) <> ''", name="ck_roles_name"),
+        CheckConstraint("updated_at >= created_at", name="ck_roles_timestamps"),
+        CheckConstraint("status IN ('active', 'inactive')", name="ck_roles_status"),
+        CheckConstraint("revision >= 1", name="ck_roles_revision"),
+        Index("ix_roles_status", "status"),
+    )
+    role_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    name_ru: Mapped[str] = mapped_column(Text)
+    name_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(16))
+    merged_from_ids: Mapped[list[str]] = mapped_column(
+        JSON().with_variant(ARRAY(Text), "postgresql")
+    )
+    role_data: Mapped[dict] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    revision: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

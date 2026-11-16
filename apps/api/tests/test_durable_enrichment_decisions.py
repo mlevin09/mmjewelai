@@ -718,6 +718,10 @@ def test_postgres_concurrent_answers_are_idempotent_or_conflict(tmp_path, confli
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     try:
         service = build_service(engine)
         organization, session, revision, *_, cycle = _setup(service, tmp_path)
@@ -781,6 +785,10 @@ def test_postgres_concurrent_corrections_are_idempotent_or_conflict(tmp_path, co
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     try:
         service = build_service(engine)
         context = _setup(service, tmp_path)

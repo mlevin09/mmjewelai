@@ -323,7 +323,7 @@ HALO_SEQUENCES = [
 ]
 
 
-@pytest.mark.parametrize("role_id", ["retail_client", "jewelry_designer"])
+@pytest.mark.parametrize("role_id", ["RR-C25", "RR-C09"])
 @pytest.mark.parametrize(("locale", "sequence"), HALO_SEQUENCES)
 def test_halo_negation_and_polarity_changes_preserve_durable_lineage(
     engine, tmp_path, role_id, locale, sequence
@@ -734,6 +734,10 @@ def test_postgres_http_concurrent_initial_requests_commit_one_complete_history(t
     engine = create_database_engine(database_url)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(engine))
     try:
         service = build_service(engine)
         runtime, *_ = _runtime(service, tmp_path)

@@ -69,6 +69,7 @@ from jewelai_text_understanding_google import TextUnderstandingUnavailableError
 
 from .artifacts import ArtifactConfigurationError, RuntimeArtifacts
 from .generation import GenerationProfileRegistry, NoVisualizationProfilesError
+from .role_selection import STUDIO_ROLE_IDS
 from .schemas import (
     ArtifactPins,
     AssetListResponse,
@@ -164,7 +165,11 @@ class RuntimeService:
         asset_access_policy: AssetAccessPolicy | None = None,
         asset_ingestion_policy: AssetIngestionPolicy | None = None,
         text_understanding_provider: TextUnderstandingProvider | None = None,
+        studio_role_ids: tuple[str, ...] = STUDIO_ROLE_IDS,
     ):
+        if artifacts.roles is None:
+            raise ArtifactConfigurationError("Runtime requires a current database role registry")
+        self._studio_role_ids = tuple(studio_role_ids)
         self.repository = repository
         self.artifacts = artifacts
         self._clock = clock or (lambda: datetime.now(UTC))
@@ -279,13 +284,21 @@ class RuntimeService:
         )
 
     def get_ui_catalog(self) -> UiCatalogResponse:
-        profiles = tuple(self.artifacts.roles[role_id] for role_id in self.artifacts.roles)
-        locales = tuple(
-            sorted({locale for profile in profiles for locale in profile.locale_policy.supported})
+        profiles = tuple(
+            self.artifacts.roles.get_profile(role_id) for role_id in self._studio_role_ids
         )
+        locales = ("en", "ru")
         return UiCatalogResponse(
             roles_artifact_version=self.artifacts.roles.artifact_version,
-            roles=tuple(RoleCatalogItem(role_id=profile.role_id.value) for profile in profiles),
+            roles=tuple(
+                RoleCatalogItem(
+                    role_id=profile.role_id.value,
+                    name_ru=profile.name_ru,
+                    name_en=profile.name_en,
+                    revision=profile.revision,
+                )
+                for profile in profiles
+            ),
             locales=locales,
             generation_profiles=tuple(
                 GenerationProfileSummary(
@@ -342,6 +355,10 @@ class RuntimeService:
         organization_id: UUID,
         request: CreateSessionRequest,
     ) -> SessionResponse:
+        if request.role_id not in self._studio_role_ids:
+            from jewelai_domain.roles import UnknownRoleError
+
+            raise UnknownRoleError("Role is not available for this Studio application")
         profile = self.artifacts.roles.get_profile(request.role_id)
         locale = self.artifacts.roles.resolve_locale(profile.role_id, request.locale)
         now = self._clock()

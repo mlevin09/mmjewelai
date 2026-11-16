@@ -257,6 +257,7 @@ def create_app(
     text_understanding_provider: TextUnderstandingProvider | None = None,
     prompt_enrichment_service: PromptEnrichmentRuntimeService | None = None,
     completion_registry=None,
+    role_registry=None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
@@ -297,8 +298,15 @@ def create_app(
         generation_task_publisher = CloudTasksGenerationPublisher(settings.generation_tasks)
     owns_engine = engine is None
     engine = engine or create_database_engine(settings.database_url)
-    artifacts = load_runtime_artifacts(settings.repository_root, settings.artifacts)
-    repository = PersistenceRepository(create_session_factory(engine))
+    from jewelai_persistence.roles import database_role_registry
+
+    factory = create_session_factory(engine)
+    repository = PersistenceRepository(factory)
+    artifacts = load_runtime_artifacts(
+        settings.repository_root,
+        settings.artifacts,
+        roles=role_registry if role_registry is not None else database_role_registry(factory),
+    )
     if prompt_enrichment_service is None and settings.prompt_enrichment is not None:
         try:
             prompt_enrichment_service = compose_prompt_enrichment_runtime(
@@ -328,6 +336,7 @@ def create_app(
     service = RuntimeService(
         repository,
         artifacts,
+        studio_role_ids=settings.studio_role_ids,
         clock=clock,
         uuid_factory=uuid_factory,
         generation_profiles=configured_profiles,
@@ -604,6 +613,14 @@ def create_app(
     app.add_exception_handler(ValidationError, invalid_handler)
     app.add_exception_handler(ValueError, invalid_handler)
 
+    from jewelai_domain.roles import RoleCatalogUnavailableError
+
+    @app.exception_handler(RoleCatalogUnavailableError)
+    async def role_catalog_handler(_, exc):
+        return _error_response(
+            503, "role_catalog_unavailable", "Current role catalog is unavailable"
+        )
+
     @app.exception_handler(UnknownRoleError)
     async def role_handler(_, exc):
         return _error_response(422, "invalid_role", str(exc))
@@ -672,6 +689,26 @@ def create_app(
     @app.get("/me", response_model=MeResponse)
     def get_me(principal: Authenticated):
         return service.get_me(principal)
+
+    @app.get("/roles")
+    def list_roles(_: Authenticated):
+        return tuple(service.artifacts.roles.get_profile(r) for r in service.artifacts.roles)
+
+    @app.get("/roles/{role_id}")
+    def get_role(role_id: str, _: Authenticated):
+        return service.artifacts.roles.get_profile(role_id)
+
+    @app.get("/roles/{role_id}/context")
+    def get_role_context(role_id: str, _: Authenticated):
+        profile = service.artifacts.roles.get_profile(role_id)
+        return {
+            "role_id": profile.role_id,
+            "revision": profile.revision,
+            "registry": profile.role_data["registry_entry"],
+            "passport": profile.role_data.get("passport"),
+            "conversation_policy": None,
+            "authorization_effect": "none",
+        }
 
     @app.get("/ui/catalog", response_model=UiCatalogResponse)
     def get_ui_catalog(_: Authenticated):

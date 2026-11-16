@@ -194,6 +194,10 @@ def test_in_memory_session_correction_keeps_outer_transaction(tmp_path, monkeypa
         "sqlite+pysqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(memory)
+    from jewelai_persistence import create_session_factory
+    from jewelai_persistence.roles import import_roles
+
+    import_roles(create_session_factory(memory))
     try:
         cycle(
             memory,

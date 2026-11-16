@@ -123,18 +123,12 @@ class QuestionEntry(ImmutableModel):
     question_id: QuestionId
     target: SchemaTarget
     answer_contract: AnswerContract
-    wording: tuple[RoleWording, ...] = Field(min_length=6, max_length=6)
+    wording: LocalizedQuestionText
     examples: tuple[QuestionExample, ...] = Field(min_length=1)
     provenance: QuestionProvenance
 
     @model_validator(mode="after")
     def validate_entry(self):
-        role_ids = tuple(item.role_id for item in self.wording)
-        if len(set(role_ids)) != len(role_ids):
-            raise ValueError("Role wording variants must be unique")
-        if role_ids != tuple(RoleId):
-            raise ValueError("Every question must provide all six roles in canonical order")
-
         uses_dictionary = isinstance(self.answer_contract, DictionaryAnswerContract)
         for example in self.examples:
             if uses_dictionary != (example.dictionary_id is not None):
@@ -259,20 +253,16 @@ class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
         self,
         bundle: QuestionCatalogBundle,
         *,
-        roles: RoleRegistry,
+        roles: RoleRegistry | None,
         dictionary: DictionaryRegistry,
     ):
         bundle = self._bundle_type.model_validate(bundle)
-        if bundle.role_artifact_version != roles.artifact_version:
-            raise ValueError("Question Catalog role artifact version does not match the registry")
         if bundle.dictionary_artifact_version != dictionary.artifact_version:
             raise ValueError(
                 "Question Catalog dictionary artifact version does not match the registry"
             )
 
         for entry in bundle.entries:
-            for wording in entry.wording:
-                roles.get_profile(wording.role_id)
             if isinstance(entry.answer_contract, DictionaryAnswerContract):
                 for example in entry.examples:
                     try:
@@ -318,12 +308,16 @@ class QuestionCatalog(Mapping[QuestionId, QuestionEntry]):
         locale: str,
     ) -> RenderedQuestion:
         entry = self.get_question(question_id)
+        if self._roles is None:
+            from .roles import RoleCatalogUnavailableError
+
+            raise RoleCatalogUnavailableError("Current role registry is required for execution")
         profile = self._roles.get_profile(role_id)
         resolved_locale = QuestionLocale(self._roles.resolve_locale(profile.role_id, locale))
-        wording = next(item for item in entry.wording if item.role_id == profile.role_id)
+        wording = entry.wording
         return self._rendered_type(
             question_id=entry.question_id,
-            wording=wording.text.for_locale(resolved_locale),
+            wording=wording.for_locale(resolved_locale),
             target=entry.target,
             answer_contract=entry.answer_contract,
             role_id=profile.role_id,
