@@ -249,7 +249,7 @@ def test_entire_api_selection_remains_blocked_before_any_collection(monkeypatch,
     manifest["suites"]["api"]["targets"] = ["apps/api/tests"]
     monkeypatch.setattr(pr_checks, "validate_selection", lambda *args: None)
     monkeypatch.setattr(pr_checks, "invoke", lambda *a, **kw: pytest.fail("broad collection"))
-    with pytest.raises(ValueError, match="entire_api_scope_requires_manual_full_regression"):
+    with pytest.raises(ValueError, match="unbounded_api_scope_requires_routing_review"):
         pr_checks.execute(ROOT, manifest, tmp_path)
     result = json.loads((tmp_path / "pr-result.json").read_text())
     assert result["status"] == "BLOCKED" and result["full_regression_required"]

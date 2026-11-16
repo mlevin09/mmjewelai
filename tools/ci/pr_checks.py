@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-from api_partitions import validate_artifacts
+from api_partitions import timing_costs, validate_artifacts
 from full_units import covers
 from pr_selection import validate_selection
 from qualification import validate_qualification
@@ -109,6 +109,10 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
         status="BLOCKED",
         reason="execution_incomplete",
         full_regression_required=manifest["full_regression_required"],
+        merge_base=manifest["merge_base"],
+        selector_sha=manifest.get("selector_sha") or manifest["source_sha"],
+        components=manifest["buckets"],
+        release_qualification="NOT_QUALIFIED",
         groups={},
         qualified_by_full=False,
     )
@@ -137,7 +141,7 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
         if saturated:
             result["full_regression_required"] = True
             if qualification is None:
-                raise ValueError("entire_api_scope_requires_manual_full_regression")
+                raise ValueError("unbounded_api_scope_requires_routing_review")
         collections = {}
         for suite, group in manifest["suites"].items():
             if suite == "api" and saturated:
@@ -163,6 +167,17 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
             result["groups"][suite] = dict(
                 selected=len(ids), case_ids=ids, targets=group["targets"]
             )
+            weights_path = root / "tools/ci/timing_weights.json"
+            if weights_path.exists():
+                weights = json.loads(weights_path.read_text())
+                costs = timing_costs(weights)
+                known = [costs[i]["milliseconds"] for i in ids if i in costs]
+                result["groups"][suite]["historical_timing"] = dict(
+                    measured_source=weights["origin"]["measurement_sha"],
+                    known_case_seconds=round(sum(known) / 1000, 3),
+                    unknown_cases=len(ids) - len(known),
+                    limitation="Historical partial estimate; not current wall time/isolation proof",
+                )
         enforce_automatic_case_budget(collections, qualification)
         if qualification is not None:
             if not set(collections.get("api", [])).issubset(qualification["api_cases"]):
@@ -177,7 +192,7 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
             result["qualified_by_full"] = True
         else:
             if saturated:
-                raise ValueError("entire_api_scope_requires_manual_full_regression")
+                raise ValueError("unbounded_api_scope_requires_routing_review")
             for suite, group in manifest["suites"].items():
                 report = invoke(
                     root,
@@ -188,8 +203,11 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
                 verify_execution(report, collections[suite])
                 validate_artifacts(output / (suite.replace("/", "_") + "-execution"), report)
                 result["groups"][suite]["seconds"] = report["wall_seconds"]
-        if result["full_regression_required"] and qualification is None:
-            raise ValueError("manual_full_qualification_required_before_merge")
+        # Complete PR evidence is sufficient for a PR PASS. Only an independently
+        # validated full receipt can qualify the exact release SHA; never infer
+        # release readiness from targeted test success.
+        if qualification is not None:
+            result["release_qualification"] = "QUALIFIED_EXACT_SHA"
         result["result"] = "success"
         result.update(status="PASS", reason="selected_tests_passed")
         return result
@@ -203,7 +221,48 @@ def execute(root, manifest, output, *, qualification=None, metadata=None):
         raise
     finally:
         result["seconds"] = round(time.monotonic() - started, 3)
+        failures = []
+        for path in sorted(output.glob("*-execution/timings.json")):
+            report = json.loads(path.read_text())
+            for case in report.get("testcases", []):
+                if case.get("outcome") != "passed" or not case.get("complete"):
+                    failures.append(
+                        {k: case.get(k) for k in ("case_id", "node_id", "outcome", "failures")}
+                    )
+        result["failed_case_count"] = len(failures)
+        result["failed_cases"] = failures[:20]
+        result["failure_artifact"] = "*-execution/timings.json"
         (output / "pr-result.json").write_text(json.dumps(result, indent=2) + "\n")
+        rows = [
+            "## Risk-based PR gate",
+            "",
+            f"Status: **{result['status']}**; reason: `{result['reason']}`.",
+            f"Source: `{result['source_sha']}`; merge base: `{result['merge_base']}`; "
+            f"selector: `{result['selector_sha']}`.",
+            f"Components: {', '.join(result['components']) or 'none'}.",
+            f"Elapsed: {result['seconds']}s. Release: **{result['release_qualification']}**.",
+            "Full Regression remains a separate exact-release-SHA obligation; "
+            "no automatic dispatch.",
+            "",
+            "| Suite | Collected cases | Execution seconds |",
+            "|---|---:|---:|",
+        ]
+        for suite, group in result["groups"].items():
+            rows.append(
+                f"| {suite} | {group['selected']} | {group.get('seconds', 'NOT EXECUTED')} |"
+            )
+        rows += ["", "### Selected targets and reasons"]
+        for target, reasons in manifest.get("target_reasons", {}).items():
+            extra = (
+                f"; +{len(reasons) - 4} origins in pr-selection.json" if len(reasons) > 4 else ""
+            )
+            rows.append(f"- `{target}`: " + "; ".join(reasons[:4]) + extra)
+        if manifest.get("blocked_reasons"):
+            rows += ["", "### Unresolved ownership", *manifest["blocked_reasons"]]
+        if failures:
+            rows += ["", "### Failed cases (bounded; full safe details in timing artifacts)"]
+            rows += [f"- `{x['node_id']}`: {x['outcome']}" for x in failures[:20]]
+        (output / "summary.md").write_text("\n".join(rows) + "\n")
         summary = {k: result[k] for k in ("status", "source_sha", "reason", "seconds")}
         summary["scopes"] = sorted(manifest["suites"])
         summary["selected_cases"] = sum(g.get("selected", 0) for g in result["groups"].values())

@@ -15,6 +15,42 @@ REPOSITORY = "mlevin09/mmjewelai"
 WORKFLOW = ".github/workflows/full-regression.yml"
 
 
+def github_json(path):
+    """Read-only bounded GitHub transport; never expose headers or response bodies."""
+    request = urllib.request.Request(
+        "https://api.github.com/repos/" + REPOSITORY + path,
+        headers={
+            "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
+            "Accept": "application/vnd.github+json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise ValueError("qualification_metadata_http_" + str(exc.code)) from None
+    except OSError:
+        raise ValueError("qualification_metadata_unavailable") from None
+
+
+def latest_metadata(sha):
+    """Locate evidence; this alone NEVER qualifies a release without its validated receipt."""
+    if not re.fullmatch("[0-9a-f]{40}", sha):
+        raise ValueError("invalid_run_identity")
+    data = github_json(
+        "/actions/workflows/full-regression.yml/runs?head_sha="
+        + sha
+        + "&event=workflow_dispatch&status=success&per_page=20"
+    )
+    for run in data.get("workflow_runs", []):
+        try:
+            validate_metadata(run, sha)
+        except ValueError:
+            continue
+        return run
+    raise ValueError("full_qualification_not_available_for_exact_sha")
+
+
 def validate_metadata(metadata, sha):
     if (
         metadata.get("head_sha") != sha
@@ -87,6 +123,9 @@ def main():
     meta.add_argument("--run-id", required=True)
     meta.add_argument("--sha", required=True)
     meta.add_argument("--output", required=True)
+    latest = sub.add_parser("latest")
+    latest.add_argument("--sha", required=True)
+    latest.add_argument("--output", required=True)
     stamp = sub.add_parser("emit")
     stamp.add_argument("--plan", required=True)
     stamp.add_argument("--gate", required=True)
@@ -97,23 +136,15 @@ def main():
     check.add_argument("--metadata", required=True)
     check.add_argument("--sha", required=True)
     args = parser.parse_args()
-    if args.command == "metadata":
-        if not args.run_id.isdigit() or not re.fullmatch("[0-9a-f]{40}", args.sha):
+    if args.command in {"metadata", "latest"}:
+        if not re.fullmatch("[0-9a-f]{40}", args.sha):
             raise ValueError("invalid_run_identity")
-        request = urllib.request.Request(
-            f"https://api.github.com/repos/{REPOSITORY}/actions/runs/{args.run_id}",
-            headers={
-                "Authorization": "Bearer " + os.environ["GITHUB_TOKEN"],
-                "Accept": "application/vnd.github+json",
-            },
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=30) as response:
-                data = json.load(response)
-        except urllib.error.HTTPError as exc:
-            raise ValueError("qualification_metadata_http_" + str(exc.code)) from None
-        except OSError:
-            raise ValueError("qualification_metadata_unavailable") from None
+        if args.command == "latest":
+            data = latest_metadata(args.sha)
+        else:
+            if not args.run_id.isdigit():
+                raise ValueError("invalid_run_identity")
+            data = github_json("/actions/runs/" + args.run_id)
         validate_metadata(data, args.sha)
         # Store only bounded identity/status, not the provider response or headers.
         payload = {
@@ -126,6 +157,7 @@ def main():
         out.write_text(json.dumps(payload))
         with open(os.environ["GITHUB_OUTPUT"], "a") as handle:
             handle.write("artifact_name=full-qualification-" + str(data["run_attempt"]) + "\n")
+            handle.write("run_id=" + str(data["id"]) + "\n")
     elif args.command == "emit":
         body = emit(
             json.loads(Path(args.plan).read_text()),

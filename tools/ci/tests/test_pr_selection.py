@@ -19,6 +19,10 @@ from test_api_timings import invoke as tiny_pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 CONFIG = json.loads((ROOT / "tools/ci/pr_routes.json").read_text())
+# These existing tests retain the version-1 fixture-scope/receipt contract.
+# Version-2 source/declaration routing has its own real-commit tests; it never
+# falls back to version1 when an ownership check fails.
+CONFIG["version"] = 1
 SHA = "a" * 40
 
 
@@ -341,7 +345,7 @@ def test_missing_or_invalid_exact_release_qualification_blocks(fault):
         qualification.validate_qualification(evidence, metadata, SHA)
 
 
-def test_high_risk_keeps_critical_execution_and_blocks_without_full(monkeypatch, tmp_path):
+def test_high_risk_keeps_critical_execution_without_claiming_release(monkeypatch, tmp_path):
     manifest = selected("packages/domain/src/jewelai_domain/preservation.py")
     monkeypatch.setattr(pr_checks, "validate_selection", lambda *a: None)
     calls = []
@@ -356,10 +360,12 @@ def test_high_risk_keeps_critical_execution_and_blocks_without_full(monkeypatch,
 
     monkeypatch.setattr(pr_checks, "invoke", invoke)
     monkeypatch.setattr(pr_checks, "validate_artifacts", lambda *a: None)
-    with pytest.raises(ValueError, match="manual_full_qualification_required"):
-        pr_checks.execute(ROOT, manifest, tmp_path)
+    pr_checks.execute(ROOT, manifest, tmp_path)
     result = json.loads((tmp_path / "pr-result.json").read_text())
-    assert not result["qualified_by_full"] and result["result"] == "failure"
+    assert not result["qualified_by_full"] and result["result"] == "success"
+    assert result["status"] == "PASS"
+    assert result["release_qualification"] == "NOT_QUALIFIED"
+    assert result["full_regression_required"]
     assert len([c for c in calls if not c.get("collect")]) == len(manifest["suites"])
 
 
