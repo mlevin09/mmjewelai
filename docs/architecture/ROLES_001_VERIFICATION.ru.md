@@ -65,3 +65,17 @@ Hosted exact-head CI и PostgreSQL execution — отдельный gate Draft P
 Оригиналы находятся внутри побайтно сохранённого `data/roles/sources/original-role-sources.zip`;
 import manifest идентифицирует отдельные файлы архива. Исходные Markdown hard-break пробелы
 сохранены без отключения Git whitespace checks и без изменения исходных байтов.
+
+## Исправление CI routing после первой публикации
+
+На `0154dd5e797b3845e914397f7cf9fdc4121f46a6` Domain/Web/Infrastructure прошли.
+Runtime API #43864842724 остановлен до тестов: `unmapped_impact_requires_routing_review`,
+selected cases=0. PostgreSQL этим прогоном не квалифицирован.
+
+Исправление декларирует полный Domain ownership изменённых schemas/catalog/source ресурсов,
+добавляет реальный archive-hash/deterministic-seed тест и маршрутизирует release verifier,
+новые fixture/builder paths. Shared helper/seed/source изменения явно сохраняют Full gate.
+Алгоритмы/workflows/required checks/database safety gates не меняются. Локальный preflight:
+blocked=[], full_required=true, 72 API targets. Existing selector: 42 PASS (34.23s);
+новая проверка archive/builder PASS (3.46s). Full Regression не запускался. Hosted CI должен
+подтвердить новый точный HEAD; старый source commit не выдаётся за новый PASS.

@@ -3,6 +3,7 @@
 Offline operator tool only; never imported or executed by application startup.
 """
 
+import argparse
 import hashlib
 import json
 import re
@@ -11,7 +12,13 @@ from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[2]
 archive = ZipFile(ROOT / "data/roles/sources/original-role-sources.zip")
-out = ROOT / "packages/persistence/src/jewelai_persistence"
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument(
+    "--output",
+    type=Path,
+    default=ROOT / "packages/persistence/src/jewelai_persistence/role_seed.json",
+)
+output = parser.parse_args().output
 registry = archive.read("JewelAI_Role_Registry_v1.0_Approved_RU.md").decode()
 cards = archive.read("COMPACT_PERSONA_CARDS_36_v0.5_RU.md").decode()
 rows = []
@@ -83,5 +90,5 @@ for rid, name, line in rows:
     )
 assert sum("passport" in x["role_data"] for x in records) == 9
 assert sum(len(x["role_data"]["personas"]) for x in records) == 36
-(out / "role_seed.json").write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n")
+output.write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n")
 print("21 roles / 9 draft passports / 36 proto-personas verified")

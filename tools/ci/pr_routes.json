@@ -3,7 +3,9 @@
   "isolated_components": {
     "apps/stt": {
       "evidence": "Standalone ephemeral STT has no API/domain/Parser/database imports. Complete native apps/stt/tests owns its source, package config, dependency locks and synthetic codec/recognizer fixtures. Test-only NumPy supports the mocked model boundary, without CUDA/Qwen/model weights. Shared backend edits retain ordinary risk gates.",
-      "test_dependencies": ["numpy==2.2.6"]
+      "test_dependencies": [
+        "numpy==2.2.6"
+      ]
     }
   },
   "smoke": [
@@ -107,6 +109,16 @@
       "packages/parser/tests",
       "apps/api/tests/test_parsed_enrichment.py",
       "apps/api/tests/test_f01_ownership.py"
+    ],
+    "role_foundation": [
+      "packages/domain/tests",
+      "apps/api/tests/test_current_roles.py",
+      "apps/api/tests/test_current_roles_postgres.py",
+      "apps/api/tests/test_professional_release_transport.py",
+      "apps/api/tests/test_professional_knowledge_release.py",
+      "apps/api/tests/test_api.py",
+      "apps/api/tests/test_persistence.py",
+      "apps/api/tests/test_prompt_enrichment_http.py"
     ]
   },
   "routes": [
@@ -314,6 +326,27 @@
       "buckets": [
         "authorization"
       ]
+    },
+    {
+      "prefixes": [
+        "tools/roles/",
+        "tests/current_roles.py",
+        "tests/__init__.py"
+      ],
+      "buckets": [
+        "domain",
+        "persistence",
+        "api",
+        "authorization"
+      ]
+    },
+    {
+      "prefixes": [
+        "tools/knowledge/verify_preprod_integration.py"
+      ],
+      "buckets": [
+        "role_foundation"
+      ]
     }
   ],
   "full_required_prefixes": [
@@ -332,7 +365,12 @@
     "packages/prompts/src/jewelai_prompts/canonical_schema",
     "packages/prompts/src/jewelai_prompts/final_schema",
     "packages/prompts/src/jewelai_prompts/handoff_schema",
-    "packages/prompts/src/jewelai_prompts/models"
+    "packages/prompts/src/jewelai_prompts/models",
+    "tests/current_roles.py",
+    "tests/__init__.py",
+    "tools/roles/",
+    "packages/persistence/src/jewelai_persistence/role_seed.json",
+    "data/roles/"
   ],
   "build_files": [
     "pyproject.toml",
@@ -375,6 +413,46 @@
       "resources": "data/completion/",
       "tests": "apps/api/tests/completion",
       "evidence": "CompletionRegistry and selector/prompt projection are owned by complete Domain/Prompts tests. The complete apps/api/tests/completion namespace owns the actual checked-in proposed policy, loader/hash/activation refusal, contextual runtime completion and latest-state integration, plus all durable completion HTTP/PostgreSQL tests. No other runtime resource is mapped. Shared app.py/models.py Full qualification remains mandatory."
+    },
+    {
+      "resources": "data/questions/",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "data/roles/",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "packages/persistence/src/jewelai_persistence/role_seed.json",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "specs/questions/schema.json",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "specs/questions/v2.0.0/schema.json",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "specs/roles/schema.json",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "specs/rules/schema.json",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
+    },
+    {
+      "resources": "specs/rules/v2.0.0/schema.json",
+      "tests": "packages/domain/tests",
+      "evidence": "ROLES-001: complete Domain scope owns current role/schema IDs, shared EN/RU questions and rules schema/catalog equality. test_roles.py validates original archive member hashes and deterministically rebuilds the complete seed; test_questions.py/test_questions_v2.py/test_rules.py/test_rules_v2.py validate their entire catalogs and schemas. Runtime API/row/FK/migration integration retains the existing mandatory exact-SHA Full qualification; no fixture reader inference or narrowed test IDs."
     }
   ]
 }

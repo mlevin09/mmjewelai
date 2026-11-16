@@ -126,3 +126,32 @@ def test_role_api_has_no_domain_transition_or_authorization_parameters():
         parameters = inspect.signature(operation).parameters
         assert "role" not in parameters
         assert "permissions" not in parameters
+
+
+def test_original_roles_archive_and_deterministic_seed(tmp_path):
+    """Complete source-fixture ownership: validate original bytes and rebuild all imported data."""
+    import hashlib
+    import subprocess
+    import sys
+    from zipfile import ZipFile
+
+    source_root = ROOT / "data/roles/sources"
+    manifest = json.loads((source_root / "source-import-manifest.json").read_text())
+    archive = source_root / manifest["archive_file"]
+    assert hashlib.sha256(archive.read_bytes()).hexdigest() == manifest["archive_sha256"]
+    with ZipFile(archive) as z:
+        for name, record in manifest["files"].items():
+            raw = z.read(name)
+            assert len(raw) == record["bytes"]
+            assert hashlib.sha256(raw).hexdigest() == record["sha256"]
+    output = tmp_path / "roles.json"
+    subprocess.run(
+        [sys.executable, str(ROOT / "tools/roles/build_seed.py"), "--output", str(output)],
+        check=True,
+        timeout=15,
+        capture_output=True,
+    )
+    assert (
+        output.read_bytes()
+        == (ROOT / "packages/persistence/src/jewelai_persistence/role_seed.json").read_bytes()
+    )

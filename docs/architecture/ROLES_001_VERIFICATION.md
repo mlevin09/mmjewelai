@@ -62,3 +62,19 @@ Draft PR. No claim of PostgreSQL qualification is made from SQLite results or so
 Original sources are stored inside the byte-identical `data/roles/sources/original-role-sources.zip`;
 its import manifest identifies individual members. Original Markdown hard-break whitespace is
 preserved without suppressing Git whitespace checks or changing source bytes.
+
+## CI routing correction after first publication
+
+Initial exact HEAD `0154dd5e797b3845e914397f7cf9fdc4121f46a6`: Domain contracts,
+Web and Infrastructure passed. Runtime API #43864842724 was BLOCKED before execution,
+`unmapped_impact_requires_routing_review`, selected cases=0. No PostgreSQL qualification
+was obtained from that run.
+
+The correction declares complete Domain ownership for the changed schemas/catalog/source
+resources, adds a real archive-hash/deterministic-seed test, and routes the small existing
+release verifier plus new fixture/builder paths. Shared helper/seed/source changes explicitly
+retain Full qualification. No CI algorithms, workflows, required checks or database safety
+gates are changed. Local selection preflight: blocked=[], full_required=true, 72 API targets.
+Existing CI selector tests: 42 PASS (34.23s); new archive/builder proof: PASS (3.46s).
+Full Regression is not dispatched. Fresh hosted CI remains an exact-new-HEAD gate, not an
+inferred PASS from the previous source commit.
