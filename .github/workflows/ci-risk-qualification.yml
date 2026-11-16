@@ -1,0 +1,88 @@
+name: CI risk reference qualification
+
+on:
+  pull_request:
+    branches: [jewelai-v2]
+    paths:
+      - tools/ci/reference-qualification.json
+      - .github/workflows/ci-risk-qualification.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-risk-reference-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: CI risk reference qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: jewelai_test
+          POSTGRES_USER: jewelai
+          POSTGRES_PASSWORD: jewelai
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jewelai -d jewelai_test"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    env:
+      TEST_POSTGRES_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
+      DATABASE_URL: postgresql+psycopg://jewelai:jewelai@localhost:5432/jewelai_test
+      CI_SELECTOR_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Bind the actual subject and selector independently
+        run: |
+          set -euo pipefail
+          subject="$(jq -r .source_sha tools/ci/reference-qualification.json)"
+          base="$(jq -r .base_sha tools/ci/reference-qualification.json)"
+          [[ "${subject}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${base}" =~ ^[0-9a-f]{40}$ ]]
+          cp -R tools/ci "${RUNNER_TEMP}/reviewed-selector"
+          cp -R .github/workflows "${RUNNER_TEMP}/reviewed-workflows"
+          git worktree add --detach "${RUNNER_TEMP}/risk-subject" "${subject}"
+          cp -R "${RUNNER_TEMP}/reviewed-selector/." "${RUNNER_TEMP}/risk-subject/tools/ci/"
+          cp -R "${RUNNER_TEMP}/reviewed-workflows/." "${RUNNER_TEMP}/risk-subject/.github/workflows/"
+          cd "${RUNNER_TEMP}/risk-subject"
+          test -z "$(git diff --name-only -- . ':!tools/ci/**' ':!.github/workflows/**')"
+          python tools/ci/pr_selection.py --base "${base}" --head "${subject}" --output "${RUNNER_TEMP}/reference-selection.json"
+          python -c 'import json,os; m=json.load(open(os.environ["RUNNER_TEMP"]+"/reference-selection.json")); assert not m["blocked_reasons"], m["blocked_reasons"]'
+          bash tools/ci/install_runtime.sh "${RUNNER_TEMP}/reference-selection.json"
+      - name: Verify disposable database before all DDL and run the selected native tests
+        run: |
+          set -euo pipefail
+          cd "${RUNNER_TEMP}/risk-subject"
+          python -c "import sys; sys.path.insert(0, 'apps/api/tests'); from disposable_postgres import verified_ci_postgres; verified_ci_postgres()"
+          alembic -c packages/persistence/alembic.ini upgrade head
+          alembic -c packages/persistence/alembic.ini check
+          python tools/ci/pr_checks.py --manifest "${RUNNER_TEMP}/reference-selection.json" --output "${RUNNER_TEMP}/reference-results"
+      - name: Publish summary
+        if: always()
+        run: |
+          if test -f "${RUNNER_TEMP}/reference-results/summary.md"; then
+            cat "${RUNNER_TEMP}/reference-results/summary.md" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-risk-reference-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/reference-selection.json
+            ${{ runner.temp }}/reference-results/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Remove only disposable qualification checkout
+        if: always()
+        run: git worktree remove --force "${RUNNER_TEMP}/risk-subject"

@@ -1,9 +1,11 @@
 {
-  "version": 1,
+  "version": 2,
   "isolated_components": {
     "apps/stt": {
       "evidence": "Standalone ephemeral STT has no API/domain/Parser/database imports. Complete native apps/stt/tests owns its source, package config, dependency locks and synthetic codec/recognizer fixtures. Test-only NumPy supports the mocked model boundary, without CUDA/Qwen/model weights. Shared backend edits retain ordinary risk gates.",
-      "test_dependencies": ["numpy==2.2.6"]
+      "test_dependencies": [
+        "numpy==2.2.6"
+      ]
     }
   },
   "smoke": [
@@ -376,5 +378,1063 @@
       "tests": "apps/api/tests/completion",
       "evidence": "CompletionRegistry and selector/prompt projection are owned by complete Domain/Prompts tests. The complete apps/api/tests/completion namespace owns the actual checked-in proposed policy, loader/hash/activation refusal, contextual runtime completion and latest-state integration, plus all durable completion HTTP/PostgreSQL tests. No other runtime resource is mapped. Shared app.py/models.py Full qualification remains mandatory."
     }
-  ]
+  ],
+  "ownership": {
+    "components": {
+      "roles": {
+        "tests": [
+          "packages/domain/tests/test_roles.py",
+          "packages/domain/tests/test_questions.py",
+          "packages/domain/tests/test_questions_v2.py",
+          "packages/domain/tests/test_rules.py",
+          "packages/domain/tests/test_rules_v2.py",
+          "apps/api/tests/test_current_roles.py",
+          "apps/api/tests/test_current_roles_postgres.py"
+        ],
+        "evidence": "Complete current Roles source/definition/schema/locale and shared question/rule contracts. Current catalog HTTP tests own all21/9 selections, full sources, revision refresh, import failure, no file fallback, tenant/CAS and restart. The PG module owns table/type/FK/counts and both EN/RU journeys. No provider implementation changed.",
+        "postgres": true,
+        "release": true,
+        "optional": [
+          "apps/api/tests/test_current_roles.py",
+          "apps/api/tests/test_current_roles_postgres.py"
+        ],
+        "optional_until_source": "packages/persistence/src/jewelai_persistence/roles.py"
+      },
+      "sessions": {
+        "tests": [
+          "apps/api/tests/test_api.py::test_health_organization_project_session_and_scope",
+          "apps/api/tests/test_api.py::test_session_rejects_invalid_role_and_locale",
+          "apps/api/tests/test_api.py::test_membership_role_does_not_replace_conversational_role",
+          "apps/api/tests/test_api.py::test_runtime_evaluation_renders_ask_persists_event_and_does_not_mutate",
+          "apps/api/tests/test_api.py::test_message_parser_proposal_apply_and_evaluate_flow",
+          "apps/api/tests/test_persistence.py::test_persistence_round_trip_lineage_pins_and_scope",
+          "apps/api/tests/test_persistence.py::test_compare_and_swap_rejects_second_writer_and_preserves_history"
+        ],
+        "evidence": "Session API and persistence contract consumers, including role validation, intake and domain evaluation. Whole parametrized functions; no case subset.",
+        "postgres": true,
+        "release": false
+      },
+      "authorization": {
+        "tests": [
+          "apps/api/tests/test_api.py::test_me_membership_lifecycle_and_cross_tenant_authorization",
+          "apps/api/tests/test_api.py::test_membership_policy_and_last_owner_http_mapping",
+          "apps/api/tests/test_api.py::test_openapi_marks_business_routes_bearer_protected",
+          "apps/api/tests/test_api.py::test_authentication_infrastructure_failure_is_503_without_principal_mutation",
+          "packages/auth/tests"
+        ],
+        "evidence": "Authorization dependency and tenant membership HTTP invariants. Authentication provider-specific edits have separate complete native owners.",
+        "postgres": true,
+        "release": true
+      },
+      "bootstrap": {
+        "tests": [
+          "apps/api/tests/test_api.py::test_health_organization_project_session_and_scope",
+          "apps/api/tests/test_api.py::test_app_factory_without_verifier_or_oidc_configuration_fails_closed",
+          "apps/api/tests/test_api.py::test_production_app_factory_composes_cloud_tasks_without_network",
+          "apps/api/tests/test_api.py::test_ui_catalog_projects_sessions_and_dictionary_options_are_scoped"
+        ],
+        "evidence": "Application composition contract. Actual shared declaration deltas are source-pair pinned: registry injection must not change authentication, provider composition or tenant routing.",
+        "postgres": true,
+        "release": true
+      },
+      "migration": {
+        "tests": [
+          "apps/api/tests/test_current_roles_postgres.py",
+          "apps/api/tests/test_session_retirement_postgres.py::test_pg01_migration_constraints_and_tombstone_downgrade",
+          "apps/api/tests/test_f04_postgres.py"
+        ],
+        "evidence": "Actual isolated schema migration/import, retained historical CHECK guards, rollback, scoped races and tombstones. Existing disposable container/cluster gate is mandatory. Entire touched migration declarations require reviewed ownership.",
+        "postgres": true,
+        "release": true,
+        "optional": [
+          "apps/api/tests/test_current_roles_postgres.py"
+        ],
+        "optional_until_source": "packages/persistence/src/jewelai_persistence/roles.py"
+      },
+      "state_safety": {
+        "tests": [
+          "packages/domain/tests/test_revisions.py",
+          "packages/domain/tests/test_canonical_lock_policy.py",
+          "apps/api/tests/test_api.py::test_revision_transition_history_locking_and_stale_conflict",
+          "apps/api/tests/test_api.py::test_text_intake_cannot_replace_a_locked_field",
+          "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin",
+          "apps/api/tests/test_f05_positive_completion.py::test_positive_completion_minimal_http[J7]"
+        ],
+        "evidence": "Cross-component invariants: KEEP/LOCK authority, CAS, rollback, real persisted RU correction/restart/final-output journey. No full F05 Cartesian history matrix needed for catalog/composition changes.",
+        "postgres": true,
+        "release": false
+      },
+      "parser": {
+        "tests": [
+          "packages/parser/tests",
+          "apps/api/tests/test_parsed_enrichment.py",
+          "apps/api/tests/test_f01_ownership.py",
+          "apps/api/tests/test_parser12_contract.py",
+          "apps/api/tests/test_style_input.py::test_minimalist_wording_http"
+        ],
+        "evidence": "Complete Parser native semantics/evidence, ownership and version contract, plus durable API integration.",
+        "postgres": true,
+        "release": true
+      },
+      "domain_rules": {
+        "tests": [
+          "packages/domain/tests/test_rules.py",
+          "packages/domain/tests/test_rules_v2.py",
+          "packages/domain/tests/test_questions.py",
+          "packages/domain/tests/test_questions_v2.py",
+          "apps/api/tests/test_f03_applicability.py"
+        ],
+        "evidence": "Complete rule/question ownership, downstream applicability and protected-state invariants.",
+        "postgres": true,
+        "release": true
+      },
+      "canonical": {
+        "tests": [
+          "packages/domain/tests",
+          "apps/api/tests/test_keep_atomicity.py",
+          "apps/api/tests/test_generation_preparations_postgres.py::test_same_revision_c3_to_c4_no_halo_race",
+          "packages/parser/tests/test_parser.py",
+          "packages/prompts/tests/test_canonical_schema.py",
+          "packages/prompts/tests/test_final_prompt.py"
+        ],
+        "evidence": "Canonical state changes are genuinely broad/high risk; complete native Domain plus targeted authoritative concurrency. Oversized plans must block for ownership review, not auto-full.",
+        "postgres": true,
+        "release": true
+      },
+      "prompts": {
+        "tests": [
+          "packages/prompts/tests",
+          "apps/api/tests/test_f04_output_integrity.py"
+        ],
+        "evidence": "Complete provider-neutral prompt/description/historical evidence contracts and API output-integrity consumers.",
+        "postgres": true,
+        "release": true
+      },
+      "knowledge": {
+        "tests": [
+          "packages/domain/tests",
+          "tests/test_knowledge_library_behavioral_regression.py",
+          "tests/test_knowledge_library_three_stone_vertical_slice.py"
+        ],
+        "evidence": "Knowledge compilation/policy provenance with complete native Domain and deterministic root consumer scopes. Professional activation is not performed.",
+        "postgres": true,
+        "release": true
+      },
+      "gateway": {
+        "tests": [
+          "packages/model_gateway/tests",
+          "workers/generation/tests",
+          "tests/test_openai_generation_pipeline.py"
+        ],
+        "evidence": "Provider-neutral contract, real mocked worker/materialization/outbox consumers; no paid calls.",
+        "postgres": true,
+        "release": false
+      },
+      "worker": {
+        "tests": [
+          "workers/generation/tests",
+          "tests/test_openai_generation_pipeline.py"
+        ],
+        "evidence": "Complete native worker and persisted fake-provider pipeline.",
+        "postgres": true,
+        "release": false
+      },
+      "ci": {
+        "tests": [
+          "tools/ci/tests"
+        ],
+        "evidence": "Complete native selector/runner/failure/fixture ownership tests. No backend product smoke or DB setup.",
+        "postgres": false,
+        "release": false
+      },
+      "release_verifier": {
+        "tests": [
+          "apps/api/tests/test_professional_release_transport.py::test_real_release_verifier_and_mismatched_consumers"
+        ],
+        "evidence": "Actual offline integration manifest verifier, mismatched-consumer rejection; no live release activation.",
+        "postgres": true,
+        "release": false
+      },
+      "model_gateway_google": {
+        "tests": [
+          "packages/model_gateway_google/tests",
+          "packages/model_gateway/tests",
+          "workers/generation/tests",
+          "tests/test_openai_generation_pipeline.py"
+        ],
+        "evidence": "Complete native model_gateway_google owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "model_gateway_openai": {
+        "tests": [
+          "packages/model_gateway_openai/tests",
+          "packages/model_gateway/tests",
+          "workers/generation/tests",
+          "tests/test_openai_generation_pipeline.py"
+        ],
+        "evidence": "Complete native model_gateway_openai owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "text_understanding_google": {
+        "tests": [
+          "packages/text_understanding_google/tests",
+          "apps/api/tests/test_api.py::test_text_intake_scope_stale_and_provider_failures_are_safe"
+        ],
+        "evidence": "Complete native text_understanding_google owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "auth_oidc": {
+        "tests": [
+          "packages/auth_oidc/tests",
+          "apps/api/tests/test_api.py::test_me_membership_lifecycle_and_cross_tenant_authorization",
+          "apps/api/tests/test_api.py::test_membership_policy_and_last_owner_http_mapping",
+          "apps/api/tests/test_api.py::test_openapi_marks_business_routes_bearer_protected",
+          "apps/api/tests/test_api.py::test_authentication_infrastructure_failure_is_503_without_principal_mutation",
+          "packages/auth/tests"
+        ],
+        "evidence": "Complete native auth_oidc owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "auth_identity_platform": {
+        "tests": [
+          "packages/auth_identity_platform/tests",
+          "apps/api/tests/test_api.py::test_me_membership_lifecycle_and_cross_tenant_authorization",
+          "apps/api/tests/test_api.py::test_membership_policy_and_last_owner_http_mapping",
+          "apps/api/tests/test_api.py::test_openapi_marks_business_routes_bearer_protected",
+          "apps/api/tests/test_api.py::test_authentication_infrastructure_failure_is_503_without_principal_mutation",
+          "packages/auth/tests"
+        ],
+        "evidence": "Complete native auth_identity_platform owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "assets": {
+        "tests": [
+          "packages/assets/tests",
+          "apps/api/tests/test_asset_access_api.py"
+        ],
+        "evidence": "Complete native assets owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "assets_gcs": {
+        "tests": [
+          "packages/assets_gcs/tests",
+          "apps/api/tests/test_asset_access_api.py"
+        ],
+        "evidence": "Complete native assets_gcs owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "generation_queue": {
+        "tests": [
+          "packages/generation_queue/tests"
+        ],
+        "evidence": "Complete native generation_queue owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "generation_queue_gcp": {
+        "tests": [
+          "packages/generation_queue_gcp/tests"
+        ],
+        "evidence": "Complete native generation_queue_gcp owner and its actual integration consumers.",
+        "postgres": true,
+        "release": false
+      },
+      "auth_contract": {
+        "tests": [
+          "packages/auth/tests",
+          "packages/auth_oidc/tests",
+          "packages/auth_identity_platform/tests",
+          "apps/api/tests/test_api.py::test_me_membership_lifecycle_and_cross_tenant_authorization",
+          "apps/api/tests/test_api.py::test_membership_policy_and_last_owner_http_mapping",
+          "apps/api/tests/test_api.py::test_openapi_marks_business_routes_bearer_protected",
+          "apps/api/tests/test_api.py::test_authentication_infrastructure_failure_is_503_without_principal_mutation",
+          "packages/auth/tests"
+        ],
+        "evidence": "Complete consumers of common authentication/identity policy and scoped HTTP membership contracts.",
+        "postgres": true,
+        "release": true
+      }
+    },
+    "sources": [
+      {
+        "path": "packages/domain/src/jewelai_domain/roles*.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/questions.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles",
+          "domain_rules"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/rules.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles",
+          "domain_rules"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/__init__.py",
+        "declarations": [
+          "@module"
+        ],
+        "components": [
+          "roles"
+        ],
+        "source_pair": [
+          "68939c377be9e583d7514e55d03adc244539e8f04fa8977148657975c1bb387b",
+          "6c740e19a098b8d1908aad4607dd600add82014e946b8096782c4876ac0711c6"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/app.py",
+        "declarations": [
+          "create_app"
+        ],
+        "components": [
+          "roles",
+          "bootstrap",
+          "authorization"
+        ],
+        "source_pair": [
+          "e2ece10d11c531e2f1f554f47d1db312cb28b459bebb66ddeecd2eb1d98bfe9e",
+          "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/services.py",
+        "declarations": [
+          "@module",
+          "RuntimeService.__init__",
+          "RuntimeService.get_ui_catalog",
+          "RuntimeService.create_session"
+        ],
+        "components": [
+          "roles",
+          "sessions"
+        ],
+        "source_pair": [
+          "73dec3df1a47556dad0e26226cb4ac345e1b09c42f411577e804b40a714c1543",
+          "2be731802148d911ea8e3634a6cd77497ae6ffd0006081a3079212dc74042a86"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/settings.py",
+        "declarations": [
+          "@module",
+          "RuntimeSettings",
+          "RuntimeSettings.__post_init__"
+        ],
+        "components": [
+          "roles",
+          "bootstrap"
+        ],
+        "source_pair": [
+          "82ea7449bc870ad1c7ceb6fe111d22124753ddf6dadcef7c8b4fb89ff370649b",
+          "1bc33248dbeb79367c831c36e4615461c0a64b75271d6693727002a0c9f8c14c"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/schemas.py",
+        "declarations": [
+          "RoleCatalogItem"
+        ],
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/artifacts.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles",
+          "release_verifier"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/role_selection.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/roles.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/models.py",
+        "declarations": [
+          "@module",
+          "DesignSessionRow",
+          "RoleRow"
+        ],
+        "components": [
+          "roles",
+          "migration"
+        ],
+        "source_pair": [
+          "5bef2fe5ea058db774bf9e25f46b98da415b0bbc6f7448130dfb16338cb08639",
+          "d5a885fa6d494ce5ba1158cdd444f24fd01927ff87acc392c7ab4cf6150046b3"
+        ]
+      },
+      {
+        "path": "packages/persistence/migrations/versions/0021_roles_foundation.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles",
+          "migration"
+        ]
+      },
+      {
+        "path": "tools/roles/build_seed.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "tools/knowledge/verify_preprod_integration.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "release_verifier"
+        ]
+      },
+      {
+        "path": "packages/parser/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "parser"
+        ]
+      },
+      {
+        "path": "packages/prompts/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "prompts"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/preservation*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/lock*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/revis*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/models*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/knowledge*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge"
+        ]
+      },
+      {
+        "path": "workers/generation/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "worker"
+        ]
+      },
+      {
+        "path": "packages/model_gateway/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "gateway"
+        ]
+      },
+      {
+        "path": "packages/model_gateway_google/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "model_gateway_google"
+        ]
+      },
+      {
+        "path": "packages/model_gateway_openai/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "model_gateway_openai"
+        ]
+      },
+      {
+        "path": "packages/text_understanding_google/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "text_understanding_google"
+        ]
+      },
+      {
+        "path": "packages/auth_oidc/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "auth_oidc"
+        ]
+      },
+      {
+        "path": "packages/auth_identity_platform/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "auth_identity_platform"
+        ]
+      },
+      {
+        "path": "packages/assets/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "assets"
+        ]
+      },
+      {
+        "path": "packages/assets_gcs/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "assets_gcs"
+        ]
+      },
+      {
+        "path": "packages/generation_queue/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "generation_queue"
+        ]
+      },
+      {
+        "path": "packages/generation_queue_gcp/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "generation_queue_gcp"
+        ]
+      },
+      {
+        "path": "packages/auth/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "auth_contract"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/schema*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/state_paths.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/clarification_state*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "canonical"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/repository.py",
+        "declarations": [
+          "PersistenceRepository.create_design_session",
+          "PersistenceRepository.get_design_session",
+          "PersistenceRepository.get_current_revision",
+          "PersistenceRepository.get_revision",
+          "PersistenceRepository.list_revisions",
+          "PersistenceRepository.append_revision_cas",
+          "PersistenceRepository.create_message",
+          "PersistenceRepository.get_message",
+          "PersistenceRepository.list_messages"
+        ],
+        "components": [
+          "sessions",
+          "state_safety"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime.py",
+        "declarations": [
+          "@module",
+          "PromptEnrichmentRuntimeService._commit_verified",
+          "PromptEnrichmentRuntimeService._for_session",
+          "build_final_prompt_snapshot"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "sessions"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime_v2.py",
+        "declarations": [
+          "_history_frame"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "sessions"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/repository.py",
+        "declarations": [
+          "@module",
+          "PersistenceRepository.current_role_registry"
+        ],
+        "components": [
+          "roles",
+          "state_safety"
+        ]
+      }
+    ],
+    "resources": [
+      {
+        "path": "data/roles/*",
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "data/questions/*",
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "specs/roles/schema.json",
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "specs/questions/*schema.json",
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "specs/questions/*/schema.json",
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "specs/rules/*schema.json",
+        "components": [
+          "domain_rules"
+        ]
+      },
+      {
+        "path": "specs/rules/*/schema.json",
+        "components": [
+          "domain_rules"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/role_seed.json",
+        "components": [
+          "roles"
+        ]
+      },
+      {
+        "path": "packages/parser/tests/fixtures/*",
+        "components": [
+          "parser"
+        ]
+      },
+      {
+        "path": "data/completion/*",
+        "components": [
+          "canonical",
+          "prompts"
+        ]
+      },
+      {
+        "path": "specs/prompts/*schema.json",
+        "components": [
+          "prompts"
+        ]
+      },
+      {
+        "path": "data/knowledge-library/*",
+        "components": [
+          "knowledge"
+        ]
+      }
+    ],
+    "test_support": {
+      "apps/api/tests/conftest.py": {
+        "source_pair": [
+          "a8aabc27920d5f5ff537777ae9cd067ce39ac6fd47aae37611a9456cda6e1006",
+          "fe5efcda82940a54859822cfaa28e9734b437ad08d6d335fa28b060a24e5e891"
+        ]
+      },
+      "apps/api/tests/test_api.py": {
+        "source_pair": [
+          "55ede43d807d14796c810ad5c6797a7cb835f09ca98bb559d280f343cc50ee43",
+          "c98e7f7e89bc1c4d2cff5fbedf7b4485170996d67221755b89bc4419a5721656"
+        ]
+      },
+      "apps/api/tests/test_asset_access_api.py": {
+        "source_pair": [
+          "9f1f5f8983376a0b6f93e759f0fd75e82466ef271a974b86f6445938ad48c7a0",
+          "4627c0f052b087d890d82278b3a53132ec9e1b3ab36d28a4a237b93e9d6b6d59"
+        ]
+      },
+      "apps/api/tests/test_current_roles.py": {
+        "source_pair": [
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "145f1f7dc41252c49b0878209aa4fdc7b7cdb33c30bcc09e4d8b209a02fbad2b"
+        ]
+      },
+      "apps/api/tests/test_current_roles_postgres.py": {
+        "source_pair": [
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "85aa21947a1728ffc9e75bdbc52f1e5275f9f5544cf376509379bd3786ca77b1"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "migration"
+        ]
+      },
+      "apps/api/tests/test_durable_enrichment_decisions.py": {
+        "source_pair": [
+          "364bad649b779e300eadad9c5be308b229e852f2194470fe1b2f8281cd1a513b",
+          "4c2fa532a5a1aaceead8d0841d34fa7b1ce42970290cdbb880752eb131d76ed0"
+        ]
+      },
+      "apps/api/tests/test_effective_readiness.py": {
+        "source_pair": [
+          "bf9a6a5905bbdcc900d7da132ee43cf680510e285c7d53a79fb20bdbe290867e",
+          "edcd2a8817f5fdd558c8db6d092385bb2a569b8734548534c41174147819d06e"
+        ]
+      },
+      "apps/api/tests/test_enrichment_persistence.py": {
+        "source_pair": [
+          "f7777cec9cfffae72b86048ce9ea3f310e261856448dfa57932f2ff45c99ad05",
+          "c8a63d8dea52a0e8178366878423267a9347ad4c85d359399f3ac384cd2a029a"
+        ]
+      },
+      "apps/api/tests/test_f04_http.py": {
+        "source_pair": [
+          "c2514b80553024ada5ec0c680db6f98215f6e11b9e32d7699f4936697ccf90f9",
+          "59b752884b86ff6c29c4b4195b4ac8cc2443fe45238c86f782fab5ef62834456"
+        ]
+      },
+      "apps/api/tests/test_f04_planning_runtime.py": {
+        "source_pair": [
+          "bc0fac7a1c3b0dcf5e7b8a35756b45c2b1beb726f7de593a48b27e7c55769327",
+          "2571e941025f87731f4a71df9a55e3e0204f624b9e65605965ac30f160a98ea2"
+        ]
+      },
+      "apps/api/tests/test_generation_preparations_postgres.py": {
+        "source_pair": [
+          "1d072d1ba896c714c16e8d6e92106f91541edb454580a324ab27ed20ff2ed758",
+          "19526db04f4b93d2d7f118d86fef8bf9addc4b9ef58a11fb5d8ed6a46c6ac91e"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "migration"
+        ]
+      },
+      "apps/api/tests/test_ifp_capacity_runtime.py": {
+        "source_pair": [
+          "4dda863bcab5372df8a25e7ac2518f9978d59d01be606b2e8ceb0c0aa9795aea",
+          "ec299a4b690fa6d81416d444f54bed3526c1c7bc76fc14308b9d34d633e699e6"
+        ]
+      },
+      "apps/api/tests/test_keep_atomicity.py": {
+        "source_pair": [
+          "5b935a3b75259508137b5c5e5a752cda79f9fd11c518b3b319b0cb5e84b2ed95",
+          "6cd2ad420085cb2e61bca1d20b2a95c457c828a33c3caa286febfc22267c6b5d"
+        ]
+      },
+      "apps/api/tests/test_knowledge_session_binding.py": {
+        "source_pair": [
+          "4ae37a0b7f49f5444a318636fd7a99c659d9455b78aa7035271e7507803b2da9",
+          "f8d43ef6ec9da20639debf9fbf17a99db60b6876ec50233b275fe756745e161f"
+        ]
+      },
+      "apps/api/tests/test_p010_symmetry_runtime.py": {
+        "source_pair": [
+          "e2b9950ba9d22778f1e2944621cacab0da7c26d83a337c16ae2b223d911f56e1",
+          "51ec0c0d2f47beafc004fe3fc817e979b563b12e369f40540b8faaf989c87025"
+        ]
+      },
+      "apps/api/tests/test_p0_18_runtime_adoption.py": {
+        "source_pair": [
+          "0c9d4dfdf5fb187e1859690e6b1aff3baff630f27d90aab5bff28f4be87445bc",
+          "fe7a062219773192a3eb79c807e21c358d4928144dad45bfe157faa5122e2a7c"
+        ]
+      },
+      "apps/api/tests/test_parsed_enrichment.py": {
+        "source_pair": [
+          "770f70e6f9a561864e7456e47dd27399c351356dddc4669e539692eab9535d06",
+          "241b053c707e1ae57930887c0dbd2063e78eff595dd8ea4ffe830d11a97b9ceb"
+        ]
+      },
+      "apps/api/tests/test_persistence.py": {
+        "source_pair": [
+          "2c271c4369000737a9b2310ff34648dd23997cc384843310f1263e11aa3c71c6",
+          "0d07bdb06783d22a1b9eb035942d83e65a865389763363af991f970cd0a8c353"
+        ]
+      },
+      "apps/api/tests/test_pr133_review_regressions.py": {
+        "source_pair": [
+          "6c5d7e01349fc0abd94446e6b623b001131edf6dac623adf262e9cd355845c86",
+          "f323c0eb84b7ea3a8b13db86c689e1e31c38a103dad7d3d4555435624d445c20"
+        ]
+      },
+      "apps/api/tests/test_preparation_lock_regressions_postgres.py": {
+        "source_pair": [
+          "a305bbbd392d119b893cdb97c932cd9a7db2bc5b2789b92d3abd5952337a12e6",
+          "7c6d525b6fe2b303d4ed9724a1fd9fb3d9ccae3911674f5e729bebaa6e5953b1"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "migration"
+        ]
+      },
+      "apps/api/tests/test_professional_knowledge_release.py": {
+        "source_pair": [
+          "be8fd64ed1c166d4607a1ced9b8f5538c7d32812995e5c3d35c77362ab9147ab",
+          "74b7980973691863f5ef284307fd68072e732a52b9e5e676d836b7610fe903a2"
+        ]
+      },
+      "apps/api/tests/test_professional_release_transport.py": {
+        "source_pair": [
+          "342a9f0c6efd0f0a3a5a3cc541cf18985ca8bf604303af3e051ab0e7683d328f",
+          "1a6849416b718d231d9fba658d9740745974194daeef7d4607c377f76e45c080"
+        ]
+      },
+      "apps/api/tests/test_prompt_enrichment_composition.py": {
+        "source_pair": [
+          "3c9c3ad766f59c4791d840709a2ed30954056fd9ee1dea6ed80f5c50176ad1f4",
+          "9eaa21c5333be1f727f5f4c474cc44afda841c468313821eff595d2ce0c3699d"
+        ]
+      },
+      "apps/api/tests/test_prompt_enrichment_http.py": {
+        "source_pair": [
+          "ceea0cb83144babc7fe2eda698e5e6d59b1e75edfa00263f4fd3a1b2c532fdbc",
+          "579d706e7a22ea6d06d7c7c1833830d97bca49bdbb98b65c0801b292ca44bea3"
+        ]
+      },
+      "apps/api/tests/test_prompt_enrichment_integration.py": {
+        "source_pair": [
+          "8327db80127123ab024b95014649cc9c0cbc718a7cc7ed5efcb5aca96b035791",
+          "011b2fc83805592f758dd585b5e40f5ac2d15fbb08c3c8a996e8a942b4ba8600"
+        ]
+      },
+      "apps/api/tests/test_prompt_enrichment_runtime.py": {
+        "source_pair": [
+          "768fc9b8cfaf34dcf1172384c93b2d299d1073f46107a7ee281a601ea1e236ba",
+          "80b7a0389e3f37fd2e9c4bbadf348faef51bf7ee4deb8ebef8fadf9e28a9df42"
+        ]
+      },
+      "apps/api/tests/test_session_retirement.py": {
+        "source_pair": [
+          "98905304ccba01aae3a84715979f2b19248202a1d1663073c492bfddc1c3ff00",
+          "e8833f973306024199c74a58649f0841617ed5c46a92980dc8aac9e61eff8576"
+        ]
+      },
+      "apps/api/tests/test_session_retirement_migration.py": {
+        "source_pair": [
+          "3ae6b6c63b7b32bfb84c43ec85c27f89a7977147ef351154b82dd2e07f0b1c54",
+          "b0967bd965462cc00e03d7110da7217354e5b31cb802ec2f751097ec299ee35f"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "migration"
+        ]
+      },
+      "apps/api/tests/test_session_retirement_postgres.py": {
+        "source_pair": [
+          "8465aa15bbc07d4a9f2f9159d9076f316802a057c9c78b4c850f873bede11b76",
+          "2f6019b44526a600bec668f55ad04398c55c6610ae0a369c06c808355f1bbbf6"
+        ],
+        "components": [
+          "roles",
+          "state_safety",
+          "migration"
+        ]
+      },
+      "apps/api/tests/test_style_input.py": {
+        "source_pair": [
+          "ccf83b5b735ebb6808fc01b9a2e8774c77f4552236ba1568e2b2a1de3311ccb1",
+          "adae7da420b53aac0cdd66f2e9407b86b3367b25fd2120cac6997d2a5b85cfcd"
+        ]
+      },
+      "packages/domain/tests/conftest.py": {
+        "source_pair": [
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "797302d5d14ac2181f1dfe5222389a351933a7a716f9e7963d7d8c7621bfe644"
+        ]
+      },
+      "packages/domain/tests/test_questions.py": {
+        "source_pair": [
+          "e84482ef4dd26a1f6e147c95ebca0de22f05e2c9626b5f08e6e8f58e6a53b249",
+          "cc547e2afdec2a1ae8ddbeff5e62041561c181dbb569911de2fd0eefc86341ea"
+        ]
+      },
+      "packages/domain/tests/test_questions_v2.py": {
+        "source_pair": [
+          "2ecb7c8465a05d358066bd49ace5d6e64237cebbab52c8a7d1312cf4dad4b66b",
+          "a1efecd30c66357d31aca7c82a7f8f0dfe70dbee8cb39d822a5cdf11ff24ee49"
+        ]
+      },
+      "packages/domain/tests/test_roles.py": {
+        "source_pair": [
+          "05e0cc69c856b9ee26e3df6d0f1e90d84e6612df310381aaa01b3e04a28a2035",
+          "8832ad798d0f21c7b947a3fdfbe8d4065015049d07dff15cb03257f779272bb0"
+        ]
+      },
+      "packages/domain/tests/test_rules.py": {
+        "source_pair": [
+          "a634c737b7d9d553313335b3ee480e525b8f7678901dd5130668d9b6e0bede6a",
+          "27930c213985a1352ff35146c34ff1469ff3fa1d1a41e7f3283ac290434615d4"
+        ]
+      },
+      "packages/domain/tests/test_rules_v2.py": {
+        "source_pair": [
+          "b1c021170a553bc3496021ca6f56c239b99a38432e7b371cdff7573b024bd804",
+          "ebb232ea33149794157ea27de1886528cff76b18a519c77563fd0a4d0c7e9fbf"
+        ]
+      },
+      "tests/__init__.py": {
+        "source_pair": [
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+        ]
+      },
+      "tests/current_roles.py": {
+        "source_pair": [
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "bc2b50edf069ea80365fe9b50db3af06a8cb8b2ae90f3d85cd4553b030718ed5"
+        ]
+      },
+      "tests/test_openai_generation_pipeline.py": {
+        "source_pair": [
+          "67119e8baf391a8fc8ccf81b802afbaecdf478965c9646bbb41017517c8ffcd6",
+          "c50674286ddbd4dc1ba84b7ad2b1ae0db0ef35d40d35668c99b42659e42229f9"
+        ]
+      },
+      "workers/generation/tests/test_generation_worker.py": {
+        "source_pair": [
+          "eccb8ce5e1e102c88748a30257032e3da723eb22bbc157bbd986841567a1cc5c",
+          "f8930d9c7ea050b558691ea69ab98ead97618c1291ff9a5194952ca87c25004b"
+        ]
+      }
+    },
+    "support_contract": {
+      "components": [
+        "roles",
+        "state_safety"
+      ],
+      "evidence": "Reviewed ROLES-001 test support transition: canonical RR identities, explicit current registry/import, import-root fix or retained migration-guard expectation. Complete role contract + protected state and direct changed parametrized tests. Hash pair pins all other test/helper/module statements; any subsequent fixture edit blocks until independently reviewed."
+    }
+  }
 }

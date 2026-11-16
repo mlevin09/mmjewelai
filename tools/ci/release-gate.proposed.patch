@@ -1,0 +1,29 @@
+--- a/.github/workflows/deploy-preprod.yml
++++ b/.github/workflows/deploy-preprod.yml
+@@ -70,6 +70,26 @@
+       - uses: actions/checkout@v4
+         with:
+           ref: ${{ github.sha }}
++      # PROPOSED CI-RISK-002 Owner gate; not activated by the CI-only PR.
++      - name: Locate exact-release-SHA Full qualification
++        id: release_qualified
++        env:
++          GITHUB_TOKEN: ${{ github.token }}
++        run: >-
++          python tools/ci/qualification.py latest --sha "${GITHUB_SHA}"
++          --output "${RUNNER_TEMP}/release-metadata.json"
++      - uses: actions/download-artifact@v4
++        with:
++          name: ${{ steps.release_qualified.outputs.artifact_name }}
++          run-id: ${{ steps.release_qualified.outputs.run_id }}
++          github-token: ${{ github.token }}
++          path: ${{ runner.temp }}/release-full
++      - name: Require validated exact-SHA release evidence before GCP access
++        run: >-
++          python tools/ci/qualification.py check
++          --sha "${GITHUB_SHA}"
++          --metadata "${RUNNER_TEMP}/release-metadata.json"
++          --receipt "${RUNNER_TEMP}/release-full/qualification.json"
+       - name: Verify immutable deployment identity
+         id: deployment_request
+         run: |

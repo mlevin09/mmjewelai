@@ -30,6 +30,10 @@ on:
       - workers/generation/src/jewelai_generation/logging.py
       - workers/generation/src/jewelai_generation/runtime.py
 
+concurrency:
+  group: infra-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
