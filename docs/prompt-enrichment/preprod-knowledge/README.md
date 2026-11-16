@@ -52,8 +52,12 @@ uses the existing fake verifier, never real Identity Platform credentials.
 With the separately reviewed exact report, existing `promote_knowledge_runtime_v1_1`
 and `load_active_runtime` verify the ACTIVE envelope; no gate or public DTO changes.
 `verify_preprod_integration.py` then independently verifies that the actual API image's
-Dictionary, parametric, roles, rules/questions and prompt bytes match the operational
+Dictionary, parametric, rules/questions and prompt bytes match the operational
 integration manifest. The manifest is deployment evidence, not a new session contract.
+ROLES-001 current roles are PostgreSQL-backed (ADR 0044); historical Role JSON is
+not a consumer authority. For consumer-only changes, preserve the qualified release
+using the [immutable rebind procedure](../../operations/roles-001-knowledge-rebind.md)
+instead of republishing or promoting semantic Knowledge.
 
 ```sh
 python tools/knowledge/prepare_preprod_integration.py \

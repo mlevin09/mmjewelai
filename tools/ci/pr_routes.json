@@ -660,6 +660,15 @@
         "evidence": "Complete consumers of common authentication/identity policy and scoped HTTP membership contracts.",
         "postgres": true,
         "release": true
+      },
+      "release_rebind": {
+        "tests": [
+          "apps/api/tests/test_professional_release_transport.py",
+          "apps/api/tests/test_preprod_consumer_rebind.py"
+        ],
+        "evidence": "Offline consumer-only archive rebinding: original ACTIVE/report/store bytes, exact pins, transport, deterministic output and tamper rejection. No activation, deployment, database or semantic catalog edits.",
+        "postgres": false,
+        "release": false
       }
     },
     "sources": [
@@ -1085,6 +1094,15 @@
           "roles",
           "state_safety"
         ]
+      },
+      {
+        "path": "tools/knowledge/rebind_preprod_integration.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "release_rebind"
+        ]
       }
     ],
     "resources": [
@@ -1159,6 +1177,12 @@
         "path": "data/knowledge-library/*",
         "components": [
           "knowledge"
+        ]
+      },
+      {
+        "path": "docs/prompt-enrichment/preprod-knowledge/roles-001-release-pin.json",
+        "components": [
+          "release_rebind"
         ]
       }
     ],
