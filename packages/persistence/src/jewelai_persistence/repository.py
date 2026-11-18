@@ -884,7 +884,13 @@ class PersistenceRepository:
             ) from exc
         return revision
 
-    def create_message(self, row: MessageRow, organization_id: UUID) -> MessageRow:
+    def create_message(
+        self,
+        row: MessageRow,
+        organization_id: UUID,
+        *,
+        first_turn_revision_id: UUID | None = None,
+    ) -> MessageRow:
         with self._session_factory.begin() as db:
             scoped = db.scalar(
                 self._scoped_session_query(row.session_id, organization_id).with_for_update()
@@ -893,6 +899,32 @@ class PersistenceRepository:
                 raise OwnershipMismatchError("Session not found in organization scope")
             if row.actor != "user":
                 raise ValueError("Parser Proposal v1 persists user messages only")
+            if first_turn_revision_id is not None:
+                self._require_native_workflow(db, row.session_id)
+                if (scoped.question_artifact_version, scoped.rules_artifact_version) != (
+                    "2.0.0",
+                    "2.0.0",
+                ):
+                    raise ValueError("ST-01 requires the retained F profile")
+                if scoped.current_revision_id != first_turn_revision_id:
+                    raise StaleRevisionError("Product State changed before first-turn Message")
+                if (
+                    any(
+                        (
+                            scoped.knowledge_package_id,
+                            scoped.knowledge_artifact_version,
+                            scoped.knowledge_runtime_sha256,
+                            scoped.knowledge_validation_report_sha256,
+                        )
+                    )
+                    or db.scalar(
+                        select(EnrichmentCycleRow.enrichment_cycle_id)
+                        .where(EnrichmentCycleRow.session_id == row.session_id)
+                        .limit(1)
+                    )
+                    is not None
+                ):
+                    raise StaleRevisionError("First-turn Message requires an uninitialized session")
             db.add(row)
         return row
 

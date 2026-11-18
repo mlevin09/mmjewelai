@@ -76,8 +76,15 @@ configured; the UI never enables it or substitutes a provider fallback. See
 
 A new session pinned to questions/rules `2.0.0` offers **Open text-only first-turn
 pilot**. This is a separate explicit choice, not a rerouting of guided fields.
-The pilot saves the exact typed text as a Message and calls the versioned
-`first-turn` route with that Message ID and the current revision. It never adds
+The pilot sends the exact textarea text to its opt-in `first-turn/messages`
+endpoint (schema `1.0.0`, current revision and content), which preserves it without
+trimming in the existing Message store. The separate DTO rejects whitespace-only
+text and limits the complete original input to 2,000 characters, matching the
+current Parser and UI. Tenant/session, retained F profile and fresh initial state
+are checked before the locked Message insert; stale revisions or initialized
+sessions cannot append through this route. The pilot then calls the versioned
+`first-turn` route with that Message ID and the current revision. Legacy `/messages`
+keeps its original trimming and 4,000-character contract. The pilot never adds
 creation wording, center-stone placement or structured choices to the text.
 The existing guided/legacy command paths remain unchanged.
 

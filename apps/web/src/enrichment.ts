@@ -222,7 +222,18 @@ export class EnrichmentClient {
     });
   }
   async startFirstTurn(snapshot: Conversation, content: string) {
-    const message = await this.message(content);
+    const message = await this.api.request<{ message_id: string }>(
+      `${this.path}/first-turn/messages`,
+      {
+        organizationId: this.organizationId,
+        method: "POST",
+        body: JSON.stringify({
+          schema_version: "1.0.0",
+          expected_revision_id: snapshot.revision.revision_id,
+          content,
+        }),
+      },
+    );
     return this.api.request<FirstTurnRead>(`${this.path}/first-turn`, {
       organizationId: this.organizationId,
       method: "POST",

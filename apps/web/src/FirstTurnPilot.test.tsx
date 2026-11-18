@@ -70,11 +70,17 @@ function setup(locale = "en", questions = "2.0.0", rules = "2.0.0") {
               { status: 404 },
             ),
     ),
-    http.post(`${root}/sessions/session/messages`, async ({ request }) => {
+    http.post(`${prefix}/first-turn/messages`, async ({ request }) => {
       expect(request.headers.get("X-Organization-ID")).toBe("org");
-      original = ((await request.json()) as { content: string }).content;
-      commands.push({ content: original });
+      const body = (await request.json()) as { content: string };
+      original = body.content;
+      commands.push(body);
       return HttpResponse.json({ message_id: "m1" });
+    }),
+    http.post(`${root}/sessions/session/messages`, () => {
+      throw new Error(
+        "Pilot must not call the legacy trimming Message endpoint",
+      );
     }),
     http.post(`${prefix}/first-turn`, async ({ request }) => {
       expect(request.headers.get("X-Organization-ID")).toBe("org");
@@ -123,8 +129,8 @@ describe("isolated first-turn pilot", () => {
       expect(screen.queryByLabelText("Center stone")).not.toBeInTheDocument();
       const raw =
         locale === "ru"
-          ? "  Хочу серьги из белого золота с двумя сапфирами\n"
-          : "  I want white gold earrings with two sapphires\n";
+          ? " \t\nХочу серьги из белого золота с двумя сапфирами\n\t "
+          : " \t\nI want white gold earrings with two sapphires\n\t ";
       fireEvent.change(screen.getByRole("textbox"), { target: { value: raw } });
       const send = screen.getByRole("button", {
         name:
@@ -134,7 +140,7 @@ describe("isolated first-turn pilot", () => {
       fireEvent.click(send);
       expect(await screen.findByText(f.reply)).toBeInTheDocument();
       expect(f.commands).toEqual([
-        { content: raw },
+        { schema_version: "1.0.0", expected_revision_id: "r1", content: raw },
         {
           schema_version: "1.0.0",
           message_id: "m1",

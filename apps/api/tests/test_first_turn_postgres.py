@@ -21,14 +21,21 @@ from test_professional_knowledge_http import real_config as real_config
 pytestmark = pytest.mark.postgres
 
 
-@pytest.mark.parametrize("locale,sentence", [("ru", RU), ("en", EN)])
+@pytest.mark.parametrize(
+    "locale,sentence", [("ru", " \t\n" + RU + "\r\n\t "), ("en", " \t\n" + EN + "\r\n\t ")]
+)
 def test_first_turn_real_postgres_migration_http_immutability_and_downgrade(
     engine, real_config, locale, sentence
 ):
     with real_client(engine, real_config) as (client, app, _):
-        sid, oid, body = setup(client, app, sentence, locale)
+        sid, oid, body = setup(client, app, sentence, locale, raw=True)
         result = post(client, sid, oid, body)
         assert result.status_code == 201, result.json()
+        import hashlib
+
+        binding = result.json()["receipt"]["binding"]
+        assert binding["message_sha256"] == hashlib.sha256(sentence.encode()).hexdigest()
+        assert all(sentence[f["start"] : f["end"]] == f["text"] for f in binding["facts"])
         # PostgreSQL migration, not just SQLAlchemy create_all, installed these triggers.
         for operation in (
             update(FirstConversationTurnRow)

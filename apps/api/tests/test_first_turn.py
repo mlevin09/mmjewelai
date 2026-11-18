@@ -22,13 +22,38 @@ RU = "Хочу элегантные серьги из белого золота 
 EN = "I want elegant white gold earrings with two sapphires"
 
 
-def setup(client, app, text, locale="en"):
+def raw_message(client, sid, oid, revision_id, text):
+    return client.post(
+        f"/v1/sessions/{sid}/prompt-enrichment/first-turn/messages",
+        headers={"X-Organization-ID": str(oid)},
+        json={
+            "schema_version": "1.0.0",
+            "expected_revision_id": str(revision_id),
+            "content": text,
+        },
+    )
+
+
+def setup(client, app, text, locale="en", *, raw=False):
     org, _, session = create_hierarchy(client, locale=locale)
     sid = UUID(session.json()["session_id"])
     oid = UUID(org)
     repo = app.state.prompt_enrichment_service.repository
     rev = repo.get_current_revision(sid, oid)
-    message = _message(client, str(sid), org, text)
+    if raw:
+        response = raw_message(client, sid, oid, rev.revision_id, text)
+        assert response.status_code == 201, response.json()
+        assert response.headers["Cache-Control"] == "no-store, private"
+        message = response.json()
+        assert message["content"].encode("utf-8") == text.encode("utf-8")
+        from jewelai_persistence.models import MessageRow
+
+        with create_session_factory(app.state.engine)() as db:
+            assert db.get(MessageRow, UUID(message["message_id"])).content.encode(
+                "utf-8"
+            ) == text.encode("utf-8")
+    else:
+        message = _message(client, str(sid), org, text)
     return (
         sid,
         oid,
@@ -54,12 +79,15 @@ def get(client, sid, oid):
     )
 
 
-@pytest.mark.parametrize("locale,text", [("ru", RU), ("en", EN)])
+@pytest.mark.parametrize(
+    "locale,text",
+    [("ru", RU), ("en", EN), ("ru", " \t\n" + RU + "\r\n\t "), ("en", " \t\n" + EN + "\r\n\t ")],
+)
 def test_first_turn_commits_source_bound_creation_and_exact_reply_reload(
     engine, real_config, locale, text
 ):
     with real_client(engine, real_config) as (client, app, provider):
-        sid, oid, body = setup(client, app, text, locale)
+        sid, oid, body = setup(client, app, text, locale, raw=True)
         response = post(client, sid, oid, body)
         assert response.status_code == 201, response.json()
         data = response.json()
@@ -67,6 +95,11 @@ def test_first_turn_commits_source_bound_creation_and_exact_reply_reload(
         receipt = data["receipt"]
         assert receipt["reply_origin"] == "deterministic_fallback"
         facts = receipt["binding"]["facts"]
+        import hashlib
+
+        assert (
+            receipt["binding"]["message_sha256"] == hashlib.sha256(text.encode("utf-8")).hexdigest()
+        )
         assert {f["target"]: f["value"] for f in facts} == {
             "jewelry_type": "earrings",
             "metal.material": "gold",
@@ -95,7 +128,117 @@ def test_first_turn_commits_source_bound_creation_and_exact_reply_reload(
         restored = get(client, sid, oid)
         assert restored.status_code == 200, restored.json()
         assert restored.json() == data
+        conversation = client.get(
+            f"/v1/sessions/{sid}/prompt-enrichment/conversation",
+            headers={"X-Organization-ID": str(oid)},
+        )
+        assert conversation.status_code == 200, conversation.json()
+        event = next(
+            e for e in conversation.json()["events"] if e.get("message_id") == body["message_id"]
+        )
+        assert event["text"].encode("utf-8") == text.encode("utf-8")
         assert provider.calls == []
+
+
+@pytest.mark.parametrize("text", ["", " \t\r\n", "\u00a0\u2003", "x" * 2001])
+def test_raw_first_turn_rejects_invalid_text_without_writes(engine, real_config, text):
+    with real_client(engine, real_config) as (client, app, provider):
+        org, _, session = create_hierarchy(client)
+        sid, oid = UUID(session.json()["session_id"]), UUID(org)
+        repo = app.state.prompt_enrichment_service.repository
+        before = repo.get_current_revision(sid, oid)
+        response = raw_message(client, sid, oid, before.revision_id, text)
+        assert response.status_code == 422, response.json()
+        assert repo.list_messages(sid, oid) == ()
+        assert repo.get_current_revision(sid, oid) == before
+        assert repo.get_design_session(sid, oid).knowledge_package_id is None
+        with create_session_factory(engine)() as db:
+            assert (
+                db.scalar(
+                    select(func.count())
+                    .select_from(EnrichmentCycleRow)
+                    .where(EnrichmentCycleRow.session_id == sid)
+                )
+                == 0
+            )
+        assert provider.calls == []
+
+
+@pytest.mark.parametrize("locale,text", [("en", EN), ("ru", RU)])
+def test_raw_first_turn_exact_parser_limit_and_unchanged_legacy_message(
+    engine, real_config, locale, text
+):
+    with real_client(engine, real_config) as (client, app, provider):
+        exact = text + " " * (2000 - len(text))
+        sid, oid, body = setup(client, app, exact, locale, raw=True)
+        result = post(client, sid, oid, body)
+        assert result.status_code == 201, result.json()
+        assert get(client, sid, oid).json() == result.json()
+        legacy = _message(client, str(sid), str(oid), " \t" + text + "\r\n ")
+        assert legacy["content"] == text
+        # The legacy contract still permits 4,000 characters and still trims.
+        assert _message(client, str(sid), str(oid), "x" * 4000)["content"] == "x" * 4000
+        assert provider.calls == []
+
+
+def test_raw_first_turn_cas_initialized_and_tenant_guards_do_not_append(engine, real_config):
+    with real_client(engine, real_config) as (client, app, provider):
+        sid, oid, body = setup(client, app, EN, raw=True)
+        repo = app.state.prompt_enrichment_service.repository
+        before = repo.list_messages(sid, oid)
+        assert raw_message(client, sid, oid, uuid4(), RU).status_code == 409
+        other_org, _, _ = create_hierarchy(client)
+        assert (
+            raw_message(client, sid, UUID(other_org), body["expected_revision_id"], RU).status_code
+            == 404
+        )
+        client.headers["Authorization"] = "Bearer test-outsider"
+        assert raw_message(client, sid, oid, body["expected_revision_id"], RU).status_code == 404
+        client.headers["Authorization"] = "Bearer test-owner-a"
+        assert len(repo.list_messages(sid, oid)) == len(before)
+        result = post(client, sid, oid, body)
+        assert result.status_code == 201, result.json()
+        current = repo.get_current_revision(sid, oid)
+        assert raw_message(client, sid, oid, current.revision_id, RU).status_code == 409
+        assert len(repo.list_messages(sid, oid)) == len(before)
+        assert get(client, sid, oid).json() == result.json()
+        assert provider.calls == []
+
+
+def test_raw_first_turn_rechecks_initial_state_at_message_insert(engine, real_config, monkeypatch):
+    with real_client(engine, real_config) as (client, app, _):
+        # A no-fact turn commits a cycle without changing the canonical revision.
+        sid, oid, body = setup(client, app, "Hello")
+        repo = app.state.prompt_enrichment_service.repository
+        original = repo.create_message
+
+        def raced_insert(row, organization_id, **kwargs):
+            assert post(client, sid, oid, body).status_code == 201
+            return original(row, organization_id, **kwargs)
+
+        monkeypatch.setattr(repo, "create_message", raced_insert)
+        assert raw_message(client, sid, oid, body["expected_revision_id"], EN).status_code == 409
+        assert len(repo.list_messages(sid, oid)) == 1
+        assert repo.get_current_revision(sid, oid).revision_id == UUID(body["expected_revision_id"])
+
+
+def test_raw_first_turn_requires_retained_f_pair(engine, real_config):
+    from jewelai_persistence.models import DesignSessionRow
+    from sqlalchemy import update
+
+    with real_client(engine, real_config) as (client, app, _):
+        org, _, session = create_hierarchy(client)
+        sid, oid = UUID(session.json()["session_id"]), UUID(org)
+        repo = app.state.prompt_enrichment_service.repository
+        before = repo.get_current_revision(sid, oid)
+        with engine.begin() as db:
+            db.execute(
+                update(DesignSessionRow)
+                .where(DesignSessionRow.session_id == sid)
+                .values(question_artifact_version="1.0.0", rules_artifact_version="1.0.0")
+            )
+        assert raw_message(client, sid, oid, before.revision_id, EN).status_code == 422
+        assert repo.list_messages(sid, oid) == ()
 
 
 @pytest.mark.parametrize(

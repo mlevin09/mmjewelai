@@ -54,6 +54,20 @@ no synthetic assistant Message or change to conversation-v1 is introduced. Dupli
 initialization does not regenerate a reply. GET retains original text and separately
 reports current revision identity and whether the receipt's revision is still current.
 
+The coordinator's original-input DoD correction adds the opt-in
+`POST .../first-turn/messages` source path. Its separate schema1 DTO preserves the
+complete supplied string, including boundary whitespace, in the existing Message
+table. It rejects whitespace-only content and counts all characters toward the
+current Parser/UI limit of2,000. It reuses tenant authorization and native/F checks;
+the existing scoped Message transaction locks the session and checks expected
+revision, complete F artifact pair and absence of a pin/cycle before append. The
+response is constructed before commit. No migration or new source storage exists.
+Legacy `/messages` and its trimming/4,000-character DTO stay unchanged. Source
+coordinates and SHA are computed from actual retained raw text. Rewriting legacy
+Message semantics or only documenting lost input would violate the narrow opt-in
+boundary or the approved original-input DoD, respectively. This route stores only
+the user source; revision/pin/cycle/plan/reply still commit in the first-turn command.
+
 The only implemented reply origin is explicitly `deterministic_fallback`. It states
 accepted source-backed values and that remaining input is not accepted as parameters.
 No model call, network access, implicit provider selection or simulated model success.
@@ -73,7 +87,9 @@ This intentionally accepts fewer syntactic forms than a general language model.
 Unsupported phrasing remains unresolved; it does not authorize guessed jewelry facts.
 Legacy F04 planning is reused with its existing canonical-revision-only option for
 ST-01, so unaccepted proposals cannot become the effective Product State. No new
-clarification content, UI, provider, release activation or deployment is included.
+clarification content, provider, release activation or deployment is included. The
+coordinator's explicit F-only text pilot UI consumes the two opt-in endpoints;
+guided/legacy paths remain available and unchanged.
 
 A conversational model/runtime selection and independent naturalness/functional
 acceptance remain separate open gates. Local SQLite and fake authentication prove

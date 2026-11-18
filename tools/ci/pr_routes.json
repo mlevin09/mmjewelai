@@ -687,7 +687,7 @@
           "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin",
           "apps/api/tests/test_first_turn_intent.py"
         ],
-        "evidence": "Complete opt-in ST-01 source binding, pinned Library ownership, actual HTTP/reload, native correction/historical reply, tenant/CAS and atomic receipt rejection. Real PostgreSQL uses the unchanged disposable gate for actual migration, immutable triggers and downgrade refusal. Existing historical Parser/Message contracts unchanged. Authority-intent regressions own informational/advice subjects versus direct creation objects and real HTTP persisted/reloaded non-selection.",
+        "evidence": "Complete opt-in ST-01 source binding, pinned Library ownership, actual HTTP/reload, native correction/historical reply, tenant/CAS and atomic receipt rejection. Real PostgreSQL uses the unchanged disposable gate for actual migration, immutable triggers and downgrade refusal. Existing historical Parser/Message contracts unchanged. Authority-intent regressions own informational/advice subjects versus direct creation objects and real HTTP persisted/reloaded non-selection. Opt-in raw Message ownership includes exact UTF-8 retention, whitespace/Parser limit validation and locked fresh-F/CAS/tenant insertion; legacy Message normalization stays unchanged.",
         "postgres": true,
         "release": true
       }
@@ -748,7 +748,7 @@
         ],
         "source_pair": [
           "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d",
-          "b4fb800d59d6479388b8c392664b83eeb503b73c306fbd418455639829d23eba"
+          "8e104d449e5dd978227c43512962d7d58a4eabdb56e1c97bd9e682f9619f9eab"
         ]
       },
       {
@@ -1179,6 +1179,7 @@
         "path": "packages/persistence/src/jewelai_persistence/repository.py",
         "declarations": [
           "EnrichmentCycleRecord",
+          "PersistenceRepository.create_message",
           "PersistenceRepository.commit_initial_enrichment",
           "PersistenceRepository.get_first_conversation_turn",
           "PersistenceRepository._enrichment_cycle_record"

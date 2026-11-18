@@ -9,12 +9,13 @@ import hashlib
 import re
 from datetime import datetime
 from types import SimpleNamespace
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from jewelai_domain.clarification_state import Sha256, StrictEvidenceModel, evidence_hash
 from jewelai_domain.knowledge_runtime import KnowledgeReleaseBinding
 from jewelai_domain.models import Explicit, KnownValue
+from pydantic import StringConstraints
 
 CONTRACT = "jewelai.st01.first-turn/1.0.0"
 _CREATION = re.compile(
@@ -58,6 +59,38 @@ class FirstTurnRequest(StrictEvidenceModel):
     schema_version: Literal["1.0.0"]
     message_id: UUID
     expected_revision_id: UUID
+
+
+class FirstTurnMessageRequest(StrictEvidenceModel):
+    """Opt-in raw source, bounded by the current Parser's 2,000-character limit."""
+
+    schema_version: Literal["1.0.0"]
+    expected_revision_id: UUID
+    content: Annotated[
+        str, StringConstraints(strict=True, min_length=1, max_length=2000, pattern=r"\S")
+    ]
+
+
+def save_message(service, sid, oid, request):
+    from jewelai_persistence.models import MessageRow
+
+    from .schemas import MessageResponse
+
+    service._require_native_workflow(sid, oid)
+    bound = service._for_session(sid, oid)
+    if not bound._is_f04:
+        raise ValueError("ST-01 requires the retained F profile")
+    row = MessageRow(
+        message_id=service._uuid(),
+        session_id=sid,
+        actor="user",
+        content=request.content,
+        created_at=service._clock(),
+    )
+    # Construct the read result before committing, without the legacy trimming DTO.
+    response = MessageResponse.model_validate(row)
+    service.repository.create_message(row, oid, first_turn_revision_id=request.expected_revision_id)
+    return response
 
 
 class CreationFact(StrictEvidenceModel):
