@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiClient, ApiError } from "./api";
+import { FirstTurnPilot } from "./FirstTurnPilot";
 import { VoiceRecorder } from "./VoiceRecorder";
 import {
   decisions,
@@ -8,6 +9,7 @@ import {
   type CompletionView,
   type Conversation,
   type FinalOutput,
+  type FirstTurnRead,
   type Question,
 } from "./enrichment";
 import type { Session } from "./types";
@@ -28,6 +30,8 @@ export function EnrichmentWorkspace({
   );
   const [session, setSession] = useState<Session | null>(null);
   const [snapshot, setSnapshot] = useState<Conversation | null>(null);
+  const [pilot, setPilot] = useState(false);
+  const [firstTurn, setFirstTurn] = useState<FirstTurnRead | null>(null);
   const [final, setFinal] = useState<FinalOutput | null>(null);
   const [completionEnabled, setCompletionEnabled] = useState(false);
   const [completion, setCompletion] = useState<CompletionView | null>(null);
@@ -54,7 +58,10 @@ export function EnrichmentWorkspace({
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [snapshot?.events.length]);
 
-  async function refresh(currentEpoch = epoch.current) {
+  async function refresh(
+    currentEpoch = epoch.current,
+    activeSession = session,
+  ) {
     if (currentEpoch !== epoch.current) return;
     const data = await client.read();
     if (currentEpoch !== epoch.current) return;
@@ -62,6 +69,22 @@ export function EnrichmentWorkspace({
     setLoading(false);
     setFinal(null);
     setCompletion(null);
+    if (
+      activeSession?.artifacts.questions === "2.0.0" &&
+      activeSession.artifacts.rules === "2.0.0"
+    ) {
+      try {
+        const saved = await client.firstTurn();
+        if (currentEpoch !== epoch.current) return;
+        setFirstTurn(saved);
+        setPilot(true);
+        return;
+      } catch (e) {
+        if (currentEpoch !== epoch.current) return;
+        // Only absent receipts/routes are compatible with legacy sessions.
+        if (!(e instanceof ApiError && e.status === 404)) throw e;
+      }
+    }
     if (data.state) {
       try {
         const current = await client.currentCompletion();
@@ -121,7 +144,7 @@ export function EnrichmentWorkspace({
       .then(async (data) => {
         if (disposed) return;
         setSession(data);
-        await refresh(current);
+        await refresh(current, data);
       })
       .catch(() => {
         if (!disposed) {
@@ -308,6 +331,16 @@ export function EnrichmentWorkspace({
         <Link to={`/organizations/${organizationId}`}>Back to projects</Link>
       </main>
     );
+  if (pilot)
+    return (
+      <FirstTurnPilot
+        client={client}
+        session={session}
+        snapshot={snapshot}
+        saved={firstTurn}
+        onClose={() => setPilot(false)}
+      />
+    );
   const s = snapshot.state;
   const activeQuestion = s?.questions[0];
   const readyForFinal =
@@ -391,6 +424,20 @@ export function EnrichmentWorkspace({
           </button>
         </div>
       </div>
+      {!snapshot.state &&
+        session.artifacts.questions === "2.0.0" &&
+        session.artifacts.rules === "2.0.0" && (
+          <button
+            type="button"
+            disabled={busy || unsavedDesignInput}
+            onClick={() => setPilot(true)}
+          >
+            {t(
+              "Open text-only first-turn pilot",
+              "Открыть текстовый пилот первого сообщения",
+            )}
+          </button>
+        )}
       {error && (
         <p role="alert" className="alert">
           {error}

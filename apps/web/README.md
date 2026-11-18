@@ -71,3 +71,32 @@ continuation request capacity. No client key, model credential, generation or ca
 activation is added. The API must already have its verified enrichment runtime
 configured; the UI never enables it or substitutes a provider fallback. See
 [ADR 0039](../../docs/adr/0039-prompt-enrichment-conversation-workspace.md).
+
+## ST-01 opt-in text pilot (coordinator UI)
+
+A new session pinned to questions/rules `2.0.0` offers **Open text-only first-turn
+pilot**. This is a separate explicit choice, not a rerouting of guided fields.
+The pilot saves the exact typed text as a Message and calls the versioned
+`first-turn` route with that Message ID and the current revision. It never adds
+creation wording, center-stone placement or structured choices to the text.
+The existing guided/legacy command paths remain unchanged.
+
+A saved first-turn receipt reopens the pilot automatically. The server's immutable
+reply is displayed verbatim with a **fallback mode** label; it is not a model reply.
+The source Message is displayed separately, and a non-current receipt is labelled
+historical rather than substituted for current State. Reload reads the receipt and
+conversation again, without generating an answer. An absent route/receipt is
+compatible with legacy sessions; authorization or verification errors are not
+silently treated as absence.
+
+Submission is guarded against repeated clicks. After an uncertain attempt the
+same mounted pilot does not blindly create another Message; the retained input
+and an explicit read-only reload remain available. There is no durable client
+retry/recovery protocol in this change. No clarification, continuation, final
+confirmation or provider call is exposed within this pilot. Dropdown/mixed-input,
+voice and natural-model acceptance are not established by these UI tests.
+
+Targeted UI contract tests use MSW and jsdom in `FirstTurnPilot.test.tsx`, plus the
+existing workspace and App suites. They are not live-browser/backend acceptance.
+The final combined PR HEAD still needs independent review, exact-head CI and a
+real isolated browser/API lifecycle check before functional acceptance.
