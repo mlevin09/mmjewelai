@@ -309,6 +309,7 @@ class EnrichmentCycleRecord:
     release_pin: KnowledgeReleasePinRecord
     result: AnyPromptEnrichmentResult
     created_at: datetime
+    source_contract: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1159,6 +1160,7 @@ class PersistenceRepository:
         clarification_plan_payload: dict | None = None,
         release_binding: KnowledgeReleaseBinding | None = None,
         verify=None,
+        first_turn_payload: dict | None = None,
     ) -> EnrichmentCycleRecord:
         """Stage the first edit/pin/cycle; optional read-only verification precedes commit."""
 
@@ -1212,6 +1214,9 @@ class PersistenceRepository:
             raise EnrichmentIntegrityError("F04 initial enrichment requires an atomic Plan2")
         record = EnrichmentCycleRecord(
             enrichment_cycle_id=enrichment_cycle_id,
+            source_contract="jewelai.st01.first-turn/1.0.0"
+            if first_turn_payload is not None
+            else None,
             session_id=session_id,
             cycle_number=1,
             specification_revision_id=authoritative_revision_id,
@@ -1274,6 +1279,9 @@ class PersistenceRepository:
                     session.updated_at = created_at
                 row = EnrichmentCycleRow(
                     enrichment_cycle_id=enrichment_cycle_id,
+                    source_contract="jewelai.st01.first-turn/1.0.0"
+                    if first_turn_payload is not None
+                    else None,
                     session_id=session_id,
                     cycle_number=1,
                     specification_revision_id=authoritative_revision_id,
@@ -1313,6 +1321,13 @@ class PersistenceRepository:
                         created_at=created_at,
                     )
                     db.flush()
+                if first_turn_payload is not None:
+                    from .first_turns import stage_first_turn
+
+                    stage_first_turn(
+                        db, session, row, expected_revision_id, first_turn_payload, organization_id
+                    )
+                    db.flush()
                 if verify is not None:
                     from .preparations import locked_reader
 
@@ -1322,6 +1337,11 @@ class PersistenceRepository:
                 "initial revision or enrichment cycle already exists"
             ) from exc
         return record
+
+    def get_first_conversation_turn(self, session_id, organization_id):
+        from .first_turns import read_first_turn
+
+        return read_first_turn(self, session_id, organization_id)
 
     def get_knowledge_release_pin(
         self, session_id: UUID, organization_id: UUID
@@ -3745,6 +3765,7 @@ class PersistenceRepository:
             cls._validate_f04_snapshot(db, session, result, row.specification_revision_id)
         return EnrichmentCycleRecord(
             enrichment_cycle_id=row.enrichment_cycle_id,
+            source_contract=row.source_contract,
             session_id=row.session_id,
             cycle_number=row.cycle_number,
             specification_revision_id=row.specification_revision_id,

@@ -1326,6 +1326,33 @@ def create_app(
 
     if prompt_enrichment_service is not None:
         from .conversation import ConversationResponse, read_conversation
+        from .first_turn import FirstTurnRead, FirstTurnRequest
+        from .first_turn import read as read_first_turn
+        from .first_turn import start as start_first_turn
+
+        @app.post(
+            "/v1/sessions/{session_id}/prompt-enrichment/first-turn",
+            response_model=FirstTurnRead,
+            status_code=201,
+        )
+        def create_first_turn(
+            session_id: UUID,
+            request: FirstTurnRequest,
+            organization_id: AuthorizedOrganization,
+            response: Response,
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            return start_first_turn(prompt_enrichment_service, session_id, organization_id, request)
+
+        @app.get(
+            "/v1/sessions/{session_id}/prompt-enrichment/first-turn",
+            response_model=FirstTurnRead,
+        )
+        def get_first_turn(
+            session_id: UUID, organization_id: AuthorizedOrganization, response: Response
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            return read_first_turn(prompt_enrichment_service, session_id, organization_id)
 
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/conversation",

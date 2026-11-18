@@ -669,6 +669,26 @@
         "evidence": "Offline consumer-only archive rebinding: original ACTIVE/report/store bytes, exact pins, transport, deterministic output and tamper rejection. No activation, deployment, database or semantic catalog edits.",
         "postgres": false,
         "release": false
+      },
+      "st01_adapter_boundary": {
+        "tests": [
+          "apps/api/tests/test_conversation_model.py"
+        ],
+        "evidence": "Internal unconnected provider-neutral draft boundary and immutable source/State/release context. Complete native module, no live provider, reply persistence, State writer, public route or catalog activation.",
+        "postgres": false,
+        "release": false
+      },
+      "st01_first_turn": {
+        "tests": [
+          "apps/api/tests/test_first_turn.py",
+          "apps/api/tests/test_first_turn_postgres.py",
+          "apps/api/tests/test_conversation.py",
+          "apps/api/tests/test_conversation_model.py",
+          "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin"
+        ],
+        "evidence": "Complete opt-in ST-01 source binding, pinned Library ownership, actual HTTP/reload, native correction/historical reply, tenant/CAS and atomic receipt rejection. Real PostgreSQL uses the unchanged disposable gate for actual migration, immutable triggers and downgrade refusal. Existing historical Parser/Message contracts unchanged.",
+        "postgres": true,
+        "release": true
       }
     },
     "sources": [
@@ -722,11 +742,12 @@
         "components": [
           "roles",
           "bootstrap",
-          "authorization"
+          "authorization",
+          "st01_first_turn"
         ],
         "source_pair": [
-          "e2ece10d11c531e2f1f554f47d1db312cb28b459bebb66ddeecd2eb1d98bfe9e",
-          "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d"
+          "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d",
+          "b4fb800d59d6479388b8c392664b83eeb503b73c306fbd418455639829d23eba"
         ]
       },
       {
@@ -808,11 +829,12 @@
         ],
         "components": [
           "roles",
-          "migration"
+          "migration",
+          "st01_first_turn"
         ],
         "source_pair": [
-          "5bef2fe5ea058db774bf9e25f46b98da415b0bbc6f7448130dfb16338cb08639",
-          "d5a885fa6d494ce5ba1158cdd444f24fd01927ff87acc392c7ab4cf6150046b3"
+          "d5a885fa6d494ce5ba1158cdd444f24fd01927ff87acc392c7ab4cf6150046b3",
+          "84cd44424444185077faca0997e342a34fc2ec77b9ffb154f594ac14042ccd2e"
         ]
       },
       {
@@ -1102,6 +1124,79 @@
         ],
         "components": [
           "release_rebind"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/conversation_model.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "st01_adapter_boundary"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/first_turn.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "st01_first_turn"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/first_turns.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "st01_first_turn"
+        ]
+      },
+      {
+        "path": "packages/persistence/migrations/versions/0022_first_conversation_turn.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "st01_first_turn",
+          "migration"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/models.py",
+        "declarations": [
+          "EnrichmentCycleRow",
+          "FirstConversationTurnRow"
+        ],
+        "components": [
+          "st01_first_turn",
+          "migration"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/repository.py",
+        "declarations": [
+          "EnrichmentCycleRecord",
+          "PersistenceRepository.commit_initial_enrichment",
+          "PersistenceRepository.get_first_conversation_turn",
+          "PersistenceRepository._enrichment_cycle_record"
+        ],
+        "components": [
+          "st01_first_turn",
+          "state_safety"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime_v2.py",
+        "declarations": [
+          "start_initial_message",
+          "_verify_source_evaluation",
+          "_verify_source_plan"
+        ],
+        "components": [
+          "st01_first_turn",
+          "state_safety"
         ]
       }
     ],
