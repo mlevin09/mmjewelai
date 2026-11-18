@@ -96,6 +96,16 @@ conversation again, without generating an answer. An absent route/receipt is
 compatible with legacy sessions; authorization or verification errors are not
 silently treated as absence.
 
+The saved-source panel displays only the referenced Message returned by the
+conversation read. If readback fails after a successful POST, the source is marked
+unavailable; any retained local input is shown separately as an **unverified local
+draft**. A POST receipt is never used to relabel the textarea as verified source.
+**View current state and history** reloads the existing workspace and opens its
+saved history, including corrections made after the receipt. An explicit return
+button reopens the retained first-turn reply with its historical label. Viewing
+either side does not submit a command or change the saved receipt. Subsequent
+workspace refreshes respect the current-view choice until the session is remounted.
+
 Submission is guarded against repeated clicks. After an uncertain attempt the
 same mounted pilot does not blindly create another Message; the retained input
 and an explicit read-only reload remain available. There is no durable client

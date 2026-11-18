@@ -52,6 +52,7 @@ export function EnrichmentWorkspace({
   const flight = useRef(false);
   const epoch = useRef(0);
   const log = useRef<HTMLOListElement>(null);
+  const currentViewChosen = useRef(false);
   const ru = session?.locale === "ru";
   const t = (en: string, russian: string) => (ru ? russian : en);
   useEffect(() => {
@@ -61,6 +62,7 @@ export function EnrichmentWorkspace({
   async function refresh(
     currentEpoch = epoch.current,
     activeSession = session,
+    openSavedPilot = !currentViewChosen.current,
   ) {
     if (currentEpoch !== epoch.current) return;
     const data = await client.read();
@@ -77,8 +79,10 @@ export function EnrichmentWorkspace({
         const saved = await client.firstTurn();
         if (currentEpoch !== epoch.current) return;
         setFirstTurn(saved);
-        setPilot(true);
-        return;
+        if (openSavedPilot) {
+          setPilot(true);
+          return;
+        }
       } catch (e) {
         if (currentEpoch !== epoch.current) return;
         // Only absent receipts/routes are compatible with legacy sessions.
@@ -339,6 +343,14 @@ export function EnrichmentWorkspace({
         snapshot={snapshot}
         saved={firstTurn}
         onClose={() => setPilot(false)}
+        onViewCurrent={async () => {
+          const current = epoch.current;
+          await refresh(current, session, false);
+          if (current !== epoch.current) return;
+          currentViewChosen.current = true;
+          setShowHistory(true);
+          setPilot(false);
+        }}
       />
     );
   const s = snapshot.state;
@@ -424,6 +436,14 @@ export function EnrichmentWorkspace({
           </button>
         </div>
       </div>
+      {firstTurn && (
+        <button type="button" disabled={busy} onClick={() => setPilot(true)}>
+          {t(
+            "View saved first-turn reply",
+            "Открыть сохранённый ответ первого сообщения",
+          )}
+        </button>
+      )}
       {!snapshot.state &&
         session.artifacts.questions === "2.0.0" &&
         session.artifacts.rules === "2.0.0" && (

@@ -15,12 +15,14 @@ export function FirstTurnPilot({
   snapshot,
   saved,
   onClose,
+  onViewCurrent,
 }: {
   client: EnrichmentClient;
   session: Session;
   snapshot: Conversation;
   saved: FirstTurnRead | null;
   onClose: () => void;
+  onViewCurrent: () => Promise<void>;
 }) {
   const [text, setText] = useState("");
   const [receipt, setReceipt] = useState(saved);
@@ -37,13 +39,17 @@ export function FirstTurnPilot({
     setReceipt(result);
     setConversation(current);
   }
-  async function run(submit: boolean) {
+  async function run(action: "submit" | "reload" | "current") {
     if (flight.current) return;
     flight.current = true;
     setBusy(true);
     setError("");
     try {
-      if (submit) {
+      if (action === "current") {
+        await onViewCurrent();
+        return;
+      }
+      if (action === "submit") {
         setAttempted(true);
         // Preserve exact raw input, including whitespace. Do not synthesize intent.
         const result = await client.startFirstTurn(conversation, text);
@@ -57,10 +63,15 @@ export function FirstTurnPilot({
               "Sign in again or check your access.",
               "Войдите снова или проверьте доступ.",
             )
-          : t(
-              "Could not verify the saved reply. Your input is kept here. Reload to check server state; this pilot does not automatically resend.",
-              "Не удалось проверить сохранённый ответ. Ввод остаётся здесь. Обновите данные сервера; пилот не отправляет сообщение повторно автоматически.",
-            ),
+          : action === "current"
+            ? t(
+                "Could not load current state and history. The saved reply remains here; try again.",
+                "Не удалось загрузить актуальное состояние и историю. Сохранённый ответ остаётся здесь; повторите попытку.",
+              )
+            : t(
+                "Could not verify the saved reply. Your input is kept here. Reload to check server state; this pilot does not automatically resend.",
+                "Не удалось проверить сохранённый ответ. Ввод остаётся здесь. Обновите данные сервера; пилот не отправляет сообщение повторно автоматически.",
+              ),
       );
     } finally {
       flight.current = false;
@@ -93,7 +104,7 @@ export function FirstTurnPilot({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (text.trim() && !attempted) void run(true);
+            if (text.trim() && !attempted) void run("submit");
           }}
         >
           <label>
@@ -123,10 +134,9 @@ export function FirstTurnPilot({
           <p style={{ whiteSpace: "pre-wrap" }}>
             {source
               ? source.text
-              : text ||
-                t(
-                  "Source message unavailable in this view.",
-                  "Исходное сообщение недоступно в этом представлении.",
+              : t(
+                  "The saved source message has not been read back in this view.",
+                  "Сохранённое исходное сообщение ещё не прочитано с сервера в этом представлении.",
                 )}
           </p>
           <h2>
@@ -156,7 +166,38 @@ export function FirstTurnPilot({
           </p>
         </section>
       )}
-      <button type="button" disabled={busy} onClick={() => void run(false)}>
+      {receipt && !source && text && (
+        <section
+          aria-label={t(
+            "Unverified local draft",
+            "Непроверенный локальный черновик",
+          )}
+        >
+          <h2>
+            {t("Unverified local draft", "Непроверенный локальный черновик")}
+          </h2>
+          <p>
+            {t(
+              "This is your local input, not a message read back from the server.",
+              "Это локально введённый текст, а не сообщение, прочитанное с сервера.",
+            )}
+          </p>
+          <p style={{ whiteSpace: "pre-wrap" }}>{text}</p>
+        </section>
+      )}
+      {receipt && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run("current")}
+        >
+          {t(
+            "View current state and history",
+            "Открыть актуальное состояние и историю",
+          )}
+        </button>
+      )}
+      <button type="button" disabled={busy} onClick={() => void run("reload")}>
         {t("Reload saved reply", "Обновить сохранённый ответ")}
       </button>
     </main>
