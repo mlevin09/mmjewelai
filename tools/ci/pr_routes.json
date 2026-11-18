@@ -684,9 +684,10 @@
           "apps/api/tests/test_first_turn_postgres.py",
           "apps/api/tests/test_conversation.py",
           "apps/api/tests/test_conversation_model.py",
-          "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin"
+          "apps/api/tests/test_keep_atomicity.py::test_rejected_final_snapshot_rolls_back_all_staged_rows_and_pin",
+          "apps/api/tests/test_first_turn_intent.py"
         ],
-        "evidence": "Complete opt-in ST-01 source binding, pinned Library ownership, actual HTTP/reload, native correction/historical reply, tenant/CAS and atomic receipt rejection. Real PostgreSQL uses the unchanged disposable gate for actual migration, immutable triggers and downgrade refusal. Existing historical Parser/Message contracts unchanged.",
+        "evidence": "Complete opt-in ST-01 source binding, pinned Library ownership, actual HTTP/reload, native correction/historical reply, tenant/CAS and atomic receipt rejection. Real PostgreSQL uses the unchanged disposable gate for actual migration, immutable triggers and downgrade refusal. Existing historical Parser/Message contracts unchanged. Authority-intent regressions own informational/advice subjects versus direct creation objects and real HTTP persisted/reloaded non-selection.",
         "postgres": true,
         "release": true
       }

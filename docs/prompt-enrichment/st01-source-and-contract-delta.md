@@ -115,6 +115,50 @@ publication outcomes will be reported separately. No claim of independent accept
 4. Final-head CI and real PostgreSQL outcomes must be reported from their actual run,
    not inferred from local SQLite. Development cannot self-accept the story.
 
+
+## P1 review correction — informational intent is not selection
+
+Independent review of `57a54d725918ae3f60a7f1cf818eea01a0d0da71` found one
+shared authority defect: “I would like to know about white gold earrings”,
+“Хочу информацию о серьгах из белого золота” and “I want advice about white gold
+earrings” were treated as selections. These three persisted HTTP/reload cases
+were reproduced RED: 3 FAIL /12.99s, each committed three explicit facts and a
+new revision, with an incorrect accepted-values reply.
+
+The fix requires a source-backed direct product object, not merely a desire verb
+followed somewhere by Library words. The intervening phrase must contain only
+permitted grammatical glue and source-backed adjectival candidates already
+recognized by the current Parser; informational heads/complements remain uncovered.
+A post-nominal informational complement is not admitted as creation either. The
+old information-word blacklist is removed, not expanded. Unrecognized syntax
+fails closed; this bounded deterministic grammar is not a general language model.
+Aesthetic modifiers establish syntax only and are still not accepted style facts.
+
+Targeted receipts: the new module 17 PASS /21.07s, existing first-turn regression
+module 26 PASS /57.37s. Strengthened recognition controls 12 PASS /5.01s ensure
+that vocabulary recognition was actually reached (rather than obtaining false
+confidence from an unknown jewelry word). These 12 overlap the 17-case module;
+do not count them as additional unique coverage. No broad API or Full run.
+
+For all three exact reported inputs: POST201, selection_eligible=false, facts=[],
+revision delta0, no accepted-values claim, GET200 and identical revision/receipt
+from a new application instance. RED/GREEN Parser payloads are identical: the
+correction is in authority intent, not in the frozen Parser or Dictionary/Library.
+A read-only comparison against the independent review's two original positive
+RU/EN records confirms identical Parser payloads and CreationFacts. Original
+review artifacts were not modified. No existing record was rewritten or repaired.
+
+The existing replay/tamper, scope/stale-CAS, protected authority, native correction,
+historical receipt and atomic failure tests pass in the directly affected 26-case
+module. PostgreSQL/CI evidence at the old SHA remains identified as old evidence;
+new exact-head automatic CI must be reported separately. No schema, migration,
+provider, UI, legacy Parser or historical verifier change is part of this correction.
+CI ownership adds the complete intent-regression module for every future binding edit;
+selector/workflow/required-check behavior is unchanged.
+
+This resolves the reported class in the bounded executable scenarios as developer
+evidence. Independent re-acceptance remains required; real model/Studio gates stay open.
+
 ## RU — основные результаты и ограничения
 
 База и ветка указаны выше. Read-only пробы подтвердили несовместимость нового
@@ -143,3 +187,20 @@ Ownership metadata содержит новые точные пары хешей 
 доказательство закреплено за своей исходной конфигурацией. Selector/workflows/gates
 не ослаблены. Ранее отказ auto-review на commit не обходился; фактический результат
 публикации и exact-head CI должен быть указан отдельно.
+
+### RU — исправление P1 независимого review
+
+Три informational/advice запроса воспроизведены через HTTP и reload: RED3 FAIL,
+12,99 с. Исправлено основание authority: изделие должно быть прямым объектом
+creation/selection, а не темой информационного запроса. Покрытие исходными
+модификаторами не принимает их как style-факты. Список запрещённых синонимов не
+расширяется; неизвестная синтаксическая конструкция остаётся unresolved.
+
+GREEN: новый модуль17 PASS /21,07 с; существующие first-turn регрессии26 PASS /57,37 с;
+12 усиленных recognition-контролей PASS /5,01 с (это повторное подмножество17).
+У трёх примеров теперь facts=[], selection_eligible=false, ревизия не меняется,
+reply не объявляет характеристики принятыми; после нового экземпляра приложения
+GET возвращает те же данные. RED/GREEN Parser evidence совпадает полностью.
+Старые позитивные RU/EN evidence/bindings также совпали при read-only сравнении.
+Новых контрактов/миграций/provider нет. Требуется независимая перепроверка;
+разговорный runtime и Studio остаются непроверенными. Merge/deploy не выполнялись.

@@ -18,13 +18,20 @@ from jewelai_domain.models import Explicit, KnownValue
 
 CONTRACT = "jewelai.st01.first-turn/1.0.0"
 _CREATION = re.compile(
-    r"^\s*(?:i\s+(?:want|would\s+like)\b|(?:please\s+)?(?:create|design|make)\b|"
-    r"(?:я\s+)?хочу\b|(?:пожалуйста[, ]+)?(?:создай(?:те)?|сделай(?:те)?|спроектируй(?:те)?)\b)",
+    r"^\s*(?:i\s+(?:want|would\s+like)(?:\s+to\s+(?:create|design|make))?\b|"
+    r"(?:please\s+)?(?:create|design|make)\b|"
+    r"(?:я\s+)?хочу(?:\s+(?:создать|сделать|спроектировать))?\b|"
+    r"(?:пожалуйста[, ]+)?(?:создай(?:те)?|сделай(?:те)?|спроектируй(?:те)?)\b)",
     re.I,
 )
 _UNRESOLVED = re.compile(
     r"\?|\b(?:if|unless|maybe|perhaps|whether|compare|versus|than|or|если|возможно|может|"
-    r"сравни\w*|чем|или|либо)\b|want\s+(?:to\s+know|information)|хочу\s+(?:узнать|спросить)",
+    r"сравни\w*|чем|или|либо)\b",
+    re.I,
+)
+_SELECTION_TAIL = re.compile(
+    r"\s*(?:$|[.,;!:—-]|with\b|of\b|in\b|made\s+(?:of|from)\b|"
+    r"and\b|but\b|с\b|со\b|из\b|и\b|но\b)",
     re.I,
 )
 _TARGETS = ("jewelry_type", "metal.material", "metal.color")
@@ -78,12 +85,48 @@ class FirstTurnRead(StrictEvidenceModel):
     current_revision_id: UUID
 
 
+def _direct_creation_subject(parsed, product, predicate):
+    """Prove the selected noun is the request's direct object, not its topic.
+
+    A desire verb alone grants no authority. Between it and the product head,
+    permit only articles/pair-of and source-backed adjectival candidates already
+    recognized by the current Parser. Uncovered heads/complements (information,
+    advice, guide, to know, etc.) therefore fail without a synonym blacklist.
+    Recognized aesthetic modifiers qualify syntax only; they remain unaccepted.
+    """
+    if product is None or product.start < predicate.end():
+        return False
+    start = predicate.end()
+    prefix = list(parsed.original_text[start : product.start])
+    for candidate in parsed.candidates:
+        span = candidate.evidence
+        modifier = (
+            (
+                candidate.target in {"metal.material", "metal.color"}
+                and candidate.subject == "product_body"
+                and candidate.certainty == "explicit"
+            )
+            or candidate.target == "style"
+            and candidate.subject == "overall_design"
+        )
+        if (
+            modifier
+            and candidate.classification in {"requirement", "preference"}
+            and start <= span.start < span.end <= product.start
+        ):
+            prefix[span.start - start : span.end - start] = " " * (span.end - span.start)
+    remaining = " ".join("".join(prefix).split())
+    if not re.fullmatch(r"(?:(?:a|an|the|some)(?:\s+|$))?(?:pair\s+of)?", remaining, re.I):
+        return False
+    # An informational complement after the noun is not a creation object either
+    # ("I want earrings explained"). Unsupported syntax remains unresolved.
+    return bool(_SELECTION_TAIL.match(parsed.original_text[product.end :]))
+
+
 def creation_facts(parsed, runtime):
     """Recompute from source spans and compiled mappings, not Policy.effect prose."""
-    eligible = bool(_CREATION.search(parsed.original_text)) and not _UNRESOLVED.search(
-        parsed.original_text
-    )
-    if not eligible:
+    predicate = _CREATION.match(parsed.original_text)
+    if predicate is None or _UNRESOLVED.search(parsed.original_text):
         return False, ()
     from jewelai_parser.knowledge_matcher import KnowledgeLibraryMatcher
 
@@ -129,6 +172,8 @@ def creation_facts(parsed, runtime):
     # белого золота". "earrings with gold center stones" is not product metal.
     by_target = {f.target: f for f in facts}
     product = by_target.get("jewelry_type")
+    if not _direct_creation_subject(parsed, product, predicate):
+        return False, ()
     material = by_target.get("metal.material")
     color = by_target.get("metal.color")
     body_owned = False

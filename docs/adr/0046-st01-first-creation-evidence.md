@@ -23,6 +23,12 @@ Only an unambiguous first RU/EN creation assertion can bind explicitly chosen
 product type, product-body material and adjacent material color. This is neither
 a global preference promotion nor an execution of policy prose. Questions,
 comparisons, conditions, alternatives and informational requests are not selection.
+Creation intent requires the product to be the direct object of the request:
+source-backed attribute/adjectival modifiers may precede it, but information/advice
+or an embedded topic do not grant selection authority. A desire verb alone is
+insufficient. Recognized aesthetic wording qualifies syntax only, never an accepted
+style value. Uncovered or informational complements remain unresolved without a
+blacklist of information-request synonyms.
 Product metal additionally requires a direct source construction, not a Parser
 subject hint. Known/confirmed/locked incompatible values cannot be overwritten;
 compatible facts retain original authority. Sapphire placement/count and all
