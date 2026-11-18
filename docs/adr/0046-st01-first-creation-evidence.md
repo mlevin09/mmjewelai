@@ -28,7 +28,13 @@ source-backed attribute/adjectival modifiers may precede it, but information/adv
 or an embedded topic do not grant selection authority. A desire verb alone is
 insufficient. Recognized aesthetic wording qualifies syntax only, never an accepted
 style value. Uncovered or informational complements remain unresolved without a
-blacklist of information-request synonyms.
+blacklist of information-request synonyms. The entire relevant post-nominal
+construction must be covered by sourced nominal modifiers and permitted syntax;
+a leading preposition is not proof for the rest of the clause. Native proven
+assertion boundaries preserve independent requests; a bare negator cannot hide
+an unchecked action. Count/component words qualify syntax only, with count,
+placement and groups still unresolved. A known positive creation action may
+close a postposed RU request; unknown informational actions are not admitted.
 Product metal additionally requires a direct source construction, not a Parser
 subject hint. Known/confirmed/locked incompatible values cannot be overwritten;
 compatible facts retain original authority. Sapphire placement/count and all

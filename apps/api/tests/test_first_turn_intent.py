@@ -19,8 +19,20 @@ from jewelai_api.first_turn import creation_facts
         ("en", "I would like to know about white gold earrings."),
         ("ru", "Хочу информацию о серьгах из белого золота."),
         ("en", "I want advice about white gold earrings."),
+        ("ru", "Хочу серьги из белого золота обсудить."),
+        ("ru", "Хочу серьги из белого золота изучить."),
+        ("ru", "Хочу серьги из белого золота с двумя сапфирами обсудить."),
+        ("en", "I want earrings made of white gold discussed."),
     ],
-    ids=("information-en", "information-ru", "advice-en"),
+    ids=(
+        "information-en",
+        "information-ru",
+        "advice-en",
+        "postnominal-discuss",
+        "postnominal-study",
+        "nested-postnominal-discuss",
+        "material-postnominal-discuss-en",
+    ),
 )
 def test_information_intent_preserves_request_without_selecting_after_reload(
     engine, real_config, tmp_path, locale, text
@@ -143,3 +155,81 @@ def test_approved_creation_still_commits_only_three_source_backed_values(
         ).design
         assert design.center_stone.material is None and design.side_stones == ()
         assert provider.calls == []
+
+
+@pytest.mark.parametrize(
+    "locale,text,expected",
+    [
+        ("ru", "Хочу серьги из белого золота, изучить.", False),
+        ("ru", "Хочу серьги из белого золота и изучить.", False),
+        ("ru", "Хочу серьги с двумя сапфирами изучить.", False),
+        ("ru", "Хочу серьги из белого золота для сравнения.", False),
+        ("en", "I would like earrings of white gold described.", False),
+        ("en", "I want earrings with two sapphires studied.", False),
+        ("en", "I want earrings made of white gold with two sapphires to be discussed.", False),
+        ("ru", "Хочу серьги из white gold изучить.", False),
+        ("en", "I want earrings with сапфирами обсудить.", False),
+        ("en", "I want white gold earrings with.", False),
+        ("ru", "Хочу серьги из.", False),
+        ("en", "I want earrings made of white gold with two sapphires.", True),
+        ("ru", "Хочу серьги из белого золота с тремя сапфирами.", True),
+        ("en", "I want earrings with gold center stones.", True),
+        ("ru", "Хочу серьги с золотыми центральными камнями.", True),
+        ("ru", "Хочу серьги из белого золота сделать.", True),
+        ("ru", "Хочу серьги из белого золота с двумя сапфирами создать.", True),
+        ("en", "I want white gold earrings, and I do not want platinum.", True),
+        ("ru", "Хочу серьги из золота и не хочу платину.", True),
+        ("ru", "Хочу серьги из белого золота, с двумя сапфирами.", True),
+    ],
+)
+def test_complete_creation_construction_has_no_uncovered_tail(
+    context_inputs, locale, text, expected
+):
+    from jewelai_parser import parse_full_message
+
+    parsed = parse_full_message(
+        text,
+        locale=locale,
+        dictionary=context_inputs["dictionary"],
+        knowledge_runtime=context_inputs["active_runtime"].compiled_runtime,
+    )
+    assert any("earrings" in c.normalized_values for c in parsed.candidates)
+    before = parsed.model_dump_json()
+    eligible, facts = creation_facts(parsed, context_inputs["active_runtime"].compiled_runtime)
+    assert eligible is expected and bool(facts) is expected
+    assert parsed.model_dump_json() == before
+    if "gold center stones" in text or "золотыми центральными камнями" in text:
+        assert {f.target: f.value for f in facts} == {"jewelry_type": "earrings"}
+    if "do not want platinum" in text or "не хочу платину" in text:
+        assert next(f.value for f in facts if f.target == "metal.material") == "gold"
+    assert all(f.target in {"jewelry_type", "metal.material", "metal.color"} for f in facts)
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        ("Хочу серьги из белого золота, не покупать, а изучить.", False),
+        ("I want earrings of white gold, not to buy but to study.", False),
+        ("Хочу серьги из золота, но не из платины.", True),
+        ("I want gold earrings without side stones.", True),
+    ],
+)
+def test_negated_tail_must_be_a_complete_nominal_not_a_skipped_action(
+    context_inputs, text, expected
+):
+    from jewelai_parser import parse_full_message
+
+    parsed = parse_full_message(
+        text,
+        locale="ru" if text.startswith("Хочу") else "en",
+        dictionary=context_inputs["dictionary"],
+        knowledge_runtime=context_inputs["active_runtime"].compiled_runtime,
+    )
+    assert any("earrings" in c.normalized_values for c in parsed.candidates)
+    eligible, facts = creation_facts(parsed, context_inputs["active_runtime"].compiled_runtime)
+    assert eligible is expected and bool(facts) is expected
+    if expected:
+        assert {f.target: f.value for f in facts} == {
+            "jewelry_type": "earrings",
+            "metal.material": "gold",
+        }

@@ -29,11 +29,28 @@ _UNRESOLVED = re.compile(
     r"сравни\w*|чем|или|либо)\b",
     re.I,
 )
-_SELECTION_TAIL = re.compile(
-    r"\s*(?:$|[.,;!:—-]|with\b|of\b|in\b|made\s+(?:of|from)\b|"
-    r"and\b|but\b|с\b|со\b|из\b|и\b|но\b)",
+# Syntax only: the count lexemes already recognized by the current Parser's
+# quantity grammar. No numeric value, placement or repeated group is inferred.
+_NOMINAL_COUNT = frozenset(
+    {
+        "two",
+        "three",
+        "four",
+        "двумя",
+        "два",
+        "две",
+        "тремя",
+        "три",
+        "четырьмя",
+        "четыре",
+    }
+)
+_STONE_QUALIFIER = re.compile(
+    r"(?:center|centre|central|side|центральн(?:ый|ая|ое|ые|ого|ой|ому|ую|ым|ыми|ых|ом)|"
+    r"боков(?:ой|ая|ое|ые|ого|ому|ую|ым|ыми|ых|ом))",
     re.I,
 )
+_TAIL_TOKEN = re.compile(r"made\s+(?:of|from)\b|[^\W_]+|[^\w\s]", re.I)
 _TARGETS = ("jewelry_type", "metal.material", "metal.color")
 
 
@@ -85,6 +102,127 @@ class FirstTurnRead(StrictEvidenceModel):
     current_revision_id: UUID
 
 
+def _creation_assertion_end(text, predicate):
+    """Reuse native assertion boundaries; a connector alone is not a new predicate."""
+    from jewelai_parser.full_message import (
+        _REQUEST_START,
+        _assertion_breaks,
+        _sentence_bounds,
+        _source_governance,
+    )
+
+    with _source_governance("1.3.0"):
+        _, end = _sentence_bounds(text, predicate.start(), predicate.end())
+        for left, right in _assertion_breaks(text):
+            if predicate.end() <= left < end:
+                following = text[right:end].lstrip()
+                if _REQUEST_START.match(following):
+                    return left
+    return end
+
+
+def _complete_nominal_tail(parsed, start, end):
+    """Cover the whole relevant construction, not just its first preposition.
+
+    Tagged Parser spans qualify nominal syntax only; only creation_facts can
+    propose the three approved canonical bindings. Unknown words cannot be
+    skipped, including an action after a valid material or gemstone phrase.
+    """
+    # A rejected nominal can qualify a negative adjunct syntactically; it never
+    # enters creation_facts, whose positive-authority filter remains unchanged.
+    spans = {}
+    for candidate in parsed.candidates:
+        span = candidate.evidence
+        target = str(candidate.target or "")
+        nominal = target in _TARGETS or target.startswith(("center_stone.", "side_stones."))
+        adjective = target == "style" and candidate.subject == "overall_design"
+        if (
+            start <= span.start < span.end <= end
+            and candidate.classification in {"requirement", "preference", "prohibition"}
+            and (
+                nominal
+                and candidate.normalized_values
+                and candidate.certainty == "explicit"
+                or adjective
+            )
+        ):
+            kind = "N" if target == "jewelry_type" or target.endswith(".material") else "A"
+            previous = spans.get(span.start)
+            if previous is None or span.end > previous[0]:
+                spans[span.start] = (span.end, kind)
+    text, index, tags = parsed.original_text, start, []
+    while index < end:
+        if text[index].isspace():
+            index += 1
+            continue
+        if index in spans:
+            index, kind = spans[index]
+        else:
+            token = _TAIL_TOKEN.match(text, index, end)
+            if token is None:
+                return False
+            raw = " ".join(token.group().casefold().split())
+            index = token.end()
+            if raw in {
+                "of",
+                "in",
+                "from",
+                "with",
+                "without",
+                "из",
+                "с",
+                "со",
+                "без",
+                "made of",
+                "made from",
+            }:
+                kind = "P"
+            elif raw in {"create", "design", "make", "создать", "сделать", "спроектировать"}:
+                # The same positive creation actions already allowed before the
+                # noun may close a RU postposed creation request. An unknown
+                # action is never admitted, nor can a valid one hide later text.
+                if text[index:end].strip():
+                    return False
+                kind = "V"
+            elif raw in {"not", "no", "не"}:
+                kind = "X"
+            elif raw in {"but", "но"}:
+                kind = "B"
+            elif raw in {"and", "и"}:
+                kind = "J"
+            elif raw == ",":
+                kind = "K"
+            elif raw in {"a", "an", "the"}:
+                kind = "D"
+            elif raw in _NOMINAL_COUNT or raw.isdecimal():
+                kind = "Q"
+            elif raw in {
+                "stone",
+                "stones",
+                "gem",
+                "gems",
+                "камень",
+                "камни",
+                "камнями",
+                "камней",
+                "камнем",
+            }:
+                kind = "N"
+            elif _STONE_QUALIFIER.fullmatch(raw):
+                kind = "C"
+            else:
+                return False
+        tags.append(kind)
+    if not tags:
+        return True
+    nominal = r"D?Q?[ACN]*N"
+    # Negated nominal adjuncts preserve the independent positive product request;
+    # a bare negator cannot end the assertion and hide an informational action.
+    phrase = "(?:PX?|XP?)" + nominal + "(?:JX?" + nominal + ")*"
+    modifiers = "(?:(?:K?B?|J)?" + phrase + ")+"
+    return bool(re.fullmatch("(?:" + modifiers + ")?V?", "".join(tags)))
+
+
 def _direct_creation_subject(parsed, product, predicate):
     """Prove the selected noun is the request's direct object, not its topic.
 
@@ -94,7 +232,8 @@ def _direct_creation_subject(parsed, product, predicate):
     advice, guide, to know, etc.) therefore fail without a synonym blacklist.
     Recognized aesthetic modifiers qualify syntax only; they remain unaccepted.
     """
-    if product is None or product.start < predicate.end():
+    end = _creation_assertion_end(parsed.original_text, predicate)
+    if product is None or not predicate.end() <= product.start < product.end <= end:
         return False
     start = predicate.end()
     prefix = list(parsed.original_text[start : product.start])
@@ -118,9 +257,7 @@ def _direct_creation_subject(parsed, product, predicate):
     remaining = " ".join("".join(prefix).split())
     if not re.fullmatch(r"(?:(?:a|an|the|some)(?:\s+|$))?(?:pair\s+of)?", remaining, re.I):
         return False
-    # An informational complement after the noun is not a creation object either
-    # ("I want earrings explained"). Unsupported syntax remains unresolved.
-    return bool(_SELECTION_TAIL.match(parsed.original_text[product.end :]))
+    return _complete_nominal_tail(parsed, product.end, end)
 
 
 def creation_facts(parsed, runtime):

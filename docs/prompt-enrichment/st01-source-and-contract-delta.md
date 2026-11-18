@@ -159,6 +159,47 @@ selector/workflow/required-check behavior is unchanged.
 This resolves the reported class in the bounded executable scenarios as developer
 evidence. Independent re-acceptance remains required; real model/Studio gates stay open.
 
+
+## R2 focused re-review — complete post-nominal construction
+
+Independent re-review of `45c6374166c1f252f6819d069d3198fc130070a0` confirmed
+that the original three information cases were corrected but the same P1 remained:
+“Хочу серьги из белого золота обсудить/изучить” passed because the suffix guard
+accepted only its leading preposition. The two exact persisted HTTP/reload cases
+were reproduced RED:2 FAIL /7.59s. Their original evidence remains unmodified.
+
+The guard now covers every word of the relevant nominal construction, not a
+preposition prefix. Existing Parser spans supply noun/attribute syntax; permitted
+prepositions/coordination must introduce complete nominal phrases. Uncovered text,
+including a postposed action after material and gemstone modifiers, fails closed.
+The same native assertion boundaries allow a proven new request to remain separate;
+a bare negative marker is not a license to skip the remainder. Rejected nominal
+objects may qualify syntax, but the canonical binding still excludes prohibitions.
+Known creation actions already supported before the noun may also close a RU
+postposed creation; they cannot hide later text. No information-verb blacklist.
+
+Syntax-only count words follow the current Parser's bounded count lexemes; no
+number is converted or accepted, and no component ownership, placement or repeated
+group is inferred. The original “with two sapphires” / “с двумя сапфирами” remains
+unresolved beyond the approved type/material/color. No public/durable contract,
+Parser, migration, provider, runtime orchestration or persistence change.
+
+Focused preliminary receipts:19 PASS /24.57s after closing the suffix;20 additional
+whole-construction controls PASS /7.64s. Negative-qualifier controls initially3 PASS
+/1 FAIL /2.03s exposed a positive-source regression (rejected platinum had not yet
+been admitted as *syntax*). Corrected without admitting it as a fact:4 PASS /1.90s.
+Final combined affected modules:71 PASS /94.07s (45 intent cases +26 existing
+first-turn cases). Exact-head CI is reported separately. A read-only comparison
+with the two prior independent positive RU/EN records again confirms identical
+Parser payloads and CreationFacts. Both reported RED/GREEN HTTP traces retain
+identical Parser payloads; facts3→0, revision delta1→0, exact fresh-app GET200.
+These executions overlap; they are not independent acceptance or unique journeys.
+
+Further controls cover informational actions after nested material/gemstone phrases,
+commas, a shared coordinator, mixed RU/EN, incomplete modifiers, positive postposed
+creation, independent rejected material and product/component ownership. Unsupported
+syntax remains unresolved rather than guessed. Model/Studio/full-release gates stay open.
+
 ## RU — основные результаты и ограничения
 
 База и ветка указаны выше. Read-only пробы подтвердили несовместимость нового
@@ -204,3 +245,15 @@ GET возвращает те же данные. RED/GREEN Parser evidence со�
 Старые позитивные RU/EN evidence/bindings также совпали при read-only сравнении.
 Новых контрактов/миграций/provider нет. Требуется независимая перепроверка;
 разговорный runtime и Studio остаются непроверенными. Merge/deploy не выполнялись.
+
+### RU — R2: полная конструкция вместо разрешённого префикса
+
+Re-review на45c6374 подтвердил сохранённый P1: после «из белого золота» мог
+следовать непроверенный глагол действия. Точные HTTP/reload RED:2 FAIL /7,59с.
+Теперь проверяются все слова модификаторов до доказанной границы утверждения;
+«из/with» само по себе не разрешает остаток. Непокрытое действие отклоняет выбор.
+Явное «создать/сделать» может завершать корректный RU creation-запрос. У отрицательных
+дополнений проверяется именная конструкция; отвергнутый металл не принимается.
+Слова количества/компонентов — только синтаксис, не значения Product State.
+Parser/history, публичный контракт и миграции не менялись. Требуется независимая
+перепроверка; model/Studio gates не закрываются этим исправлением.
