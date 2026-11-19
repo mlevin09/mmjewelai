@@ -121,6 +121,9 @@ function setup(locale = "en", questions = "2.0.0", rules = "2.0.0") {
                 { status: 404 },
               ),
     ),
+    http.get(`${prefix}/first-turn/options`, () =>
+      HttpResponse.json({ error: "not_found" }, { status: 404 }),
+    ),
     http.post(`${prefix}/first-turn/messages`, async ({ request }) => {
       expect(request.headers.get("X-Organization-ID")).toBe("org");
       const body = (await request.json()) as { content: string };
@@ -172,7 +175,125 @@ function setup(locale = "en", questions = "2.0.0", rules = "2.0.0") {
     },
   };
 }
+async function openLegacyPilot() {
+  const button = await screen.findByRole("button", {
+    name: /Open text-only|Открыть текстовый/,
+  });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+}
 describe("isolated first-turn pilot", () => {
+  it.each(["en", "ru"])(
+    "shows the saved schema2 current brief across both legacy design panels (%s)",
+    async (locale) => {
+      const f = setup(locale);
+      const brief =
+        locale === "ru" ? "Серьги из белого золота" : "White gold earrings";
+      server.use(
+        http.get(`${prefix}/first-turn`, () =>
+          HttpResponse.json({
+            schema_version: "2.0.0",
+            commit_status: "committed",
+            delivery_status: "delivered",
+            evidence: {
+              request: {
+                turn_id: "turn-1",
+                expected_revision_id: "r1",
+                original_text: brief,
+              },
+            },
+            input_hash: "hash",
+            delivered_reply: { origin: "model", text: brief },
+            current_revision: { revision_id: "r2" },
+            current_brief: brief,
+            is_current_revision: true,
+          }),
+        ),
+        http.get(`${prefix}/first-turn/options`, () =>
+          HttpResponse.json({
+            schema_version: "2.0.0",
+            locale,
+            model_configured: true,
+            options: [],
+          }),
+        ),
+      );
+      f.mount();
+      const view = await screen.findByRole("button", {
+        name: /View current design and history|Открыть актуальный дизайн и историю/,
+      });
+      fireEvent.click(view);
+      const current = await screen.findByRole("region", {
+        name: /Current design text|Актуальное описание украшения/,
+      });
+      expect(within(current).getByText(brief)).toBeInTheDocument();
+      expect(
+        screen
+          .getAllByRole("status")
+          .some((node) =>
+            node.textContent?.includes(
+              locale === "ru"
+                ? "Первое сообщение сохранено"
+                : "First message saved",
+            ),
+          ),
+      ).toBe(true);
+      expect(
+        screen.queryByText(
+          /Waiting for your first message|Ожидается первое сообщение/,
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          /No accepted characteristics yet|Принятых характеристик пока нет/,
+        ),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("waits for schema2 options instead of silently submitting schema1", async () => {
+    const f = setup("en");
+    let releaseOptions: () => void = () => undefined;
+    const optionsReady = new Promise<void>((resolve) => {
+      releaseOptions = resolve;
+    });
+    server.use(
+      http.get(`${prefix}/first-turn/options`, async () => {
+        await optionsReady;
+        return HttpResponse.json({
+          schema_version: "2.0.0",
+          model_configured: true,
+          locale: "en",
+          options: [],
+        });
+      }),
+    );
+    f.mount();
+    const button = await screen.findByRole("button", {
+      name: "Open text-only first-turn pilot",
+    });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(f.commands).toHaveLength(0);
+    releaseOptions();
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(
+      await screen.findByRole("button", { name: "Submit original request" }),
+    ).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "I want a gold ring" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Submit original request" }),
+    );
+    await waitFor(() => expect(f.commands).toHaveLength(1));
+    expect(f.commands[0]).toMatchObject({
+      schema_version: "2.0.0",
+      original_text: "I want a gold ring",
+    });
+  });
+
   it.each([
     ["en", "receipt"],
     ["ru", "receipt"],
@@ -184,11 +305,7 @@ describe("isolated first-turn pilot", () => {
       const f = setup(locale);
       f.failRead(failed);
       f.mount();
-      fireEvent.click(
-        await screen.findByRole("button", {
-          name: /Open text-only|Открыть текстовый/,
-        }),
-      );
+      await openLegacyPilot();
       const raw =
         locale === "ru"
           ? " \tХочу серьги из золота\n "
@@ -238,11 +355,7 @@ describe("isolated first-turn pilot", () => {
     async (locale) => {
       const f = setup(locale);
       const initial = f.mount();
-      fireEvent.click(
-        await screen.findByRole("button", {
-          name: /Open text-only|Открыть текстовый/,
-        }),
-      );
+      await openLegacyPilot();
       fireEvent.change(screen.getByRole("textbox"), {
         target: { value: "I want gold earrings" },
       });
@@ -309,11 +422,7 @@ describe("isolated first-turn pilot", () => {
     async (locale) => {
       const f = setup(locale);
       const view = f.mount();
-      const open =
-        locale === "ru"
-          ? "Открыть текстовый пилот первого сообщения"
-          : "Open text-only first-turn pilot";
-      fireEvent.click(await screen.findByRole("button", { name: open }));
+      await openLegacyPilot();
       expect(screen.queryByLabelText("Center stone")).not.toBeInTheDocument();
       const raw =
         locale === "ru"
@@ -364,11 +473,7 @@ describe("isolated first-turn pilot", () => {
   it("cancel returns to unchanged legacy form without writes", async () => {
     const f = setup();
     f.mount();
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Open text-only first-turn pilot",
-      }),
-    );
+    await openLegacyPilot();
     fireEvent.click(screen.getByRole("button", { name: "Cancel pilot" }));
     expect(screen.getByLabelText("Center stone")).toBeInTheDocument();
     expect(f.commands).toEqual([]);
@@ -402,11 +507,7 @@ describe("isolated first-turn pilot", () => {
     const f = setup();
     server.use(http.post(`${prefix}/first-turn`, () => HttpResponse.error()));
     f.mount();
-    fireEvent.click(
-      await screen.findByRole("button", {
-        name: "Open text-only first-turn pilot",
-      }),
-    );
+    await openLegacyPilot();
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "I want earrings" },
     });

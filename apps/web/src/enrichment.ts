@@ -119,6 +119,39 @@ export interface FirstTurnRead {
   current_revision_id: string;
 }
 
+/** Persisted US-01 schema2 turn, distinct from historical ST-01. */
+export interface NaturalTurnRead {
+  schema_version: "2.0.0";
+  commit_status: "committed";
+  delivery_status: "pending" | "delivered";
+  evidence: {
+    message_id: string;
+    request: {
+      turn_id: string;
+      expected_revision_id: string;
+      original_text: string;
+      selections?: { target: string; value: string }[];
+    };
+    [key: string]: unknown;
+  };
+  input_hash: string;
+  delivered_reply: null | {
+    origin: "model" | "fallback";
+    text: string;
+    failure_code?: string | null;
+    [key: string]: unknown;
+  };
+  current_revision: Record<string, unknown> & { revision_id: string };
+  current_brief: string;
+  is_current_revision: boolean;
+}
+export interface NaturalTurnOptions {
+  schema_version: "2.0.0";
+  model_configured: boolean;
+  locale: "en" | "ru";
+  options: { value: string; label: string; mapping_id: string }[];
+}
+
 export interface FinalOutput {
   description: { text: string };
   internal_final_prompt: {
@@ -213,6 +246,46 @@ export class EnrichmentClient {
     return this.post("corrections", {
       ...this.nativeFrame(s),
       message_id: message.message_id,
+    });
+  }
+  naturalOptions() {
+    return this.api.request<NaturalTurnOptions>(
+      `${this.path}/first-turn/options`,
+      {
+        organizationId: this.organizationId,
+        cache: "no-store",
+      },
+    );
+  }
+  naturalTurn() {
+    return this.api.request<NaturalTurnRead | FirstTurnRead>(
+      `${this.path}/first-turn?turn_version=2.0.0`,
+      {
+        organizationId: this.organizationId,
+        cache: "no-store",
+      },
+    );
+  }
+  startNaturalTurn(
+    snapshot: Conversation,
+    originalText: string,
+    turnId: string,
+    selection?: string,
+    expectedRevisionId?: string,
+  ) {
+    return this.api.request<NaturalTurnRead>(`${this.path}/first-turn`, {
+      organizationId: this.organizationId,
+      method: "POST",
+      body: JSON.stringify({
+        schema_version: "2.0.0",
+        turn_id: turnId,
+        expected_revision_id:
+          expectedRevisionId ?? snapshot.revision.revision_id,
+        original_text: originalText,
+        selections: selection
+          ? [{ target: "jewelry_type", value: selection }]
+          : [],
+      }),
     });
   }
   firstTurn() {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiClient, ApiError } from "./api";
 import { FirstTurnPilot } from "./FirstTurnPilot";
+import { NaturalTurnPilot } from "./NaturalTurnPilot";
 import { VoiceRecorder } from "./VoiceRecorder";
 import {
   decisions,
@@ -10,6 +11,8 @@ import {
   type Conversation,
   type FinalOutput,
   type FirstTurnRead,
+  type NaturalTurnRead,
+  type NaturalTurnOptions,
   type Question,
 } from "./enrichment";
 import type { Session } from "./types";
@@ -32,6 +35,12 @@ export function EnrichmentWorkspace({
   const [snapshot, setSnapshot] = useState<Conversation | null>(null);
   const [pilot, setPilot] = useState(false);
   const [firstTurn, setFirstTurn] = useState<FirstTurnRead | null>(null);
+  const [naturalTurn, setNaturalTurn] = useState<NaturalTurnRead | null>(null);
+  const [naturalOptions, setNaturalOptions] =
+    useState<NaturalTurnOptions | null>(null);
+  const [naturalOptionsResolved, setNaturalOptionsResolved] = useState(false);
+  const [legacyFirstTurnSupported, setLegacyFirstTurnSupported] =
+    useState(false);
   const [final, setFinal] = useState<FinalOutput | null>(null);
   const [completionEnabled, setCompletionEnabled] = useState(false);
   const [completion, setCompletion] = useState<CompletionView | null>(null);
@@ -71,22 +80,49 @@ export function EnrichmentWorkspace({
     setLoading(false);
     setFinal(null);
     setCompletion(null);
+    setNaturalOptionsResolved(false);
+    setLegacyFirstTurnSupported(false);
     if (
       activeSession?.artifacts.questions === "2.0.0" &&
       activeSession.artifacts.rules === "2.0.0"
     ) {
       try {
-        const saved = await client.firstTurn();
+        // Existing schema1 receipts remain historical; schema2 is a separate reader.
+        const saved = await client.naturalTurn();
         if (currentEpoch !== epoch.current) return;
-        setFirstTurn(saved);
-        if (openSavedPilot) {
-          setPilot(true);
-          return;
+        if (saved.schema_version === "2.0.0") {
+          const options = await client.naturalOptions();
+          if (currentEpoch !== epoch.current) return;
+          setNaturalOptions(options);
+          setNaturalOptionsResolved(true);
+          setNaturalTurn(saved);
+          if (openSavedPilot) {
+            setPilot(true);
+            return;
+          }
+        } else {
+          setFirstTurn(saved);
+          if (openSavedPilot) {
+            setPilot(true);
+            return;
+          }
         }
       } catch (e) {
         if (currentEpoch !== epoch.current) return;
-        // Only absent receipts/routes are compatible with legacy sessions.
         if (!(e instanceof ApiError && e.status === 404)) throw e;
+      }
+      try {
+        const options = await client.naturalOptions();
+        if (currentEpoch !== epoch.current) return;
+        setNaturalOptions(options);
+      } catch (e) {
+        if (currentEpoch !== epoch.current) return;
+        if (!(e instanceof ApiError && e.status === 404)) throw e;
+        // Explicit 404 means this deployment has only the historical schema1 pilot.
+        // Do not conflate it with an in-flight schema2 options lookup.
+        setLegacyFirstTurnSupported(true);
+      } finally {
+        if (currentEpoch === epoch.current) setNaturalOptionsResolved(true);
       }
     }
     if (data.state) {
@@ -335,6 +371,48 @@ export function EnrichmentWorkspace({
         <Link to={`/organizations/${organizationId}`}>Back to projects</Link>
       </main>
     );
+  if (pilot && naturalOptions && (naturalTurn || !firstTurn))
+    return (
+      <NaturalTurnPilot
+        client={client}
+        session={session}
+        snapshot={snapshot}
+        saved={naturalTurn}
+        options={naturalOptions}
+        onClose={() => setPilot(false)}
+        onViewCurrent={async () => {
+          const current = epoch.current;
+          await refresh(current, session, false);
+          if (current !== epoch.current) return;
+          currentViewChosen.current = true;
+          setShowHistory(true);
+          setPilot(false);
+        }}
+      />
+    );
+  if (pilot && !naturalOptionsResolved && !firstTurn)
+    return (
+      <main className="page" aria-busy="true">
+        {t(
+          "Loading first-turn contract…",
+          "Загружаем контракт первого сообщения…",
+        )}
+      </main>
+    );
+  if (pilot && !naturalOptions && !firstTurn && !legacyFirstTurnSupported)
+    return (
+      <main className="page">
+        <p role="alert">
+          {t(
+            "First-turn API is unavailable; reload or contact support.",
+            "API первого сообщения недоступен; обновите страницу или обратитесь в поддержку.",
+          )}
+        </p>
+        <button type="button" onClick={() => setPilot(false)}>
+          {t("Back", "Назад")}
+        </button>
+      </main>
+    );
   if (pilot)
     return (
       <FirstTurnPilot
@@ -385,6 +463,12 @@ export function EnrichmentWorkspace({
   const promptReadiness = completionEnabled
     ? activeCompletion?.readiness
     : final?.internal_final_prompt.readiness;
+  // Schema2 receipts may commit a current brief before the older conversational
+  // projection exists. Both panels must use the same saved current revision.
+  const savedCurrentBrief = naturalTurn?.is_current_revision
+    ? naturalTurn.current_brief
+    : null;
+  const currentDesignText = s?.description.text || savedCurrentBrief;
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");
   const unresolved = fields.filter((f) => f.availability !== "value");
@@ -420,7 +504,7 @@ export function EnrichmentWorkspace({
         </div>
         <div className="piece-actions">
           <span className="studio-state">
-            {s
+            {s || naturalTurn
               ? t("Piece in progress", "Изделие в работе")
               : t("New piece", "Новое изделие")}
           </span>
@@ -436,7 +520,7 @@ export function EnrichmentWorkspace({
           </button>
         </div>
       </div>
-      {firstTurn && (
+      {(firstTurn || naturalTurn) && (
         <button type="button" disabled={busy} onClick={() => setPilot(true)}>
           {t(
             "View saved first-turn reply",
@@ -445,11 +529,17 @@ export function EnrichmentWorkspace({
         </button>
       )}
       {!snapshot.state &&
+        !naturalTurn &&
         session.artifacts.questions === "2.0.0" &&
         session.artifacts.rules === "2.0.0" && (
           <button
             type="button"
-            disabled={busy || unsavedDesignInput}
+            disabled={
+              busy ||
+              unsavedDesignInput ||
+              !naturalOptionsResolved ||
+              (!naturalOptions && !firstTurn && !legacyFirstTurnSupported)
+            }
             onClick={() => setPilot(true)}
           >
             {t(
@@ -458,6 +548,18 @@ export function EnrichmentWorkspace({
             )}
           </button>
         )}
+      {naturalTurn && !snapshot.state && (
+        <section
+          aria-label={t("Current saved design", "Текущий сохранённый дизайн")}
+        >
+          <h2>{t("Current saved design", "Текущий сохранённый дизайн")}</h2>
+          <p style={{ whiteSpace: "pre-wrap" }}>{naturalTurn.current_brief}</p>
+          <p>
+            {t("Current revision", "Текущая ревизия")}:{" "}
+            {naturalTurn.current_revision.revision_id}
+          </p>
+        </section>
+      )}
       {error && (
         <p role="alert" className="alert">
           {error}
@@ -707,7 +809,7 @@ export function EnrichmentWorkspace({
               {t("Your design, updated", "Ваше украшение — актуальный текст")}
             </h3>
             <p className="living-design-text" aria-live="polite">
-              {s?.description.text ||
+              {currentDesignText ||
                 t(
                   "Start by describing your jewelry below. Your saved answers will be reflected here in one current description.",
                   "Опишите своё украшение ниже. Сохранённые ответы будут отражены здесь в одном актуальном описании.",
@@ -885,12 +987,14 @@ export function EnrichmentWorkspace({
           <p role="status">
             {s
               ? label(s.status)
-              : t(
-                  "Waiting for your first message",
-                  "Ожидается первое сообщение",
-                )}
+              : savedCurrentBrief
+                ? t("First message saved", "Первое сообщение сохранено")
+                : t(
+                    "Waiting for your first message",
+                    "Ожидается первое сообщение",
+                  )}
           </p>
-          {!known.length && (
+          {!known.length && !savedCurrentBrief && (
             <p>
               {t(
                 "No accepted characteristics yet.",
