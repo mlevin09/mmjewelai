@@ -751,6 +751,7 @@
       {
         "path": "apps/api/src/jewelai_api/app.py",
         "declarations": [
+          "@module",
           "create_app"
         ],
         "components": [
@@ -795,7 +796,7 @@
           "us01_semantic_turn"
         ],
         "source_pair": [
-          "82ea7449bc870ad1c7ceb6fe111d22124753ddf6dadcef7c8b4fb89ff370649b",
+          "1bc33248dbeb79367c831c36e4615461c0a64b75271d6693727002a0c9f8c14c",
           "c8560e438e761f5bce6105bc1bfd9457107579ef1127305f9384073e30e185d8"
         ]
       },
@@ -1290,7 +1291,7 @@
       {
         "path": "apps/api/src/jewelai_api/settings.py",
         "declarations": [
-          "RuntimeSettings.from_env",
+          "RuntimeSettings.from_environment",
           "_conversation_config"
         ],
         "components": [
