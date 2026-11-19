@@ -389,14 +389,18 @@ def checked_reply(
                 continue
             sweeping = re.search(
                 r"\b(?:all|every|everything|все|всё|вс[её]\b|кажд\w*)\b",
-                sentence, re.I,
+                sentence,
+                re.I,
             )
             saved_claim = re.search(
                 r"\b(?:saved|accepted|selected|recorded|сохран\w*|принят\w*|выбран\w*|записан\w*)\b",
-                sentence, re.I,
+                sentence,
+                re.I,
             )
             denial = re.search(
-                r"\b(?:not|never|не|никогда)\b", sentence, re.I,
+                r"\b(?:not|never|не|никогда)\b",
+                sentence,
+                re.I,
             )
             if sweeping and saved_claim and not denial:
                 raise ValueError("Reply globally claims unresolved source facts were saved")
