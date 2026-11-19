@@ -384,25 +384,43 @@ def checked_reply(
     # unresolved in US-01 even when the jewelry/body-metal facts are committed.
     unresolved_source = any(o.kind in {"stone", "count", "unresolved"} for o in observations)
     if unresolved_source:
-        for sentence in re.split(r"(?<=[.!?])\s+|\n", draft.text):
-            if "?" in sentence:
-                continue
+        # Evaluate each assertion clause independently. A later unrelated
+        # "do not repeat" clause must never cancel a false saved-all claim.
+        # Conversely "all accepted/verified facts" is scoped to committed facts,
+        # not a claim that every requested gemstone/count was committed.
+        for clause in re.split(r"[.!?;\n]+", draft.text):
             sweeping = re.search(
-                r"\b(?:all|every|everything|все|всё|вс[её]\b|кажд\w*)\b",
-                sentence,
+                r"\b(?:all|every|everything|все|всё|кажд\w*)\b",
+                clause,
                 re.I,
             )
             saved_claim = re.search(
-                r"\b(?:saved|accepted|selected|recorded|сохран\w*|принят\w*|выбран\w*|записан\w*)\b",
-                sentence,
+                r"\b(?:saved|accepted|selected|recorded|сохран\w*|принят\w*|"
+                r"выбран\w*|записан\w*)\b",
+                clause,
                 re.I,
             )
-            denial = re.search(
-                r"\b(?:not|never|не|никогда)\b",
-                sentence,
-                re.I,
+            if not sweeping or not saved_claim or saved_claim.start() < sweeping.start():
+                continue
+            claim_scope = clause[sweeping.start() : saved_claim.end()]
+            qualified = bool(
+                re.match(
+                    r"(?i)(?:all\s+(?:accepted|verified|committed|supported)\b|"
+                    r"все\s+(?:принятые|проверенные|подтвержд[её]нные)\b|"
+                    r"всё\s+(?:принятое|подтвержд[её]нное)\b)",
+                    claim_scope,
+                )
             )
-            if sweeping and saved_claim and not denial:
+            negated_claim = bool(
+                re.search(
+                    r"(?i)\b(?:not|never|не|никогда)\b(?:\s+\S+){0,4}\s+"
+                    r"(?:saved|accepted|selected|recorded|сохран\w*|"
+                    r"принят\w*|выбран\w*|записан\w*)\b",
+                    claim_scope,
+                )
+                or re.match(r"(?i)(?:not\s+all\b|не\s+все\b)", claim_scope)
+            )
+            if not qualified and not negated_claim:
                 raise ValueError("Reply globally claims unresolved source facts were saved")
     covered = []
     acknowledged = set()
