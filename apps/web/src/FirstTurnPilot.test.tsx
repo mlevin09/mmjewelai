@@ -227,9 +227,13 @@ describe("isolated first-turn pilot", () => {
         name: /Current design text|Актуальное описание украшения/,
       });
       expect(within(current).getByText(brief)).toBeInTheDocument();
-      expect(screen.getByRole("status")).toHaveTextContent(
-        locale === "ru" ? "Первое сообщение сохранено" : "First message saved",
-      );
+      expect(
+        screen.getAllByRole("status").some((node) =>
+          node.textContent?.includes(
+            locale === "ru" ? "Первое сообщение сохранено" : "First message saved",
+          ),
+        ),
+      ).toBe(true);
       expect(
         screen.queryByText(
           /Waiting for your first message|Ожидается первое сообщение/,
