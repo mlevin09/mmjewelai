@@ -1,5 +1,190 @@
 # JewelAI isolated CPU LLM lab
 
+## Current capacity and R2 research — 2026-11-19 (EN MASTER)
+
+Final readback at `2026-11-19T12:25:05.620317+00:00`: **TERMINATED**, with the approved
+`e2-standard-2` upgrade retained. The same VM ID `8540966569077646041` and retained
+20 GiB boot disk remain. There is no external IP or service account. The task's
+temporary SSH metadata was removed; network and IAM configuration were not changed.
+
+The VM now has nominal 8 GiB RAM and two effective logical vCPUs. Guest topology
+reports one core with two SMT threads; this is not a claim of two physical host
+cores. The persistent drop-in
+`/etc/systemd/system/jewelai-llm-lab.service.d/90-r2-cpu.conf` sets `CPUQuota=200%`;
+verified `cpu.max` is `200000 100000` and `nproc` is 2. The existing process limits
+remain `MemoryHigh=2500M`, `MemoryMax=3000M`, `MemorySwapMax=0`.
+
+The model and binary pins below are unchanged. The volatile research override was
+removed, the original service was health-checked and explicitly stopped, and its
+enabled startup setting was retained. The recommended application profile was
+**not activated**. The original start/verify/stop commands below remain applicable.
+
+Four identical historical R1 B512 requests were each repeated twice. Historical
+full-response p50/p95 were **88.16 / 99.89 s** (n=4); upgraded measurements were
+**42.03 / 50.11 s** (n=8), with identical assistant output bytes. This is a measured
+52.32% median reduction on that workload, not a controlled causal estimate of the
+CPU change. Historical host, date and contention differ; comparator TTFT was not
+instrumented.
+
+The bounded study evaluated 16 screening and eight refinement configurations,
+then three frozen final candidates. All parameter ranges were sampled, with
+explicitly disclosed factor aliasing in the interaction design. Slot erasure
+initially returned HTTP 501 before inference; the pinned runtime required
+`--slot-save-path`. A separate frozen recovery enabled the erase API only for
+cache experiments, using the service's private `/tmp`. Original evidence was
+preserved. Synthetic marker checks passed, but the actual concurrent RU/EN pair
+took 109.30 s and truncated RU; it did not improve on the 108.51 s serial pair.
+
+| Final candidate | Complete semantic interpretations | Critical category events | Completed typed-valid proposals | Semantic p50 / p95, s |
+| --- | --- | --- | --- | --- |
+| `C1-F05-thread2-largebatch-H512` | 2/12 | 11 | 12/12 | 60.22 / 74.23 |
+| `C0-S00-B512` | 2/12 | 7 | 11/12 | 36.34 / 45.46 |
+| `C2-S10-repetition-mid-low` | 2/12 | 8 | 8/12 | 37.55 / 45.89 |
+
+Quality scores are provisional source predicates with actual pinned US-01
+Parser/SO replay, not professional gold or independent acceptance. Missing facts,
+invalid quotes and malformed/truncated outputs prevent success. Invalid JSON is
+not assigned semantic critical categories, so zero categories is not a safety
+certificate. The full report includes native R16/D05 source review, omissions,
+arbitration decisions, resources, cost and latency-objective failures. A complete
+model proposal can still receive SO CLARIFY; the score does not certify a committed
+Product State.
+
+
+The measured US-01 source remains pinned to `bc86a14b3e93d854e034579b459a15cfac899504`. A publication-time read at
+`2026-11-19T12:25:59.370076+00:00` found PR #185 at `62c5430e14c0a6970dddfcccaadd938bcc7866b3`. That later revision was not substituted or
+qualified by this experiment; parallel development remained unblocked.
+
+The single recommendation is `C1-F05-thread2-largebatch-H512` in
+`jewelai-qwen-recommended-config.json`, SHA-256
+`69b78a19b1fb54f0a4f2c23237415bba1b64148786907777e311b8900987d492`. It is **NOT PRODUCT-QUALIFIED**. Its principal values are context
+8192, threads 2, batch/microbatch
+256/128, slots 1,
+thinking `true`, reasoning budget
+128, and max output 512. The JSON
+provides every sampler, seed, timeout/retry, runtime and machine pin; the bilingual
+report gives each selection rationale. No global optimum or production SLA is claimed.
+
+Private review artifacts delivered separately:
+`JewelAI-Qwen-R2-2026-11-19-Report.html`,
+`JewelAI-Qwen-R2-2026-11-19-evidence.zip`, the single configuration JSON, and the
+external delivery receipt. Raw measurements and frozen inputs remain under
+`/opt/jewelai-qwen-r2-20261119` on the retained disk. Ranking was computed offline after measurement; the final configuration artifact
+was written after verified VM shutdown and is delivered locally and through the
+approved private evidence destination.
+
+Current regional list estimate: compute **$0.07371546/h**, retained disk
+**$0.00109590/h**, combined **$0.07481136/h** or **$54.61 per 730 running hours**.
+Stopped disk storage remains about **$0.80 per 730 hours**. These estimates exclude
+taxes, discounts and transfer/operator costs; continuous running is not authorized.
+Sources: [compute](https://cloud.google.com/products/compute/pricing/general-purpose)
+and [disk](https://cloud.google.com/compute/disks-image-pricing).
+
+This repository update is documentation-only. The private standalone research
+harness passed 29 local tests and lint checks under the pinned repository policy; that is separate from this PR's
+documentation checks and from independent product acceptance. No application,
+CI, deployment, catalog or database behavior changed. See the
+[capacity amendment in ADR 0043](../adr/0043-isolated-cpu-llm-lab.md).
+
+### Перевод RU
+
+Итоговая проверка `2026-11-19T12:25:05.620317+00:00`: **TERMINATED**, разрешённая модернизация
+до `e2-standard-2` сохранена. Сохранены та же ВМ ID `8540966569077646041` и загрузочный
+диск 20 GiB. Внешнего IP и service account нет. Временные SSH-метаданные этой задачи
+удалены; конфигурация сети и IAM не изменялась.
+
+ВМ имеет номинально 8 GiB RAM и два эффективных логических vCPU. Гостевая топология
+показывает одно ядро с двумя потоками SMT; это не утверждение о двух физических
+ядрах хоста. Постоянный drop-in
+`/etc/systemd/system/jewelai-llm-lab.service.d/90-r2-cpu.conf` задаёт `CPUQuota=200%`;
+проверены `cpu.max=200000 100000` и `nproc=2`. Лимиты процесса сохранены:
+`MemoryHigh=2500M`, `MemoryMax=3000M`, `MemorySwapMax=0`.
+
+Хеши модели и бинарного файла ниже не изменены. Временный исследовательский
+override удалён; исходная служба прошла health-проверку и явно остановлена,
+настройка автозапуска сохранена. Рекомендуемый профиль приложения **не активирован**.
+Исходные команды запуска, проверки и остановки ниже остаются применимыми.
+
+Четыре идентичных исторических запроса R1 B512 повторены по два раза. Исторические
+p50/p95 полного ответа — **88.16 / 99.89 s** (n=4); после модернизации —
+**42.03 / 50.11 s** (n=8), при побайтово одинаковых ответах ассистента. Измеренное
+снижение медианы на этой нагрузке составляет 52.32%; это не контролируемая
+причинная оценка изменения CPU. Хост, дата и конкуренция за ресурсы отличаются;
+TTFT компаратора не измерялось.
+
+Ограниченное исследование охватило 16 скрининговых и восемь уточняющих
+конфигураций, затем три зафиксированных финальных кандидата. Все диапазоны
+параметров опробованы; смешение факторов в плане взаимодействий явно указано.
+Первоначально очистка слота вернула HTTP 501 до инференса: закреплённая версия
+требовала `--slot-save-path`. Отдельное зафиксированное восстановление включило
+API очистки только для опытов с кэшем, используя приватный `/tmp` службы.
+Исходные доказательства сохранены. Проверки синтетических маркеров прошли,
+но реальная параллельная пара RU/EN заняла 109.30 s и обрезала RU; улучшения
+относительно 108.51 s последовательной пары не получено.
+
+| Финальный кандидат | Полное семантическое понимание | Критические события по категориям | Завершённые типизированные предложения | Семантические p50 / p95, s |
+| --- | --- | --- | --- | --- |
+| `C1-F05-thread2-largebatch-H512` | 2/12 | 11 | 12/12 | 60.22 / 74.23 |
+| `C0-S00-B512` | 2/12 | 7 | 11/12 | 36.34 / 45.46 |
+| `C2-S10-repetition-mid-low` | 2/12 | 8 | 8/12 | 37.55 / 45.89 |
+
+Оценки качества — предварительные условия исходного текста с фактическим
+воспроизведением закреплённых Parser/SO US-01, а не профессиональный эталон или
+независимая приёмка. Пропуски фактов, неверные цитаты и некорректные/обрезанные
+ответы исключают успех. Неверному JSON не назначаются семантические критические
+категории, поэтому ноль категорий не является сертификатом безопасности.
+Полный отчёт включает проверку исходных R16/D05, пропуски, решения арбитража,
+ресурсы, стоимость и невыполненные цели задержки. Полное предложение модели может
+получить SO CLARIFY; оценка не подтверждает зафиксированный Product State.
+
+
+Измеренный исходник US-01 остаётся закреплённым за `bc86a14b3e93d854e034579b459a15cfac899504`. Проверка перед
+публикацией `2026-11-19T12:25:59.370076+00:00` обнаружила PR #185 на `62c5430e14c0a6970dddfcccaadd938bcc7866b3`. Эта более поздняя версия
+не подставлялась и не квалифицировалась данным опытом; параллельная разработка
+оставалась незаблокированной.
+
+Единственная рекомендация — `C1-F05-thread2-largebatch-H512` в
+`jewelai-qwen-recommended-config.json`, SHA-256
+`69b78a19b1fb54f0a4f2c23237415bba1b64148786907777e311b8900987d492`. Статус — **NOT PRODUCT-QUALIFIED**. Основные значения: контекст
+8192, потоки 2, batch/microbatch
+256/128, слоты 1,
+thinking `true`, бюджет reasoning
+128, максимум вывода 512. JSON
+содержит все sampler, seed, timeout/retry, версии runtime и параметры машины;
+двуязычный отчёт обосновывает каждый выбор. Глобальный оптимум или production SLA
+не заявляются.
+
+Приватные материалы для проверки переданы отдельно:
+`JewelAI-Qwen-R2-2026-11-19-Report.html`,
+`JewelAI-Qwen-R2-2026-11-19-evidence.zip`, единственный JSON конфигурации и внешняя
+квитанция доставки. Исходные измерения и зафиксированные входы сохранены в
+`/opt/jewelai-qwen-r2-20261119` на оставленном диске. Ранжирование рассчитано
+офлайн после измерений; итоговый файл конфигурации создан после проверенной
+остановки ВМ и передан локально и в разрешённое приватное хранилище.
+
+Текущая региональная оценка: compute **$0.07371546/h**, диск **$0.00109590/h**,
+суммарно **$0.07481136/h**, или **$54.61 за 730 часов работы**. Диск остановленной
+ВМ — около **$0.80 за 730 часов**. Налоги, скидки и расходы на передачу/оператора
+не включены; непрерывная работа не разрешена. Источники:
+[compute](https://cloud.google.com/products/compute/pricing/general-purpose) и
+[disk](https://cloud.google.com/compute/disks-image-pricing).
+
+Изменение репозитория касается только документации. Приватный автономный
+исследовательский инструментарий прошёл 29 локальных тестов и lint по закреплённой политике репозитория; это отдельно
+от проверок документации данного PR и независимой приёмки продукта. Поведение
+приложения, CI, deployment, каталогов и БД не изменено. См.
+[поправку мощности ADR 0043](../adr/0043-isolated-cpu-llm-lab.md).
+
+## Historical installation record — 2026-11-09
+
+The following original record is retained for provenance. Its machine/quota and
+continuous-running cost describe the initial installation; the current capacity
+and research status above supersede those historical values.
+
+Следующая исходная запись сохранена для происхождения данных. Тип машины,
+квота и стоимость непрерывной работы описывают первоначальную установку;
+текущие значения и исследовательский статус выше заменяют исторические значения.
+
 Owner-approved installation dated 2026-11-09. This is an independent lab, with no
 JewelAI, Parser, Knowledge, Studio, provider-adapter or STT integration.
 See [ADR 0043](../adr/0043-isolated-cpu-llm-lab.md).
