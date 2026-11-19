@@ -555,8 +555,18 @@ def test_invalid_inputs_fail_before_model_or_writes(engine, real_config, changes
 @pytest.mark.parametrize(
     "locale,wording",
     [
-        ("en", "Your white gold earrings are saved. All requested details have been saved. Are the two mentioned sapphires for the pair or for each earring?"),
-        ("ru", "Сохранены серьги из белого золота. Все запрошенные детали сохранены. Как распределить упомянутые сапфиры: два на пару или на каждую серьгу?"),
+        (
+            "en",
+            "Your white gold earrings are saved. "
+            "All requested details have been saved. "
+            "Are the two mentioned sapphires for the pair or for each earring?",
+        ),
+        (
+            "ru",
+            "Сохранены серьги из белого золота. "
+            "Все запрошенные детали сохранены. "
+            "Как распределить упомянутые сапфиры: два на пару или на каждую серьгу?",
+        ),
     ],
 )
 def test_unresolved_details_reject_global_saved_claim(engine, real_config, locale, wording):
