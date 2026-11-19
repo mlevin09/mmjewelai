@@ -555,6 +555,28 @@ def test_invalid_inputs_fail_before_model_or_writes(engine, real_config, changes
 @pytest.mark.parametrize(
     "locale,wording",
     [
+        ("en", "Your white gold earrings are saved. All requested details have been saved. Are the two mentioned sapphires for the pair or for each earring?"),
+        ("ru", "Сохранены серьги из белого золота. Все запрошенные детали сохранены. Как распределить упомянутые сапфиры: два на пару или на каждую серьгу?"),
+    ],
+)
+def test_unresolved_details_reject_global_saved_claim(engine, real_config, locale, wording):
+    model = Model(reply=wording)
+    with real_client(engine, real_config, conversation_model=model) as (client, app, _):
+        sid, oid, _, request = prepare(client, app, locale, RU if locale == "ru" else EN)
+        result = post(client, sid, oid, request)
+        assert result.status_code == 201, result.json()
+        body = result.json()
+        assert body["delivered_reply"]["origin"] == "fallback"
+        assert wording not in body["delivered_reply"]["text"]
+        assert [d["outcome"] for d in body["evidence"]["arbitration"]][-2:] == [
+            "CLARIFY", "CLARIFY",
+        ]
+        assert get(client, sid, oid).json() == body
+
+
+@pytest.mark.parametrize(
+    "locale,wording",
+    [
         ("en", "I understand your idea: white gold earrings."),
         ("en", "Your white gold earrings are saved. The mentioned sapphires are not saved."),
         ("ru", "Понял ваш замысел. Это серьги из белого золота."),
