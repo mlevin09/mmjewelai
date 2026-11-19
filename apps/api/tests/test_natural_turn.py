@@ -579,7 +579,8 @@ def test_unresolved_details_reject_global_saved_claim(engine, real_config, local
         assert body["delivered_reply"]["origin"] == "fallback"
         assert wording not in body["delivered_reply"]["text"]
         assert [d["outcome"] for d in body["evidence"]["arbitration"]][-2:] == [
-            "CLARIFY", "CLARIFY",
+            "CLARIFY",
+            "CLARIFY",
         ]
         assert get(client, sid, oid).json() == body
 
