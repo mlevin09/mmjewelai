@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ApiClient, ApiError } from "./api";
+import { FirstTurnPilot } from "./FirstTurnPilot";
 import { VoiceRecorder } from "./VoiceRecorder";
 import {
   decisions,
@@ -8,6 +9,7 @@ import {
   type CompletionView,
   type Conversation,
   type FinalOutput,
+  type FirstTurnRead,
   type Question,
 } from "./enrichment";
 import type { Session } from "./types";
@@ -28,6 +30,8 @@ export function EnrichmentWorkspace({
   );
   const [session, setSession] = useState<Session | null>(null);
   const [snapshot, setSnapshot] = useState<Conversation | null>(null);
+  const [pilot, setPilot] = useState(false);
+  const [firstTurn, setFirstTurn] = useState<FirstTurnRead | null>(null);
   const [final, setFinal] = useState<FinalOutput | null>(null);
   const [completionEnabled, setCompletionEnabled] = useState(false);
   const [completion, setCompletion] = useState<CompletionView | null>(null);
@@ -48,13 +52,18 @@ export function EnrichmentWorkspace({
   const flight = useRef(false);
   const epoch = useRef(0);
   const log = useRef<HTMLOListElement>(null);
+  const currentViewChosen = useRef(false);
   const ru = session?.locale === "ru";
   const t = (en: string, russian: string) => (ru ? russian : en);
   useEffect(() => {
     if (log.current) log.current.scrollTop = log.current.scrollHeight;
   }, [snapshot?.events.length]);
 
-  async function refresh(currentEpoch = epoch.current) {
+  async function refresh(
+    currentEpoch = epoch.current,
+    activeSession = session,
+    openSavedPilot = !currentViewChosen.current,
+  ) {
     if (currentEpoch !== epoch.current) return;
     const data = await client.read();
     if (currentEpoch !== epoch.current) return;
@@ -62,6 +71,24 @@ export function EnrichmentWorkspace({
     setLoading(false);
     setFinal(null);
     setCompletion(null);
+    if (
+      activeSession?.artifacts.questions === "2.0.0" &&
+      activeSession.artifacts.rules === "2.0.0"
+    ) {
+      try {
+        const saved = await client.firstTurn();
+        if (currentEpoch !== epoch.current) return;
+        setFirstTurn(saved);
+        if (openSavedPilot) {
+          setPilot(true);
+          return;
+        }
+      } catch (e) {
+        if (currentEpoch !== epoch.current) return;
+        // Only absent receipts/routes are compatible with legacy sessions.
+        if (!(e instanceof ApiError && e.status === 404)) throw e;
+      }
+    }
     if (data.state) {
       try {
         const current = await client.currentCompletion();
@@ -121,7 +148,7 @@ export function EnrichmentWorkspace({
       .then(async (data) => {
         if (disposed) return;
         setSession(data);
-        await refresh(current);
+        await refresh(current, data);
       })
       .catch(() => {
         if (!disposed) {
@@ -308,6 +335,24 @@ export function EnrichmentWorkspace({
         <Link to={`/organizations/${organizationId}`}>Back to projects</Link>
       </main>
     );
+  if (pilot)
+    return (
+      <FirstTurnPilot
+        client={client}
+        session={session}
+        snapshot={snapshot}
+        saved={firstTurn}
+        onClose={() => setPilot(false)}
+        onViewCurrent={async () => {
+          const current = epoch.current;
+          await refresh(current, session, false);
+          if (current !== epoch.current) return;
+          currentViewChosen.current = true;
+          setShowHistory(true);
+          setPilot(false);
+        }}
+      />
+    );
   const s = snapshot.state;
   const activeQuestion = s?.questions[0];
   const readyForFinal =
@@ -391,6 +436,28 @@ export function EnrichmentWorkspace({
           </button>
         </div>
       </div>
+      {firstTurn && (
+        <button type="button" disabled={busy} onClick={() => setPilot(true)}>
+          {t(
+            "View saved first-turn reply",
+            "Открыть сохранённый ответ первого сообщения",
+          )}
+        </button>
+      )}
+      {!snapshot.state &&
+        session.artifacts.questions === "2.0.0" &&
+        session.artifacts.rules === "2.0.0" && (
+          <button
+            type="button"
+            disabled={busy || unsavedDesignInput}
+            onClick={() => setPilot(true)}
+          >
+            {t(
+              "Open text-only first-turn pilot",
+              "Открыть текстовый пилот первого сообщения",
+            )}
+          </button>
+        )}
       {error && (
         <p role="alert" className="alert">
           {error}

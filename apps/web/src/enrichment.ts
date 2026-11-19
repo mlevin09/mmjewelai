@@ -82,6 +82,43 @@ export interface Conversation {
     message_id: string | null;
   }[];
 }
+/** Immutable ST-01 receipt; never substitute its historical facts for current State. */
+export interface FirstTurnRead {
+  schema_version: "1.0.0";
+  receipt: {
+    schema_version: "1.0.0";
+    binding: {
+      contract_version: "jewelai.st01.first-turn/1.0.0";
+      organization_id: string;
+      session_id: string;
+      message_id: string;
+      message_sha256: string;
+      parent_revision_id: string;
+      result_revision_id: string;
+      enrichment_cycle_id: string;
+      parser_version: string;
+      parse_sha256: string;
+      knowledge_binding: Record<string, unknown>;
+      selection_eligible: boolean;
+      facts: {
+        target: "jewelry_type" | "metal.material" | "metal.color";
+        value: string;
+        candidate_id: string;
+        start: number;
+        end: number;
+        text: string;
+        mapping_ids: string[];
+      }[];
+    };
+    reply_origin: "deterministic_fallback";
+    reply_text: string;
+    created_at: string;
+    content_hash: string;
+  };
+  is_current_revision: boolean;
+  current_revision_id: string;
+}
+
 export interface FinalOutput {
   description: { text: string };
   internal_final_prompt: {
@@ -176,6 +213,35 @@ export class EnrichmentClient {
     return this.post("corrections", {
       ...this.nativeFrame(s),
       message_id: message.message_id,
+    });
+  }
+  firstTurn() {
+    return this.api.request<FirstTurnRead>(`${this.path}/first-turn`, {
+      organizationId: this.organizationId,
+      cache: "no-store",
+    });
+  }
+  async startFirstTurn(snapshot: Conversation, content: string) {
+    const message = await this.api.request<{ message_id: string }>(
+      `${this.path}/first-turn/messages`,
+      {
+        organizationId: this.organizationId,
+        method: "POST",
+        body: JSON.stringify({
+          schema_version: "1.0.0",
+          expected_revision_id: snapshot.revision.revision_id,
+          content,
+        }),
+      },
+    );
+    return this.api.request<FirstTurnRead>(`${this.path}/first-turn`, {
+      organizationId: this.organizationId,
+      method: "POST",
+      body: JSON.stringify({
+        schema_version: "1.0.0",
+        message_id: message.message_id,
+        expected_revision_id: snapshot.revision.revision_id,
+      }),
     });
   }
   private nativeFrame(s: EnrichmentState) {

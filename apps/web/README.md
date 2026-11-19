@@ -71,3 +71,49 @@ continuation request capacity. No client key, model credential, generation or ca
 activation is added. The API must already have its verified enrichment runtime
 configured; the UI never enables it or substitutes a provider fallback. See
 [ADR 0039](../../docs/adr/0039-prompt-enrichment-conversation-workspace.md).
+
+## ST-01 opt-in text pilot (coordinator UI)
+
+A new session pinned to questions/rules `2.0.0` offers **Open text-only first-turn
+pilot**. This is a separate explicit choice, not a rerouting of guided fields.
+The pilot sends the exact textarea text to its opt-in `first-turn/messages`
+endpoint (schema `1.0.0`, current revision and content), which preserves it without
+trimming in the existing Message store. The separate DTO rejects whitespace-only
+text and limits the complete original input to 2,000 characters, matching the
+current Parser and UI. Tenant/session, retained F profile and fresh initial state
+are checked before the locked Message insert; stale revisions or initialized
+sessions cannot append through this route. The pilot then calls the versioned
+`first-turn` route with that Message ID and the current revision. Legacy `/messages`
+keeps its original trimming and 4,000-character contract. The pilot never adds
+creation wording, center-stone placement or structured choices to the text.
+The existing guided/legacy command paths remain unchanged.
+
+A saved first-turn receipt reopens the pilot automatically. The server's immutable
+reply is displayed verbatim with a **fallback mode** label; it is not a model reply.
+The source Message is displayed separately, and a non-current receipt is labelled
+historical rather than substituted for current State. Reload reads the receipt and
+conversation again, without generating an answer. An absent route/receipt is
+compatible with legacy sessions; authorization or verification errors are not
+silently treated as absence.
+
+The saved-source panel displays only the referenced Message returned by the
+conversation read. If readback fails after a successful POST, the source is marked
+unavailable; any retained local input is shown separately as an **unverified local
+draft**. A POST receipt is never used to relabel the textarea as verified source.
+**View current state and history** reloads the existing workspace and opens its
+saved history, including corrections made after the receipt. An explicit return
+button reopens the retained first-turn reply with its historical label. Viewing
+either side does not submit a command or change the saved receipt. Subsequent
+workspace refreshes respect the current-view choice until the session is remounted.
+
+Submission is guarded against repeated clicks. After an uncertain attempt the
+same mounted pilot does not blindly create another Message; the retained input
+and an explicit read-only reload remain available. There is no durable client
+retry/recovery protocol in this change. No clarification, continuation, final
+confirmation or provider call is exposed within this pilot. Dropdown/mixed-input,
+voice and natural-model acceptance are not established by these UI tests.
+
+Targeted UI contract tests use MSW and jsdom in `FirstTurnPilot.test.tsx`, plus the
+existing workspace and App suites. They are not live-browser/backend acceptance.
+The final combined PR HEAD still needs independent review, exact-head CI and a
+real isolated browser/API lifecycle check before functional acceptance.

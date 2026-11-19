@@ -34,8 +34,17 @@ def test_real_roles_diff_has_explained_bounded_owners(roles_tree, monkeypatch):
     native_blob = pr_impact.blob
     monkeypatch.setattr(pr_impact, "blob", lambda root, rev, path: native_blob(ROOT, rev, path))
     base, paths = pr_selection.git_changes(ROOT, BASE, ROLES)
+    # The immutable ROLES source fixture must use its accepted ownership receipt,
+    # not a later feature's different, exact before/after pair.
+    historical_config = json.loads(
+        subprocess.check_output(
+            ["git", "show", "ba422f81430a35d1dbaf6f781ee07e81b494a6f7:tools/ci/pr_routes.json"],
+            cwd=ROOT,
+            text=True,
+        )
+    )
     result = pr_selection.build_selection(
-        roles_tree, paths, CONFIG, source_sha=ROLES, merge_base=base
+        roles_tree, paths, historical_config, source_sha=ROLES, merge_base=base
     )
     assert len(paths) == 81
     assert result["blocked_reasons"] == []
@@ -303,3 +312,18 @@ def test_proposed_release_condition_is_reviewable_but_not_activated():
     # This is the explicit Owner deployment-rule gate; do not silently claim enforcement.
     workflow = (ROOT / ".github/workflows/deploy-preprod.yml").read_text()
     assert "Locate exact-release-SHA Full qualification" not in workflow
+
+
+def test_current_shared_source_pairs_remain_exact_and_owned():
+    # A future shared edit without a reviewed pair must still fail closed. This
+    # accompanies, rather than replaces, the frozen historical Roles proof.
+    for path in (
+        "apps/api/src/jewelai_api/app.py",
+        "packages/persistence/src/jewelai_persistence/models.py",
+    ):
+        contracts = [
+            c for c in CONFIG["ownership"]["sources"] if c["path"] == path and "source_pair" in c
+        ]
+        assert len(contracts) == 1
+        assert contracts[0]["source_pair"][1] == pr_impact.ast_hash((ROOT / path).read_text())
+        assert "st01_first_turn" in contracts[0]["components"]

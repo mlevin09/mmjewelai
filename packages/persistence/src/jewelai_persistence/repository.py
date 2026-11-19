@@ -77,6 +77,7 @@ from .models import (
     EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
     GenerationRunRow,
+    InitialConversationTurnRow,
     IterativeEditRow,
     KnowledgeReleaseBindingRow,
     MessageRow,
@@ -309,6 +310,7 @@ class EnrichmentCycleRecord:
     release_pin: KnowledgeReleasePinRecord
     result: AnyPromptEnrichmentResult
     created_at: datetime
+    source_contract: str | None = None
 
 
 @dataclass(frozen=True)
@@ -883,7 +885,13 @@ class PersistenceRepository:
             ) from exc
         return revision
 
-    def create_message(self, row: MessageRow, organization_id: UUID) -> MessageRow:
+    def create_message(
+        self,
+        row: MessageRow,
+        organization_id: UUID,
+        *,
+        first_turn_revision_id: UUID | None = None,
+    ) -> MessageRow:
         with self._session_factory.begin() as db:
             scoped = db.scalar(
                 self._scoped_session_query(row.session_id, organization_id).with_for_update()
@@ -892,6 +900,32 @@ class PersistenceRepository:
                 raise OwnershipMismatchError("Session not found in organization scope")
             if row.actor != "user":
                 raise ValueError("Parser Proposal v1 persists user messages only")
+            if first_turn_revision_id is not None:
+                self._require_native_workflow(db, row.session_id)
+                if (scoped.question_artifact_version, scoped.rules_artifact_version) != (
+                    "2.0.0",
+                    "2.0.0",
+                ):
+                    raise ValueError("ST-01 requires the retained F profile")
+                if scoped.current_revision_id != first_turn_revision_id:
+                    raise StaleRevisionError("Product State changed before first-turn Message")
+                if (
+                    any(
+                        (
+                            scoped.knowledge_package_id,
+                            scoped.knowledge_artifact_version,
+                            scoped.knowledge_runtime_sha256,
+                            scoped.knowledge_validation_report_sha256,
+                        )
+                    )
+                    or db.scalar(
+                        select(EnrichmentCycleRow.enrichment_cycle_id)
+                        .where(EnrichmentCycleRow.session_id == row.session_id)
+                        .limit(1)
+                    )
+                    is not None
+                ):
+                    raise StaleRevisionError("First-turn Message requires an uninitialized session")
             db.add(row)
         return row
 
@@ -1159,6 +1193,7 @@ class PersistenceRepository:
         clarification_plan_payload: dict | None = None,
         release_binding: KnowledgeReleaseBinding | None = None,
         verify=None,
+        first_turn_payload: dict | None = None,
     ) -> EnrichmentCycleRecord:
         """Stage the first edit/pin/cycle; optional read-only verification precedes commit."""
 
@@ -1212,6 +1247,9 @@ class PersistenceRepository:
             raise EnrichmentIntegrityError("F04 initial enrichment requires an atomic Plan2")
         record = EnrichmentCycleRecord(
             enrichment_cycle_id=enrichment_cycle_id,
+            source_contract="jewelai.st01.first-turn/1.0.0"
+            if first_turn_payload is not None
+            else None,
             session_id=session_id,
             cycle_number=1,
             specification_revision_id=authoritative_revision_id,
@@ -1274,6 +1312,9 @@ class PersistenceRepository:
                     session.updated_at = created_at
                 row = EnrichmentCycleRow(
                     enrichment_cycle_id=enrichment_cycle_id,
+                    source_contract="jewelai.st01.first-turn/1.0.0"
+                    if first_turn_payload is not None
+                    else None,
                     session_id=session_id,
                     cycle_number=1,
                     specification_revision_id=authoritative_revision_id,
@@ -1313,6 +1354,13 @@ class PersistenceRepository:
                         created_at=created_at,
                     )
                     db.flush()
+                if first_turn_payload is not None:
+                    from .first_turns import stage_first_turn
+
+                    stage_first_turn(
+                        db, session, row, expected_revision_id, first_turn_payload, organization_id
+                    )
+                    db.flush()
                 if verify is not None:
                     from .preparations import locked_reader
 
@@ -1322,6 +1370,26 @@ class PersistenceRepository:
                 "initial revision or enrichment cycle already exists"
             ) from exc
         return record
+
+    def get_first_conversation_turn(self, session_id, organization_id):
+        from .first_turns import read_first_turn
+
+        return read_first_turn(self, session_id, organization_id)
+
+    def get_initial_conversation_turn(self, session_id, organization_id):
+        from .initial_turns import read
+
+        return read(self, session_id, organization_id)
+
+    def commit_initial_conversation_turn(self, **kwargs):
+        from .initial_turns import commit
+
+        return commit(self, **kwargs)
+
+    def commit_initial_conversation_reply(self, **kwargs):
+        from .initial_turns import deliver
+
+        return deliver(self, **kwargs)
 
     def get_knowledge_release_pin(
         self, session_id: UUID, organization_id: UUID
@@ -1364,6 +1432,8 @@ class PersistenceRepository:
 
     @staticmethod
     def _require_native_workflow(db, session_id):
+        if db.get(InitialConversationTurnRow, session_id) is not None:
+            raise UnsupportedWorkflowVersionError("US-01 first turn requires its versioned reader")
         if (
             db.scalar(
                 select(EnrichmentCycleRow.enrichment_cycle_id)
@@ -3745,6 +3815,7 @@ class PersistenceRepository:
             cls._validate_f04_snapshot(db, session, result, row.specification_revision_id)
         return EnrichmentCycleRecord(
             enrichment_cycle_id=row.enrichment_cycle_id,
+            source_contract=row.source_contract,
             session_id=row.session_id,
             cycle_number=row.cycle_number,
             specification_revision_id=row.specification_revision_id,

@@ -246,6 +246,7 @@ class KnowledgeReleaseBindingRow(Base):
 
 class EnrichmentCycleRow(Base):
     __tablename__ = "enrichment_cycle"
+    source_contract: Mapped[str | None] = mapped_column(String(80), nullable=True)
     knowledge_contract_version: Mapped[str | None] = mapped_column(String(32), nullable=True)
     __table_args__ = (
         UniqueConstraint(
@@ -863,3 +864,82 @@ class RoleRow(Base):
     revision: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class FirstConversationTurnRow(Base):
+    """One immutable ST-01 source transition/reply, never a synthetic user Message."""
+
+    __tablename__ = "first_conversation_turn"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["session_id", "enrichment_cycle_id", "cycle_number", "specification_revision_id"],
+            [
+                "enrichment_cycle.session_id",
+                "enrichment_cycle.enrichment_cycle_id",
+                "enrichment_cycle.cycle_number",
+                "enrichment_cycle.specification_revision_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("cycle_number = 1", name="ck_first_conversation_initial"),
+    )
+    session_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT")
+    )
+    message_id: Mapped[UUID] = mapped_column(ForeignKey("message.message_id", ondelete="RESTRICT"))
+    parent_revision_id: Mapped[UUID] = mapped_column(
+        ForeignKey("specification_revision.revision_id", ondelete="RESTRICT")
+    )
+    enrichment_cycle_id: Mapped[UUID] = mapped_column(Uuid)
+    cycle_number: Mapped[int] = mapped_column(Integer)
+    specification_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    payload: Mapped[dict] = mapped_column(JSON)
+    content_hash: Mapped[str] = mapped_column(String(64))
+
+
+class InitialConversationTurnRow(Base):
+    """US-01 input/Matrix commit; a separately write-once delivery is not State."""
+
+    __tablename__ = "initial_conversation_turn"
+    __table_args__ = (
+        UniqueConstraint("turn_id", name="uq_initial_conversation_turn_id"),
+        ForeignKeyConstraint(
+            ["session_id", "parent_revision_id", "design_id"],
+            [
+                "specification_revision.session_id",
+                "specification_revision.revision_id",
+                "specification_revision.design_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "result_revision_id", "design_id"],
+            [
+                "specification_revision.session_id",
+                "specification_revision.revision_id",
+                "specification_revision.design_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "(reply_payload IS NULL) = (reply_hash IS NULL)",
+            name="ck_initial_conversation_delivery_pair",
+        ),
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), primary_key=True
+    )
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT")
+    )
+    turn_id: Mapped[UUID] = mapped_column(Uuid)
+    message_id: Mapped[UUID] = mapped_column(ForeignKey("message.message_id", ondelete="RESTRICT"))
+    design_id: Mapped[UUID] = mapped_column(Uuid)
+    parent_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    result_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    input_payload: Mapped[dict] = mapped_column(JSON)
+    input_hash: Mapped[str] = mapped_column(String(64))
+    reply_payload: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    reply_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

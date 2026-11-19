@@ -195,7 +195,7 @@ def answer_intent_hash(plan, question, request, message):
 
 
 @boundary
-def start_initial_message(service, request):
+def start_initial_message(service, request, *, first_turn=False):
     request = InitialEnrichmentRequestV2.model_validate(request)
     repo = service.repository
     session = repo.get_design_session(request.session_id, request.organization_id)
@@ -261,6 +261,11 @@ def start_initial_message(service, request):
         revision, parsed, source, **({"equivalent_candidate_ids": equivalent} if equivalent else {})
     )
     proposed = proposed_design_for_transition(revision, first)
+    if first_turn:
+        from .first_turn import creation_design, creation_facts
+
+        _, facts = creation_facts(parsed, verified.compiled_runtime)
+        proposed = creation_design(revision, facts, source)
     authoritative = revision
     if proposed != revision.design:
         authoritative = revise_design(
@@ -303,23 +308,48 @@ def start_initial_message(service, request):
         cycle_number=1,
         trigger=InitialTrigger(kind="initial", message_id=message.message_id),
         conflicts=(conflict,) if conflict else (),
+        _canonical_revision_only=first_turn,
         constraint_evidence=constraints,
     )
-    return service._commit_verified(
-        repo.commit_initial_enrichment,
-        lambda bound, record: InitialEnrichmentRuntimeResultV2(
+    commit_time = service._clock()
+    first_turn_payload = None
+    if first_turn:
+        from .first_turn import make_receipt
+
+        first_turn_payload = make_receipt(
+            revision=revision,
+            authoritative=authoritative,
+            parsed=parsed,
+            binding=verified,
+            source=binding,
+            request=request,
+            cycle_id=cycle_id,
+            now=commit_time,
+        ).model_dump(mode="json")
+
+    def build_result(bound, record):
+        if first_turn:
+            from .first_turn import read
+
+            return read(bound, request.session_id, request.organization_id)
+        return InitialEnrichmentRuntimeResultV2(
             parse_result=parsed,
             parser_proposal=first.parser_proposal,
             enrichment=evaluated,
             workflow=get_current_state(bound, request.session_id, request.organization_id),
-        ),
+        )
+
+    return service._commit_verified(
+        repo.commit_initial_enrichment,
+        build_result,
+        first_turn_payload=first_turn_payload,
         enrichment_cycle_id=cycle_id,
         session_id=request.session_id,
         organization_id=request.organization_id,
         expected_revision_id=revision.revision_id,
         resulting_revision=authoritative if authoritative != revision else None,
         result=evaluated.enrichment_result,
-        created_at=service._clock(),
+        created_at=commit_time,
         clarification_plan_id=plan_id,
         clarification_plan_payload=plan.model_dump(mode="json"),
         release_binding=binding,
@@ -404,6 +434,15 @@ def _question_integrity(service, plan, question):
 def _verify_source_evaluation(
     service, repo, session_id, organization_id, plan, cycle, message, verified, *, correction=None
 ):
+    if cycle.source_contract is not None:
+        from .first_turn import CONTRACT, verify_source
+
+        if cycle.source_contract != CONTRACT or correction is not None or cycle.cycle_number != 1:
+            raise ValueError("Unsupported source transition contract")
+        with _source_governance("1.3.0"):
+            return verify_source(
+                service, repo, session_id, organization_id, plan, cycle, message, verified
+            )
     version = (
         correction.parsed_correction.parse_version
         if correction
@@ -638,6 +677,7 @@ def _verify_source_plan(
     states=None,
     reoffers=None,
     offers=(),
+    canonical_revision_only=False,
 ):
     """Validate source-to-plan evidence, not just a self-consistent stored hash."""
     constraints = merge_constraint_evidence(
@@ -680,6 +720,7 @@ def _verify_source_plan(
         constraint_evidence=constraints,
         relevant_changes=reoffers,
         offer_history=offers,
+        _canonical_revision_only=canonical_revision_only,
     )
     if expected != plan:
         raise ValueError("F plan is not the pinned deterministic source/frontier projection")
@@ -1053,7 +1094,15 @@ def _history_frame(service, repo, session_id, organization_id):
             _, actual_source = source_message(
                 service, session_id, message.message_id, organization_id, repository=repo
             )
-            _verify_source_plan(service, repo, plan, revision, source_evaluation, actual_source)
+            _verify_source_plan(
+                service,
+                repo,
+                plan,
+                revision,
+                source_evaluation,
+                actual_source,
+                canonical_revision_only=cycle.source_contract is not None,
+            )
         for question in plan.questions:
             _question_integrity(service, plan, question)
         from jewelai_domain.rules_v2 import RuleContextV2

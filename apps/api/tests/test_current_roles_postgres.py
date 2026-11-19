@@ -37,7 +37,8 @@ def test_roles_migration_and_import_postgres(monkeypatch):
     try:
         command.upgrade(cfg, "0020_session_retirement")
         before = set(inspect(engine).get_table_names())
-        command.upgrade(cfg, "head")
+        # This test owns the Roles delta, not unrelated future additive tables.
+        command.upgrade(cfg, "0021_roles_foundation")
         assert set(inspect(engine).get_table_names()) - before == {"roles"}
         factory = create_session_factory(engine)
         roles = database_role_registry(factory)
