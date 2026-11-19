@@ -586,6 +586,58 @@ def test_unresolved_details_reject_global_saved_claim(engine, real_config, local
 
 
 @pytest.mark.parametrize(
+    "locale,wording,expected_origin",
+    [
+        (
+            "en",
+            "Your white gold earrings are saved. "
+            "All requested details have been saved; you do not need to repeat them. "
+            "How should the mentioned sapphires be allocated?",
+            "fallback",
+        ),
+        (
+            "ru",
+            "Серьги из белого золота сохранены. "
+            "Все запрошенные детали сохранены; повторять их не нужно. "
+            "Как распределить упомянутые сапфиры?",
+            "fallback",
+        ),
+        (
+            "en",
+            "All accepted jewelry type and metal facts are saved: white gold earrings. "
+            "How should the mentioned sapphires be allocated?",
+            "model",
+        ),
+        (
+            "ru",
+            "Все принятые сведения о типе украшения и металле сохранены: серьги из белого золота. "
+            "Как распределить упомянутые сапфиры?",
+            "model",
+        ),
+    ],
+)
+def test_saved_claim_clause_scope_and_accepted_facts(
+    engine, real_config, locale, wording, expected_origin
+):
+    model = Model(reply=wording)
+    with real_client(engine, real_config, conversation_model=model) as (client, app, _):
+        sid, oid, _, request = prepare(client, app, locale, RU if locale == "ru" else EN)
+        result = post(client, sid, oid, request)
+        assert result.status_code == 201, result.json()
+        body = result.json()
+        assert body["delivered_reply"]["origin"] == expected_origin
+        if expected_origin == "model":
+            assert body["delivered_reply"]["text"] == wording
+        else:
+            assert wording not in body["delivered_reply"]["text"]
+        assert [d["outcome"] for d in body["evidence"]["arbitration"]][-2:] == [
+            "CLARIFY",
+            "CLARIFY",
+        ]
+        assert get(client, sid, oid).json() == body
+
+
+@pytest.mark.parametrize(
     "locale,wording",
     [
         ("en", "I understand your idea: white gold earrings."),
