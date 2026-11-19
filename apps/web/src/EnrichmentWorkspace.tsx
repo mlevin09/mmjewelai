@@ -465,8 +465,9 @@ export function EnrichmentWorkspace({
     : final?.internal_final_prompt.readiness;
   // Schema2 receipts may commit a current brief before the older conversational
   // projection exists. Both panels must use the same saved current revision.
-  const savedCurrentBrief =
-    naturalTurn?.is_current_revision ? naturalTurn.current_brief : null;
+  const savedCurrentBrief = naturalTurn?.is_current_revision
+    ? naturalTurn.current_brief
+    : null;
   const currentDesignText = s?.description.text || savedCurrentBrief;
   const fields = designFields(snapshot.revision.design);
   const known = fields.filter((f) => f.availability === "value");

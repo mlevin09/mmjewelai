@@ -187,7 +187,8 @@ describe("isolated first-turn pilot", () => {
     "shows the saved schema2 current brief across both legacy design panels (%s)",
     async (locale) => {
       const f = setup(locale);
-      const brief = locale === "ru" ? "Серьги из белого золота" : "White gold earrings";
+      const brief =
+        locale === "ru" ? "Серьги из белого золота" : "White gold earrings";
       server.use(
         http.get(`${prefix}/first-turn`, () =>
           HttpResponse.json({
@@ -229,8 +230,16 @@ describe("isolated first-turn pilot", () => {
       expect(screen.getByRole("status")).toHaveTextContent(
         locale === "ru" ? "Первое сообщение сохранено" : "First message saved",
       );
-      expect(screen.queryByText(/Waiting for your first message|Ожидается первое сообщение/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/No accepted characteristics yet|Принятых характеристик пока нет/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          /Waiting for your first message|Ожидается первое сообщение/,
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(
+          /No accepted characteristics yet|Принятых характеристик пока нет/,
+        ),
+      ).not.toBeInTheDocument();
     },
   );
 
