@@ -379,6 +379,27 @@ def checked_reply(
     }
     mentions = {v for o in observations for v in o.normalized_values}
     counts = {o.count for o in observations if o.kind == "count"}
+    # A generic "everything was saved" claim cannot be verified by checking
+    # only the three writable initial targets. Stone/count observations remain
+    # unresolved in US-01 even when the jewelry/body-metal facts are committed.
+    unresolved_source = any(o.kind in {"stone", "count", "unresolved"} for o in observations)
+    if unresolved_source:
+        for sentence in re.split(r"(?<=[.!?])\\s+|\\n", draft.text):
+            if "?" in sentence:
+                continue
+            sweeping = re.search(
+                r"\\b(?:all|every|everything|все|всё|вс[её]\\b|кажд\\w*)\\b",
+                sentence, re.I,
+            )
+            saved_claim = re.search(
+                r"\\b(?:saved|accepted|selected|recorded|сохран\\w*|принят\\w*|выбран\\w*|записан\\w*)\\b",
+                sentence, re.I,
+            )
+            denial = re.search(
+                r"\\b(?:not|never|не|никогда)\\b", sentence, re.I,
+            )
+            if sweeping and saved_claim and not denial:
+                raise ValueError("Reply globally claims unresolved source facts were saved")
     covered = []
     acknowledged = set()
     for c in parsed.candidates:
