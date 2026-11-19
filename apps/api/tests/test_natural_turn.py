@@ -749,3 +749,158 @@ def test_compact_qwen_wire_uses_real_so_commit_and_retained_reply(engine, real_c
         assert len(sent) == 2
     with real_client(engine, real_config, conversation_model=None) as (client, _, _):
         assert get(client, sid, oid).json() == body
+
+
+@pytest.mark.parametrize(
+    "locale,assertion,origin",
+    [
+        ("en", "Saved all requested details.", "fallback"),
+        ("ru", "Сохранены все запрошенные параметры.", "fallback"),
+        ("en", "Not all requested details were saved.", "model"),
+        ("ru", "Не все параметры сохранены.", "model"),
+    ],
+)
+def test_p1a_save_assertion_order_negation_and_immutable_reload(
+    engine, real_config, locale, assertion, origin, tmp_path
+):
+    import hashlib
+    from pathlib import Path
+
+    from jewelai_persistence.models import SpecificationRevisionRow
+    from sqlalchemy import func, select
+
+    text = RU if locale == "ru" else EN
+    wording = (
+        "Серьги из белого золота сохранены. " + assertion + " Как распределить упомянутые сапфиры?"
+        if locale == "ru"
+        else "Your white gold earrings are saved. "
+        + assertion
+        + " How should the mentioned sapphires be allocated?"
+    )
+    model = Model(reply=wording)
+    with real_client(engine, real_config, conversation_model=model) as (client, app, legacy):
+        sid, oid, parent, request = prepare(client, app, locale, text)
+        result = post(client, sid, oid, request)
+        assert result.status_code == 201, result.json()
+        body = result.json()
+        restored = get(client, sid, oid)
+        assert restored.status_code == 200 and restored.json() == body
+        repo = app.state.prompt_enrichment_service.repository
+        revision = repo.get_current_revision(sid, oid)
+        assert revision.design.jewelry_type.value == "earrings"
+        assert revision.design.metal.material.value == "gold"
+        assert revision.design.metal.color.value == "white"
+        assert revision.design.center_stone.material is None and revision.design.side_stones == ()
+        assert [d["outcome"] for d in body["evidence"]["arbitration"]][-2:] == [
+            "CLARIFY",
+            "CLARIFY",
+        ]
+        before = repo.get_initial_conversation_turn(sid, oid)
+        assert post(client, sid, oid, request).json() == body
+        assert post(client, sid, oid, {**request, "turn_id": str(uuid4())}).status_code == 409
+        assert (
+            post(client, sid, oid, {**request, "expected_revision_id": str(uuid4())}).status_code
+            == 409
+        )
+        assert repo.get_current_revision(sid, oid) == revision
+        assert revision.parent_revision_id == parent.revision_id
+        assert len(repo.list_messages(sid, oid)) == 1 and len(model.calls) == 2
+        with create_session_factory(engine)() as db:
+            assert (
+                db.scalar(
+                    select(func.count())
+                    .select_from(SpecificationRevisionRow)
+                    .where(SpecificationRevisionRow.session_id == sid)
+                )
+                == 2
+            )
+        assert legacy.calls == []
+    engine.dispose()
+    db_path = Path(engine.url.database)
+    digest = hashlib.sha256(db_path.read_bytes()).hexdigest()
+    with real_client(engine, real_config, conversation_model=None) as (client, app, legacy):
+        reread = get(client, sid, oid)
+        assert reread.status_code == 200 and reread.json() == body
+        assert (
+            app.state.prompt_enrichment_service.repository.get_initial_conversation_turn(sid, oid)
+            == before
+        )
+        assert legacy.calls == []
+    engine.dispose()
+    assert hashlib.sha256(db_path.read_bytes()).hexdigest() == digest
+    (tmp_path / "p1a-receipt.json").write_text(
+        json.dumps(
+            {
+                "input": text,
+                "assertion": assertion,
+                "expected_origin": origin,
+                "actual_origin": body["delivered_reply"]["origin"],
+                "post": result.status_code,
+                "get": reread.status_code,
+                "reply_hash": before["reply_hash"],
+                "input_hash": before["input_hash"],
+                "db_sha256": digest,
+                "unchanged_after_restart_read": True,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
+    assert body["delivered_reply"]["origin"] == origin
+    if origin == "model":
+        assert body["delivered_reply"]["text"] == wording
+    else:
+        assert body["delivered_reply"]["failure_code"] == "invalid_reply"
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "All requested details were saved.",
+        "Saved all requested details.",
+        "The requested details were all saved.",
+        "Сохранены все запрошенные параметры.",
+        "Все запрошенные параметры сохранены.",
+        "Запрошенные параметры все сохранены.",
+        "Every requested detail has been recorded.",
+        "Recorded each requested detail.",
+        "Все запрошенные параметры приняты; повторять их не нужно.",
+        "You do not need to repeat them. Saved all requested details.",
+        "Not all requested details were saved, but all requested details are saved.",
+        "Not all requested details were saved and all requested details are saved.",
+        "Не все параметры сохранены, но сохранены все параметры.",
+        "All accepted facts are saved and all requested details are saved.",
+        "Сохранены all requested details.",
+        "All requested details were not saved and were later saved.",
+        "Все параметры не сохранены, а затем сохранены.",
+    ],
+)
+def test_p1a_unsupported_save_assertions_fail_independently_of_order(text):
+    from jewelai_api.natural_turn import _checked_saved_assertions
+
+    with pytest.raises(ValueError, match="globally claims"):
+        _checked_saved_assertions(text)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Not all requested details were saved.",
+        "Не все параметры сохранены.",
+        "Saved not all requested details.",
+        "Сохранены не все параметры.",
+        "All requested details have not yet been saved.",
+        "Все запрошенные параметры ещё не сохранены.",
+        "All accepted facts are saved.",
+        "Saved all verified parameters.",
+        "Every committed fact has been saved.",
+        "Сохранён каждый принятый параметр.",
+        "Все принятые сведения сохранены.",
+        "Not all requested details were saved; all accepted facts are saved.",
+        "Не все параметры сохранены, но все принятые сведения сохранены.",
+    ],
+)
+def test_p1a_scoped_and_negative_save_assertions_keep_their_governor(text):
+    from jewelai_api.natural_turn import _checked_saved_assertions
+
+    assert _checked_saved_assertions(text)
