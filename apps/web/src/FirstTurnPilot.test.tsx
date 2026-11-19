@@ -228,11 +228,15 @@ describe("isolated first-turn pilot", () => {
       });
       expect(within(current).getByText(brief)).toBeInTheDocument();
       expect(
-        screen.getAllByRole("status").some((node) =>
-          node.textContent?.includes(
-            locale === "ru" ? "Первое сообщение сохранено" : "First message saved",
+        screen
+          .getAllByRole("status")
+          .some((node) =>
+            node.textContent?.includes(
+              locale === "ru"
+                ? "Первое сообщение сохранено"
+                : "First message saved",
+            ),
           ),
-        ),
       ).toBe(true);
       expect(
         screen.queryByText(
