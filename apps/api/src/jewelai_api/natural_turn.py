@@ -328,6 +328,58 @@ def reply_options(brief, observations, locale):
     )
 
 
+def _checked_saved_assertions(text):
+    """Check complete save assertions, without depending on subject/verb order.
+
+    Negation belongs to its quantifier or save predicate; an unrelated denial
+    cannot exempt another assertion. Return only qualified/negative universal
+    token spans, so "every accepted fact" is not confused with stone allocation.
+    Actual named facts and authority are still checked against State below.
+    """
+    universal = r"\b(?:all|every|each|everything|все|всё|кажд\w*)\b"
+    boundary = re.compile(
+        r"[.!?;\n]+|\b(?:but|however|но|однако)\b|"
+        r"\b(?:and|и)\b(?=\s+(?:(?:not|не)\s+)?" + universal + ")",
+        re.I,
+    )
+    predicates = re.compile(
+        r"\b(?:saved|accepted|selected|recorded|сохран\w*|принят\w*|выбран\w*|записан\w*)\b",
+        re.I,
+    )
+    qualifier = re.compile(
+        r"(?:all|every|each)\s+(?:accepted|verified|committed|supported)\b|"
+        r"(?:все|всё|кажд\w*)\s+(?:принят\w*|проверенн\w*|подтвержд[её]нн\w*)\b",
+        re.I,
+    )
+    result = []
+    start = 0
+    for end in (*tuple(m.start() for m in boundary.finditer(text)), len(text)):
+        clause = text[start:end]
+        for quantifier in re.finditer(universal, clause, re.I):
+            qualified = qualifier.match(clause, quantifier.start())
+            verbs = tuple(
+                v
+                for v in predicates.finditer(clause)
+                if not (qualified and quantifier.end() <= v.start() < qualified.end())
+            )
+            if not verbs:
+                continue
+            negative_quantifier = re.search(r"\b(?:not|не)\s+$", clause[: quantifier.start()], re.I)
+            for verb in verbs:
+                negative_predicate = re.search(
+                    r"\b(?:not|never|не|никогда)\s+(?:(?:yet|been|be|ещ[её]|были|был|была)\s+)*$",
+                    clause[: verb.start()],
+                    re.I,
+                )
+                if not qualified and not negative_quantifier and not negative_predicate:
+                    raise ValueError("Reply globally claims unresolved source facts were saved")
+            result.append((start + quantifier.start(), start + quantifier.end()))
+        # The next clause begins after this boundary, not at the boundary text.
+        match = boundary.match(text, end)
+        start = match.end() if match is not None else end
+    return tuple(result)
+
+
 def checked_reply(
     draft,
     options,
@@ -383,45 +435,7 @@ def checked_reply(
     # only the three writable initial targets. Stone/count observations remain
     # unresolved in US-01 even when the jewelry/body-metal facts are committed.
     unresolved_source = any(o.kind in {"stone", "count", "unresolved"} for o in observations)
-    if unresolved_source:
-        # Evaluate each assertion clause independently. A later unrelated
-        # "do not repeat" clause must never cancel a false saved-all claim.
-        # Conversely "all accepted/verified facts" is scoped to committed facts,
-        # not a claim that every requested gemstone/count was committed.
-        for clause in re.split(r"[.!?;\n]+", draft.text):
-            sweeping = re.search(
-                r"\b(?:all|every|everything|все|всё|кажд\w*)\b",
-                clause,
-                re.I,
-            )
-            saved_claim = re.search(
-                r"\b(?:saved|accepted|selected|recorded|сохран\w*|принят\w*|"
-                r"выбран\w*|записан\w*)\b",
-                clause,
-                re.I,
-            )
-            if not sweeping or not saved_claim or saved_claim.start() < sweeping.start():
-                continue
-            claim_scope = clause[sweeping.start() : saved_claim.end()]
-            qualified = bool(
-                re.match(
-                    r"(?i)(?:all\s+(?:accepted|verified|committed|supported)\b|"
-                    r"все\s+(?:принятые|проверенные|подтвержд[её]нные)\b|"
-                    r"всё\s+(?:принятое|подтвержд[её]нное)\b)",
-                    claim_scope,
-                )
-            )
-            negated_claim = bool(
-                re.search(
-                    r"(?i)\b(?:not|never|не|никогда)\b(?:\s+\S+){0,4}\s+"
-                    r"(?:saved|accepted|selected|recorded|сохран\w*|"
-                    r"принят\w*|выбран\w*|записан\w*)\b",
-                    claim_scope,
-                )
-                or re.match(r"(?i)(?:not\s+all\b|не\s+все\b)", claim_scope)
-            )
-            if not qualified and not negated_claim:
-                raise ValueError("Reply globally claims unresolved source facts were saved")
+    scoped_quantifiers = _checked_saved_assertions(draft.text) if unresolved_source else ()
     covered = []
     acknowledged = set()
     for c in parsed.candidates:
@@ -527,10 +541,13 @@ def checked_reply(
             raise ValueError("Reply did not address the unresolved quantity scope")
         # A question about EACH/PAIR/TOTAL is fine; affirming an allocation is
         # not. A question elsewhere in the reply cannot qualify this sentence.
-        for sentence in re.split(r"(?<=[.!?])\s+|\n", draft.text):
-            if re.search(r"\b(?:each|per|every|total|кажд\w*|всего)\b", sentence, re.I):
-                if "?" not in sentence:
-                    raise ValueError("Reply asserts an unresolved quantity scope")
+        for match in re.finditer(r"\b(?:each|per|every|total|кажд\w*|всего)\b", draft.text, re.I):
+            if match.span() in scoped_quantifiers:
+                continue  # Universal over saved facts, not allocation over stone instances.
+            with _source_governance("1.3.0"):
+                left, right = _sentence_bounds(draft.text, match.start(), match.end())
+            if "?" not in draft.text[left : right + 1]:
+                raise ValueError("Reply asserts an unresolved quantity scope")
     # With unresolved stone scope, a response must actually ask/retain uncertainty;
     # it cannot silently present a guessed distribution as an accepted design.
     if any(o.kind in {"stone", "count"} for o in observations) and not re.search(
