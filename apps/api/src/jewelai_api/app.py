@@ -5,7 +5,7 @@ import json
 import os
 from collections.abc import Callable
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, Response, UploadFile
@@ -48,6 +48,7 @@ from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
 from jewelai_parser import AnyParserProposal
 from jewelai_persistence import (
+    EnrichmentIntegrityError,
     GenerationRetryNotAllowedError,
     GenerationStateConflictError,
     NotFoundError,
@@ -255,6 +256,7 @@ def create_app(
     asset_object_store: PrivateObjectStore | None = None,
     generation_task_publisher: GenerationTaskPublisher | None = None,
     text_understanding_provider: TextUnderstandingProvider | None = None,
+    conversation_model=None,
     prompt_enrichment_service: PromptEnrichmentRuntimeService | None = None,
     completion_registry=None,
     role_registry=None,
@@ -333,6 +335,11 @@ def create_app(
             settings.text_understanding,
             api_key=api_key,
         )
+    if conversation_model is None and settings.conversation is not None:
+        from .conversation_qwen import QwenConversationAdapter
+
+        conversation_model = QwenConversationAdapter(settings.conversation)
+
     service = RuntimeService(
         repository,
         artifacts,
@@ -1330,6 +1337,31 @@ def create_app(
         from .first_turn import read as read_first_turn
         from .first_turn import save_message as save_first_turn_message
         from .first_turn import start as start_first_turn
+        from .natural_turn import NaturalTurnRead, NaturalTurnRequest
+        from .natural_turn import execute as execute_natural_turn
+        from .natural_turn import input_options as natural_turn_options
+        from .natural_turn import read as read_natural_turn
+
+        def checked_natural_call(function, *args):
+            try:
+                return function(*args)
+            except (EnrichmentIntegrityError, KeyError, TypeError) as exc:
+                raise PromptEnrichmentRuntimeError(
+                    PromptEnrichmentRuntimeErrorCode.INVALID_HISTORY,
+                    "US-01 durable source or delivery failed verification",
+                ) from exc
+
+        @app.get("/v1/sessions/{session_id}/prompt-enrichment/first-turn/options")
+        def get_first_turn_options(
+            session_id: UUID, organization_id: AuthorizedOrganization, response: Response
+        ):
+            response.headers["Cache-Control"] = "no-store, private"
+            return natural_turn_options(
+                prompt_enrichment_service,
+                session_id,
+                organization_id,
+                model_configured=conversation_model is not None,
+            )
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/first-turn/messages",
@@ -1349,26 +1381,49 @@ def create_app(
 
         @app.post(
             "/v1/sessions/{session_id}/prompt-enrichment/first-turn",
-            response_model=FirstTurnRead,
+            response_model=FirstTurnRead | NaturalTurnRead,
             status_code=201,
         )
         def create_first_turn(
             session_id: UUID,
-            request: FirstTurnRequest,
+            request: FirstTurnRequest | NaturalTurnRequest,
             organization_id: AuthorizedOrganization,
             response: Response,
         ):
             response.headers["Cache-Control"] = "no-store, private"
+            if isinstance(request, NaturalTurnRequest):
+                result, created = checked_natural_call(
+                    execute_natural_turn,
+                    prompt_enrichment_service,
+                    session_id,
+                    organization_id,
+                    request,
+                    conversation_model,
+                )
+                response.status_code = (
+                    202 if result.delivery_status == "pending" else 201 if created else 200
+                )
+                return result
             return start_first_turn(prompt_enrichment_service, session_id, organization_id, request)
 
         @app.get(
             "/v1/sessions/{session_id}/prompt-enrichment/first-turn",
-            response_model=FirstTurnRead,
+            response_model=FirstTurnRead | NaturalTurnRead,
         )
         def get_first_turn(
-            session_id: UUID, organization_id: AuthorizedOrganization, response: Response
+            session_id: UUID,
+            organization_id: AuthorizedOrganization,
+            response: Response,
+            turn_version: Literal["1.0.0", "2.0.0"] = "1.0.0",
         ):
             response.headers["Cache-Control"] = "no-store, private"
+            if turn_version == "2.0.0":
+                try:
+                    return checked_natural_call(
+                        read_natural_turn, prompt_enrichment_service, session_id, organization_id
+                    )
+                except NotFoundError:
+                    pass  # Only genuine absence can fall back to the unchanged v1 reader.
             return read_first_turn(prompt_enrichment_service, session_id, organization_id)
 
         @app.get(

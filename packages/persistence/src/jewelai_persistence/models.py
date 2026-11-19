@@ -896,3 +896,50 @@ class FirstConversationTurnRow(Base):
     specification_revision_id: Mapped[UUID] = mapped_column(Uuid)
     payload: Mapped[dict] = mapped_column(JSON)
     content_hash: Mapped[str] = mapped_column(String(64))
+
+
+class InitialConversationTurnRow(Base):
+    """US-01 input/Matrix commit; a separately write-once delivery is not State."""
+
+    __tablename__ = "initial_conversation_turn"
+    __table_args__ = (
+        UniqueConstraint("turn_id", name="uq_initial_conversation_turn_id"),
+        ForeignKeyConstraint(
+            ["session_id", "parent_revision_id", "design_id"],
+            [
+                "specification_revision.session_id",
+                "specification_revision.revision_id",
+                "specification_revision.design_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["session_id", "result_revision_id", "design_id"],
+            [
+                "specification_revision.session_id",
+                "specification_revision.revision_id",
+                "specification_revision.design_id",
+            ],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint(
+            "(reply_payload IS NULL) = (reply_hash IS NULL)",
+            name="ck_initial_conversation_delivery_pair",
+        ),
+    )
+    session_id: Mapped[UUID] = mapped_column(
+        ForeignKey("design_session.session_id", ondelete="RESTRICT"), primary_key=True
+    )
+    organization_id: Mapped[UUID] = mapped_column(
+        ForeignKey("organization.organization_id", ondelete="RESTRICT")
+    )
+    turn_id: Mapped[UUID] = mapped_column(Uuid)
+    message_id: Mapped[UUID] = mapped_column(ForeignKey("message.message_id", ondelete="RESTRICT"))
+    design_id: Mapped[UUID] = mapped_column(Uuid)
+    parent_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    result_revision_id: Mapped[UUID] = mapped_column(Uuid)
+    input_payload: Mapped[dict] = mapped_column(JSON)
+    input_hash: Mapped[str] = mapped_column(String(64))
+    reply_payload: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    reply_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

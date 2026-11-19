@@ -7,7 +7,7 @@ the adapter cannot mutate either through a shared ORM object or nested dictionar
 """
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 from jewelai_domain.knowledge_runtime import (
@@ -17,6 +17,9 @@ from jewelai_domain.knowledge_runtime import (
 )
 from jewelai_domain.models_v1_1 import AnyDesignRevision, validate_design_revision
 from jewelai_parser import parse_full_message
+
+if TYPE_CHECKING:
+    from .semantic_proposal import SemanticProposal
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,10 @@ class ConversationContext:
     committed_revision_json: str
     source_parse_json: str
     knowledge_binding_json: str
+    # US-01 supplies scoped, verified data; defaults preserve the original internal adapter.
+    turn_binding_json: str = "{}"
+    semantic_evidence_json: str = "{}"
+    safe_reply_options_json: str = "[]"
 
 
 @dataclass(frozen=True)
@@ -41,6 +48,10 @@ class UntrustedConversationDraft:
 
 
 class ConversationModel(Protocol):
+    def interpret(self, context: ConversationContext) -> "SemanticProposal":
+        """Primary interpretation; no Parser-derived meaning or State write."""
+        ...
+
     def draft_reply(self, context: ConversationContext) -> UntrustedConversationDraft:
         """No State write, arbitrary tool execution or implicit provider authorization."""
         ...

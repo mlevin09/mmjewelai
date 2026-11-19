@@ -17,6 +17,7 @@ from jewelai_domain import (
 from jewelai_generation_queue_gcp import CloudTasksGenerationConfig
 from jewelai_text_understanding_google import GoogleTextUnderstandingConfig
 
+from .conversation_qwen import QwenConversationConfig
 from .generation import GenerationProfile
 from .role_selection import STUDIO_ROLE_IDS
 
@@ -89,6 +90,7 @@ class RuntimeSettings:
     prompt_enrichment: PromptEnrichmentRuntimeConfig | None = None
     completion_policy_path: Path | None = None
     completion_policy_sha256: str | None = None
+    conversation: QwenConversationConfig | None = None
 
     def __post_init__(self) -> None:
         from jewelai_domain.roles import RoleId
@@ -272,7 +274,21 @@ class RuntimeSettings:
                 else None
             ),
             prompt_enrichment=_parse_prompt_enrichment_config(),
+            conversation=_conversation_config(),
         )
+
+
+def _conversation_config():
+    provider = os.getenv("ST01_CONVERSATION_PROVIDER")
+    if provider is None:
+        return None
+    if provider != "qwen":
+        raise ValueError("US-01 requires the existing machine-hosted Qwen runtime")
+    names = ("ENDPOINT", "MODEL", "MODEL_SHA256", "RUNTIME_BUILD")
+    values = {name.lower(): os.getenv("ST01_CONVERSATION_" + name) for name in names}
+    if not all(values.values()):
+        raise ValueError("Qwen requires explicit endpoint/model/artifact/runtime pins")
+    return QwenConversationConfig(**values)
 
 
 def _strict_bounded_integer(value: str | None, *, default: int, maximum: int, name: str) -> int:

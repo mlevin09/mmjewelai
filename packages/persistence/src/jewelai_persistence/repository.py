@@ -77,6 +77,7 @@ from .models import (
     EnrichmentCycleRow,
     GenerationDispatchOutboxRow,
     GenerationRunRow,
+    InitialConversationTurnRow,
     IterativeEditRow,
     KnowledgeReleaseBindingRow,
     MessageRow,
@@ -1375,6 +1376,21 @@ class PersistenceRepository:
 
         return read_first_turn(self, session_id, organization_id)
 
+    def get_initial_conversation_turn(self, session_id, organization_id):
+        from .initial_turns import read
+
+        return read(self, session_id, organization_id)
+
+    def commit_initial_conversation_turn(self, **kwargs):
+        from .initial_turns import commit
+
+        return commit(self, **kwargs)
+
+    def commit_initial_conversation_reply(self, **kwargs):
+        from .initial_turns import deliver
+
+        return deliver(self, **kwargs)
+
     def get_knowledge_release_pin(
         self, session_id: UUID, organization_id: UUID
     ) -> KnowledgeReleasePinRecord:
@@ -1416,6 +1432,8 @@ class PersistenceRepository:
 
     @staticmethod
     def _require_native_workflow(db, session_id):
+        if db.get(InitialConversationTurnRow, session_id) is not None:
+            raise UnsupportedWorkflowVersionError("US-01 first turn requires its versioned reader")
         if (
             db.scalar(
                 select(EnrichmentCycleRow.enrichment_cycle_id)

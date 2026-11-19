@@ -690,6 +690,19 @@
         "evidence": "Complete opt-in ST-01 source binding, pinned Library ownership, actual HTTP/reload, native correction/historical reply, tenant/CAS and atomic receipt rejection. Real PostgreSQL uses the unchanged disposable gate for actual migration, immutable triggers and downgrade refusal. Existing historical Parser/Message contracts unchanged. Authority-intent regressions own informational/advice subjects versus direct creation objects and real HTTP persisted/reloaded non-selection. Opt-in raw Message ownership includes exact UTF-8 retention, whitespace/Parser limit validation and locked fresh-F/CAS/tenant insertion; legacy Message normalization stays unchanged.",
         "postgres": true,
         "release": true
+      },
+      "us01_semantic_turn": {
+        "tests": [
+          "apps/api/tests/test_natural_turn.py",
+          "apps/api/tests/test_natural_turn_postgres.py",
+          "apps/api/tests/test_semantic_proposal.py",
+          "apps/api/tests/test_conversation_qwen.py",
+          "apps/api/tests/test_conversation_model.py",
+          "apps/api/tests/test_first_turn_intent.py"
+        ],
+        "evidence": "Owner-approved additive US-01 schema2 source/dual-interpretation/SO/Matrix/State commit and write-once natural delivery. Complete native modules own raw text and structured/transcript sources, independent Parser1.3, conservative lexical/component proof (including missing Parser candidates), recommendations/questions, lock/source integrity, CAS/idempotency, rollback, retained reply/restart and mocked bounded private Qwen HTTP. PostgreSQL module reuses the unchanged independently verified disposable gate for migration0023, non-blocking model phases and immutability/downgrade; real model/live UI remain separate operational evidence. No Full gate or CI algorithm is weakened.",
+        "postgres": true,
+        "release": true
       }
     },
     "sources": [
@@ -744,11 +757,12 @@
           "roles",
           "bootstrap",
           "authorization",
-          "st01_first_turn"
+          "st01_first_turn",
+          "us01_semantic_turn"
         ],
         "source_pair": [
           "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d",
-          "8e104d449e5dd978227c43512962d7d58a4eabdb56e1c97bd9e682f9619f9eab"
+          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c"
         ]
       },
       {
@@ -777,11 +791,12 @@
         ],
         "components": [
           "roles",
-          "bootstrap"
+          "bootstrap",
+          "us01_semantic_turn"
         ],
         "source_pair": [
           "82ea7449bc870ad1c7ceb6fe111d22124753ddf6dadcef7c8b4fb89ff370649b",
-          "1bc33248dbeb79367c831c36e4615461c0a64b75271d6693727002a0c9f8c14c"
+          "c8560e438e761f5bce6105bc1bfd9457107579ef1127305f9384073e30e185d8"
         ]
       },
       {
@@ -831,11 +846,12 @@
         "components": [
           "roles",
           "migration",
-          "st01_first_turn"
+          "st01_first_turn",
+          "us01_semantic_turn"
         ],
         "source_pair": [
           "d5a885fa6d494ce5ba1158cdd444f24fd01927ff87acc392c7ab4cf6150046b3",
-          "84cd44424444185077faca0997e342a34fc2ec77b9ffb154f594ac14042ccd2e"
+          "5ab7e3f72ab157ea18193e7881db9e4c5fd2c7ddc4a573a7f9f2814305ff038c"
         ]
       },
       {
@@ -1200,6 +1216,87 @@
           "st01_first_turn",
           "state_safety"
         ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/natural_turn.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "us01_semantic_turn"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/semantic_proposal.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "us01_semantic_turn"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/conversation_qwen.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "us01_semantic_turn"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/initial_turns.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "us01_semantic_turn"
+        ]
+      },
+      {
+        "path": "packages/persistence/migrations/versions/0023_initial_conversation_turn.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "us01_semantic_turn",
+          "migration"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/models.py",
+        "declarations": [
+          "InitialConversationTurnRow"
+        ],
+        "components": [
+          "us01_semantic_turn",
+          "migration"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/repository.py",
+        "declarations": [
+          "@module",
+          "PersistenceRepository.get_initial_conversation_turn",
+          "PersistenceRepository.commit_initial_conversation_turn",
+          "PersistenceRepository.commit_initial_conversation_reply",
+          "PersistenceRepository._require_native_workflow"
+        ],
+        "components": [
+          "us01_semantic_turn",
+          "state_safety"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/settings.py",
+        "declarations": [
+          "RuntimeSettings.from_env",
+          "_conversation_config"
+        ],
+        "components": [
+          "us01_semantic_turn",
+          "bootstrap"
+        ]
       }
     ],
     "resources": [
@@ -1281,6 +1378,14 @@
         "components": [
           "release_rebind"
         ]
+      },
+      {
+        "path": "apps/api/pyproject.toml",
+        "components": [
+          "us01_semantic_turn",
+          "bootstrap"
+        ],
+        "evidence": "Only declares httpx>=0.28,<1 directly for the new private conversational HTTP client. This same library/range is already runtime-required by jewelai-text-understanding-google; no new library/provider or test dependency is introduced. Bootstrap/adapter/configuration and full native US-01 owners validate composition; mandatory release qualification is retained."
       }
     ],
     "test_support": {

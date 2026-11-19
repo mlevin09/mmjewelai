@@ -346,31 +346,8 @@ def creation_facts(parsed, runtime):
         return False, ()
     material = by_target.get("metal.material")
     color = by_target.get("metal.color")
-    body_owned = False
-    if product is not None and material is not None:
-        text = parsed.original_text
-        if material.end <= product.start:
-            body_owned = not text[material.end : product.start].strip()
-        elif product.end <= material.start:
-            material_start = material.start
-            if (
-                color is not None
-                and color.end <= material.start
-                and not text[color.end : material.start].strip()
-            ):
-                material_start = color.start
-            body_owned = bool(
-                re.fullmatch(
-                    r"\s+(?:из|of|in|made\s+(?:of|from))\s+",
-                    text[product.end : material_start],
-                    re.I,
-                )
-            )
-    color_owned = (
-        body_owned
-        and color is not None
-        and color.end <= material.start
-        and not parsed.original_text[color.end : material.start].strip()
+    body_owned, color_owned = creation_body_ownership(
+        parsed.original_text, product, material, color
     )
     return True, tuple(
         f
@@ -589,3 +566,33 @@ def read(service, sid, oid):
             )
 
     return verified_read()
+
+
+def creation_body_ownership(text, product, material, color):
+    """Existing source-relative body/material/color ownership, shared with SO."""
+    body_owned = False
+    if product is not None and material is not None:
+        if material.end <= product.start:
+            body_owned = not text[material.end : product.start].strip()
+        elif product.end <= material.start:
+            material_start = material.start
+            if (
+                color is not None
+                and color.end <= material.start
+                and not text[color.end : material.start].strip()
+            ):
+                material_start = color.start
+            body_owned = bool(
+                re.fullmatch(
+                    r"\s+(?:из|of|in|made\s+(?:of|from))\s+",
+                    text[product.end : material_start],
+                    re.I,
+                )
+            )
+    color_owned = (
+        body_owned
+        and color is not None
+        and color.end <= material.start
+        and not text[color.end : material.start].strip()
+    )
+    return body_owned, color_owned
