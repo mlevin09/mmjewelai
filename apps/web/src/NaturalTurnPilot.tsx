@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ApiError } from "./api";
+import { VoiceRecorder } from "./VoiceRecorder";
 import type {
   Conversation,
   EnrichmentClient,
@@ -93,13 +94,18 @@ export function NaturalTurnPilot({
   const delivered = receipt?.delivered_reply;
   const savedSource = receipt?.evidence.request.original_text;
   return (
-    <main className="page enrichment-page" aria-busy={busy}>
+    <main className="page enrichment-page studio-first-turn" aria-busy={busy}>
       <Link
         to={`/organizations/${client.organizationId}/projects/${session.project_id}`}
       >
         {t("Sessions", "Сессии")}
       </Link>
-      <h1>{t("Describe your jewelry", "Опишите украшение")}</h1>
+      <header className="studio-first-turn-hero">
+        <div>
+          <p className="eyebrow">{t("JEWELAI DESIGN STUDIO", "СТУДИЯ ДИЗАЙНА JEWELAI")}</p>
+          <h1>{t("Describe your jewelry", "Опишите украшение")}</h1>
+        </div>
+      </header>
       <p>
         {t(
           "One first message. The independent Parser and model are checked before State is saved. Further clarification belongs to later steps.",
@@ -114,9 +120,10 @@ export function NaturalTurnPilot({
           )}
         </p>
       )}
+      <div className="studio-first-turn-panel">
       {error && <p role="alert">{error}</p>}
       {!receipt && (
-        <form
+        <form className="studio-first-turn-form"
           onSubmit={(event) => {
             event.preventDefault();
             if ((text.trim() || selection) && !attempted) void run("submit");
@@ -131,6 +138,16 @@ export function NaturalTurnPilot({
               onChange={(event) => setText(event.target.value)}
             />
           </label>
+          <VoiceRecorder
+            api={client.api}
+            organizationId={client.organizationId}
+            sessionId={client.sessionId}
+            language={session.locale}
+            disabled={busy || attempted}
+            onTranscript={(spoken) =>
+              setText((current) => (current.trim() ? `${current.trimEnd()}\\n${spoken}` : spoken).slice(0, 2000))
+            }
+          />
           {options.options.length > 0 && (
             <label>
               {t(
@@ -153,6 +170,7 @@ export function NaturalTurnPilot({
               </select>
             </label>
           )}
+          <div className="studio-first-turn-actions">
           <button
             type="submit"
             disabled={busy || attempted || (!text.trim() && !selection)}
@@ -161,6 +179,13 @@ export function NaturalTurnPilot({
               ? t("Processing…", "Обрабатываем…")
               : t("Submit original request", "Отправить описание")}
           </button>
+          <button type="button" className="quiet" disabled={busy} onClick={() => void run("reload")}>
+            {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+          </button>
+          <button type="button" className="quiet" disabled={busy} onClick={onClose}>
+            {t("Cancel", "Отмена")}
+          </button>
+          </div>
         </form>
       )}
       {receipt && (
@@ -238,12 +263,13 @@ export function NaturalTurnPilot({
           {t("Retry same turn (same identity)", "Повторить ту же операцию")}
         </button>
       )}
-      <button type="button" disabled={busy} onClick={() => void run("reload")}>
-        {t(
-          "Reload saved State and reply",
-          "Обновить сохранённый State и ответ",
-        )}
-      </button>
+      {receipt && (
+        <div className="studio-first-turn-actions">
+          <button type="button" className="quiet" disabled={busy} onClick={() => void run("reload")}>
+            {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+          </button>
+        </div>
+      )}
       {receipt && (
         <button
           type="button"
@@ -256,11 +282,8 @@ export function NaturalTurnPilot({
           )}
         </button>
       )}
-      {!receipt && (
-        <button type="button" disabled={busy} onClick={onClose}>
-          {t("Cancel", "Отмена")}
-        </button>
-      )}
+
+      </div>
     </main>
   );
 }
