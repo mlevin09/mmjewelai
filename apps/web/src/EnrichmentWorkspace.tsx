@@ -115,6 +115,12 @@ export function EnrichmentWorkspace({
         const options = await client.naturalOptions();
         if (currentEpoch !== epoch.current) return;
         setNaturalOptions(options);
+        // US-01 is the primary entry for a fresh schema2 session. Wait for
+        // options rather than presenting the legacy form or risking a schema1
+        // submission before the authoritative contract has been resolved.
+        if (!data.state && openSavedPilot && !currentViewChosen.current) {
+          setPilot(true);
+        }
       } catch (e) {
         if (currentEpoch !== epoch.current) return;
         if (!(e instanceof ApiError && e.status === 404)) throw e;
@@ -369,6 +375,24 @@ export function EnrichmentWorkspace({
       <main className="page">
         <p role="alert">{error || "Conversation unavailable."}</p>
         <Link to={`/organizations/${organizationId}`}>Back to projects</Link>
+      </main>
+    );
+  // Do not flash the legacy guided form while a schema2 session's
+  // authoritative first-turn options are still being fetched.
+  if (
+    !naturalOptionsResolved &&
+    session.artifacts.questions === "2.0.0" &&
+    session.artifacts.rules === "2.0.0" &&
+    !snapshot.state &&
+    !naturalTurn &&
+    !firstTurn
+  )
+    return (
+      <main className="page" aria-busy="true">
+        {t(
+          "Loading first-turn contract…",
+          "Загружаем контракт первого сообщения…",
+        )}
       </main>
     );
   if (pilot && naturalOptions && (naturalTurn || !firstTurn))
