@@ -286,9 +286,7 @@ describe("isolated first-turn pilot", () => {
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "I want a gold ring" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Send description" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Send description" }));
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]).toMatchObject({
       schema_version: "2.0.0",
@@ -313,8 +311,7 @@ describe("isolated first-turn pilot", () => {
       f.mount();
       expect(
         await screen.findByRole("button", {
-          name:
-            locale === "ru" ? "Отправить описание" : "Send description",
+          name: locale === "ru" ? "Отправить описание" : "Send description",
         }),
       ).toBeInTheDocument();
       expect(
