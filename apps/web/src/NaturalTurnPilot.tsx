@@ -119,15 +119,15 @@ export function NaturalTurnPilot({
       </header>
       <p>
         {t(
-          "One first message. The independent Parser and model are checked before State is saved. Further clarification belongs to later steps.",
-          "Одно первое сообщение. Независимый Parser и модель проверяются до сохранения State. Последующие уточнения выполняются на следующих шагах.",
+          "Describe your idea in your own words or use the microphone.",
+          "Опишите вашу идею своими словами или используйте микрофон.",
         )}
       </p>
       {!options.model_configured && (
         <p role="status">
           {t(
-            "Qwen is not configured. Any fallback reply must not be presented as a model answer.",
-            "Qwen не настроен. Резервный ответ не является ответом модели.",
+            "AI conversation is not connected yet. Your description can be saved, but you will receive an automatic response instead of an AI answer.",
+            "ИИ-консультант пока не подключён. Описание можно сохранить, но вместо ответа ИИ вы получите автоматическое сообщение.",
           )}
         </p>
       )}
@@ -187,19 +187,20 @@ export function NaturalTurnPilot({
               >
                 {busy
                   ? t("Processing…", "Обрабатываем…")
-                  : t("Submit original request", "Отправить описание")}
+                  : options.model_configured
+                    ? t("Send description", "Отправить описание")
+                    : t("Save description", "Сохранить описание")}
               </button>
-              <button
-                type="button"
-                className="quiet"
-                disabled={busy}
-                onClick={() => void run("reload")}
-              >
-                {t(
-                  "Reload saved State and reply",
-                  "Обновить сохранённый State и ответ",
-                )}
-              </button>
+              {error && (
+                <button
+                  type="button"
+                  className="quiet"
+                  disabled={busy}
+                  onClick={() => void run("reload")}
+                >
+                  {t("Restore saved data", "Восстановить сохранённые данные")}
+                </button>
+              )}
               <button
                 type="button"
                 className="quiet"
@@ -290,7 +291,7 @@ export function NaturalTurnPilot({
             {t("Retry same turn (same identity)", "Повторить ту же операцию")}
           </button>
         )}
-        {receipt && (
+        {receipt && error && (
           <div className="studio-first-turn-actions">
             <button
               type="button"
@@ -298,10 +299,7 @@ export function NaturalTurnPilot({
               disabled={busy}
               onClick={() => void run("reload")}
             >
-              {t(
-                "Reload saved State and reply",
-                "Обновить сохранённый State и ответ",
-              )}
+              {t("Restore saved data", "Восстановить сохранённые данные")}
             </button>
           </div>
         )}
@@ -311,10 +309,7 @@ export function NaturalTurnPilot({
             disabled={busy}
             onClick={() => void run("current")}
           >
-            {t(
-              "View current design and history",
-              "Открыть актуальный дизайн и историю",
-            )}
+            {t("Continue with my design", "Продолжить работу над дизайном")}
           </button>
         )}
       </div>
