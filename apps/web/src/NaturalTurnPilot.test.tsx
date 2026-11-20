@@ -118,7 +118,7 @@ describe("US-01 schema2 Studio", () => {
       target: { value: "ring" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: "Submit original request" }),
+      screen.getByRole("button", { name: "Send description" }),
     );
     await screen.findByText("Saved model reply");
     const call = startNaturalTurn.mock.calls[0];
@@ -160,7 +160,7 @@ describe("US-01 schema2 Studio", () => {
       target: { value: "I want earrings" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: "Submit original request" }),
+      screen.getByRole("button", { name: "Send description" }),
     );
     await screen.findByRole("alert");
     expect(
