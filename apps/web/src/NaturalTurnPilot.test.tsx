@@ -192,11 +192,28 @@ describe("US-01 schema2 Studio", () => {
     );
   });
 
+  it("shows the correct saved automatic reply without technical recovery controls", () => {
+    mount({
+      ...base,
+      delivered_reply: {
+        origin: "fallback",
+        text: "Saved only verified facts.",
+      },
+    });
+    expect(screen.getByText("Saved fallback reply")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Reload saved State and reply" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Continue with my design" }),
+    ).toBeInTheDocument();
+  });
+
   it("marks historical State and permits current-state navigation", async () => {
     const { onViewCurrent } = mount({ ...base, is_current_revision: false });
     expect(screen.getByText(/Historical turn/)).toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole("button", { name: "View current design and history" }),
+      screen.getByRole("button", { name: "Continue with my design" }),
     );
     await waitFor(() => expect(onViewCurrent).toHaveBeenCalledOnce());
   });
