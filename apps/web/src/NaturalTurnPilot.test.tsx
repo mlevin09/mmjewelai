@@ -117,9 +117,7 @@ describe("US-01 schema2 Studio", () => {
     fireEvent.change(screen.getByRole("combobox"), {
       target: { value: "ring" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Send description" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Send description" }));
     await screen.findByText("Saved model reply");
     const call = startNaturalTurn.mock.calls[0];
     expect(call?.[0]).toBe(snapshot);
@@ -159,9 +157,7 @@ describe("US-01 schema2 Studio", () => {
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "I want earrings" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "Send description" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Send description" }));
     await screen.findByRole("alert");
     expect(
       screen.getByRole("region", { name: "Unverified local draft" }),
