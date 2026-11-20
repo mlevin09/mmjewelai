@@ -269,18 +269,20 @@ describe("isolated first-turn pilot", () => {
       }),
     );
     f.mount();
-    const button = await screen.findByRole("button", {
-      name: "Open text-only first-turn pilot",
-    });
-    expect(button).toBeDisabled();
-    fireEvent.click(button);
+    expect(
+      await screen.findByText("Loading first-turn contract…"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Start with what you know"),
+    ).not.toBeInTheDocument();
     expect(f.commands).toHaveLength(0);
     releaseOptions();
-    await waitFor(() => expect(button).toBeEnabled());
-    fireEvent.click(button);
     expect(
       await screen.findByRole("button", { name: "Submit original request" }),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Start with what you know"),
+    ).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("textbox"), {
       target: { value: "I want a gold ring" },
     });
@@ -293,6 +295,31 @@ describe("isolated first-turn pilot", () => {
       original_text: "I want a gold ring",
     });
   });
+
+  it.each(["en", "ru"])(
+    "uses the conversation as the default Studio entry for fresh schema2 %s sessions",
+    async (locale) => {
+      const f = setup(locale);
+      server.use(
+        http.get(`${prefix}/first-turn/options`, () =>
+          HttpResponse.json({
+            schema_version: "2.0.0",
+            model_configured: true,
+            locale,
+            options: [],
+          }),
+        ),
+      );
+      f.mount();
+      expect(
+        await screen.findByRole("button", {
+          name: locale === "ru" ? "Отправить описание" : "Submit original request",
+        }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Start with what you know")).not.toBeInTheDocument();
+      expect(f.commands).toHaveLength(0);
+    },
+  );
 
   it.each([
     ["en", "receipt"],
