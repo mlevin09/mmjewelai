@@ -1101,3 +1101,81 @@ nav {
 .voice-recorder [aria-pressed="true"] {
   outline: 2px solid currentColor;
 }
+
+/* US-01: retain the Studio design system for the first conversational turn. */
+.studio-first-turn {
+  max-width: 1120px;
+}
+.studio-first-turn .studio-first-turn-hero {
+  position: static;
+  height: auto;
+  z-index: auto;
+  padding: 0.75rem 0 1.2rem;
+  margin-bottom: 1.25rem;
+  display: block;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: none;
+}
+.studio-first-turn-hero h1 {
+  margin: 0.4rem 0 0.6rem;
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+.studio-first-turn-panel {
+  max-width: 960px;
+  padding: clamp(1.1rem, 3vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: 1.2rem;
+  background: var(--paper);
+  box-shadow: 0 8px 32px rgba(22, 35, 28, 0.04);
+}
+.studio-first-turn-form {
+  display: grid;
+  gap: 1.15rem;
+}
+.studio-first-turn-form textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 9rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+  font: inherit;
+  resize: vertical;
+  background: white;
+  color: var(--ink);
+}
+.studio-first-turn-form select {
+  width: 100%;
+  max-width: 560px;
+}
+.studio-first-turn .voice-recorder {
+  margin: 0;
+}
+.studio-first-turn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.studio-first-turn-actions button {
+  width: auto;
+  margin: 0;
+}
+.studio-first-turn-panel > section {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 640px) {
+  .studio-first-turn {
+    width: calc(100% - 2rem);
+  }
+  .studio-first-turn-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .studio-first-turn-actions button {
+    width: 100%;
+  }
+}
