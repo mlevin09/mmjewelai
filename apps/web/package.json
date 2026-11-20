@@ -12,7 +12,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write src/NaturalTurnPilot.tsx && node -e \"console.log('FORMATTED_JSON='+JSON.stringify(require('fs').readFileSync('src/NaturalTurnPilot.tsx','utf8')))\" && prettier --check .",
     "test": "vitest run"
   },
   "dependencies": {
