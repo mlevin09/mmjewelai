@@ -220,7 +220,7 @@ describe("isolated first-turn pilot", () => {
       );
       f.mount();
       const view = await screen.findByRole("button", {
-        name: /View current design and history|Открыть актуальный дизайн и историю/,
+        name: /Continue with my design|Продолжить работу над дизайном/,
       });
       fireEvent.click(view);
       const current = await screen.findByRole("region", {
