@@ -278,7 +278,7 @@ describe("isolated first-turn pilot", () => {
     expect(f.commands).toHaveLength(0);
     releaseOptions();
     expect(
-      await screen.findByRole("button", { name: "Submit original request" }),
+      await screen.findByRole("button", { name: "Send description" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByText("Start with what you know"),
@@ -287,7 +287,7 @@ describe("isolated first-turn pilot", () => {
       target: { value: "I want a gold ring" },
     });
     fireEvent.click(
-      screen.getByRole("button", { name: "Submit original request" }),
+      screen.getByRole("button", { name: "Send description" }),
     );
     await waitFor(() => expect(f.commands).toHaveLength(1));
     expect(f.commands[0]).toMatchObject({
@@ -314,7 +314,7 @@ describe("isolated first-turn pilot", () => {
       expect(
         await screen.findByRole("button", {
           name:
-            locale === "ru" ? "Отправить описание" : "Submit original request",
+            locale === "ru" ? "Отправить описание" : "Send description",
         }),
       ).toBeInTheDocument();
       expect(
