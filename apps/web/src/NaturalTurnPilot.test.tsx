@@ -80,7 +80,7 @@ describe("US-01 schema2 Studio", () => {
     ["en", "Voice input"],
     ["ru", "Голосовой ввод"],
   ] as const)("restores existing microphone entry to the first-turn composer (%s)", (locale, buttonLabel) => {
-    const localizedSession = { ...session, locale } as Session;
+    const localizedSession = { ...session, locale };
     const client = {
       api: {} as EnrichmentClient["api"],
       organizationId: "org",
