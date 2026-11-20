@@ -309,10 +309,7 @@ export function NaturalTurnPilot({
             disabled={busy}
             onClick={() => void run("current")}
           >
-            {t(
-              "Continue with my design",
-              "Продолжить работу над дизайном",
-            )}
+            {t("Continue with my design", "Продолжить работу над дизайном")}
           </button>
         )}
       </div>
