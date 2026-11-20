@@ -1,4 +1,5 @@
 locals {
+  conversation = jsondecode(file("${path.module}/conversation.json"))
   api_environment = merge(local.database_env, {
     JEWELAI_ENVIRONMENT                   = var.deployment_environment
     JEWELAI_REPOSITORY_ROOT               = "/app"
@@ -17,6 +18,8 @@ locals {
     GENERATION_TASK_SERVICE_ACCOUNT_EMAIL = google_service_account.runtime["task"].email
     GENERATION_TASK_OIDC_AUDIENCE         = google_cloud_run_v2_service.worker.uri
     GENERATION_PROFILES_JSON              = var.generation_profiles_json
+    ST01_CONVERSATION_ACTIVE_PROFILE      = local.conversation.active_profile
+    ST01_CONVERSATION_PROFILES_JSON       = jsonencode(local.conversation.profiles)
     STT_SERVICE_URL                       = local.stt_enabled ? google_cloud_run_v2_service.stt[0].uri : ""
     }, local.google_generation_enabled ? {
     TEXT_UNDERSTANDING_PROVIDER               = "google"

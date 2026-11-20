@@ -390,6 +390,7 @@ def checked_reply(
     locale=None,
     observations=(),
     expected_model=None,
+    expected_provider="qwen",
 ):
     """Critical fact checking, not a neutral-word vocabulary or template selector.
 
@@ -409,7 +410,8 @@ def checked_reply(
     if (
         not isinstance(draft, UntrustedConversationDraft)
         or not 1 <= len(draft.text) <= 6000
-        or draft.provider != "qwen"
+        or expected_provider not in {"qwen", "llama_cpp"}
+        or draft.provider != expected_provider
         or draft.prompt_version != REPLY_VERSION
         or expected_model is not None
         and draft.model != expected_model
@@ -781,6 +783,7 @@ def read(service, sid, oid):
                         locale=session.locale,
                         observations=observed,
                         expected_model=record["input"]["model_runtime"]["model"],
+                        expected_provider=record["input"]["model_runtime"]["provider"],
                     )
                 except ValueError as exc:
                     raise EnrichmentIntegrityError("US-01 model provenance mismatch") from exc
@@ -893,7 +896,7 @@ def execute(service, sid, oid, request, model):
     conflict = any(d.outcome == "CLARIFY" for d in decisions)
     config = getattr(model, "config", None)
     model_runtime = {
-        "provider": "qwen",
+        "provider": getattr(config, "provider", "qwen"),
         "model": getattr(config, "model", None),
         "model_sha256": getattr(config, "model_sha256", None),
         "runtime_build": getattr(config, "runtime_build", None),
@@ -1012,7 +1015,20 @@ def deliver_pending(service, sid, oid, request, model, *, created):
         meaning=meaning,
         decisions=decisions,
     )
-    origin, failure, provider, model_id, text = "model", None, "qwen", None, None
+    # A pending old turn cannot be silently completed by a different runtime.
+    # Delivered historical receipts are read above without any current-model dependency.
+    if model is not None:
+        config = getattr(model, "config", None)
+        actual = {
+            "provider": getattr(config, "provider", "qwen"),
+            "model": getattr(config, "model", None),
+            "model_sha256": getattr(config, "model_sha256", None),
+            "runtime_build": getattr(config, "runtime_build", None),
+            "sampling": model.sampling_snapshot() if hasattr(model, "sampling_snapshot") else None,
+        }
+        if actual != model_runtime:
+            raise StaleRevisionError("Pending reply requires its originally committed runtime")
+    origin, failure, provider, model_id, text = "model", None, model_runtime["provider"], None, None
     try:
         if model is None:
             raise ConversationProviderError("not_configured")
@@ -1025,6 +1041,7 @@ def deliver_pending(service, sid, oid, request, model, *, created):
             locale=session.locale,
             observations=observed,
             expected_model=model_runtime["model"],
+            expected_provider=model_runtime["provider"],
         )
         model_id, text = draft.model, draft.text
     except (ConversationProviderError, ValueError) as exc:

@@ -226,10 +226,12 @@ resource "google_cloud_run_v2_service" "stt" {
         limits   = { cpu = "2", memory = "2Gi" }
         cpu_idle = true
       }
+      # Same 240-second startup allowance; observe readiness within one second.
+      # No warm instance, CPU boost, model change or additional runtime capacity.
       startup_probe {
-        period_seconds    = 10
-        timeout_seconds   = 2
-        failure_threshold = 24
+        period_seconds    = 1
+        timeout_seconds   = 1
+        failure_threshold = 240
         http_get { path = "/health" }
       }
       liveness_probe {
