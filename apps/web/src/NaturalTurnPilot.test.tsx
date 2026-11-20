@@ -75,6 +75,36 @@ function mount(
 }
 
 describe("US-01 schema2 Studio", () => {
+
+  it.each([
+    ["en", "Voice input"],
+    ["ru", "Голосовой ввод"],
+  ] as const)("restores existing microphone entry to the first-turn composer (%s)", (locale, buttonLabel) => {
+    const localizedSession = { ...session, locale } as Session;
+    const client = {
+      api: {} as EnrichmentClient["api"],
+      organizationId: "org",
+      sessionId: "session",
+      naturalTurn: vi.fn().mockResolvedValue(base),
+      startNaturalTurn: vi.fn().mockResolvedValue(base),
+    } as unknown as EnrichmentClient;
+    render(
+      <MemoryRouter>
+        <NaturalTurnPilot
+          client={client}
+          session={localizedSession}
+          snapshot={snapshot}
+          saved={null}
+          options={{ ...options, locale }}
+          onClose={vi.fn()}
+          onViewCurrent={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("button", { name: buttonLabel })).toBeInTheDocument();
+    expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
   it("sends raw text and a qualified typed selection through one atomic schema2 call", async () => {
     const { startNaturalTurn } = mount(null);
     fireEvent.change(screen.getByRole("textbox"), {
