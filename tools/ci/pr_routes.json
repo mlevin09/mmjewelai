@@ -698,11 +698,20 @@
           "apps/api/tests/test_semantic_proposal.py",
           "apps/api/tests/test_conversation_qwen.py",
           "apps/api/tests/test_conversation_model.py",
-          "apps/api/tests/test_first_turn_intent.py"
+          "apps/api/tests/test_first_turn_intent.py",
+          "apps/api/tests/test_conversation_profiles.py"
         ],
         "evidence": "Owner-approved additive US-01 schema2 source/dual-interpretation/SO/Matrix/State commit and write-once natural delivery. Complete native modules own raw text and structured/transcript sources, independent Parser1.3, conservative lexical/component proof (including missing Parser candidates), recommendations/questions, lock/source integrity, CAS/idempotency, rollback, retained reply/restart and mocked bounded private Qwen HTTP. PostgreSQL module reuses the unchanged independently verified disposable gate for migration0023, non-blocking model phases and immutability/downgrade; real model/live UI remain separate operational evidence. No Full gate or CI algorithm is weakened.",
         "postgres": true,
         "release": true
+      },
+      "stt_proxy": {
+        "tests": [
+          "apps/api/tests/test_stt_proxy.py"
+        ],
+        "evidence": "Complete authenticated STT proxy tests own no-write, bounds, upstream errors, private numeric timing and unchanged editable-text API. No live inference or activation is certified.",
+        "postgres": false,
+        "release": false
       }
     },
     "sources": [
@@ -759,11 +768,12 @@
           "bootstrap",
           "authorization",
           "st01_first_turn",
-          "us01_semantic_turn"
+          "us01_semantic_turn",
+          "stt_proxy"
         ],
         "source_pair": [
-          "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d",
-          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c"
+          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c",
+          "4d1413dd69eb42bb18ecd8b1f3fe8b2a5b1ad87a29d6862b968dae71d17989a6"
         ]
       },
       {
@@ -796,8 +806,8 @@
           "us01_semantic_turn"
         ],
         "source_pair": [
-          "1bc33248dbeb79367c831c36e4615461c0a64b75271d6693727002a0c9f8c14c",
-          "c8560e438e761f5bce6105bc1bfd9457107579ef1127305f9384073e30e185d8"
+          "c8560e438e761f5bce6105bc1bfd9457107579ef1127305f9384073e30e185d8",
+          "bf7ba3806c29dc616de7d58122ebb0670598630c35ab7097b166e13ded50a391"
         ]
       },
       {
@@ -1298,6 +1308,16 @@
           "us01_semantic_turn",
           "bootstrap"
         ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/conversation_profiles.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "us01_semantic_turn",
+          "bootstrap"
+        ]
       }
     ],
     "resources": [
@@ -1653,6 +1673,15 @@
         "source_pair": [
           "eccb8ce5e1e102c88748a30257032e3da723eb22bbc157bbd986841567a1cc5c",
           "f8930d9c7ea050b558691ea69ab98ead97618c1291ff9a5194952ca87c25004b"
+        ]
+      },
+      "apps/api/tests/test_conversation_profiles.py": {
+        "source_pair": [
+          "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "fd587b9413de49906695f0bff67592832688f929f8346cfb545a44c2af25a274"
+        ],
+        "components": [
+          "us01_semantic_turn"
         ]
       }
     },

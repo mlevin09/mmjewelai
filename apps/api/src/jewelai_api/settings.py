@@ -279,6 +279,16 @@ class RuntimeSettings:
 
 
 def _conversation_config():
+    from .conversation_profiles import select_profile
+
+    raw = os.getenv("ST01_CONVERSATION_PROFILES_JSON")
+    active = os.getenv("ST01_CONVERSATION_ACTIVE_PROFILE")
+    if raw is not None or active is not None:
+        if active == "disabled":
+            return select_profile(raw or "[]", active)
+        if not raw or not active or os.getenv("ST01_CONVERSATION_PROVIDER") is not None:
+            raise ValueError("Explicit unambiguous conversational profile selection required")
+        return select_profile(raw, active)
     provider = os.getenv("ST01_CONVERSATION_PROVIDER")
     if provider is None:
         return None

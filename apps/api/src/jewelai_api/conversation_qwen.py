@@ -6,8 +6,13 @@ provide a private connection. Unit tests inject HTTP transport; they are not liv
 model acceptance. Redirects and automatic retries are disabled.
 """
 
+import hashlib
 import ipaddress
 import json
+import math
+import os
+import re
+import time
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
@@ -44,6 +49,24 @@ class QwenConversationConfig:
     timeout_seconds: float = 90
     max_tokens: int = 512
     max_response_bytes: int = 65536
+    # Optional named-profile composition; absent fields preserve legacy defaults.
+    profile_id: str | None = None
+    provider: str = "qwen"
+    context_tokens: int | None = None
+    temperature: float = 0.7
+    top_p: float = 0.8
+    top_k: int = 20
+    min_p: float = 0.0
+    presence_penalty: float = 1.5
+    repeat_penalty: float = 1.0
+    seed: int = 20261111
+    cache_prompt: bool = False
+    enable_thinking: bool = False
+    stream: bool = False
+    max_attempts: int = 1
+    auth_mode: str = "none"
+    auth_env: str | None = None
+    audience: str | None = None
 
     def __post_init__(self):
         url = urlsplit(self.endpoint)
@@ -73,30 +96,121 @@ class QwenConversationConfig:
             or any(c not in "0123456789abcdef" for c in self.model_sha256)
             or isinstance(self.timeout_seconds, bool)
             or not 0 < self.timeout_seconds <= 240
-            or isinstance(self.max_tokens, bool)
+            or type(self.max_tokens) is not int
             or not 64 <= self.max_tokens <= 1024
             or not 1024 <= self.max_response_bytes <= 65536
         ):
             raise ValueError("Qwen requires explicit artifact pins and bounded execution")
+
+        numeric = (
+            self.temperature,
+            self.top_p,
+            self.min_p,
+            self.presence_penalty,
+            self.repeat_penalty,
+        )
+        if (
+            any(type(v) not in (int, float) or not math.isfinite(v) for v in numeric)
+            or not 0 <= self.temperature <= 2
+            or not 0 < self.top_p <= 1
+            or not 0 <= self.min_p <= 1
+            or not -2 <= self.presence_penalty <= 2
+            or not 0 < self.repeat_penalty <= 2
+            or type(self.top_k) is not int
+            or not 0 <= self.top_k <= 1000
+            or type(self.seed) is not int
+            or not 0 <= self.seed <= 2**31 - 1
+            or type(self.cache_prompt) is not bool
+            or type(self.enable_thinking) is not bool
+            or self.stream is not False
+            or type(self.max_attempts) is not int
+            or self.max_attempts != 1
+            or self.provider not in {"qwen", "llama_cpp"}
+            or self.context_tokens is not None
+            and (
+                type(self.context_tokens) is not int
+                or not 256 <= self.context_tokens <= 131072
+                or self.max_tokens >= self.context_tokens
+            )
+        ):
+            raise ValueError("Invalid bounded conversational inference configuration")
+        if self.profile_id is not None:
+            if (
+                not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", self.profile_id)
+                or self.context_tokens is None
+            ):
+                raise ValueError("Named profile requires identity and context pin")
+            if self.auth_mode == "none":
+                if not address.is_loopback or self.auth_env or self.audience:
+                    raise ValueError("Named remote profiles require authenticated HTTPS")
+            elif self.auth_mode == "bearer_env":
+                if (
+                    url.scheme != "https"
+                    or not self.auth_env
+                    or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,99}", self.auth_env)
+                    or self.audience
+                ):
+                    raise ValueError(
+                        "Bearer profile requires HTTPS and a secret environment reference"
+                    )
+            elif self.auth_mode == "google_id_token":
+                if (
+                    url.scheme != "https"
+                    or self.auth_env
+                    or self.audience != f"https://{url.netloc}"
+                ):
+                    raise ValueError("Google identity profile requires the exact HTTPS audience")
+            else:
+                raise ValueError("Unsupported conversational authentication")
+        elif self.auth_mode != "none" or self.auth_env is not None or self.audience is not None:
+            raise ValueError("Authentication requires an explicit named profile")
+
+    def sampling_parameters(self):
+        return {name: getattr(self, name) for name in R1_REFERENCE}
 
 
 class QwenConversationAdapter:
     def __init__(self, config, *, client=None):
         self.config = config
         self._client = client or httpx.Client(
-            timeout=config.timeout_seconds, follow_redirects=False
+            timeout=config.timeout_seconds, follow_redirects=False, trust_env=False
         )
 
     def sampling_snapshot(self):
-        return {
-            "profile": "R1-B512-operational-reference-not-qualified",
-            **R1_REFERENCE,
+        result = {
+            "profile": self.config.profile_id or "R1-B512-operational-reference-not-qualified",
+            **self.config.sampling_parameters(),
             "max_tokens": self.config.max_tokens,
             "stream": False,
-            "enable_thinking": False,
+            "enable_thinking": self.config.enable_thinking,
             "timeout_seconds": self.config.timeout_seconds,
             "max_attempts": 1,
         }
+        if self.config.profile_id is not None:
+            result.update(
+                engine=self.config.provider,
+                context_tokens=self.config.context_tokens,
+                endpoint_sha256=hashlib.sha256(self.config.endpoint.encode()).hexdigest(),
+                auth_mode=self.config.auth_mode,
+            )
+        return result
+
+    def _headers(self):
+        if self.config.auth_mode == "none":
+            return {}
+        if self.config.auth_mode == "bearer_env":
+            token = os.environ.get(self.config.auth_env, "")
+            if not token or any(c in token for c in "\r\n"):
+                raise ConversationProviderError("credential_unavailable")
+        else:
+            from google.auth.transport.requests import Request
+            from google.oauth2.id_token import fetch_id_token
+
+            try:
+                token = fetch_id_token(Request(), self.config.audience)
+            except Exception:
+                raise ConversationProviderError("credential_unavailable") from None
+        return {"Authorization": "Bearer " + token}
 
     def _request(self, system, context, *, phase, schema):
         revision = json.loads(context.committed_revision_json)
@@ -174,10 +288,10 @@ class QwenConversationAdapter:
                 {"role": "user", "content": json.dumps(data, ensure_ascii=False)},
             ],
             # Existing R1 neutral B512 operational reference (not product qualification).
-            **R1_REFERENCE,
+            **self.config.sampling_parameters(),
             "max_tokens": self.config.max_tokens,
             "stream": False,
-            "chat_template_kwargs": {"enable_thinking": False},
+            "chat_template_kwargs": {"enable_thinking": self.config.enable_thinking},
             "response_format": (
                 {"type": "json_object", "schema": schema}
                 if schema is not None
@@ -189,6 +303,7 @@ class QwenConversationAdapter:
                 "POST",
                 self.config.endpoint,
                 json=payload,
+                headers=self._headers(),
                 timeout=self.config.timeout_seconds,
                 follow_redirects=False,
             ) as response:
@@ -229,7 +344,48 @@ class QwenConversationAdapter:
         except (KeyError, TypeError, ValueError):
             raise ConversationProviderError("invalid_output") from None
 
+    def _observed(self, phase, context, function):
+        from .middleware import configure_json_logger
+
+        started = time.monotonic()
+        outcome, code = "error", "client_error"
+        try:
+            result = function(context)
+            outcome, code = "untrusted_draft_generated", None
+            return result
+        except ConversationProviderError as exc:
+            code = exc.code
+            raise
+        finally:
+            configure_json_logger("jewelai.conversation").info(
+                "Conversational inference completed",
+                extra={
+                    "jewelai_fields": {
+                        "event": "conversation_inference",
+                        "phase": phase,
+                        "message_id": str(context.message_id),
+                        "provider": self.config.provider,
+                        "model": self.config.model,
+                        "profile": self.config.profile_id,
+                        "model_sha256": self.config.model_sha256,
+                        "runtime_build": self.config.runtime_build,
+                        "configuration_sha256": hashlib.sha256(
+                            json.dumps(self.sampling_snapshot(), sort_keys=True).encode()
+                        ).hexdigest(),
+                        "outcome": outcome,
+                        "error_code": code,
+                        "latency_ms": round((time.monotonic() - started) * 1000, 3),
+                    }
+                },
+            )
+
     def interpret(self, context: ConversationContext) -> SemanticProposal:
+        return self._observed("interpretation", context, self._interpret)
+
+    def draft_reply(self, context: ConversationContext) -> UntrustedConversationDraft:
+        return self._observed("reply", context, self._draft_reply)
+
+    def _interpret(self, context: ConversationContext) -> SemanticProposal:
         # Compact transport, same typed semantic boundary. SO independently
         # anchors unique original source phrases; the model does not calculate
         # Unicode offsets or manufacture Parser candidate IDs.
@@ -279,7 +435,7 @@ class QwenConversationAdapter:
         except (KeyError, TypeError, ValueError):
             raise ConversationProviderError("invalid_semantics") from None
 
-    def draft_reply(self, context: ConversationContext) -> UntrustedConversationDraft:
+    def _draft_reply(self, context: ConversationContext) -> UntrustedConversationDraft:
         raw = self._request(
             "Write a natural, concise jewelry conversation reply in the supplied locale. "
             "Return JSON {text:string}. Respond to the actual intent. State contains saved facts; "
@@ -301,7 +457,7 @@ class QwenConversationAdapter:
             raise ConversationProviderError("invalid_output")
         return UntrustedConversationDraft(
             text=raw["text"],
-            provider="qwen",
+            provider=self.config.provider,
             model=self.config.model,
             prompt_version=REPLY_VERSION,
         )

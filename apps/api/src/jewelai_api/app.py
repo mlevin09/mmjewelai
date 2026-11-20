@@ -336,9 +336,9 @@ def create_app(
             api_key=api_key,
         )
     if conversation_model is None and settings.conversation is not None:
-        from .conversation_qwen import QwenConversationAdapter
+        from .conversation_profiles import compose_conversation_model
 
-        conversation_model = QwenConversationAdapter(settings.conversation)
+        conversation_model = compose_conversation_model(settings.conversation)
 
     service = RuntimeService(
         repository,
@@ -872,16 +872,30 @@ def create_app(
     async def transcribe_session_audio(
         session_id: UUID,
         organization_id: AuthorizedOrganization,
+        request: Request,
         audio: Annotated[UploadFile, File()],
         language: str | None = None,
     ):
         """Return editable speech text without modifying a session or persisting audio."""
+        import math
         import re
+        import time
 
         import requests
         from google.auth.transport.requests import Request as GoogleAuthRequest
         from google.oauth2.id_token import fetch_id_token
 
+        started = time.perf_counter()
+        timings = {
+            "event": "speech_transcription",
+            "request_id": request.state.request_id,
+            "audio_read_ms": None,
+            "auth_ms": None,
+            "upstream_ms": None,
+            "processing_ms": None,
+            "upstream_status": None,
+            "outcome": "rejected",
+        }
         # AuthorizedOrganization validates tenant membership and the active session.
         try:
             service_url = os.getenv("STT_SERVICE_URL", "")
@@ -892,13 +906,18 @@ def create_app(
                 return _error_response(415, "unsupported_audio", "Unsupported speech format")
             if language not in (None, "ru", "en"):
                 return _error_response(422, "unsupported_language", "Unsupported language")
+            reading = time.perf_counter()
             content = await audio.read(10 * 1024 * 1024 + 1)
+            timings["audio_read_ms"] = round((time.perf_counter() - reading) * 1000, 3)
             if not content or len(content) > 10 * 1024 * 1024:
                 return _error_response(413, "audio_too_large", "Speech recording exceeds limits")
 
             # Only the server receives Google service identity; no external inference API.
             def call_stt():
+                authorizing = time.perf_counter()
                 token = fetch_id_token(GoogleAuthRequest(), service_url)
+                timings["auth_ms"] = round((time.perf_counter() - authorizing) * 1000, 3)
+                upstream = time.perf_counter()
                 with requests.post(
                     service_url + "/internal/v1/transcriptions",
                     params={"language": language} if language else None,
@@ -908,6 +927,7 @@ def create_app(
                     allow_redirects=False,
                     stream=True,
                 ) as response:
+                    timings["upstream_status"] = response.status_code
                     if response.status_code != 200:
                         raise ValueError("stt_response_unavailable")
                     body = bytearray()
@@ -916,6 +936,7 @@ def create_app(
                             raise ValueError("stt_response_unavailable")
                         body.extend(chunk)
                     payload = json.loads(body)
+                timings["upstream_ms"] = round((time.perf_counter() - upstream) * 1000, 3)
                 if (
                     not isinstance(payload, dict)
                     or payload.get("schema_version") != "1.0.0"
@@ -924,17 +945,29 @@ def create_app(
                     or len(payload["text"]) > 8192
                 ):
                     raise ValueError("invalid_stt_response")
+                processing = payload.get("processing_ms")
+                if (
+                    type(processing) in (int, float)
+                    and math.isfinite(processing)
+                    and 0 <= processing <= 60000
+                ):
+                    timings["processing_ms"] = processing
+                timings["outcome"] = payload["status"]
                 return {key: payload[key] for key in ("schema_version", "status", "text")}
 
             try:
                 return await asyncio.to_thread(call_stt)
             except requests.Timeout:
+                timings["outcome"] = "timeout"
                 return _error_response(504, "stt_timeout", "Speech service timed out")
             except Exception:
+                timings["outcome"] = "unavailable"
                 # Upstream text, credentials and internal error details are never returned.
                 return _error_response(503, "stt_unavailable", "Speech service unavailable")
         finally:
             await audio.close()
+            timings["total_ms"] = round((time.perf_counter() - started) * 1000, 3)
+            api_logger.info("Speech transcription completed", extra={"jewelai_fields": timings})
 
     @app.post("/sessions/{session_id}/messages", response_model=MessageResponse, status_code=201)
     def create_message(
