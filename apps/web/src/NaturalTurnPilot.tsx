@@ -213,7 +213,10 @@ export function NaturalTurnPilot({
         )}
         {receipt && (
           <section
-            aria-label={t("Verified first turn", "Проверенное первое сообщение")}
+            aria-label={t(
+              "Verified first turn",
+              "Проверенное первое сообщение",
+            )}
           >
             <h2>
               {t(
@@ -277,7 +280,8 @@ export function NaturalTurnPilot({
             <p style={{ whiteSpace: "pre-wrap" }}>{text}</p>
           </section>
         )}
-        {((attempted && !receipt) || receipt?.delivery_status === "pending") && (
+        {((attempted && !receipt) ||
+          receipt?.delivery_status === "pending") && (
           <button
             type="button"
             disabled={busy}
@@ -313,7 +317,6 @@ export function NaturalTurnPilot({
             )}
           </button>
         )}
-
       </div>
     </main>
   );
