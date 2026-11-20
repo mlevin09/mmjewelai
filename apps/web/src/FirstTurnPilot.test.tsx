@@ -313,10 +313,13 @@ describe("isolated first-turn pilot", () => {
       f.mount();
       expect(
         await screen.findByRole("button", {
-          name: locale === "ru" ? "Отправить описание" : "Submit original request",
+          name:
+            locale === "ru" ? "Отправить описание" : "Submit original request",
         }),
       ).toBeInTheDocument();
-      expect(screen.queryByText("Start with what you know")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("Start with what you know"),
+      ).not.toBeInTheDocument();
       expect(f.commands).toHaveLength(0);
     },
   );
