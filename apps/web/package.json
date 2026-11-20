@@ -12,7 +12,7 @@
     "typecheck": "tsc -b --pretty false",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format:check": "prettier --write src/FirstTurnPilot.test.tsx src/NaturalTurnPilot.test.tsx && node -e \"console.log('FORMATTED_FIRST='+JSON.stringify(require('fs').readFileSync('src/FirstTurnPilot.test.tsx','utf8')));console.log('FORMATTED_NATURAL='+JSON.stringify(require('fs').readFileSync('src/NaturalTurnPilot.test.tsx','utf8')))\" && prettier --check .",
     "test": "vitest run"
   },
   "dependencies": {
