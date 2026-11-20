@@ -102,7 +102,9 @@ export function NaturalTurnPilot({
       </Link>
       <header className="studio-first-turn-hero">
         <div>
-          <p className="eyebrow">{t("JEWELAI DESIGN STUDIO", "СТУДИЯ ДИЗАЙНА JEWELAI")}</p>
+          <p className="eyebrow">
+            {t("JEWELAI DESIGN STUDIO", "СТУДИЯ ДИЗАЙНА JEWELAI")}
+          </p>
           <h1>{t("Describe your jewelry", "Опишите украшение")}</h1>
         </div>
       </header>
@@ -121,167 +123,188 @@ export function NaturalTurnPilot({
         </p>
       )}
       <div className="studio-first-turn-panel">
-      {error && <p role="alert">{error}</p>}
-      {!receipt && (
-        <form className="studio-first-turn-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if ((text.trim() || selection) && !attempted) void run("submit");
-          }}
-        >
-          <label>
-            {t("Your original description", "Исходное описание")}
-            <textarea
-              value={text}
-              maxLength={2000}
-              disabled={busy || attempted}
-              onChange={(event) => setText(event.target.value)}
-            />
-          </label>
-          <VoiceRecorder
-            api={client.api}
-            organizationId={client.organizationId}
-            sessionId={client.sessionId}
-            language={session.locale}
-            disabled={busy || attempted}
-            onTranscript={(spoken) =>
-              setText((current) => (current.trim() ? `${current.trimEnd()}\n${spoken}` : spoken).slice(0, 2000))
-            }
-          />
-          {options.options.length > 0 && (
-            <label>
-              {t(
-                "Explicit jewelry type (optional)",
-                "Выбранный тип изделия (необязательно)",
-              )}
-              <select
-                value={selection}
-                disabled={busy || attempted}
-                onChange={(event) => setSelection(event.target.value)}
-              >
-                <option value="">
-                  {t("No selected type", "Тип не выбран")}
-                </option>
-                {options.options.map((option) => (
-                  <option value={option.value} key={option.mapping_id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <div className="studio-first-turn-actions">
-          <button
-            type="submit"
-            disabled={busy || attempted || (!text.trim() && !selection)}
+        {error && <p role="alert">{error}</p>}
+        {!receipt && (
+          <form
+            className="studio-first-turn-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if ((text.trim() || selection) && !attempted) void run("submit");
+            }}
           >
-            {busy
-              ? t("Processing…", "Обрабатываем…")
-              : t("Submit original request", "Отправить описание")}
-          </button>
-          <button type="button" className="quiet" disabled={busy} onClick={() => void run("reload")}>
-            {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
-          </button>
-          <button type="button" className="quiet" disabled={busy} onClick={onClose}>
-            {t("Cancel", "Отмена")}
-          </button>
-          </div>
-        </form>
-      )}
-      {receipt && (
-        <section
-          aria-label={t("Verified first turn", "Проверенное первое сообщение")}
-        >
-          <h2>
-            {t(
-              "Original request · saved on server",
-              "Исходное сообщение · сохранено на сервере",
+            <label>
+              {t("Your original description", "Исходное описание")}
+              <textarea
+                value={text}
+                maxLength={2000}
+                disabled={busy || attempted}
+                onChange={(event) => setText(event.target.value)}
+              />
+            </label>
+            <VoiceRecorder
+              api={client.api}
+              organizationId={client.organizationId}
+              sessionId={client.sessionId}
+              language={session.locale}
+              disabled={busy || attempted}
+              onTranscript={(spoken) =>
+                setText((current) =>
+                  (current.trim() ? `${current.trimEnd()}\n${spoken}` : spoken).slice(
+                    0,
+                    2000,
+                  ),
+                )
+              }
+            />
+            {options.options.length > 0 && (
+              <label>
+                {t(
+                  "Explicit jewelry type (optional)",
+                  "Выбранный тип изделия (необязательно)",
+                )}
+                <select
+                  value={selection}
+                  disabled={busy || attempted}
+                  onChange={(event) => setSelection(event.target.value)}
+                >
+                  <option value="">
+                    {t("No selected type", "Тип не выбран")}
+                  </option>
+                  {options.options.map((option) => (
+                    <option value={option.value} key={option.mapping_id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
-          </h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>
-            {savedSource || t("Typed selection", "Выбор параметра")}
-          </p>
-          {!receipt.is_current_revision && (
-            <p role="status">
+            <div className="studio-first-turn-actions">
+              <button
+                type="submit"
+                disabled={busy || attempted || (!text.trim() && !selection)}
+              >
+                {busy
+                  ? t("Processing…", "Обрабатываем…")
+                  : t("Submit original request", "Отправить описание")}
+              </button>
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy}
+                onClick={() => void run("reload")}
+              >
+                {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+              </button>
+              <button
+                type="button"
+                className="quiet"
+                disabled={busy}
+                onClick={onClose}
+              >
+                {t("Cancel", "Отмена")}
+              </button>
+            </div>
+          </form>
+        )}
+        {receipt && (
+          <section
+            aria-label={t("Verified first turn", "Проверенное первое сообщение")}
+          >
+            <h2>
               {t(
-                "Historical turn: the current State has since changed.",
-                "Историческое сообщение: актуальный State уже изменился.",
+                "Original request · saved on server",
+                "Исходное сообщение · сохранено на сервере",
               )}
+            </h2>
+            <p style={{ whiteSpace: "pre-wrap" }}>
+              {savedSource || t("Typed selection", "Выбор параметра")}
             </p>
-          )}
-          <h2>{t("Saved design brief", "Сохранённое описание дизайна")}</h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>{receipt.current_brief}</p>
-          {receipt.delivery_status === "pending" ? (
-            <p role="status">
-              {t(
-                "Your input and State were committed. The reply is pending. Use Retry to resume delivery without committing State again.",
-                "Сообщение и State сохранены. Ответ ожидается. Нажмите «Повторить», чтобы завершить доставку без повторного сохранения State.",
-              )}
+            {!receipt.is_current_revision && (
+              <p role="status">
+                {t(
+                  "Historical turn: the current State has since changed.",
+                  "Историческое сообщение: актуальный State уже изменился.",
+                )}
+              </p>
+            )}
+            <h2>{t("Saved design brief", "Сохранённое описание дизайна")}</h2>
+            <p style={{ whiteSpace: "pre-wrap" }}>{receipt.current_brief}</p>
+            {receipt.delivery_status === "pending" ? (
+              <p role="status">
+                {t(
+                  "Your input and State were committed. The reply is pending. Use Retry to resume delivery without committing State again.",
+                  "Сообщение и State сохранены. Ответ ожидается. Нажмите «Повторить», чтобы завершить доставку без повторного сохранения State.",
+                )}
+              </p>
+            ) : delivered ? (
+              <>
+                <h2>
+                  {delivered.origin === "model"
+                    ? t("Saved model reply", "Сохранённый ответ модели")
+                    : t("Saved fallback reply", "Сохранённый резервный ответ")}
+                </h2>
+                <p style={{ whiteSpace: "pre-wrap" }}>{delivered.text}</p>
+              </>
+            ) : (
+              <p role="alert">
+                {t(
+                  "Reply receipt is unavailable.",
+                  "Сохранённый ответ недоступен.",
+                )}
+              </p>
+            )}
+            <p>
+              {t("Current revision", "Текущая ревизия")}:{" "}
+              {receipt.current_revision.revision_id}
             </p>
-          ) : delivered ? (
-            <>
-              <h2>
-                {delivered.origin === "model"
-                  ? t("Saved model reply", "Сохранённый ответ модели")
-                  : t("Saved fallback reply", "Сохранённый резервный ответ")}
-              </h2>
-              <p style={{ whiteSpace: "pre-wrap" }}>{delivered.text}</p>
-            </>
-          ) : (
-            <p role="alert">
-              {t(
-                "Reply receipt is unavailable.",
-                "Сохранённый ответ недоступен.",
-              )}
-            </p>
-          )}
-          <p>
-            {t("Current revision", "Текущая ревизия")}:{" "}
-            {receipt.current_revision.revision_id}
-          </p>
-        </section>
-      )}
-      {attempted && !receipt && text && (
-        <section
-          aria-label={t(
-            "Unverified local draft",
-            "Непроверенный локальный черновик",
-          )}
-        >
-          <h2>
-            {t("Unverified local draft", "Непроверенный локальный черновик")}
-          </h2>
-          <p style={{ whiteSpace: "pre-wrap" }}>{text}</p>
-        </section>
-      )}
-      {((attempted && !receipt) || receipt?.delivery_status === "pending") && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void run("submit")}
-        >
-          {t("Retry same turn (same identity)", "Повторить ту же операцию")}
-        </button>
-      )}
-      {receipt && (
-        <div className="studio-first-turn-actions">
-          <button type="button" className="quiet" disabled={busy} onClick={() => void run("reload")}>
-            {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+          </section>
+        )}
+        {attempted && !receipt && text && (
+          <section
+            aria-label={t(
+              "Unverified local draft",
+              "Непроверенный локальный черновик",
+            )}
+          >
+            <h2>
+              {t("Unverified local draft", "Непроверенный локальный черновик")}
+            </h2>
+            <p style={{ whiteSpace: "pre-wrap" }}>{text}</p>
+          </section>
+        )}
+        {((attempted && !receipt) || receipt?.delivery_status === "pending") && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run("submit")}
+          >
+            {t("Retry same turn (same identity)", "Повторить ту же операцию")}
           </button>
-        </div>
-      )}
-      {receipt && (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void run("current")}
-        >
-          {t(
-            "View current design and history",
-            "Открыть актуальный дизайн и историю",
-          )}
-        </button>
-      )}
+        )}
+        {receipt && (
+          <div className="studio-first-turn-actions">
+            <button
+              type="button"
+              className="quiet"
+              disabled={busy}
+              onClick={() => void run("reload")}
+            >
+              {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+            </button>
+          </div>
+        )}
+        {receipt && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void run("current")}
+          >
+            {t(
+              "View current design and history",
+              "Открыть актуальный дизайн и историю",
+            )}
+          </button>
+        )}
 
       </div>
     </main>
