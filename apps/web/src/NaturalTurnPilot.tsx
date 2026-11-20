@@ -145,7 +145,7 @@ export function NaturalTurnPilot({
             language={session.locale}
             disabled={busy || attempted}
             onTranscript={(spoken) =>
-              setText((current) => (current.trim() ? `${current.trimEnd()}\\n${spoken}` : spoken).slice(0, 2000))
+              setText((current) => (current.trim() ? `${current.trimEnd()}\n${spoken}` : spoken).slice(0, 2000))
             }
           />
           {options.options.length > 0 && (
