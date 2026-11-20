@@ -91,6 +91,15 @@ export function NaturalTurnPilot({
     }
   }
 
+  function appendTranscript(spoken: string) {
+    setText((current) => {
+      const combined = current.trim()
+        ? [current.trimEnd(), spoken].join("\n")
+        : spoken;
+      return combined.slice(0, 2000);
+    });
+  }
+
   const delivered = receipt?.delivered_reply;
   const savedSource = receipt?.evidence.request.original_text;
   return (
@@ -147,14 +156,7 @@ export function NaturalTurnPilot({
               sessionId={client.sessionId}
               language={session.locale}
               disabled={busy || attempted}
-              onTranscript={(spoken) =>
-                setText((current) =>
-                  (current.trim() ? `${current.trimEnd()}\n${spoken}` : spoken).slice(
-                    0,
-                    2000,
-                  ),
-                )
-              }
+              onTranscript={appendTranscript}
             />
             {options.options.length > 0 && (
               <label>
@@ -193,7 +195,10 @@ export function NaturalTurnPilot({
                 disabled={busy}
                 onClick={() => void run("reload")}
               >
-                {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+                {t(
+                  "Reload saved State and reply",
+                  "Обновить сохранённый State и ответ",
+                )}
               </button>
               <button
                 type="button"
@@ -289,7 +294,10 @@ export function NaturalTurnPilot({
               disabled={busy}
               onClick={() => void run("reload")}
             >
-              {t("Reload saved State and reply", "Обновить сохранённый State и ответ")}
+              {t(
+                "Reload saved State and reply",
+                "Обновить сохранённый State и ответ",
+              )}
             </button>
           </div>
         )}
