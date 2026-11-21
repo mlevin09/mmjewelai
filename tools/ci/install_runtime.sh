@@ -4,6 +4,7 @@ if test "$#" -gt 0 && test "$1" != --backend; then
   exec python tools/ci/pr_selection.py --install-manifest "$1"
 fi
 python -m pip install \
+  -e './packages/observability[test]' \
   -e './packages/domain[test]' \
   -e './packages/auth[test]' \
   -e './packages/auth_oidc[test]' \

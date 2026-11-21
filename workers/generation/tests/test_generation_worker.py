@@ -388,7 +388,15 @@ def test_worker_structured_events_exclude_prompt_bytes_and_raw_provider_errors(p
     events = [json.loads(line) for line in stream.getvalue().splitlines()]
     assert [event["event"] for event in events] == [
         "generation_task_received",
+        "generation_gateway_error",
         "generation_task_failed",
+    ]
+    assert events[1]["severity"] == "ERROR"
+    # The run's provider has no registered executor here; the diagnostic chain now
+    # exposes that lookup failure behind the sanitized gateway_unavailable code.
+    assert events[1]["error_chain"] == [
+        "jewelai_model_gateway.gateway.GatewayUnavailableError",
+        "builtins.KeyError",
     ]
     assert events[-1]["generation_run_id"] == str(RUN_ID)
     assert events[-1]["disposition"] == "failed"
