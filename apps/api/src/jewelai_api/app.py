@@ -260,6 +260,7 @@ def create_app(
     prompt_enrichment_service: PromptEnrichmentRuntimeService | None = None,
     completion_registry=None,
     role_registry=None,
+    knowledge_http=None,
 ) -> FastAPI:
     settings = settings or RuntimeSettings.from_environment(
         require_oidc=token_verifier is None,
@@ -716,6 +717,13 @@ def create_app(
             "conversation_policy": None,
             "authorization_effect": "none",
         }
+
+    # Knowledge Library 2.0 read-only HTTP surface (ADR 0048); disabled unless configured.
+    from .knowledge_routes import KnowledgeHttpConfig, register_knowledge_routes
+
+    knowledge_config = knowledge_http or KnowledgeHttpConfig.from_environment()
+    if knowledge_config.enabled:
+        register_knowledge_routes(app, Authenticated, factory, knowledge_config)
 
     @app.get("/ui/catalog", response_model=UiCatalogResponse)
     def get_ui_catalog(_: Authenticated):

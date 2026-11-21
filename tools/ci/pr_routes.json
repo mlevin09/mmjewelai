@@ -703,6 +703,17 @@
         "evidence": "Owner-approved additive US-01 schema2 source/dual-interpretation/SO/Matrix/State commit and write-once natural delivery. Complete native modules own raw text and structured/transcript sources, independent Parser1.3, conservative lexical/component proof (including missing Parser candidates), recommendations/questions, lock/source integrity, CAS/idempotency, rollback, retained reply/restart and mocked bounded private Qwen HTTP. PostgreSQL module reuses the unchanged independently verified disposable gate for migration0023, non-blocking model phases and immutability/downgrade; real model/live UI remain separate operational evidence. No Full gate or CI algorithm is weakened.",
         "postgres": true,
         "release": true
+      },
+      "knowledge_kb": {
+        "tests": [
+          "packages/domain/tests/test_knowledge_kb_contract.py",
+          "apps/api/tests/test_knowledge_kb_postgres.py",
+          "apps/api/tests/test_knowledge_kb_corpus_postgres.py",
+          "apps/api/tests/test_knowledge_kb_http_postgres.py"
+        ],
+        "evidence": "ADR 0048 Knowledge Library Contract 2.0. Domain tests own the deterministic contract, policy revision 1, scope/value normalization and every validation profile. The PG module owns migration 0024 triggers, immutable release membership, publish/diff/revert/activate, pilot seed re-qualification, legacy mapping, release pinning, typed errors, caller/purpose authorization, read-only API and package export/import behind the unchanged disposable-PostgreSQL gate. No Product State, Parser, Dictionary, Rules or Knowledge 1.x behaviour changes. The corpus PG module loads all 17 682 v1.6.2 K-IDs, publishes kb-2.1.0 and owns completeness, statuses and real-entity policies. The HTTP PG module owns the opt-in read-only /knowledge routes over the real app: disabled by default, bearer auth, server-fixed caller, typed errors, no writes.",
+        "postgres": true,
+        "release": true
       }
     },
     "sources": [
@@ -759,11 +770,12 @@
           "bootstrap",
           "authorization",
           "st01_first_turn",
-          "us01_semantic_turn"
+          "us01_semantic_turn",
+          "knowledge_kb"
         ],
         "source_pair": [
-          "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d",
-          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c"
+          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c",
+          "14df9f838f02c599257a5489f6a8530f0132d9c3cb5866551cd70b03133e3777"
         ]
       },
       {
@@ -1298,6 +1310,90 @@
           "us01_semantic_turn",
           "bootstrap"
         ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/kb_contract.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/kb_models.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb",
+          "migration"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/knowledge_kb.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "packages/persistence/src/jewelai_persistence/knowledge_kb_pilot.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "packages/persistence/migrations/versions/0024_knowledge_kb_foundation.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb",
+          "migration"
+        ]
+      },
+      {
+        "path": "packages/persistence/migrations/env.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb",
+          "migration"
+        ]
+      },
+      {
+        "path": "tools/knowledge_kb/build_pilot_seed.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "tools/knowledge_kb/build_corpus_seed.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/knowledge_routes.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
       }
     ],
     "resources": [
@@ -1387,6 +1483,18 @@
           "bootstrap"
         ],
         "evidence": "Only declares httpx>=0.28,<1 directly for the new private conversational HTTP client. This same library/range is already runtime-required by jewelai-text-understanding-google; no new library/provider or test dependency is introduced. Bootstrap/adapter/configuration and full native US-01 owners validate composition; mandatory release qualification is retained."
+      },
+      {
+        "path": "data/knowledge-kb/*",
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "specs/knowledge-library-kb/*",
+        "components": [
+          "knowledge_kb"
+        ]
       }
     ],
     "test_support": {

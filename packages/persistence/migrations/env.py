@@ -4,6 +4,7 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
+from jewelai_persistence import kb_models  # noqa: F401  (registers kb_* tables, ADR 0048)
 from jewelai_persistence.models import Base
 from sqlalchemy import engine_from_config, pool
 

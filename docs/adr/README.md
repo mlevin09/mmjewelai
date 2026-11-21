@@ -1,5 +1,7 @@
 # Architecture decision records
 
+- [0048 — Knowledge Library Contract 2.0: PostgreSQL `kb` schema (Owner-approved; implementation pending)](0048-knowledge-library-kb-postgresql-contract-2.md) · [RU](0048-knowledge-library-kb-postgresql-contract-2.ru.md)
+
 - [0043 — Isolated CPU LLM lab (Owner-approved installation; documentation review pending)](0043-isolated-cpu-llm-lab.md)
 
 - [0042 — Parser 1.3 and historical source verification (Owner-approved; independent review pending)](0042-parser-13-source-verification.md)
