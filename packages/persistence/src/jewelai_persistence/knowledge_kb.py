@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
-from jewelai_domain.knowledge_kb import (
+from jewelai_domain.kb_contract import (
     KB_CONTRACT_VERSION,
     NORMATIVE_SCOPE_KEYS,
     PURPOSES,

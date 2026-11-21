@@ -1309,7 +1309,7 @@
         ]
       },
       {
-        "path": "packages/domain/src/jewelai_domain/knowledge_kb.py",
+        "path": "packages/domain/src/jewelai_domain/kb_contract.py",
         "declarations": [
           "*"
         ],

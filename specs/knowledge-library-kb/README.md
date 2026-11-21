@@ -3,7 +3,7 @@
 Owner-approved [Architecture v1.2](https://docs.google.com/document/d/17cYWdLIqPfrxWuCfvXNyMODpe-fv6_Flrk5VOJJMrWw/edit)
 and [ADR 0048](../../docs/adr/0048-knowledge-library-kb-postgresql-contract-2.md).
 [`contract-2.0.0.json`](contract-2.0.0.json) is generated from
-`jewelai_domain.knowledge_kb.contract_document()`; a domain test fails if they differ.
+`jewelai_domain.kb_contract.contract_document()`; a domain test fails if they differ.
 
 ## Storage
 

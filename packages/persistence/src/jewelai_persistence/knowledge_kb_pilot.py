@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from jewelai_domain.knowledge_kb import (
+from jewelai_domain.kb_contract import (
     POLICY_REVISION_1,
     evaluate_profile,
     normalize_scope,

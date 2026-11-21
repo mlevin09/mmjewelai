@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from jewelai_domain.knowledge_kb import (
+from jewelai_domain.kb_contract import (
     ERROR_CODES,
     POLICY_REVISION_1,
     KnowledgeKbError,

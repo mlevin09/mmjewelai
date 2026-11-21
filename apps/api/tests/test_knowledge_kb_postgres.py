@@ -14,7 +14,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from conftest import ROOT
-from jewelai_domain.knowledge_kb import KnowledgeKbError
+from jewelai_domain.kb_contract import KnowledgeKbError
 from jewelai_persistence import create_database_engine, create_session_factory
 from jewelai_persistence.kb_models import (
     KbClaimEvidenceRow,
