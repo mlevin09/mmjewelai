@@ -707,9 +707,10 @@
       "knowledge_kb": {
         "tests": [
           "packages/domain/tests/test_knowledge_kb_contract.py",
-          "apps/api/tests/test_knowledge_kb_postgres.py"
+          "apps/api/tests/test_knowledge_kb_postgres.py",
+          "apps/api/tests/test_knowledge_kb_corpus_postgres.py"
         ],
-        "evidence": "ADR 0048 Knowledge Library Contract 2.0. Domain tests own the deterministic contract, policy revision 1, scope/value normalization and every validation profile. The PG module owns migration 0024 triggers, immutable release membership, publish/diff/revert/activate, pilot seed re-qualification, legacy mapping, release pinning, typed errors, caller/purpose authorization, read-only API and package export/import behind the unchanged disposable-PostgreSQL gate. No Product State, Parser, Dictionary, Rules or Knowledge 1.x behaviour changes.",
+        "evidence": "ADR 0048 Knowledge Library Contract 2.0. Domain tests own the deterministic contract, policy revision 1, scope/value normalization and every validation profile. The PG module owns migration 0024 triggers, immutable release membership, publish/diff/revert/activate, pilot seed re-qualification, legacy mapping, release pinning, typed errors, caller/purpose authorization, read-only API and package export/import behind the unchanged disposable-PostgreSQL gate. No Product State, Parser, Dictionary, Rules or Knowledge 1.x behaviour changes. The corpus PG module loads all 17 682 v1.6.2 K-IDs, publishes kb-2.1.0 and owns completeness, statuses and real-entity policies.",
         "postgres": true,
         "release": true
       }
@@ -1367,6 +1368,15 @@
       },
       {
         "path": "tools/knowledge_kb/build_pilot_seed.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "tools/knowledge_kb/build_corpus_seed.py",
         "declarations": [
           "*"
         ],

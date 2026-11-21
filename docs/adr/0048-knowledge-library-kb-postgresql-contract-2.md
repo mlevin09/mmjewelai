@@ -118,10 +118,13 @@ does not acquire two competing knowledge systems.
 | B2. Pilot slice | Import from v1.6.2: corundum (ruby, sapphire), approximate diamond sizes, ring-size conversions, purity conversions, and a few GOST alloys plus generic Ag 925/Pt 950 for negative tests; re-qualification; `legacy_map`; release `kb-2.0.0-pilot` in development only |
 | B3. Knowledge API | Read-only module in `apps/api`; six operations; acceptance criteria AC-01…AC-11 for the slice and the eleven mandatory negative tests of v1.2 §12 |
 
+| D. Full corpus (Owner-authorized 21 November) | All 17 682 v1.6.2 K-IDs as release `kb-2.1.0`: VERIFIED records re-qualified against the recorded source fragments; all other records kept as REFERENCE ONLY / REJECTED text claims grouped by normalized subject; every K-ID in `legacy_map` |
+
 Excluded: SO and IFP integration (AC-12), enabling contract 2.0 in runtime configuration,
-shared or preprod migration execution, ACTIVE activation, deployment, the full corpus
-migration (phase D), and any change to Dictionary, Rules, the parametric knowledge base or
-1.x Knowledge artifacts.
+shared or preprod migration execution, ACTIVE activation, deployment, and any change to
+Dictionary, Rules, the parametric knowledge base or 1.x Knowledge artifacts. v1.6.2 term
+rows are kept as REFERENCE ONLY claims; promoting them to `kb_term_revision` (which feeds
+`resolve_terms`) needs a terminology review.
 
 ## Owner decisions on open questions
 

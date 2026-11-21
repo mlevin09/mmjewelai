@@ -162,3 +162,33 @@ def test_errors_are_typed():
     assert KnowledgeKbError("no_data").code == "no_data"
     with pytest.raises(ValueError):
         KnowledgeKbError("something_else")
+
+
+def test_recorded_review_needs_the_fragment_and_the_review():
+    statement = {"text_ru": "п. 50"}
+    recorded = {"text_ru": "фрагмент источника", "text_en": "reviewed in v1.4-C"}
+    assert evaluate_profile("recorded_review", {}, statement, "text", recorded)[0] == (
+        "source_match"
+    )
+    assert evaluate_profile("recorded_review", {}, statement, "text", {"text_ru": "x"})[0] == (
+        "no_source"
+    )
+    assert evaluate_profile("recorded_review", {}, statement, "text", None)[0] == "no_source"
+
+
+def test_claim_precision_compares_at_the_records_own_precision_only():
+    params = {"precision": "claim"}
+    assert evaluate_profile("exact_number", params, {"num": "19.3"}, "exact", {"num": "19.32"})[
+        0
+    ] == ("source_match")
+    assert evaluate_profile("exact_number", params, {"num": "19.35"}, "exact", {"num": "19.3"})[
+        0
+    ] == ("mismatch")
+
+
+def test_single_value_is_a_zero_width_range():
+    assert normalize_value({"num": "9"}, "range") == {"min": "9", "max": "9"}
+    # A more precise record than its source is not a source match (diamond RI 2.417 vs 2.42).
+    assert evaluate_profile(
+        "source_range", {"precision": 3}, {"min": "2.417", "max": "2.417"}, "x", {"num": "2.42"}
+    )[0] == ("mismatch")

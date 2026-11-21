@@ -73,6 +73,7 @@ PROFILE_METHODS = (
     "typical_range",
     "formula",
     "enum_match",
+    "recorded_review",
     "manual_source_review",
 )
 
@@ -302,6 +303,8 @@ def normalize_value(value: dict[str, Any], value_type: str) -> dict[str, str]:
     """Typed value as canonical strings: number→num, range→min/max, enum, text→text_ru/en."""
     if value_type not in VALUE_TYPES:
         raise ValueError(f"unknown value type: {value_type}")
+    if value_type == "range" and set(value) == {"num"}:
+        value = {"min": value["num"], "max": value["num"]}  # a single value is a 0-width range
     allowed = {
         "number": {"num"},
         "range": {"min", "max"},
@@ -361,6 +364,10 @@ def _quantize(value: Decimal, precision: int | None) -> Decimal:
     return value.quantize(Decimal(1).scaleb(-precision))
 
 
+def _decimals(text: str) -> int:
+    return len(text.split(".")[1]) if "." in text else 0
+
+
 def _round(value: float, rounding: str) -> Decimal:
     if rounding == "nearest_half":
         return Decimal(math.floor(value * 2 + 0.5)) / 2
@@ -407,6 +414,12 @@ def evaluate_profile(
         raise ValueError(f"unknown profile method: {method}")
     if method == "manual_source_review":
         return "no_source", "no automatic source comparison exists for this attribute"
+    if method == "recorded_review":
+        # Text statements (norms, definitions) are not machine-comparable. They match only when
+        # the evidence link records the verified source fragment and the review that read it.
+        if source_value and source_value.get("text_ru") and source_value.get("text_en"):
+            return "source_match", "verified source fragment and review are recorded"
+        return "no_source", "no recorded review of the source fragment"
     if method == "formula":
         scope = scope or {}
         if "from_value" not in scope:
@@ -427,6 +440,12 @@ def evaluate_profile(
         claim, source = _dec(claim_value.get("num")), _dec(source_value.get("num"))
         if claim is None or source is None:
             return "mismatch", "exact_number needs single numbers"
+        if precision == "claim":
+            # The record states fewer decimals than the source: compare at the record's own
+            # precision (19.3 vs 19.32), never at a precision finer than the source.
+            precision = min(_decimals(claim_value["num"]), _decimals(source_value["num"]))
+            if _decimals(claim_value["num"]) > _decimals(source_value["num"]):
+                return "mismatch", "record is more precise than its source"
         if _quantize(claim, precision) == _quantize(source, precision):
             return "source_match", "equal at the source precision"
         return "mismatch", f"{claim} differs from source {source}"

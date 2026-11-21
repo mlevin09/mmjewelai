@@ -76,6 +76,7 @@
     "typical_range",
     "formula",
     "enum_match",
+    "recorded_review",
     "manual_source_review"
   ],
   "profile_outcomes": [

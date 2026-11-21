@@ -13,3 +13,9 @@ They are inputs to the `kb` drafts, not a runtime source and not ACTIVE.
 Slice: corundum (ruby, sapphire) constants, care and reference rows; round-diamond Stuller
 points and separate Dalila ranges; RU → US/EU/UK/JP ring sizes and the metric carat; gold
 fineness ↔ karat; three GOST 30649-99 alloy densities and the generic Ag 925 / Pt 950 rows.
+
+- `corpus-v1.6.2.json` — the full v1.6.2 library (all 17 682 K-IDs → 17 632 claims, release
+  `kb-2.1.0`), built by `tools/knowledge_kb/build_corpus_seed.py`. It contains the pilot
+  records unchanged. VERIFIED records carry the source value recorded in their evidence
+  fragment; everything else is kept as REFERENCE ONLY or REJECTED text, grouped by
+  normalized subject so identical rows merge (`legacy_map` records each merge).

@@ -60,8 +60,8 @@ ENTITIES = [
 # attribute_id, value_type, unit, scale, validation_profile_id
 ATTRIBUTES = [
     ("refractive_index", "range", None, None, "gem_ri_source_range"),
-    ("mohs_hardness", "number", None, "mohs", "mohs_ordinal"),
-    ("specific_gravity", "number", None, None, "gem_sg_exact"),
+    ("mohs_hardness", "range", None, "mohs", "mohs_ordinal"),
+    ("specific_gravity", "range", None, None, "gem_sg_source"),
     ("care_steam", "enum", None, None, "care_statement"),
     ("care_ultrasonic", "enum", None, None, "care_statement"),
     ("diameter_at_weight", "number", "mm", None, "stuller_point"),
@@ -79,7 +79,7 @@ ATTRIBUTES = [
 PROFILES = [
     ("gem_ri_source_range", "source_range", {"precision": 3}),
     ("mohs_ordinal", "ordinal_scale", {"precision": 1}),
-    ("gem_sg_exact", "exact_number", {"precision": 2}),
+    ("gem_sg_source", "source_range", {"precision": 2}),
     ("care_statement", "enum_match", {}),
     ("stuller_point", "approximate_point", {"precision": 1}),
     ("retail_typical_range", "typical_range", {"precision": 1}),

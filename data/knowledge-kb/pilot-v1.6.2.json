@@ -145,17 +145,17 @@
   },
   {
    "attribute_id": "mohs_hardness",
-   "value_type": "number",
+   "value_type": "range",
    "unit": null,
    "scale": "mohs",
    "validation_profile_id": "mohs_ordinal"
   },
   {
    "attribute_id": "specific_gravity",
-   "value_type": "number",
+   "value_type": "range",
    "unit": null,
    "scale": null,
-   "validation_profile_id": "gem_sg_exact"
+   "validation_profile_id": "gem_sg_source"
   },
   {
    "attribute_id": "care_steam",
@@ -258,8 +258,8 @@
    }
   },
   {
-   "profile_id": "gem_sg_exact",
-   "method": "exact_number",
+   "profile_id": "gem_sg_source",
+   "method": "source_range",
    "params": {
     "precision": 2
    }
