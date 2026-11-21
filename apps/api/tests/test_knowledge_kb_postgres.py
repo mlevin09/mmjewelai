@@ -108,20 +108,24 @@ def _code(error):
 
 def test_requalification_demotes_only_records_without_full_source_match(pilot):
     _, factory, report = pilot
-    assert (report["verified"], report["reference_only"], report["rejected"]) == (108, 177, 2)
+    assert (report["verified"], report["reference_only"], report["rejected"]) == (111, 174, 2)
     demoted = {k for item in report["demoted"] for k in item["legacy"]}
     reasons = " ".join(item["reason"] for item in report["demoted"])
-    assert len(report["demoted"]) == 13
-    # 7 JP sizes (no JP rule in EV-RING), 3 purity rows (EV-CARAT is mass, not fineness),
-    # 3 EU sizes that v1.6.2 rounded inconsistently.
-    assert {"K-14282", "K-02644", "K-14293", "K-14337", "K-14353"} <= demoted
+    assert len(report["demoted"]) == 10
+    # 7 JP sizes (no JP rule in EV-RING) and 3 EU sizes that v1.6.2 rounded inconsistently.
+    assert {"K-14282", "K-14293", "K-14337", "K-14353"} <= demoted
     assert "no automatic source comparison" in reasons
     with factory() as session:
         purity = session.scalars(
             select(KbClaimRevisionRow).where(KbClaimRevisionRow.claim_id.like("%karat_fineness%"))
         ).all()
-        assert {row.status for row in purity} == {"REFERENCE ONLY"}
-        assert all(row.qualification["demoted"] for row in purity)
+        assert {row.status for row in purity} == {"VERIFIED"}
+        links = session.scalars(
+            select(KbClaimEvidenceRow.ev_revision_id).where(
+                KbClaimEvidenceRow.revision_id.in_([row.revision_id for row in purity])
+            )
+        ).all()
+        assert set(links) == {"EV-BHC-FINENESS@1"}  # British Hallmarking Council, 585/14ct
 
 
 def test_ac11_every_imported_k_id_has_an_explainable_mapping(pilot):
@@ -440,6 +444,7 @@ def test_ac10_ambiguity_false_equivalents_and_conflicts(fresh):
         "measure.metric_carat",
         "metal.gold.karat",
     }
+    assert {c.review_status for c in karat_ru.candidates} == {"curated"}
     carat = api.resolve_terms("carat", PILOT, lang="en")
     assert not carat.ambiguous and carat.candidates[0].entity_id == "measure.metric_carat"
     assert any("karat" in warning for warning in carat.false_equivalent_warnings)

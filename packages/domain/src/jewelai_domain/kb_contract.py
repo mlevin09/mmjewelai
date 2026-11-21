@@ -116,6 +116,9 @@ RELEASE_ARTIFACT_KINDS = (
 )
 
 TERM_RELATIONS = ("synonym", "false_equivalent", "ambiguous", "broader", "narrower")
+# curated: JewelAI canonical name; source_match: checked against a terminology source;
+# unreviewed: imported (v1.6.2) without terminology review — a hint, never a normalization.
+TERM_REVIEW_STATUSES = ("curated", "source_match", "unreviewed")
 RULE_SEVERITIES = ("info", "warn", "block")
 
 
@@ -514,6 +517,7 @@ def contract_document() -> dict[str, Any]:
         "normative_scope_keys": list(NORMATIVE_SCOPE_KEYS),
         "release_artifact_kinds": list(RELEASE_ARTIFACT_KINDS),
         "term_relations": list(TERM_RELATIONS),
+        "term_review_statuses": list(TERM_REVIEW_STATUSES),
         "rule_severities": list(RULE_SEVERITIES),
         "policy_revision_1": [
             {
@@ -532,5 +536,6 @@ def contract_document() -> dict[str, Any]:
             "Read-only purposes never grant an action permission.",
             "validate_block is disabled in policy revision 1.",
             "Knowledge API reads never write Product State.",
+            "Unreviewed terms are returned with their review status and never as normalization.",
         ],
     }

@@ -471,6 +471,8 @@ def upgrade() -> None:
         sa.Column("kind", sa.String(length=16), nullable=False),
         sa.Column("is_preferred", sa.Boolean(), nullable=False),
         sa.Column("context", sa.Text(), nullable=True),
+        sa.Column("review_status", sa.String(length=16), nullable=False),
+        sa.Column("review_note", sa.Text(), nullable=True),
         sa.Column("rev_state", sa.String(length=32), nullable=False),
         sa.Column("reason", sa.Text(), nullable=False),
         sa.Column("created_by", sa.String(length=128), nullable=False),
@@ -484,6 +486,9 @@ def upgrade() -> None:
             "kind IN ('name','synonym','jargon','translation')", name="ck_kb_term_kind"
         ),
         sa.CheckConstraint("lang IN ('ru','en')", name="ck_kb_term_lang"),
+        sa.CheckConstraint(
+            "review_status IN ('curated','source_match','unreviewed')", name="ck_kb_term_review"
+        ),
         sa.CheckConstraint("rev_state IN ('draft','published')", name="ck_kb_term_state"),
         sa.ForeignKeyConstraint(["entity_id"], ["kb_entity.entity_id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("term_revision_id"),

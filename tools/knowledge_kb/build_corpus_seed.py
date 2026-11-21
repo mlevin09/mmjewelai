@@ -25,6 +25,7 @@ import openpyxl
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_pilot_seed as pilot  # noqa: E402
+from jewelai_domain.kb_contract import normalize_term  # noqa: E402
 
 REGISTRY = "Реестр источников"
 TIER = {"A": "Q1", "B": "Q2", "C": "Q3"}
@@ -503,7 +504,17 @@ def build(xlsx: Path) -> dict:
                         value_kind="source_range" if "min" in typed else "exact",
                         proposed_status="VERIFIED",
                         permission_code=code,
-                        evidence=[{"ev_id": ev, "source_value": source_of(stated, attribute)}],
+                        evidence=[{"ev_id": ev, "source_value": source_of(stated, attribute)}]
+                        + (
+                            [
+                                {
+                                    "ev_id": "EV-IGS-DIA",
+                                    "source_value": {"min": "2.417", "max": "2.417"},
+                                }
+                            ]
+                            if (entity, attribute) == ("gem.diamond", "refractive_index")
+                            else []
+                        ),
                         reason=f"v1.6.2 VERIFIED ({check})",
                     )
                     continue
@@ -659,6 +670,57 @@ def build(xlsx: Path) -> dict:
             evidence=[{"ev_id": ev, "source_value": None} for ev in ev_ids(r[col["evidence"]])],
             reason=f"v1.6.2 VERIFIED ({check})",
         )
+    # Term rows → kb terms with review_status=unreviewed (v1.2 §11: terms go to terms).
+    terms = {term["term_id"]: term for term in base["terms"]}
+    seen_terms: dict[tuple, str] = {}
+    term_legacy = []
+
+    def add_term(entity_id, text, kind, k):
+        text = " ".join(str(text).split())
+        if not 1 <= len(text) <= 200 or re.fullmatch(r"[\W\d_]+", text):
+            return None
+        lang = "ru" if re.search("[А-Яа-яЁё]", text) else "en"
+        key = (entity_id, lang, normalize_term(text))
+        if key not in seen_terms:
+            term_id = "term.v162." + hashlib.sha256("|".join(key).encode()).hexdigest()[:16]
+            seen_terms[key] = term_id
+            terms[term_id] = {
+                "term_id": term_id,
+                "entity_id": entity_id,
+                "lang": lang,
+                "text": text,
+                "kind": kind,
+                "is_preferred": False,
+                "review_status": "unreviewed",
+                "review_note": f"imported from v1.6.2 {k}; terminology review pending",
+            }
+        return seen_terms[key]
+
+    for r in rows:
+        k = r[col["k"]]
+        if (
+            k in handled
+            or r[3] != "Термин"
+            or r[col["status"]] != "REFERENCE ONLY"
+            or r[col["parameter"]] not in ("Название EN", "Название RU")
+        ):
+            continue
+        entity_id = legacy_entity(r[col["entity"]])
+        produced = []
+        subject = re.sub(r"\[[^\]]*\]", "", str(r[col["entity"]] or "")).strip()
+        if subject and "=" not in subject and ":" not in subject:
+            produced.append(add_term(entity_id, subject, "name", k))
+        for piece in re.split(r"\s*/\s*|;\s*", str(r[col["value"]] or "")):
+            produced.append(add_term(entity_id, piece, "translation", k))
+        produced = sorted({p for p in produced if p})
+        if not produced:
+            continue
+        for term_id in produced:
+            term_legacy.append(
+                [k, term_id, f"v1.6.2 «{r[col['parameter']]}» row → unreviewed term"]
+            )
+        handled.add(k)
+
     # Everything else: text claims grouped by subject + parameter + value.
     groups: dict[tuple, list] = {}
     for r in rows:
@@ -722,6 +784,8 @@ def build(xlsx: Path) -> dict:
             "validation_profiles": sorted(profiles.values(), key=lambda p: p["profile_id"]),
             "evidence": sorted(evidence.values(), key=lambda e: e["ev_id"]),
             "claims": claims,
+            "terms": sorted(terms.values(), key=lambda term: term["term_id"]),
+            "term_legacy": sorted(term_legacy),
             "k_ids": len(all_k),
         }
     )

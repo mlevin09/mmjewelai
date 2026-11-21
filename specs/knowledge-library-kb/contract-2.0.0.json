@@ -136,6 +136,11 @@
     "broader",
     "narrower"
   ],
+  "term_review_statuses": [
+    "curated",
+    "source_match",
+    "unreviewed"
+  ],
   "rule_severities": [
     "info",
     "warn",
@@ -282,6 +287,7 @@
     "Only profile outcome source_match may be published as VERIFIED.",
     "Read-only purposes never grant an action permission.",
     "validate_block is disabled in policy revision 1.",
-    "Knowledge API reads never write Product State."
+    "Knowledge API reads never write Product State.",
+    "Unreviewed terms are returned with their review status and never as normalization."
   ]
 }

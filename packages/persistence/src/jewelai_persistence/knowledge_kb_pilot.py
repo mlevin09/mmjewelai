@@ -138,6 +138,9 @@ def load_seed(session: Session, seed: dict[str, Any], actor: str) -> dict[str, A
             text=term["text"],
             kind=term["kind"],
             is_preferred=term["is_preferred"],
+            context=term.get("context"),
+            review_status=term["review_status"],
+            review_note=term.get("review_note"),
         )
     for relation in seed["term_relations"]:
         admin.draft_artifact(
@@ -153,6 +156,8 @@ def load_seed(session: Session, seed: dict[str, Any], actor: str) -> dict[str, A
     for caller in seed["callers"]:
         admin.register_caller(caller["caller_id"], caller["description"], caller["purposes"])
     report = {"verified": 0, "reference_only": 0, "rejected": 0, "demoted": []}
+    for k_id, term_id, explanation in seed.get("term_legacy", ()):
+        admin.map_legacy(k_id, "term", term_id, "to_term", explanation)
     for claim in seed["claims"]:
         attribute = attributes[claim["attribute_id"]]
         decision = requalify(claim, attribute, profiles[attribute["validation_profile_id"]])

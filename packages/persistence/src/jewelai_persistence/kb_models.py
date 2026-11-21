@@ -180,6 +180,9 @@ class KbTermRevisionRow(Base):
         CheckConstraint(
             "kind IN ('name','synonym','jargon','translation')", name="ck_kb_term_kind"
         ),
+        CheckConstraint(
+            "review_status IN ('curated','source_match','unreviewed')", name="ck_kb_term_review"
+        ),
     )
     term_revision_id: Mapped[str] = mapped_column(String(160), primary_key=True)
     term_id: Mapped[str] = mapped_column(String(120), index=True)
@@ -192,6 +195,8 @@ class KbTermRevisionRow(Base):
     kind: Mapped[str] = mapped_column(String(16))
     is_preferred: Mapped[bool] = mapped_column(Boolean)
     context: Mapped[str | None] = mapped_column(Text, nullable=True)
+    review_status: Mapped[str] = mapped_column(String(16))
+    review_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     rev_state, reason, created_by, created_at = _audit()
 
 

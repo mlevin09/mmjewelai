@@ -4,7 +4,6 @@ Behind the unchanged disposable-PostgreSQL gate. Loads all 17 682 K-IDs, re-qual
 publishes kb-2.1.0 and checks completeness, statuses, permissions and history.
 """
 
-from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -53,22 +52,42 @@ def test_every_v162_k_id_is_in_the_database_with_an_explained_mapping(corpus):
             ).all()
         )
         unexplained = session.scalar(select(func.count()).where(KbLegacyMapRow.explanation == ""))
-    assert k_ids == 17682 and members == len(seed["claims"]) == 17632
+    assert k_ids == 17682 and members == len(seed["claims"]) == 14658
     assert types["excluded"] == 267 and types["merged"] >= 1 and types["split"] >= 1
+    assert types["to_term"] == 2974  # v1.6.2 term rows now live in the term dictionary
     assert unexplained == 0
 
 
 def test_corpus_statuses_after_requalification(corpus):
     _, factory, report, _ = corpus
-    assert (report["verified"], report["reference_only"], report["rejected"]) == (236, 17130, 266)
-    reasons = Counter(item["reason"].split(" differs")[0] for item in report["demoted"])
-    assert len(report["demoted"]) == 39
-    # Diamond RI 2.417 is more precise than the recorded GIA fragment (2.42).
-    assert reasons["2.417–2.417"] == 17
+    assert (report["verified"], report["reference_only"], report["rejected"]) == (256, 14136, 266)
+    assert len(report["demoted"]) == 19
     with factory() as session:
         release = session.get(KbReleaseRow, RELEASE)
-    assert release.manifest["status"] == {"REFERENCE ONLY": 17130, "REJECTED": 266, "VERIFIED": 236}
+    assert release.manifest["status"] == {"REFERENCE ONLY": 14136, "REJECTED": 266, "VERIFIED": 256}
+    assert release.manifest["artifacts"]["term"] == 4230
     assert release.validation_report["errors"] == []
+
+
+def test_diamond_ri_is_verified_by_the_igs_source_and_keeps_the_gia_link(corpus):
+    _, factory, _, _ = corpus
+    api = KnowledgeApi(factory, "semantic_orchestrator")
+    ri = api.get_claims("gem.diamond", "prompt", RELEASE, attributes=["refractive_index"]).claims
+    assert len(ri) == 16
+    assert all(c.evidence_revision_ids == ("EV-GIA-DIA@1", "EV-IGS-DIA@1") for c in ri)
+
+
+def test_imported_terms_are_flagged_unreviewed_and_never_outrank_curated_terms(corpus):
+    _, factory, _, _ = corpus
+    api = KnowledgeApi(factory, "semantic_orchestrator")
+    ruby = api.resolve_terms("рубин", RELEASE)
+    assert ruby.candidates[0].entity_id == "gem.corundum.ruby"
+    assert ruby.candidates[0].review_status == "curated"
+    assert not ruby.ambiguous and not ruby.unreviewed_only
+    assert any(c.review_status == "unreviewed" for c in ruby.candidates[1:])
+    fishtail = api.resolve_terms("рыбий хвост", RELEASE)
+    assert fishtail.unreviewed_only
+    assert {c.review_status for c in fishtail.candidates} == {"unreviewed"}
 
 
 def test_corpus_knowledge_api_applies_policies_on_real_entities(corpus):

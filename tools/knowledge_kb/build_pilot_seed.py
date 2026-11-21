@@ -71,7 +71,7 @@ ATTRIBUTES = [
     ("ring_size_uk", "enum", None, "UK", "ring_uk"),
     ("ring_size_jp", "number", None, "JP", "ring_jp_unsourced"),
     ("mass_in_grams", "number", "g", None, "unit_definition"),
-    ("karat_fineness_equivalent", "enum", None, None, "purity_unsourced"),
+    ("karat_fineness_equivalent", "enum", None, None, "purity_fineness_designation"),
     ("density", "number", "g/cm3", None, "gost_density_exact"),
     ("legacy_reference", "text", None, None, "reference_text"),
 ]
@@ -88,11 +88,7 @@ PROFILES = [
     ("ring_uk", "formula", {"formula": "ring_uk_from_diameter", "rounding": "floor"}),
     ("ring_jp_unsourced", "manual_source_review", {"reason": "EV-RING has no JP formula"}),
     ("unit_definition", "exact_number", {"precision": 3}),
-    (
-        "purity_unsourced",
-        "manual_source_review",
-        {"reason": "EV-CARAT defines the metric carat (mass), not gold karat fineness"},
-    ),
+    ("purity_fineness_designation", "enum_match", {}),
     ("gost_density_exact", "exact_number", {"precision": 2}),
     ("reference_text", "manual_source_review", {"reason": "unnormalized legacy text"}),
 ]
@@ -136,6 +132,19 @@ EVIDENCE = {
         "https://nvlpubs.nist.gov/nistpubs/Legacy/circ/nbscircular43.pdf",
         "Q1",
     ),
+    "EV-BHC-FINENESS": (
+        "British Hallmarking Council",
+        "Guidance on Fineness Description (approved 7 April 2014)",
+        "https://assets.publishing.service.gov.uk/media/5a7f05baed915d74e6227f54/"
+        "bhc-guidance-on-fineness-april-2014.pdf",
+        "Q1",
+    ),
+    "EV-IGS-DIA": (
+        "International Gem Society",
+        "Diamond properties",
+        "https://www.gemsociety.org/article/diamond-properties/",
+        "Q2",
+    ),
     "EV-GOST30649-FACSIMILE": (
         "МГС / Госстандарт (републикация сторонним сайтом)",
         "ГОСТ 30649-99, скан печатного издания, Изм. № 1 и № 2",
@@ -159,6 +168,8 @@ FRAGMENTS = {
         "UK: C = 40 mm, step 1.25 mm"
     ),
     "EV-CARAT": "Metric carat = 200 mg",
+    "EV-BHC-FINENESS": "Gold: 999/Fine gold/24ct; 990; 916/22ct; 750/18ct; 585/14ct; 375/9ct",
+    "EV-IGS-DIA": "Natural & Synthetics: hardness 10; SG 3.51–3.53; RI 2.417",
     "EV-GOST30649-FACSIMILE": (
         "Tables А.1, Б.1, В.1, Г.1 (calculated density); cross-checked with the dnaop.com and "
         "meganorm.ru transcriptions on 20.11.2026"
@@ -169,6 +180,10 @@ LIMITATIONS = {
     "EV-DALILA-SIZE": "Secondary retail orientation; not a tolerance or guarantee",
     "EV-GOST30649-FACSIMILE": "Third-party copy of the printed edition; not a certified copy",
     "EV-RING": "Standard annotation plus secondary tables; no JP rule",
+    "EV-BHC-FINENESS": (
+        "UK traditional descriptions of hallmark finenesses; CARICOM CRS 17:2010 maps 14 kt to "
+        "583 (14/24), so 585 ↔ 14K is a designation, not an exact ratio"
+    ),
 }
 
 # Independently re-read GOST 30649-99 densities (dnaop.com tables, 21.11.2026).
@@ -512,7 +527,7 @@ def build(xlsx: Path) -> dict:
                 "value_kind": "derived",
                 "proposed_status": "VERIFIED",
                 "permission_code": "NONBINDING_PURITY_CONVERSION",
-                "evidence": [{"ev_id": "EV-CARAT", "source_value": None}],
+                "evidence": [{"ev_id": "EV-BHC-FINENESS", "source_value": {"enum": f"k{karat}"}}],
                 "reason": f"v1.6.2 VERIFIED (CHK-PURITY): {r[COL['basis']]}",
             }
         )
@@ -595,12 +610,17 @@ def build(xlsx: Path) -> dict:
             for ev, (org, title, url, tier) in EVIDENCE.items()
         ],
         "terms": [
-            dict(
-                zip(
-                    ("term_id", "entity_id", "lang", "text", "kind", "is_preferred"), t, strict=True
+            {**term, "review_status": "curated", "review_note": "JewelAI pilot canonical name"}
+            for term in [
+                dict(
+                    zip(
+                        ("term_id", "entity_id", "lang", "text", "kind", "is_preferred"),
+                        t,
+                        strict=True,
+                    )
                 )
-            )
-            for t in TERMS
+                for t in TERMS
+            ]
         ],
         "term_relations": [
             dict(zip(("relation_id", "term_a", "term_b", "relation", "note"), r, strict=True))

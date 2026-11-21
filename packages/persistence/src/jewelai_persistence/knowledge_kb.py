@@ -90,7 +90,17 @@ ARTIFACTS: dict[str, tuple[type, str, str, tuple[str, ...]]] = {
         KbTermRevisionRow,
         "term_revision_id",
         "term_id",
-        ("entity_id", "lang", "text", "normalized_form", "kind", "is_preferred", "context"),
+        (
+            "entity_id",
+            "lang",
+            "text",
+            "normalized_form",
+            "kind",
+            "is_preferred",
+            "context",
+            "review_status",
+            "review_note",
+        ),
     ),
     "term_relation": (
         KbTermRelationRevisionRow,
@@ -911,14 +921,16 @@ class TermCandidate:
     term_revision_id: str
     text: str
     lang: str
+    review_status: str
 
 
 @dataclass(frozen=True)
 class ResolveResult:
     release_id: str
-    candidates: tuple[TermCandidate, ...]
-    ambiguous: bool
+    candidates: tuple[TermCandidate, ...]  # reviewed (curated/source_match) candidates first
+    ambiguous: bool  # over reviewed candidates when any exist; unreviewed ones are hints
     false_equivalent_warnings: tuple[str, ...]
+    unreviewed_only: bool = False
 
 
 @dataclass(frozen=True)
@@ -1072,53 +1084,84 @@ class KnowledgeApi:
                 raise KnowledgeKbError("purpose_not_allowed", "resolve_terms is purpose=resolve")
             self._release(session, release_id)
             normalized = normalize_term(text_value)
-            artifacts = session.scalars(
-                select(KbReleaseArtifactRow).where(
-                    KbReleaseArtifactRow.release_id == release_id,
-                    KbReleaseArtifactRow.object_kind.in_(("term", "term_relation")),
+            query = (
+                select(KbTermRevisionRow)
+                .join(
+                    KbReleaseArtifactRow,
+                    (KbReleaseArtifactRow.object_revision_id == KbTermRevisionRow.term_revision_id)
+                    & (KbReleaseArtifactRow.object_kind == "term"),
                 )
-            ).all()
-            terms = {
-                row.object_id: session.get(KbTermRevisionRow, row.object_revision_id)
-                for row in artifacts
-                if row.object_kind == "term"
-            }
-            matches = [
-                term
-                for term in terms.values()
-                if term.normalized_form == normalized and (lang is None or term.lang == lang)
-            ]
+                .where(
+                    KbReleaseArtifactRow.release_id == release_id,
+                    KbTermRevisionRow.normalized_form == normalized,
+                )
+            )
+            if lang is not None:
+                query = query.where(KbTermRevisionRow.lang == lang)
+            matches = session.scalars(query).all()
             if not matches:
                 raise KnowledgeKbError("unknown_entity", text_value)
             matched_ids = {term.term_id for term in matches}
+            relations = session.scalars(
+                select(KbTermRelationRevisionRow)
+                .join(
+                    KbReleaseArtifactRow,
+                    (
+                        KbReleaseArtifactRow.object_revision_id
+                        == KbTermRelationRevisionRow.relation_revision_id
+                    )
+                    & (KbReleaseArtifactRow.object_kind == "term_relation"),
+                )
+                .where(
+                    KbReleaseArtifactRow.release_id == release_id,
+                    KbTermRelationRevisionRow.term_a.in_(matched_ids)
+                    | KbTermRelationRevisionRow.term_b.in_(matched_ids),
+                )
+            ).all()
             warnings, ambiguous_relation = [], False
-            for row in artifacts:
-                if row.object_kind != "term_relation":
-                    continue
-                relation = session.get(KbTermRelationRevisionRow, row.object_revision_id)
+            for relation in relations:
                 pair = {relation.term_a, relation.term_b}
-                if not pair & matched_ids:
-                    continue
                 if relation.relation == "false_equivalent":
-                    other = (pair - matched_ids) or pair
-                    for term_id in sorted(other):
-                        if term_id in terms:
+                    for term_id in sorted((pair - matched_ids) or pair):
+                        other = session.scalar(
+                            select(KbTermRevisionRow)
+                            .join(
+                                KbReleaseArtifactRow,
+                                (
+                                    KbReleaseArtifactRow.object_revision_id
+                                    == KbTermRevisionRow.term_revision_id
+                                )
+                                & (KbReleaseArtifactRow.object_kind == "term"),
+                            )
+                            .where(
+                                KbReleaseArtifactRow.release_id == release_id,
+                                KbTermRevisionRow.term_id == term_id,
+                            )
+                        )
+                        if other is not None:
                             warnings.append(
-                                f"{text_value} ≠ {terms[term_id].text}"
+                                f"{text_value} ≠ {other.text}"
                                 + (f": {relation.note}" if relation.note else "")
                             )
                 if relation.relation == "ambiguous":
                     ambiguous_relation = True
             candidates = tuple(
-                TermCandidate(t.entity_id, t.term_id, t.term_revision_id, t.text, t.lang)
-                for t in sorted(matches, key=lambda t: (t.entity_id, t.term_id))
+                TermCandidate(
+                    t.entity_id, t.term_id, t.term_revision_id, t.text, t.lang, t.review_status
+                )
+                for t in sorted(
+                    matches,
+                    key=lambda t: (t.review_status == "unreviewed", t.entity_id, t.term_id),
+                )
             )
-            entities = {candidate.entity_id for candidate in candidates}
+            reviewed = {c.entity_id for c in candidates if c.review_status != "unreviewed"}
+            entities = reviewed or {c.entity_id for c in candidates}
             return ResolveResult(
                 release_id=release_id,
                 candidates=candidates,
                 ambiguous=len(entities) > 1 or ambiguous_relation,
                 false_equivalent_warnings=tuple(sorted(set(warnings))),
+                unreviewed_only=not reviewed,
             )
 
         return self._read(run)
