@@ -44,7 +44,9 @@ does not acquire two competing knowledge systems.
 1. **New contract, not a rewrite.** Knowledge Library Contract 2.0.0 is the v1.2 model
    stored in PostgreSQL schema `kb`. PostgreSQL is the operational source for 2.0 content,
    following the precedent of ADR 0044 (Roles). No 1.x artifact is converted, re-hashed or
-   reinterpreted as 2.0.
+   reinterpreted as 2.0. Implementation note: the logical schema `kb` is realised as `kb_*`
+   tables in the application schema, so the existing Alembic check and the per-schema
+   disposable-PostgreSQL test isolation apply unchanged.
 
 2. **The 1.x JSON library becomes an archive.** The Owner's target state (21 November) is
    that today's JSON library is kept as a backup for history, not as a working tool.
