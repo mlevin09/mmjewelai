@@ -121,14 +121,15 @@ def test_stuller_point_rules_allow_equal_diameters_and_reject_mixed_or_derived()
     assert evaluate_profile("approximate_point", {}, point, "exact", point)[0] == "mismatch"
 
 
-@pytest.mark.parametrize(
-    "diameter,us,eu,uk",
-    [("15.0", "4", "47", "H"), ("15.3", "4.5", "48", "I"), ("18.1", "8", "57", "P")],
-)
-def test_ring_formulas_follow_ev_ring(diameter, us, eu, uk):
-    assert apply_formula("ring_us_from_diameter", "nearest_half", diameter) == us
-    assert apply_formula("ring_eu_from_diameter", "nearest_int", diameter) == eu
-    assert apply_formula("ring_uk_from_diameter", "floor", diameter) == uk
+def test_ring_formulas_follow_ev_ring():
+    for diameter, us, eu, uk in (
+        ("15.0", "4", "47", "H"),
+        ("15.3", "4.5", "48", "I"),
+        ("18.1", "8", "57", "P"),
+    ):
+        assert apply_formula("ring_us_from_diameter", "nearest_half", diameter) == us
+        assert apply_formula("ring_eu_from_diameter", "nearest_int", diameter) == eu
+        assert apply_formula("ring_uk_from_diameter", "floor", diameter) == uk
 
 
 def test_inconsistent_legacy_conversion_is_a_mismatch_not_a_tolerance():
@@ -174,9 +175,11 @@ def test_recorded_review_needs_the_fragment_and_the_review():
         "no_source"
     )
     assert evaluate_profile("recorded_review", {}, statement, "text", None)[0] == "no_source"
+    _claim_precision_compares_at_the_records_own_precision_only()
+    _single_value_is_a_zero_width_range()
 
 
-def test_claim_precision_compares_at_the_records_own_precision_only():
+def _claim_precision_compares_at_the_records_own_precision_only():
     params = {"precision": "claim"}
     assert evaluate_profile("exact_number", params, {"num": "19.3"}, "exact", {"num": "19.32"})[
         0
@@ -186,7 +189,7 @@ def test_claim_precision_compares_at_the_records_own_precision_only():
     ] == ("mismatch")
 
 
-def test_single_value_is_a_zero_width_range():
+def _single_value_is_a_zero_width_range():
     assert normalize_value({"num": "9"}, "range") == {"min": "9", "max": "9"}
     # A more precise record than its source is not a source match (diamond RI 2.417 vs 2.42).
     assert evaluate_profile(

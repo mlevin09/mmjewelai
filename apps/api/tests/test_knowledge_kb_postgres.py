@@ -169,24 +169,24 @@ def test_ac01_publish_is_idempotent_and_conflicts_on_a_different_payload(fresh):
         assert _code(error) == "payload_conflict"
 
 
-@pytest.mark.parametrize(
-    "statement",
-    [
-        lambda: update(KbClaimRevisionRow).values(status="REJECTED"),
-        lambda: delete(KbClaimRevisionRow),
-        lambda: delete(KbReleaseClaimRow),
-        lambda: update(KbReleaseArtifactRow).values(content_hash="0" * 64),
-        lambda: update(KbReleaseRow).values(checksum="0" * 64),
-        lambda: delete(KbLegacyMapRow),
-        lambda: update(KbClaimEvidenceRow).values(check_id="tampered"),
-    ],
-    ids=["rev-update", "rev-delete", "member-delete", "artifact-update", "release", "legacy", "ev"],
-)
-def test_ac01_published_rows_and_membership_are_immutable_in_postgres(pilot, statement):
+IMMUTABLE_STATEMENTS = {
+    "rev-update": lambda: update(KbClaimRevisionRow).values(status="REJECTED"),
+    "rev-delete": lambda: delete(KbClaimRevisionRow),
+    "member-delete": lambda: delete(KbReleaseClaimRow),
+    "artifact-update": lambda: update(KbReleaseArtifactRow).values(content_hash="0" * 64),
+    "release": lambda: update(KbReleaseRow).values(checksum="0" * 64),
+    "legacy": lambda: delete(KbLegacyMapRow),
+    "ev": lambda: update(KbClaimEvidenceRow).values(check_id="tampered"),
+}
+
+
+def test_ac01_published_rows_and_membership_are_immutable_in_postgres(pilot):
     engine, _, _ = pilot
-    with pytest.raises(DBAPIError, match="kb:"):
-        with engine.begin() as db:
-            db.execute(statement())
+    for name, statement in IMMUTABLE_STATEMENTS.items():
+        with pytest.raises(DBAPIError, match="kb:"):
+            with engine.begin() as db:
+                db.execute(statement())
+        assert name  # every statement is attempted in its own rolled-back transaction
 
 
 def test_ac01_truncate_and_direct_published_insert_are_rejected(pilot):
