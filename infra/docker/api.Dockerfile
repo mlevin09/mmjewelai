@@ -8,7 +8,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
       ./packages/domain ./packages/auth ./packages/auth_oidc \
       ./packages/auth_identity_platform ./packages/assets \
       ./packages/assets_gcs ./packages/generation_queue ./packages/generation_queue_gcp \
-      ./packages/model_gateway ./packages/parser ./packages/persistence ./packages/prompts \
+      ./packages/model_gateway ./packages/observability ./packages/parser ./packages/persistence ./packages/prompts \
       ./packages/text_understanding_google \
       ./apps/api
 

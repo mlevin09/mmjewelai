@@ -20,6 +20,7 @@ dependencies = [
   "jewelai-generation-queue==1.0.0",
   "jewelai-generation-queue-gcp==1.0.0",
   "jewelai-model-gateway==1.0.0",
+  "jewelai-observability==1.0.0",
   "jewelai-parser==1.0.0",
   "jewelai-persistence==1.0.0",
   "jewelai-prompts==1.0.0",
