@@ -75602,6 +75602,7 @@
    "description": "AI consultant",
    "purposes": [
     "resolve",
+    "verify_evidence",
     "search",
     "release_metadata",
     "display",
@@ -75615,6 +75616,7 @@
    "description": "Gemology trainer",
    "purposes": [
     "resolve",
+    "verify_evidence",
     "search",
     "release_metadata",
     "display",

@@ -708,9 +708,10 @@
         "tests": [
           "packages/domain/tests/test_knowledge_kb_contract.py",
           "apps/api/tests/test_knowledge_kb_postgres.py",
-          "apps/api/tests/test_knowledge_kb_corpus_postgres.py"
+          "apps/api/tests/test_knowledge_kb_corpus_postgres.py",
+          "apps/api/tests/test_knowledge_kb_http_postgres.py"
         ],
-        "evidence": "ADR 0048 Knowledge Library Contract 2.0. Domain tests own the deterministic contract, policy revision 1, scope/value normalization and every validation profile. The PG module owns migration 0024 triggers, immutable release membership, publish/diff/revert/activate, pilot seed re-qualification, legacy mapping, release pinning, typed errors, caller/purpose authorization, read-only API and package export/import behind the unchanged disposable-PostgreSQL gate. No Product State, Parser, Dictionary, Rules or Knowledge 1.x behaviour changes. The corpus PG module loads all 17 682 v1.6.2 K-IDs, publishes kb-2.1.0 and owns completeness, statuses and real-entity policies.",
+        "evidence": "ADR 0048 Knowledge Library Contract 2.0. Domain tests own the deterministic contract, policy revision 1, scope/value normalization and every validation profile. The PG module owns migration 0024 triggers, immutable release membership, publish/diff/revert/activate, pilot seed re-qualification, legacy mapping, release pinning, typed errors, caller/purpose authorization, read-only API and package export/import behind the unchanged disposable-PostgreSQL gate. No Product State, Parser, Dictionary, Rules or Knowledge 1.x behaviour changes. The corpus PG module loads all 17 682 v1.6.2 K-IDs, publishes kb-2.1.0 and owns completeness, statuses and real-entity policies. The HTTP PG module owns the opt-in read-only /knowledge routes over the real app: disabled by default, bearer auth, server-fixed caller, typed errors, no writes.",
         "postgres": true,
         "release": true
       }
@@ -769,11 +770,12 @@
           "bootstrap",
           "authorization",
           "st01_first_turn",
-          "us01_semantic_turn"
+          "us01_semantic_turn",
+          "knowledge_kb"
         ],
         "source_pair": [
-          "d2d5929c873201851ee6939a03ab2308519cfc604c395df606a87f024919ff8d",
-          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c"
+          "cc7d278aab941f73e0f04e419a15bc7b18924406760d99b4b45a5959cef0e42c",
+          "14df9f838f02c599257a5489f6a8530f0132d9c3cb5866551cd70b03133e3777"
         ]
       },
       {
@@ -1377,6 +1379,15 @@
       },
       {
         "path": "tools/knowledge_kb/build_corpus_seed.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "knowledge_kb"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/knowledge_routes.py",
         "declarations": [
           "*"
         ],

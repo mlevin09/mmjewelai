@@ -253,6 +253,7 @@ CALLERS = [
         "AI consultant",
         [
             "resolve",
+            "verify_evidence",
             "search",
             "release_metadata",
             "display",
@@ -264,7 +265,15 @@ CALLERS = [
     (
         "trainer",
         "Gemology trainer",
-        ["resolve", "search", "release_metadata", "display", "display_caveat", "explain"],
+        [
+            "resolve",
+            "verify_evidence",
+            "search",
+            "release_metadata",
+            "display",
+            "display_caveat",
+            "explain",
+        ],
     ),
 ]
 
