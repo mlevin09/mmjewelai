@@ -122,9 +122,14 @@ does not acquire two competing knowledge systems.
 
 Excluded: SO and IFP integration (AC-12), enabling contract 2.0 in runtime configuration,
 shared or preprod migration execution, ACTIVE activation, deployment, and any change to
-Dictionary, Rules, the parametric knowledge base or 1.x Knowledge artifacts. v1.6.2 term
-rows are kept as REFERENCE ONLY claims; promoting them to `kb_term_revision` (which feeds
-`resolve_terms`) needs a terminology review.
+Dictionary, Rules, the parametric knowledge base or 1.x Knowledge artifacts.
+
+Terms (Owner, 21 November): v1.6.2 term rows move into `kb_term_revision` with
+`review_status` (`curated`, `source_match`, `unreviewed`). Imported terms are `unreviewed`:
+`resolve_terms` returns them flagged, ranks reviewed terms first and computes ambiguity over
+reviewed candidates, so an unreviewed term is a hint and never a normalization. ГОСТ Р
+52793-2007 covers only 97 precious-metal production terms without English equivalents, so a
+domain terminology review remains necessary before terms are promoted.
 
 ## Owner decisions on open questions
 
