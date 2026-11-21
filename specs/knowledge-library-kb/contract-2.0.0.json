@@ -1,0 +1,286 @@
+{
+  "contract_id": "jewelai.knowledge_library.kb",
+  "contract_version": "2.0.0",
+  "architecture": "Knowledge Library Architecture v1.2 (Owner-approved 2026-11-20)",
+  "adr": "docs/adr/0048-knowledge-library-kb-postgresql-contract-2.md",
+  "statuses": [
+    "VERIFIED",
+    "REFERENCE ONLY",
+    "REJECTED"
+  ],
+  "revision_states": [
+    "draft",
+    "published"
+  ],
+  "evidence_roles": [
+    "supports",
+    "contradicts"
+  ],
+  "evidence_tiers": [
+    "Q1",
+    "Q2",
+    "Q3",
+    "Q4"
+  ],
+  "value_types": [
+    "number",
+    "range",
+    "enum",
+    "text"
+  ],
+  "value_kinds": [
+    "exact",
+    "source_range",
+    "approximate",
+    "derived",
+    "text"
+  ],
+  "uses": [
+    "display",
+    "display_caveat",
+    "explain",
+    "prompt",
+    "calc_reference",
+    "legal_info",
+    "validate_warn",
+    "validate_block"
+  ],
+  "read_purposes": [
+    "resolve",
+    "verify_evidence",
+    "search",
+    "release_metadata"
+  ],
+  "error_codes": [
+    "unknown_entity",
+    "ambiguous_term",
+    "no_data",
+    "release_not_found",
+    "release_unavailable",
+    "purpose_not_allowed",
+    "scope_conflict",
+    "evidence_conflict",
+    "payload_conflict"
+  ],
+  "evaluation_results": [
+    "supported",
+    "contradicted",
+    "unknown",
+    "review_required"
+  ],
+  "profile_methods": [
+    "exact_number",
+    "source_range",
+    "ordinal_scale",
+    "approximate_point",
+    "typical_range",
+    "formula",
+    "enum_match",
+    "manual_source_review"
+  ],
+  "profile_outcomes": [
+    "source_match",
+    "within_range",
+    "derived_estimate",
+    "conflict",
+    "mismatch",
+    "no_source"
+  ],
+  "formulas": [
+    "ring_us_from_diameter",
+    "ring_eu_from_diameter",
+    "ring_uk_from_diameter"
+  ],
+  "rounding": [
+    "nearest_half",
+    "nearest_int",
+    "floor"
+  ],
+  "scope_keys": [
+    "origin",
+    "treatment",
+    "shape",
+    "reference",
+    "from_system",
+    "from_value",
+    "to_system",
+    "carat_weight",
+    "alloy_grade",
+    "jurisdiction",
+    "document",
+    "clause",
+    "effective_from",
+    "effective_to",
+    "legacy_parameter",
+    "legacy_k_id"
+  ],
+  "normative_scope_keys": [
+    "jurisdiction",
+    "document",
+    "clause",
+    "effective_from"
+  ],
+  "release_artifact_kinds": [
+    "term",
+    "term_relation",
+    "rule",
+    "policy",
+    "evidence",
+    "validation_profile"
+  ],
+  "term_relations": [
+    "synonym",
+    "false_equivalent",
+    "ambiguous",
+    "broader",
+    "narrower"
+  ],
+  "rule_severities": [
+    "info",
+    "warn",
+    "block"
+  ],
+  "policy_revision_1": [
+    {
+      "permission_code": "FACT_DISPLAY_RENDER_HINT",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain",
+        "prompt"
+      ],
+      "prompt_conditions": "Gem constant with mineral, parameter and source; never a property of a specific stone",
+      "forbidden": "Silently changing Product State; claiming quality of a specific specimen",
+      "conditions": "Exact match of material, property and source"
+    },
+    {
+      "permission_code": "APPROX_SIZE_REFERENCE",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain",
+        "prompt"
+      ],
+      "prompt_conditions": "Only with ≈; one relevant weight/diameter pair; never a production tolerance",
+      "forbidden": "Exact seat or production tolerances, certification",
+      "conditions": "A specific stone needs a measurement"
+    },
+    {
+      "permission_code": "NONBINDING_UNIT_CONVERSION",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain",
+        "calc_reference",
+        "prompt"
+      ],
+      "prompt_conditions": "State the source system and rounding; not an ISO or legal certification",
+      "forbidden": "Treating different national systems as legally identical",
+      "conditions": "Record the source system and rounding step"
+    },
+    {
+      "permission_code": "NONBINDING_PURITY_CONVERSION",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain",
+        "prompt"
+      ],
+      "prompt_conditions": "Descriptive metal fraction only; 585 corresponds to 14K commercially, not literally",
+      "forbidden": "Hallmarking and compliance",
+      "conditions": "The formula does not replace a statutory assay check"
+    },
+    {
+      "permission_code": "FACT_PARTIAL_DISPLAY_ONLY",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Using unverified companion parts automatically",
+      "conditions": "Only the confirmed atomic fragment may be shown until atomized"
+    },
+    {
+      "permission_code": "CARE_GUIDANCE_CONDITIONAL",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Assigning cleaning automatically for an unknown item",
+      "conditions": "Needs fracture, treatment, coating and setting data"
+    },
+    {
+      "permission_code": "VENDOR_MATERIAL_REFERENCE",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain",
+        "calc_reference"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Production tolerance, acceptance and regulatory control",
+      "conditions": "Pure metals from an external reference"
+    },
+    {
+      "permission_code": "GOST_ALLOY_DENSITY_REFERENCE",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain",
+        "calc_reference"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Design tolerance, legal compliance, mandatory mass calculation, prompt or render",
+      "conditions": "The alloy must match the grade exactly; values are calculated reference densities"
+    },
+    {
+      "permission_code": "LEGAL_INFORMATION_ONLY",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "legal_info"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Legal PASS/FAIL; obligation without product-category analysis",
+      "conditions": "Atomic norm with clause, edition, jurisdiction and date"
+    },
+    {
+      "permission_code": "FACT_DISPLAY_ONLY",
+      "allowed_status": "VERIFIED",
+      "uses": [
+        "display",
+        "explain"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Automatic decisions beyond the proven content",
+      "conditions": "Source-bound, not a universal guarantee"
+    },
+    {
+      "permission_code": "RESEARCH_WITH_CAVEAT",
+      "allowed_status": "REFERENCE ONLY",
+      "uses": [
+        "display_caveat",
+        "explain"
+      ],
+      "prompt_conditions": "",
+      "forbidden": "Automatic decisions, regulatory checks, production calculation, prompt",
+      "conditions": "State the incomplete verification and the source"
+    },
+    {
+      "permission_code": "EXCLUDE",
+      "allowed_status": "REJECTED",
+      "uses": [],
+      "prompt_conditions": "",
+      "forbidden": "Showing as a fact, retrieval, automation",
+      "conditions": "Kept only as a historical trace"
+    }
+  ],
+  "invariants": [
+    "Published revisions and release membership are never updated or deleted.",
+    "Only profile outcome source_match may be published as VERIFIED.",
+    "Read-only purposes never grant an action permission.",
+    "validate_block is disabled in policy revision 1.",
+    "Knowledge API reads never write Product State."
+  ]
+}

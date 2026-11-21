@@ -1,0 +1,8365 @@
+{
+ "seed": "jewelai.knowledge_library.kb.pilot",
+ "seed_version": "1.0.0",
+ "release_id": "kb-2.0.0-pilot",
+ "source": {
+  "library": "JewelAI Knowledge Library v1.6.2",
+  "drive_file_id": "1So1_YjY4DRKbFMALybKPyWcdcBd-EmL7_3OaCzQ71rA",
+  "xlsx_export_sha256": "056bc1db42381aab4ed4031fe4eb4354d6699a9590bff0844f8f41a94d77333e"
+ },
+ "entities": [
+  {
+   "entity_id": "gem",
+   "entity_type": "category",
+   "parent_id": null,
+   "label_ru": "Драгоценные камни",
+   "label_en": "Gemstones"
+  },
+  {
+   "entity_id": "gem.corundum",
+   "entity_type": "mineral",
+   "parent_id": "gem",
+   "label_ru": "Корунд",
+   "label_en": "Corundum"
+  },
+  {
+   "entity_id": "gem.corundum.ruby",
+   "entity_type": "variety",
+   "parent_id": "gem.corundum",
+   "label_ru": "Рубин",
+   "label_en": "Ruby"
+  },
+  {
+   "entity_id": "gem.corundum.sapphire",
+   "entity_type": "variety",
+   "parent_id": "gem.corundum",
+   "label_ru": "Сапфир",
+   "label_en": "Sapphire"
+  },
+  {
+   "entity_id": "gem.diamond",
+   "entity_type": "mineral",
+   "parent_id": "gem",
+   "label_ru": "Алмаз (бриллиант)",
+   "label_en": "Diamond"
+  },
+  {
+   "entity_id": "measure",
+   "entity_type": "category",
+   "parent_id": null,
+   "label_ru": "Единицы и размеры",
+   "label_en": "Units and sizes"
+  },
+  {
+   "entity_id": "measure.ring_size",
+   "entity_type": "measure",
+   "parent_id": "measure",
+   "label_ru": "Размер кольца",
+   "label_en": "Ring size"
+  },
+  {
+   "entity_id": "measure.metric_carat",
+   "entity_type": "unit",
+   "parent_id": "measure",
+   "label_ru": "Метрический карат",
+   "label_en": "Metric carat"
+  },
+  {
+   "entity_id": "metal",
+   "entity_type": "category",
+   "parent_id": null,
+   "label_ru": "Металлы",
+   "label_en": "Metals"
+  },
+  {
+   "entity_id": "metal.gold",
+   "entity_type": "metal",
+   "parent_id": "metal",
+   "label_ru": "Золото",
+   "label_en": "Gold"
+  },
+  {
+   "entity_id": "metal.gold.karat",
+   "entity_type": "unit",
+   "parent_id": "metal.gold",
+   "label_ru": "Карат пробы золота",
+   "label_en": "Gold karat"
+  },
+  {
+   "entity_id": "metal.silver",
+   "entity_type": "metal",
+   "parent_id": "metal",
+   "label_ru": "Серебро",
+   "label_en": "Silver"
+  },
+  {
+   "entity_id": "metal.silver.925",
+   "entity_type": "fineness",
+   "parent_id": "metal.silver",
+   "label_ru": "Серебро 925 (обобщённо)",
+   "label_en": "Silver 925"
+  },
+  {
+   "entity_id": "metal.platinum",
+   "entity_type": "metal",
+   "parent_id": "metal",
+   "label_ru": "Платина",
+   "label_en": "Platinum"
+  },
+  {
+   "entity_id": "metal.platinum.950",
+   "entity_type": "fineness",
+   "parent_id": "metal.platinum",
+   "label_ru": "Платина 950 (обобщённо)",
+   "label_en": "Pt 950"
+  },
+  {
+   "entity_id": "metal.alloy.srm_925",
+   "entity_type": "alloy_grade",
+   "parent_id": "metal.silver",
+   "label_ru": "СрМ 925",
+   "label_en": "AgCu 925"
+  },
+  {
+   "entity_id": "metal.alloy.plpd_850_150",
+   "entity_type": "alloy_grade",
+   "parent_id": "metal.platinum",
+   "label_ru": "ПлПд 850-150",
+   "label_en": "PtPd 850-150"
+  },
+  {
+   "entity_id": "metal.alloy.zlsrm_585_80",
+   "entity_type": "alloy_grade",
+   "parent_id": "metal.gold",
+   "label_ru": "ЗлСрМ 585-80",
+   "label_en": "AuAgCu 585-80"
+  }
+ ],
+ "attributes": [
+  {
+   "attribute_id": "refractive_index",
+   "value_type": "range",
+   "unit": null,
+   "scale": null,
+   "validation_profile_id": "gem_ri_source_range"
+  },
+  {
+   "attribute_id": "mohs_hardness",
+   "value_type": "number",
+   "unit": null,
+   "scale": "mohs",
+   "validation_profile_id": "mohs_ordinal"
+  },
+  {
+   "attribute_id": "specific_gravity",
+   "value_type": "number",
+   "unit": null,
+   "scale": null,
+   "validation_profile_id": "gem_sg_exact"
+  },
+  {
+   "attribute_id": "care_steam",
+   "value_type": "enum",
+   "unit": null,
+   "scale": null,
+   "validation_profile_id": "care_statement"
+  },
+  {
+   "attribute_id": "care_ultrasonic",
+   "value_type": "enum",
+   "unit": null,
+   "scale": null,
+   "validation_profile_id": "care_statement"
+  },
+  {
+   "attribute_id": "diameter_at_weight",
+   "value_type": "number",
+   "unit": "mm",
+   "scale": null,
+   "validation_profile_id": "stuller_point"
+  },
+  {
+   "attribute_id": "typical_diameter_range_at_weight",
+   "value_type": "range",
+   "unit": "mm",
+   "scale": null,
+   "validation_profile_id": "retail_typical_range"
+  },
+  {
+   "attribute_id": "ring_size_us",
+   "value_type": "number",
+   "unit": null,
+   "scale": "US",
+   "validation_profile_id": "ring_us"
+  },
+  {
+   "attribute_id": "ring_size_eu",
+   "value_type": "number",
+   "unit": null,
+   "scale": "EU/ISO",
+   "validation_profile_id": "ring_eu"
+  },
+  {
+   "attribute_id": "ring_size_uk",
+   "value_type": "enum",
+   "unit": null,
+   "scale": "UK",
+   "validation_profile_id": "ring_uk"
+  },
+  {
+   "attribute_id": "ring_size_jp",
+   "value_type": "number",
+   "unit": null,
+   "scale": "JP",
+   "validation_profile_id": "ring_jp_unsourced"
+  },
+  {
+   "attribute_id": "mass_in_grams",
+   "value_type": "number",
+   "unit": "g",
+   "scale": null,
+   "validation_profile_id": "unit_definition"
+  },
+  {
+   "attribute_id": "karat_fineness_equivalent",
+   "value_type": "enum",
+   "unit": null,
+   "scale": null,
+   "validation_profile_id": "purity_unsourced"
+  },
+  {
+   "attribute_id": "density",
+   "value_type": "number",
+   "unit": "g/cm3",
+   "scale": null,
+   "validation_profile_id": "gost_density_exact"
+  },
+  {
+   "attribute_id": "legacy_reference",
+   "value_type": "text",
+   "unit": null,
+   "scale": null,
+   "validation_profile_id": "reference_text"
+  }
+ ],
+ "validation_profiles": [
+  {
+   "profile_id": "gem_ri_source_range",
+   "method": "source_range",
+   "params": {
+    "precision": 3
+   }
+  },
+  {
+   "profile_id": "mohs_ordinal",
+   "method": "ordinal_scale",
+   "params": {
+    "precision": 1
+   }
+  },
+  {
+   "profile_id": "gem_sg_exact",
+   "method": "exact_number",
+   "params": {
+    "precision": 2
+   }
+  },
+  {
+   "profile_id": "care_statement",
+   "method": "enum_match",
+   "params": {}
+  },
+  {
+   "profile_id": "stuller_point",
+   "method": "approximate_point",
+   "params": {
+    "precision": 1
+   }
+  },
+  {
+   "profile_id": "retail_typical_range",
+   "method": "typical_range",
+   "params": {
+    "precision": 1
+   }
+  },
+  {
+   "profile_id": "ring_us",
+   "method": "formula",
+   "params": {
+    "formula": "ring_us_from_diameter",
+    "rounding": "nearest_half"
+   }
+  },
+  {
+   "profile_id": "ring_eu",
+   "method": "formula",
+   "params": {
+    "formula": "ring_eu_from_diameter",
+    "rounding": "nearest_int"
+   }
+  },
+  {
+   "profile_id": "ring_uk",
+   "method": "formula",
+   "params": {
+    "formula": "ring_uk_from_diameter",
+    "rounding": "floor"
+   }
+  },
+  {
+   "profile_id": "ring_jp_unsourced",
+   "method": "manual_source_review",
+   "params": {
+    "reason": "EV-RING has no JP formula"
+   }
+  },
+  {
+   "profile_id": "unit_definition",
+   "method": "exact_number",
+   "params": {
+    "precision": 3
+   }
+  },
+  {
+   "profile_id": "purity_unsourced",
+   "method": "manual_source_review",
+   "params": {
+    "reason": "EV-CARAT defines the metric carat (mass), not gold karat fineness"
+   }
+  },
+  {
+   "profile_id": "gost_density_exact",
+   "method": "exact_number",
+   "params": {
+    "precision": 2
+   }
+  },
+  {
+   "profile_id": "reference_text",
+   "method": "manual_source_review",
+   "params": {
+    "reason": "unnormalized legacy text"
+   }
+  }
+ ],
+ "evidence": [
+  {
+   "ev_id": "EV-GIA-RUBY",
+   "org": "GIA",
+   "title": "Gem Encyclopedia — Ruby (FACTS)",
+   "url": "https://www.gia.edu/ruby",
+   "tier": "Q1",
+   "fragment": "Corundum, Al2O3; RI 1.762–1.770; SG 4.00 (±0.05); Mohs 9",
+   "limitations": null,
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-GIA-SAPH",
+   "org": "GIA",
+   "title": "Gem Encyclopedia — Sapphire (FACTS)",
+   "url": "https://my.gia.edu/sapphire",
+   "tier": "Q1",
+   "fragment": "Every color but red; RI 1.762–1.770; SG 4.00; Mohs 9",
+   "limitations": null,
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-GIA-CARE-RUBY",
+   "org": "GIA",
+   "title": "Ruby Care and Cleaning Guide (корунд)",
+   "url": "https://www.gia.edu/ruby-care-cleaning",
+   "tier": "Q1",
+   "fragment": "Ultrasonic and steam usually safe for untreated, heat-treated and diffused stones; fracture-filled only with a damp cloth",
+   "limitations": null,
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-STULLER",
+   "org": "Stuller",
+   "title": "Millimeter to Diamond Carat Weight Conversion Chart",
+   "url": "https://blog.stuller.com/wp-content/uploads/2025/05/MM-CT-Chart.pdf",
+   "tier": "Q2",
+   "fragment": "Round: 0.005 ct — 1.0 mm … 1 ct — 6.4 mm … 5 ct — 11.0 mm; sizes are approximate",
+   "limitations": "Approximate points; not a production tolerance",
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-DALILA-SIZE",
+   "org": "Dalila Diamonds",
+   "title": "Round diamond size chart (secondary retailer)",
+   "url": "https://www.daliladiamonds.com/resources/diamond-size-chart",
+   "tier": "Q3",
+   "fragment": "Typical weight–diameter ranges; for example 1.50 ct ≈ 7.3–7.5 mm",
+   "limitations": "Secondary retail orientation; not a tolerance or guarantee",
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-RING",
+   "org": "ISO 8653:2016 (iteh preview) + industry tables",
+   "title": "Jewellery — Ring-sizes — Definition, measurement and designation; US size chart",
+   "url": "https://standards.iteh.ai/catalog/standards/iso/799f4661-1465-4f4f-a23d-1a9ad8567517/iso-8653-2016",
+   "tier": "Q2",
+   "fragment": "ISO size = inner circumference; US: d = 11.63 + 0.8128 × size (mm); UK: C = 40 mm, step 1.25 mm",
+   "limitations": "Standard annotation plus secondary tables; no JP rule",
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-CARAT",
+   "org": "NBS (NIST) Circular 43",
+   "title": "The Metric Carat",
+   "url": "https://nvlpubs.nist.gov/nistpubs/Legacy/circ/nbscircular43.pdf",
+   "tier": "Q1",
+   "fragment": "Metric carat = 200 mg",
+   "limitations": null,
+   "retrieved_at": "2026-11-20"
+  },
+  {
+   "ev_id": "EV-GOST30649-FACSIMILE",
+   "org": "МГС / Госстандарт (републикация сторонним сайтом)",
+   "title": "ГОСТ 30649-99, скан печатного издания, Изм. № 1 и № 2",
+   "url": "https://auremo.org/files/gosts/gost-30649-99.pdf",
+   "tier": "Q2",
+   "fragment": "Tables А.1, Б.1, В.1, Г.1 (calculated density); cross-checked with the dnaop.com and meganorm.ru transcriptions on 20.11.2026",
+   "limitations": "Third-party copy of the printed edition; not a certified copy",
+   "retrieved_at": "2026-11-20"
+  }
+ ],
+ "terms": [
+  {
+   "term_id": "term.ruby.ru",
+   "entity_id": "gem.corundum.ruby",
+   "lang": "ru",
+   "text": "рубин",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.ruby.en",
+   "entity_id": "gem.corundum.ruby",
+   "lang": "en",
+   "text": "ruby",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.sapphire.ru",
+   "entity_id": "gem.corundum.sapphire",
+   "lang": "ru",
+   "text": "сапфир",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.sapphire.en",
+   "entity_id": "gem.corundum.sapphire",
+   "lang": "en",
+   "text": "sapphire",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.corundum.ru",
+   "entity_id": "gem.corundum",
+   "lang": "ru",
+   "text": "корунд",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.corundum.en",
+   "entity_id": "gem.corundum",
+   "lang": "en",
+   "text": "corundum",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.diamond.ru",
+   "entity_id": "gem.diamond",
+   "lang": "ru",
+   "text": "бриллиант",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.diamond.en",
+   "entity_id": "gem.diamond",
+   "lang": "en",
+   "text": "diamond",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.metric_carat.ru",
+   "entity_id": "measure.metric_carat",
+   "lang": "ru",
+   "text": "карат",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.metric_carat.en",
+   "entity_id": "measure.metric_carat",
+   "lang": "en",
+   "text": "carat",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.metric_carat.ct",
+   "entity_id": "measure.metric_carat",
+   "lang": "en",
+   "text": "ct",
+   "kind": "synonym",
+   "is_preferred": false
+  },
+  {
+   "term_id": "term.gold_karat.ru",
+   "entity_id": "metal.gold.karat",
+   "lang": "ru",
+   "text": "карат",
+   "kind": "name",
+   "is_preferred": true
+  },
+  {
+   "term_id": "term.gold_karat.en",
+   "entity_id": "metal.gold.karat",
+   "lang": "en",
+   "text": "karat",
+   "kind": "name",
+   "is_preferred": true
+  }
+ ],
+ "term_relations": [
+  {
+   "relation_id": "rel.carat_karat",
+   "term_a": "term.metric_carat.en",
+   "term_b": "term.gold_karat.en",
+   "relation": "false_equivalent",
+   "note": "carat (mass, 0.2 g) ≠ karat (gold fineness in 24ths)"
+  },
+  {
+   "relation_id": "rel.karat_ru_ambiguous",
+   "term_a": "term.metric_carat.ru",
+   "term_b": "term.gold_karat.ru",
+   "relation": "ambiguous",
+   "note": "В русском «карат» обозначает и массу камня, и пробу золота"
+  }
+ ],
+ "callers": [
+  {
+   "caller_id": "semantic_orchestrator",
+   "description": "Conversational Core SO (phase C consumer)",
+   "purposes": [
+    "resolve",
+    "verify_evidence",
+    "release_metadata",
+    "display",
+    "display_caveat",
+    "explain",
+    "prompt",
+    "calc_reference",
+    "validate_warn"
+   ]
+  },
+  {
+   "caller_id": "consultant",
+   "description": "AI consultant",
+   "purposes": [
+    "resolve",
+    "search",
+    "release_metadata",
+    "display",
+    "display_caveat",
+    "explain",
+    "legal_info"
+   ]
+  },
+  {
+   "caller_id": "trainer",
+   "description": "Gemology trainer",
+   "purposes": [
+    "resolve",
+    "search",
+    "release_metadata",
+    "display",
+    "display_caveat",
+    "explain"
+   ]
+  }
+ ],
+ "claims": [
+  {
+   "legacy": [
+    [
+     "K-00688",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00688",
+    "legacy_parameter": "Исправление"
+   },
+   "value": {
+    "text_ru": "Пересчитать hue в blue"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00689",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00689",
+    "legacy_parameter": "Причина"
+   },
+   "value": {
+    "text_ru": "Неверный hue"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00762",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00762",
+    "legacy_parameter": "Минерал"
+   },
+   "value": {
+    "text_ru": "Corundum (Al₂O₃)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00763",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00763",
+    "legacy_parameter": "Ключевой цвет"
+   },
+   "value": {
+    "text_ru": "Синий (Fe/Ti); также fancy (жёлтый, розовый, падпараджа)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00764",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00764",
+    "legacy_parameter": "Разновидность"
+   },
+   "value": {
+    "text_ru": "Сапфир"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00765",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00765",
+    "legacy_parameter": "Ключевой цвет"
+   },
+   "value": {
+    "text_ru": "Красный (Cr)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00766",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00766",
+    "legacy_parameter": "Разновидность"
+   },
+   "value": {
+    "text_ru": "Рубин"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00776",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00776",
+    "legacy_parameter": "Исправление"
+   },
+   "value": {
+    "text_ru": "Снизить до vivid, добавить tone"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00777",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00777",
+    "legacy_parameter": "Причина"
+   },
+   "value": {
+    "text_ru": "Перебор saturation"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00843",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00843",
+    "legacy_parameter": "Absorption (color)"
+   },
+   "value": {
+    "text_ru": "Red absorption, Cr fluorescence"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00844",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00844",
+    "legacy_parameter": "BR"
+   },
+   "value": {
+    "text_ru": "0,008–0,010"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00845",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00845",
+    "legacy_parameter": "Дисперсия"
+   },
+   "value": {
+    "text_ru": "0,018 (рубин)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L8 Согласовано несколькими источниками, но независимо не проверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00846",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00846",
+    "legacy_parameter": "Закрепка (P0-4)"
+   },
+   "value": {
+    "text_ru": "Любая, включая tension"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00847",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00847",
+    "legacy_parameter": "Источники и локализация по найденным данным"
+   },
+   "value": {
+    "text_ru": "Мьянма (Могок, Монг Ху) — традиционно высшие цены; Мозамбик (Монтепуэс, с 2009), Шри-Ланка, Таиланд, Мадагаскар, Вьетнам, Таджикистан, Кения, Афганистан, Пакистан, США (Монтана)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00848",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00848",
+    "legacy_parameter": "Комментарий"
+   },
+   "value": {
+    "text_ru": "стекло-наполненные рубины хрупки: ограничения см. 6.3"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00849",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00849",
+    "legacy_parameter": "Освещение"
+   },
+   "value": {
+    "text_ru": "Daylight + UV-подсветка (флуоресценция), тёплый key"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00850",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00850",
+    "legacy_parameter": "Особое"
+   },
+   "value": {
+    "text_ru": "Emission (UV)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00852",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00852",
+    "legacy_parameter": "Спайность"
+   },
+   "value": {
+    "text_ru": "нет; у двойников — отдельность"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00854",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00854",
+    "legacy_parameter": "Типичные обработки"
+   },
+   "value": {
+    "text_ru": "нагрев (повсеместно); заполнение трещин свинцовым стеклом; бериллиевая диффузия; флюсовое залечивание"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00856",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00856",
+    "legacy_parameter": "Характеристика"
+   },
+   "value": {
+    "text_ru": "Флуоресценция (Cr)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00857",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00857",
+    "legacy_parameter": "Хрупкость"
+   },
+   "value": {
+    "text_ru": "Низкая"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00858",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00858",
+    "legacy_parameter": "Цвета"
+   },
+   "value": {
+    "text_ru": "Красный / красно-фиолетовый"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00859",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00859",
+    "legacy_parameter": "Trade name"
+   },
+   "value": {
+    "text_ru": "Pigeon's Blood"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00860",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00860",
+    "legacy_parameter": "Trade name"
+   },
+   "value": {
+    "text_ru": "Royal Red"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00861",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00861",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Burma (Mogok)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00862",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00862",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Mozambique"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00863",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00863",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Thailand"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00864",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00864",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "«Pigeon's blood», silk, высокий флуоресцент"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00865",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00865",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "Более тёмный, менее флуоресцентный"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00866",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00866",
+    "legacy_parameter": "HTS-ориентир"
+   },
+   "value": {
+    "text_ru": "Red, medium-dark, vivid"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00867",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00867",
+    "legacy_parameter": "HTS-ориентир"
+   },
+   "value": {
+    "text_ru": "Red, medium-dark, strong"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00868",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00868",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "Темнее, Fe-богатый"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00886",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00886",
+    "legacy_parameter": "Absorption (color)"
+   },
+   "value": {
+    "text_ru": "Blue absorption"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00887",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00887",
+    "legacy_parameter": "BR"
+   },
+   "value": {
+    "text_ru": "0,008–0,010"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00888",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00888",
+    "legacy_parameter": "Дисперсия"
+   },
+   "value": {
+    "text_ru": "0,018 (рубин)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L8 Согласовано несколькими источниками, но независимо не проверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00889",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00889",
+    "legacy_parameter": "Закрепка (P0-4)"
+   },
+   "value": {
+    "text_ru": "Любая"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00890",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00890",
+    "legacy_parameter": "Источники и локализация по найденным данным"
+   },
+   "value": {
+    "text_ru": "GIA: Кашмир получает наибольшую премию; Мьянма, Шри-Ланка, Мадагаскар тоже дают камни высшего качества. Другие: Австралия, Камбоджа, Китай, Эфиопия, Кения, Нигерия, Танзания, Таиланд, США (Монтана), Вьетнам"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00891",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00891",
+    "legacy_parameter": "Комментарий"
+   },
+   "value": {
+    "text_ru": "GIA: lattice diffusion — нагрев с химикатами для искусственного изменения цвета"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00892",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00892",
+    "legacy_parameter": "Освещение"
+   },
+   "value": {
+    "text_ru": "Холодный студийный свет (blue), мягкий fill"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00893",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00893",
+    "legacy_parameter": "Особое"
+   },
+   "value": {
+    "text_ru": "Silk (subsurface)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00895",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00895",
+    "legacy_parameter": "Спайность"
+   },
+   "value": {
+    "text_ru": "нет; у двойников — отдельность"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00897",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00897",
+    "legacy_parameter": "Типичные обработки"
+   },
+   "value": {
+    "text_ru": "нагрев; диффузия (титан, бериллий); окрашивание/масла (временные)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-00899",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00899",
+    "legacy_parameter": "Характеристика"
+   },
+   "value": {
+    "text_ru": "Шёлк (рутил)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00900",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00900",
+    "legacy_parameter": "Хрупкость"
+   },
+   "value": {
+    "text_ru": "Низкая"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00901",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00901",
+    "legacy_parameter": "Цвета"
+   },
+   "value": {
+    "text_ru": "Синий / зеленовато-синий"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00902",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00902",
+    "legacy_parameter": "Trade name"
+   },
+   "value": {
+    "text_ru": "Royal Blue / Cornflower"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00903",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00903",
+    "legacy_parameter": "Trade name"
+   },
+   "value": {
+    "text_ru": "Padparadscha"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00904",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00904",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Ceylon (Sri Lanka)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00905",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00905",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Kashmir"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00906",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00906",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Madagascar"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00907",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00907",
+    "legacy_parameter": "Источник"
+   },
+   "value": {
+    "text_ru": "Montana (USA)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00908",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00908",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "Светлее, «молочный» silk, падпараджа"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00909",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00909",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "«Velvet blue», шёлк"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00910",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00910",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "Разнообразие"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00911",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00911",
+    "legacy_parameter": "Маркер происхождения"
+   },
+   "value": {
+    "text_ru": "Бледный, «металлический»"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00912",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00912",
+    "legacy_parameter": "HTS-ориентир"
+   },
+   "value": {
+    "text_ru": "Orange-pink, light-medium, strong"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00913",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-00913",
+    "legacy_parameter": "HTS-ориентир"
+   },
+   "value": {
+    "text_ru": "Blue, medium, vivid"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03156",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03156",
+    "legacy_parameter": "Белое"
+   },
+   "value": {
+    "text_ru": "Современно"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03157",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03157",
+    "legacy_parameter": "Жёлтое"
+   },
+   "value": {
+    "text_ru": "Классика"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03158",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03158",
+    "legacy_parameter": "Платина"
+   },
+   "value": {
+    "text_ru": "Современно"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03159",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03159",
+    "legacy_parameter": "Розовое"
+   },
+   "value": {
+    "text_ru": "Хорошо"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03188",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03188",
+    "legacy_parameter": "Белое"
+   },
+   "value": {
+    "text_ru": "Усиливает синий"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03189",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03189",
+    "legacy_parameter": "Жёлтое"
+   },
+   "value": {
+    "text_ru": "Тёплый контраст"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03190",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03190",
+    "legacy_parameter": "Платина"
+   },
+   "value": {
+    "text_ru": "Идеально"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03191",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-03191",
+    "legacy_parameter": "Розовое"
+   },
+   "value": {
+    "text_ru": "Необычно"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04461",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04461",
+    "legacy_parameter": "Art Deco"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04462",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04462",
+    "legacy_parameter": "Art Nouveau"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04463",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04463",
+    "legacy_parameter": "Bezel"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04464",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04464",
+    "legacy_parameter": "Channel"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04465",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04465",
+    "legacy_parameter": "Modern"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04466",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04466",
+    "legacy_parameter": "Prong"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04467",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04467",
+    "legacy_parameter": "Tension"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04468",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04468",
+    "legacy_parameter": "Victorian"
+   },
+   "value": {
+    "text_ru": "✅✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04469",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04469",
+    "legacy_parameter": "Белое"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04470",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04470",
+    "legacy_parameter": "Жёлтое"
+   },
+   "value": {
+    "text_ru": "✅✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04471",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04471",
+    "legacy_parameter": "Платина"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04472",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04472",
+    "legacy_parameter": "Розовое"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04473",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04473",
+    "legacy_parameter": "Источник / замечание"
+   },
+   "value": {
+    "text_ru": "gemmology-dev, USA Jewels; нагретые или заполненные — осторожно (gemmology-dev; Digital Gem Chart: «fracture-filled» требует осторожности)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L9 Один источник (Claude, с цитатами) — не перепроверено"
+  },
+  {
+   "legacy": [
+    [
+     "K-04477",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04477",
+    "legacy_parameter": "Art Deco"
+   },
+   "value": {
+    "text_ru": "✅✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04478",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04478",
+    "legacy_parameter": "Art Nouveau"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04479",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04479",
+    "legacy_parameter": "Bezel"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04480",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04480",
+    "legacy_parameter": "Channel"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04481",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04481",
+    "legacy_parameter": "Modern"
+   },
+   "value": {
+    "text_ru": "✅✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04482",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04482",
+    "legacy_parameter": "Prong"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04483",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04483",
+    "legacy_parameter": "Tension"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04484",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04484",
+    "legacy_parameter": "Victorian"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04485",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04485",
+    "legacy_parameter": "Белое"
+   },
+   "value": {
+    "text_ru": "✅✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04486",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04486",
+    "legacy_parameter": "Жёлтое"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04487",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04487",
+    "legacy_parameter": "Платина"
+   },
+   "value": {
+    "text_ru": "✅✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04488",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-04488",
+    "legacy_parameter": "Розовое"
+   },
+   "value": {
+    "text_ru": "⚠️"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-06699",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-06699",
+    "legacy_parameter": "Название EN"
+   },
+   "value": {
+    "text_ru": "No silk"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L6 Термин/перевод — не аттестован первоисточником"
+  },
+  {
+   "legacy": [
+    [
+     "K-07165",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-07165",
+    "legacy_parameter": "Признак"
+   },
+   "value": {
+    "text_ru": "Сапфир «идеальный»"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-07166",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-07166",
+    "legacy_parameter": "Уровень"
+   },
+   "value": {
+    "text_ru": "Низкий"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09854",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09854",
+    "legacy_parameter": "Метод"
+   },
+   "value": {
+    "text_ru": "Вернейля"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09855",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09855",
+    "legacy_parameter": "Метод"
+   },
+   "value": {
+    "text_ru": "Флюсовый"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09856",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09856",
+    "legacy_parameter": "Диагностические включения"
+   },
+   "value": {
+    "text_ru": "Curved striae (изогнутые линии роста), gas bubbles"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09857",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09857",
+    "legacy_parameter": "Диагностические включения"
+   },
+   "value": {
+    "text_ru": "Flux inclusions, Pt-пластинки, «вуаль»"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09877",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09877",
+    "legacy_parameter": "Pavé"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09878",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09878",
+    "legacy_parameter": "Метод"
+   },
+   "value": {
+    "text_ru": "Вернейля"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09879",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09879",
+    "legacy_parameter": "Метод"
+   },
+   "value": {
+    "text_ru": "Чохральского"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09880",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09880",
+    "legacy_parameter": "Диагностические включения"
+   },
+   "value": {
+    "text_ru": "Curved striae, bubbles"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09881",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09881",
+    "legacy_parameter": "Диагностические включения"
+   },
+   "value": {
+    "text_ru": "Отсутствие striae, высокая чистота"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09890",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09890",
+    "legacy_parameter": "Bezel"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09891",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09891",
+    "legacy_parameter": "Pavé"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09892",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09892",
+    "legacy_parameter": "Prong"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09893",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09893",
+    "legacy_parameter": "Tension"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09903",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09903",
+    "legacy_parameter": "Исправление"
+   },
+   "value": {
+    "text_ru": "curved striae, flux inclusions"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09904",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09904",
+    "legacy_parameter": "Причина"
+   },
+   "value": {
+    "text_ru": "Ошибка"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-10230",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-10230",
+    "legacy_parameter": "Действие"
+   },
+   "value": {
+    "text_ru": "Требовать подтверждение"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-10231",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-10231",
+    "legacy_parameter": "Уровень"
+   },
+   "value": {
+    "text_ru": "🟠 High"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-10903",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-10903",
+    "legacy_parameter": "Влажность"
+   },
+   "value": {
+    "text_ru": "Низкая"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-10904",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-10904",
+    "legacy_parameter": "Свет"
+   },
+   "value": {
+    "text_ru": "Любой"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-10905",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-10905",
+    "legacy_parameter": "Температура"
+   },
+   "value": {
+    "text_ru": "Комнатная"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-10906",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-10906",
+    "legacy_parameter": "Условия"
+   },
+   "value": {
+    "text_ru": "Сухо, отдельно"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11033",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11033",
+    "legacy_parameter": "Вода"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11035",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11035",
+    "legacy_parameter": "Тёплая вода + мыло"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11036",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11036",
+    "legacy_parameter": "Химическая формула"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11038",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11038",
+    "legacy_parameter": "Ультразвук"
+   },
+   "value": {
+    "text_ru": "✅ 5 мин"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: Класс совпадает с GIA (обычно безопасно, кроме камней с трещинами/заполнением/жидкими включениями (GIA)); длительность обработки в источнике не подтверждена"
+  },
+  {
+   "legacy": [
+    [
+     "K-11073",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11073",
+    "legacy_parameter": "Вода"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11075",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11075",
+    "legacy_parameter": "Тёплая вода + мыло"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11076",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11076",
+    "legacy_parameter": "Химическая формула"
+   },
+   "value": {
+    "text_ru": "✅"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-11078",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-11078",
+    "legacy_parameter": "Ультразвук"
+   },
+   "value": {
+    "text_ru": "✅ 5 мин"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: Класс совпадает с GIA (обычно безопасно, кроме камней с трещинами/заполнением/жидкими включениями (GIA)); длительность обработки в источнике не подтверждена"
+  },
+  {
+   "legacy": [
+    [
+     "K-12535",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12535",
+    "legacy_parameter": "Значение"
+   },
+   "value": {
+    "text_ru": "Огонь, страсть"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12536",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12536",
+    "legacy_parameter": "Культура"
+   },
+   "value": {
+    "text_ru": "Тибет/Индия"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12537",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12537",
+    "legacy_parameter": "Значение"
+   },
+   "value": {
+    "text_ru": "Страсть, любовь, жизненная сила"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12538",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12538",
+    "legacy_parameter": "Культура"
+   },
+   "value": {
+    "text_ru": "Западная, Индия"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12539",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12539",
+    "legacy_parameter": "Культура"
+   },
+   "value": {
+    "text_ru": "Некоторые"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12563",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12563",
+    "legacy_parameter": "Значение"
+   },
+   "value": {
+    "text_ru": "Верность, мудрость, королевская власть"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12564",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12564",
+    "legacy_parameter": "Культура"
+   },
+   "value": {
+    "text_ru": "Западная"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-12565",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-12565",
+    "legacy_parameter": "Культура"
+   },
+   "value": {
+    "text_ru": "Некоторые"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13553",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13553",
+    "legacy_parameter": "Fill"
+   },
+   "value": {
+    "text_ru": "Soft"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13554",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13554",
+    "legacy_parameter": "Key"
+   },
+   "value": {
+    "text_ru": "Warm"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13555",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13555",
+    "legacy_parameter": "Rim"
+   },
+   "value": {
+    "text_ru": "Warm"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13556",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13556",
+    "legacy_parameter": "Схема"
+   },
+   "value": {
+    "text_ru": "Two-strip"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13576",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13576",
+    "legacy_parameter": "Fill"
+   },
+   "value": {
+    "text_ru": "Soft"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13577",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13577",
+    "legacy_parameter": "Key"
+   },
+   "value": {
+    "text_ru": "Cool"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13578",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13578",
+    "legacy_parameter": "Rim"
+   },
+   "value": {
+    "text_ru": "Cool"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-13579",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-13579",
+    "legacy_parameter": "Схема"
+   },
+   "value": {
+    "text_ru": "Light tent"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L11 Один непроверенный источник (DeepSeek)"
+  },
+  {
+   "legacy": [
+    [
+     "K-17627",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-17627",
+    "legacy_parameter": "Плеохроизм"
+   },
+   "value": {
+    "text_ru": "сильный (дихроизм: пурпурно-красный / оранжево-красный)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L7 Расхождение решено редакционно; первоисточник не проверен"
+  },
+  {
+   "legacy": [
+    [
+     "K-17628",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-17628",
+    "legacy_parameter": "Плеохроизм"
+   },
+   "value": {
+    "text_ru": "умеренный — сильный (дихроизм)"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: L7 Расхождение решено редакционно; первоисточник не проверен"
+  },
+  {
+   "legacy": [
+    [
+     "K-17680",
+     "one_to_one",
+     "unnormalized legacy text kept as reference"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-17680",
+    "legacy_parameter": "Правило"
+   },
+   "value": {
+    "text_ru": "Зелёный сапфир — реальная разновидность корунда. Зелёный оттенок — ошибка рендера только если пользователь запросил синий сапфир. Негативный промпт «green sapphire» применять только для запроса синего сапфира."
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [],
+   "reason": "v1.6.2 REFERENCE ONLY: v1.5 audit: GIA подтверждает существование зелёного сапфира, но не предписывает негативный промпт/правило рендера. Источник/контекст: https://www.gia.edu/sapphire"
+  },
+  {
+   "legacy": [
+    [
+     "K-05100",
+     "excluded",
+     "REJECTED in v1.6.2; kept for history only"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-05100"
+   },
+   "value": {
+    "text_ru": "Плотность влияет на вес: сапфир (4,0) тяжелее изумруда (2,7)."
+   },
+   "value_kind": "text",
+   "proposed_status": "REJECTED",
+   "permission_code": "EXCLUDE",
+   "evidence": [],
+   "reason": "v1.6.2 REJECTED: Дубль: Дубль K-00884 (сходство 0.89)"
+  },
+  {
+   "legacy": [
+    [
+     "K-09789",
+     "excluded",
+     "REJECTED in v1.6.2; kept for history only"
+    ]
+   ],
+   "entity_id": "gem.corundum",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-09789"
+   },
+   "value": {
+    "text_ru": "составу). Имитация рубина — это стекло или шпинель (другой состав)."
+   },
+   "value_kind": "text",
+   "proposed_status": "REJECTED",
+   "permission_code": "EXCLUDE",
+   "evidence": [],
+   "reason": "v1.6.2 REJECTED: Фрагмент (текст объединён): Фрагмент — текст объединён в K-09788"
+  },
+  {
+   "legacy": [
+    [
+     "K-00851",
+     "one_to_one",
+     "atomic gem constant"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "refractive_index",
+   "scope": {},
+   "value": {
+    "min": "1.762",
+    "max": "1.770"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "VERIFIED",
+   "permission_code": "FACT_DISPLAY_RENDER_HINT",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-RUBY",
+     "source_value": {
+      "min": "1.762",
+      "max": "1.77"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-GEM)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00853",
+     "one_to_one",
+     "atomic gem constant"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "mohs_hardness",
+   "scope": {},
+   "value": {
+    "num": "9"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "FACT_DISPLAY_RENDER_HINT",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-RUBY",
+     "source_value": {
+      "num": "9"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-GEM)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00855",
+     "one_to_one",
+     "atomic gem constant"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "specific_gravity",
+   "scope": {},
+   "value": {
+    "num": "4.00"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "FACT_PARTIAL_DISPLAY_ONLY",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-RUBY",
+     "source_value": {
+      "num": "4"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-GEM)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00894",
+     "one_to_one",
+     "atomic gem constant"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "refractive_index",
+   "scope": {},
+   "value": {
+    "min": "1.762",
+    "max": "1.770"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "VERIFIED",
+   "permission_code": "FACT_DISPLAY_RENDER_HINT",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-SAPH",
+     "source_value": {
+      "min": "1.762",
+      "max": "1.77"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-GEM)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00896",
+     "one_to_one",
+     "atomic gem constant"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "mohs_hardness",
+   "scope": {},
+   "value": {
+    "num": "9"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "FACT_DISPLAY_RENDER_HINT",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-SAPH",
+     "source_value": {
+      "num": "9"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-GEM)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00898",
+     "one_to_one",
+     "atomic gem constant"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "specific_gravity",
+   "scope": {},
+   "value": {
+    "num": "4.00"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "FACT_DISPLAY_RENDER_HINT",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-SAPH",
+     "source_value": {
+      "num": "4"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-GEM)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04474",
+     "split",
+     "«рубин, сапфир (не облагороженные)» split into one claim per variety"
+    ],
+    [
+     "K-11034",
+     "merged",
+     "✅ without treatment scope merged; GIA limits it to untreated/heated/diffused"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "care_steam",
+   "scope": {
+    "treatment": "untreated"
+   },
+   "value": {
+    "enum": "usually_safe"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "CARE_GUIDANCE_CONDITIONAL",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-CARE-RUBY",
+     "source_value": {
+      "enum": "usually_safe"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-CARE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04475",
+     "split",
+     "«рубин, сапфир (не облагороженные)» split into one claim per variety"
+    ],
+    [
+     "K-11037",
+     "merged",
+     "✅ without treatment scope merged; GIA limits it to untreated/heated/diffused"
+    ]
+   ],
+   "entity_id": "gem.corundum.ruby",
+   "attribute_id": "care_ultrasonic",
+   "scope": {
+    "treatment": "untreated"
+   },
+   "value": {
+    "enum": "usually_safe"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "CARE_GUIDANCE_CONDITIONAL",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-CARE-RUBY",
+     "source_value": {
+      "enum": "usually_safe"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-CARE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04474",
+     "split",
+     "«рубин, сапфир (не облагороженные)» split into one claim per variety"
+    ],
+    [
+     "K-11074",
+     "merged",
+     "✅ without treatment scope merged; GIA limits it to untreated/heated/diffused"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "care_steam",
+   "scope": {
+    "treatment": "untreated"
+   },
+   "value": {
+    "enum": "usually_safe"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "CARE_GUIDANCE_CONDITIONAL",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-CARE-RUBY",
+     "source_value": {
+      "enum": "usually_safe"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-CARE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04475",
+     "split",
+     "«рубин, сапфир (не облагороженные)» split into one claim per variety"
+    ],
+    [
+     "K-11077",
+     "merged",
+     "✅ without treatment scope merged; GIA limits it to untreated/heated/diffused"
+    ]
+   ],
+   "entity_id": "gem.corundum.sapphire",
+   "attribute_id": "care_ultrasonic",
+   "scope": {
+    "treatment": "untreated"
+   },
+   "value": {
+    "enum": "usually_safe"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "CARE_GUIDANCE_CONDITIONAL",
+   "evidence": [
+    {
+     "ev_id": "EV-GIA-CARE-RUBY",
+     "source_value": {
+      "enum": "usually_safe"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-CARE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00177",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.005",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "1.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "1.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00179",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.0075",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "1.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "1.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00181",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.01",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "1.3"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "1.3"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00181",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.01",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "1.3",
+    "max": "1.3"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "1.3",
+      "max": "1.3"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00182",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.015",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "1.5"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "1.5"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00183",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.02",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "1.7"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "1.7"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00183",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.02",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "1.7",
+    "max": "1.7"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "1.7",
+      "max": "1.7"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00184",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.025",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "1.8"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "1.8"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00185",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.03",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00185",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.03",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "2.0",
+    "max": "2.0"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "2.0",
+      "max": "2.0"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00186",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.035",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.1"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.1"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00187",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.04",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00188",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.05",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.4"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.4"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00188",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.05",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "2.4",
+    "max": "2.4"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "2.4",
+      "max": "2.4"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00189",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.06",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.5"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.5"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00189",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.06",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "2.5",
+    "max": "2.5"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "2.5",
+      "max": "2.5"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00191",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.07",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.7"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.7"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00192",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.08",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.8"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.8"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00193",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.09",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "2.9"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "2.9"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00194",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.1",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00194",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.1",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "3.0",
+    "max": "3.0"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "3.0",
+      "max": "3.0"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00195",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.12",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00196",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.14",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.3"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.3"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00197",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.15",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.4"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.4"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04710",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.16",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.5"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.5"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00198",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.2",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.7"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.7"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00198",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.2",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "3.8",
+    "max": "3.8"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "3.8",
+      "max": "3.8"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00199",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.23",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "3.9"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "3.9"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00200",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.25",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "4.1"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "4.1"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00200",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.25",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "4.0",
+    "max": "4.1"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "4.0",
+      "max": "4.1"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00201",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.3",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "4.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "4.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00201",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.3",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "4.3",
+    "max": "4.3"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "4.3",
+      "max": "4.3"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00202",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.4",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "4.8"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "4.8"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00202",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.4",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "4.7",
+    "max": "4.8"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "4.7",
+      "max": "4.8"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-17165",
+     "split",
+     "v1.6.2 value «diameter 5 мм» mixed sources; Stuller point kept"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.47",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "5.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "5.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00203",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.5",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "5.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "5.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00203",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.5",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "5.0",
+    "max": "5.2"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "5.0",
+      "max": "5.2"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04712",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.6",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "5.4"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "5.4"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00204",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.75",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "5.7"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "5.7"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00204",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.75",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "5.7",
+    "max": "5.9"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "5.7",
+      "max": "5.9"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-04713",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "0.8",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "6.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "6.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-17166",
+     "split",
+     "v1.6.2 value «6,4–6,5 мм» mixed sources; Stuller point kept"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "6.4"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "6.4"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-17166",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "6.4",
+    "max": "6.5"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "6.4",
+      "max": "6.5"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00205",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.25",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "7.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "7.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00205",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.25",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "6.8",
+    "max": "7.0"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "6.8",
+      "max": "7.0"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00206",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.5",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "7.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "7.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00206",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.5",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "7.3",
+    "max": "7.5"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "7.3",
+      "max": "7.5"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00207",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.75",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "7.8"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "7.8"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00207",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.75",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "7.7",
+    "max": "7.9"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "7.7",
+      "max": "7.9"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-17167",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "1.9",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "7.9"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "7.9"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00208",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "2",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "8.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "8.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00208",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "2",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "8.0",
+    "max": "8.2"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "8.0",
+      "max": "8.2"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00209",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "2.5",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "8.6"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "8.6"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00209",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "2.5",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "8.7",
+    "max": "8.9"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "8.7",
+      "max": "8.9"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00210",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "3",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "9.3"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "9.3"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00210",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "3",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "9.2",
+    "max": "9.4"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "9.2",
+      "max": "9.4"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00211",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "3.5",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "9.8"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "9.8"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00212",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "4",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "10.2"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "10.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00212",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "4",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "10.1",
+    "max": "10.3"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "10.1",
+      "max": "10.3"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00213",
+     "one_to_one",
+     "atomic Stuller reference point"
+    ],
+    [
+     "K-17678",
+     "split",
+     "aggregated weight–diameter table split into atomic points"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "diameter_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "5",
+    "reference": "stuller_2025"
+   },
+   "value": {
+    "num": "11.0"
+   },
+   "value_kind": "approximate",
+   "proposed_status": "VERIFIED",
+   "permission_code": "APPROX_SIZE_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-STULLER",
+     "source_value": {
+      "num": "11.0"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-SIZE)"
+  },
+  {
+   "legacy": [
+    [
+     "K-00213",
+     "split",
+     "independent Dalila typical range kept separately"
+    ]
+   ],
+   "entity_id": "gem.diamond",
+   "attribute_id": "typical_diameter_range_at_weight",
+   "scope": {
+    "shape": "round",
+    "carat_weight": "5",
+    "reference": "dalila_typical"
+   },
+   "value": {
+    "min": "10.9",
+    "max": "11.1"
+   },
+   "value_kind": "source_range",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-DALILA-SIZE",
+     "source_value": {
+      "min": "10.9",
+      "max": "11.1"
+     }
+    }
+   ],
+   "reason": "secondary retail range; orientation only (v1.6.2 column «Dalila»)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14281",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.0"
+   },
+   "value": {
+    "num": "47"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14282",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.0"
+   },
+   "value": {
+    "num": "7"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14283",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.0"
+   },
+   "value": {
+    "enum": "H"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14284",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.0"
+   },
+   "value": {
+    "num": "4"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14285",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.3"
+   },
+   "value": {
+    "num": "48"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14286",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.3"
+   },
+   "value": {
+    "num": "8"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14287",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.3"
+   },
+   "value": {
+    "enum": "I"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14288",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.3"
+   },
+   "value": {
+    "num": "4.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14289",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.7"
+   },
+   "value": {
+    "num": "49"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14290",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.7"
+   },
+   "value": {
+    "num": "9"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14291",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.7"
+   },
+   "value": {
+    "enum": "J"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14292",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "15.7"
+   },
+   "value": {
+    "num": "5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14293",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.1"
+   },
+   "value": {
+    "num": "50"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14294",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.1"
+   },
+   "value": {
+    "num": "10"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14295",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.1"
+   },
+   "value": {
+    "enum": "K"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14296",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.1"
+   },
+   "value": {
+    "num": "5.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14297",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.5"
+   },
+   "value": {
+    "num": "52"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14298",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.5"
+   },
+   "value": {
+    "num": "11"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14299",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.5"
+   },
+   "value": {
+    "enum": "L"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14300",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.5"
+   },
+   "value": {
+    "num": "6"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14301",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.9"
+   },
+   "value": {
+    "num": "53"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14302",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.9"
+   },
+   "value": {
+    "num": "12"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14303",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.9"
+   },
+   "value": {
+    "enum": "M"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14304",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "16.9"
+   },
+   "value": {
+    "num": "6.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14305",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.3"
+   },
+   "value": {
+    "num": "54"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14306",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_jp",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.3"
+   },
+   "value": {
+    "num": "13"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14307",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.3"
+   },
+   "value": {
+    "enum": "N"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14308",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.3"
+   },
+   "value": {
+    "num": "7"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14309",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.7"
+   },
+   "value": {
+    "num": "56"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14311",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.7"
+   },
+   "value": {
+    "enum": "O"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14312",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "17.7"
+   },
+   "value": {
+    "num": "7.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14313",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.1"
+   },
+   "value": {
+    "num": "57"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14315",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.1"
+   },
+   "value": {
+    "enum": "P"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14316",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.1"
+   },
+   "value": {
+    "num": "8"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14317",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.5"
+   },
+   "value": {
+    "num": "58"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14319",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.5"
+   },
+   "value": {
+    "enum": "Q"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14320",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.5"
+   },
+   "value": {
+    "num": "8.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14321",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.9"
+   },
+   "value": {
+    "num": "59"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14323",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.9"
+   },
+   "value": {
+    "enum": "R"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14324",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "18.9"
+   },
+   "value": {
+    "num": "9"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14325",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "19.3"
+   },
+   "value": {
+    "num": "61"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14327",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "19.3"
+   },
+   "value": {
+    "enum": "S"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14328",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "19.3"
+   },
+   "value": {
+    "num": "9.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14329",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "19.7"
+   },
+   "value": {
+    "num": "62"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14331",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "19.7"
+   },
+   "value": {
+    "enum": "T"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14332",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "19.7"
+   },
+   "value": {
+    "num": "10"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14333",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.1"
+   },
+   "value": {
+    "num": "63"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14335",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.1"
+   },
+   "value": {
+    "enum": "U"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14336",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.1"
+   },
+   "value": {
+    "num": "10.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14337",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.5"
+   },
+   "value": {
+    "num": "65"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14339",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.5"
+   },
+   "value": {
+    "enum": "V"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14340",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.5"
+   },
+   "value": {
+    "num": "11"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14341",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.9"
+   },
+   "value": {
+    "num": "66"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14343",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.9"
+   },
+   "value": {
+    "enum": "W"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14344",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "20.9"
+   },
+   "value": {
+    "num": "11.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14345",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "21.3"
+   },
+   "value": {
+    "num": "67"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14347",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "21.3"
+   },
+   "value": {
+    "enum": "X"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14348",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "21.3"
+   },
+   "value": {
+    "num": "12"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14349",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "21.7"
+   },
+   "value": {
+    "num": "68"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14351",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "21.7"
+   },
+   "value": {
+    "enum": "Y"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14352",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "21.7"
+   },
+   "value": {
+    "num": "12.5"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14353",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_eu",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "22.1"
+   },
+   "value": {
+    "num": "70"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14355",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_uk",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "22.1"
+   },
+   "value": {
+    "enum": "Z"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-14356",
+     "one_to_one",
+     "ring size conversion"
+    ]
+   ],
+   "entity_id": "measure.ring_size",
+   "attribute_id": "ring_size_us",
+   "scope": {
+    "from_system": "RU_inner_diameter_mm",
+    "from_value": "22.1"
+   },
+   "value": {
+    "num": "13"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-RING",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-RING)"
+  },
+  {
+   "legacy": [
+    [
+     "K-17682",
+     "one_to_one",
+     "metric carat definition"
+    ]
+   ],
+   "entity_id": "measure.metric_carat",
+   "attribute_id": "mass_in_grams",
+   "scope": {},
+   "value": {
+    "num": "0.2"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_UNIT_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-CARAT",
+     "source_value": {
+      "num": "0.2"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (1 ct = 200 mg)"
+  },
+  {
+   "legacy": [
+    [
+     "K-02643",
+     "one_to_one",
+     "fineness ↔ karat correspondence"
+    ]
+   ],
+   "entity_id": "metal.gold.karat",
+   "attribute_id": "karat_fineness_equivalent",
+   "scope": {
+    "from_system": "fineness_per_mille",
+    "from_value": "375"
+   },
+   "value": {
+    "enum": "k9"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_PURITY_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-CARAT",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-PURITY): 375‰ ≈ 9/24 = 375.0‰ (Δ 0.0‰; рыночное соответствие проб и каратов)"
+  },
+  {
+   "legacy": [
+    [
+     "K-02644",
+     "one_to_one",
+     "fineness ↔ karat correspondence"
+    ]
+   ],
+   "entity_id": "metal.gold.karat",
+   "attribute_id": "karat_fineness_equivalent",
+   "scope": {
+    "from_system": "fineness_per_mille",
+    "from_value": "585"
+   },
+   "value": {
+    "enum": "k14"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_PURITY_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-CARAT",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-PURITY): 585‰ ≈ 14/24 = 583.3‰ (Δ 1.7‰; рыночное соответствие проб и каратов)"
+  },
+  {
+   "legacy": [
+    [
+     "K-02645",
+     "one_to_one",
+     "fineness ↔ karat correspondence"
+    ]
+   ],
+   "entity_id": "metal.gold.karat",
+   "attribute_id": "karat_fineness_equivalent",
+   "scope": {
+    "from_system": "fineness_per_mille",
+    "from_value": "750"
+   },
+   "value": {
+    "enum": "k18"
+   },
+   "value_kind": "derived",
+   "proposed_status": "VERIFIED",
+   "permission_code": "NONBINDING_PURITY_CONVERSION",
+   "evidence": [
+    {
+     "ev_id": "EV-CARAT",
+     "source_value": null
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (CHK-PURITY): 750‰ ≈ 18/24 = 750.0‰ (Δ 0.0‰; рыночное соответствие проб и каратов)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03224",
+     "one_to_one",
+     "GOST 30649-99 calculated density"
+    ]
+   ],
+   "entity_id": "metal.alloy.srm_925",
+   "attribute_id": "density",
+   "scope": {
+    "document": "ГОСТ 30649-99",
+    "alloy_grade": "СрМ 925"
+   },
+   "value": {
+    "num": "10.36"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "GOST_ALLOY_DENSITY_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-GOST30649-FACSIMILE",
+     "source_value": {
+      "num": "10.36"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (GOST facsimile, re-read 21.11.2026)"
+  },
+  {
+   "legacy": [
+    [
+     "K-03091",
+     "one_to_one",
+     "GOST 30649-99 calculated density"
+    ]
+   ],
+   "entity_id": "metal.alloy.plpd_850_150",
+   "attribute_id": "density",
+   "scope": {
+    "document": "ГОСТ 30649-99",
+    "alloy_grade": "ПлПд 850-150"
+   },
+   "value": {
+    "num": "19.25"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "GOST_ALLOY_DENSITY_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-GOST30649-FACSIMILE",
+     "source_value": {
+      "num": "19.25"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (GOST facsimile, re-read 21.11.2026)"
+  },
+  {
+   "legacy": [
+    [
+     "K-15538",
+     "one_to_one",
+     "GOST 30649-99 calculated density"
+    ]
+   ],
+   "entity_id": "metal.alloy.zlsrm_585_80",
+   "attribute_id": "density",
+   "scope": {
+    "document": "ГОСТ 30649-99",
+    "alloy_grade": "ЗлСрМ 585-80"
+   },
+   "value": {
+    "num": "13.24"
+   },
+   "value_kind": "exact",
+   "proposed_status": "VERIFIED",
+   "permission_code": "GOST_ALLOY_DENSITY_REFERENCE",
+   "evidence": [
+    {
+     "ev_id": "EV-GOST30649-FACSIMILE",
+     "source_value": {
+      "num": "13.24"
+     }
+    }
+   ],
+   "reason": "v1.6.2 VERIFIED (GOST facsimile, re-read 21.11.2026)"
+  },
+  {
+   "legacy": [
+    [
+     "K-02658",
+     "one_to_one",
+     "generic grade: no single density"
+    ]
+   ],
+   "entity_id": "metal.silver.925",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-02658",
+    "legacy_parameter": "Удельный вес / плотность (SG)"
+   },
+   "value": {
+    "text_ru": "СрМ 925: 10,36 г/см³ (ГОСТ, Б.1); для обобщённого Ag 925 без состава точная плотность не установлена"
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-GOST30649-FACSIMILE",
+     "source_value": null
+    }
+   ],
+   "reason": "generic grade; GOST defines densities per exact grade only"
+  },
+  {
+   "legacy": [
+    [
+     "K-02808",
+     "one_to_one",
+     "generic grade: no single density"
+    ]
+   ],
+   "entity_id": "metal.platinum.950",
+   "attribute_id": "legacy_reference",
+   "scope": {
+    "legacy_k_id": "K-02808",
+    "legacy_parameter": "Удельный вес / плотность (SG)"
+   },
+   "value": {
+    "text_ru": "ПлМ 950: 20,15; ПлПд 950-50: 20,66; ПлРд 950-50: 20,70; ПлИ 950-50: 21,50 г/см³ (ГОСТ, В.1). Общее Pt950 не задаёт одну плотность."
+   },
+   "value_kind": "text",
+   "proposed_status": "REFERENCE ONLY",
+   "permission_code": "RESEARCH_WITH_CAVEAT",
+   "evidence": [
+    {
+     "ev_id": "EV-GOST30649-FACSIMILE",
+     "source_value": null
+    }
+   ],
+   "reason": "generic grade; GOST defines densities per exact grade only"
+  }
+ ]
+}
