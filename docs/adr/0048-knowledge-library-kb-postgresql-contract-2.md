@@ -1,7 +1,7 @@
 # ADR 0048 — Knowledge Library Contract 2.0: PostgreSQL `kb` schema as operational source
 
-Status: Proposed for Owner review. Not an implementation, migration execution, release,
-activation or deployment. EN MASTER, 2026-11-21. Russian copy: [0048 RU](0048-knowledge-library-kb-postgresql-contract-2.ru.md).
+Status: Owner-approved 2026-11-21; implementation pending in Draft PRs and independent review.
+Not a shared migration execution, release, activation or deployment. EN MASTER, 2026-11-21. Russian copy: [0048 RU](0048-knowledge-library-kb-postgresql-contract-2.ru.md).
 
 ## Context and authority
 
@@ -56,10 +56,8 @@ does not acquire two competing knowledge systems.
      project Drive folder «Library and Matrix/Архив». Full change history stays in git.
    - Until Contract 2.0 is integrated (v1.2 phase C), the current Prompt Enrichment still
      depends on the 1.x runtime, so it is not removed in this block.
-   - After phase C, new sessions use only 2.0. The 1.x data and loaders are then kept only
-     for reading historical sessions, if the Owner wants those sessions to stay viewable;
-     otherwise they are retired under a separately reviewed retention plan (ADR 0035
-     forbids silently discarding bindings).
+   - After phase C, new sessions use only 2.0. The 1.x data and loaders are kept read-only
+     so that historical sessions stay viewable (Owner decision, 21 November).
 
 3. **Dispatch by exact contract version.** Consumers select 2.0 only through the ADR 0035
    mechanism (`PROMPT_ENRICHMENT_KNOWLEDGE_CONTRACT_VERSION=2.0.0`). This block does not add
@@ -123,10 +121,11 @@ shared or preprod migration execution, ACTIVE activation, deployment, the full c
 migration (phase D), and any change to Dictionary, Rules, the parametric knowledge base or
 1.x Knowledge artifacts.
 
-## Open questions for the Owner
+## Owner decisions on open questions
 
-1. After phase C, must historical 1.x sessions in preprod stay viewable (keep read-only 1.x
-   loaders), or may they be retired with a reviewed retention plan?
+1. Historical 1.x sessions must stay viewable after phase C (Owner, 21 November). The 1.x
+   data and loaders are kept read-only for historical sessions only; new sessions never
+   use them.
 
 ## Alternatives
 

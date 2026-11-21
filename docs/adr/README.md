@@ -1,6 +1,6 @@
 # Architecture decision records
 
-- [0048 — Knowledge Library Contract 2.0: PostgreSQL `kb` schema (proposed for Owner review)](0048-knowledge-library-kb-postgresql-contract-2.md) · [RU](0048-knowledge-library-kb-postgresql-contract-2.ru.md)
+- [0048 — Knowledge Library Contract 2.0: PostgreSQL `kb` schema (Owner-approved; implementation pending)](0048-knowledge-library-kb-postgresql-contract-2.md) · [RU](0048-knowledge-library-kb-postgresql-contract-2.ru.md)
 
 - [0043 — Isolated CPU LLM lab (Owner-approved installation; documentation review pending)](0043-isolated-cpu-llm-lab.md)
 
