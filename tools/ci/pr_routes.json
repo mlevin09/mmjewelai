@@ -728,6 +728,41 @@
         "evidence": "Every API test module that imports or drives the Prompt Enrichment runtime service, its F04 workflow or their shared contracts, including the static module-boundary guard and the PostgreSQL knowledge-binding suite.",
         "postgres": true,
         "release": false
+      },
+      "f04_f05_enrichment": {
+        "tests": [
+          "apps/api/tests/completion/test_studio_recovery.py",
+          "apps/api/tests/test_correction_enrichment.py",
+          "apps/api/tests/test_enrichment_versioned_history.py",
+          "apps/api/tests/test_f01_ownership.py",
+          "apps/api/tests/test_f02_binding.py",
+          "apps/api/tests/test_f04_conflict_evidence.py",
+          "apps/api/tests/test_f04_equivalent_proposals.py",
+          "apps/api/tests/test_f04_planning_runtime.py",
+          "apps/api/tests/test_f05_answer_preparation.py",
+          "apps/api/tests/test_f05_compatibility.py",
+          "apps/api/tests/test_f05_correction_preparation.py",
+          "apps/api/tests/test_f05_evaluation.py",
+          "apps/api/tests/test_f05_mutation_safety.py",
+          "apps/api/tests/test_f05_positive_completion.py",
+          "apps/api/tests/test_keep_atomicity.py",
+          "apps/api/tests/test_p010_symmetry_runtime.py",
+          "apps/api/tests/test_parsed_enrichment.py",
+          "apps/api/tests/test_style_input.py"
+        ],
+        "evidence": "Every API test module that imports the F04 conflict/constraint evidence, planning and frontier, F05 continuation answers/corrections/evaluation/planning, compatibility projection or parsed enrichment modules (f04_frontier through its importers' tests).",
+        "postgres": false,
+        "release": false
+      },
+      "smart_defaults": {
+        "tests": [
+          "packages/domain/tests/test_smart_defaults_candidate.py",
+          "packages/prompts/tests/test_completion.py",
+          "packages/prompts/tests/test_completion_candidate.py"
+        ],
+        "evidence": "Native smart-defaults candidate tests and the prompts tests that drive its completion consumer.",
+        "postgres": false,
+        "release": false
       }
     },
     "sources": [
@@ -1371,6 +1406,105 @@
         "components": [
           "us01_semantic_turn",
           "bootstrap"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/compatibility_projection.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/conflict_evidence.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/constraint_evidence.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/continuation_answers.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/continuation_corrections.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/continuation_evaluation.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/continuation_planning.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/f04_frontier.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/f04_planning.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/parsed_enrichment.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "f04_f05_enrichment"
+        ]
+      },
+      {
+        "path": "packages/domain/src/jewelai_domain/smart_defaults_candidate.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "smart_defaults"
         ]
       }
     ],
