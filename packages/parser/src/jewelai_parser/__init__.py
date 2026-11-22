@@ -2,6 +2,8 @@
 
 from .full_message import (
     FULL_MESSAGE_PARSE_VERSION,
+    REQUEST_START,
+    SOURCE_GOVERNANCE,
     AnyFullMessageParseResult,
     CandidateApplication,
     CandidateCertainty,
@@ -15,9 +17,18 @@ from .full_message import (
     NormalizationSource,
     StructuredCandidate,
     StructuredTarget,
+    assertion_breaks,
+    certainty_for,
+    classification_for,
+    ownership_context,
     parse_full_message,
+    parse_recorded_message,
     read_full_message_parse_result,
+    recorded_governance,
     same_parse_evidence,
+    sentence_bounds,
+    source_dictionary_material_ids,
+    source_governance,
 )
 from .knowledge_matcher import (
     AmbiguousKnowledgeMatch,
@@ -47,6 +58,17 @@ from .models import (
 from .proposals import StaleParserProposalError, build_parser_proposal
 
 __all__ = [
+    "REQUEST_START",
+    "SOURCE_GOVERNANCE",
+    "assertion_breaks",
+    "certainty_for",
+    "classification_for",
+    "ownership_context",
+    "parse_recorded_message",
+    "recorded_governance",
+    "sentence_bounds",
+    "source_dictionary_material_ids",
+    "source_governance",
     "PARSER_SCHEMA_VERSION",
     "AcceptedUpdate",
     "AnyParserProposal",
