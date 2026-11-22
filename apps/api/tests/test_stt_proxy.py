@@ -185,3 +185,38 @@ def test_private_upstream_fields_never_reach_browser(client, speech_transport):
     assert response.json() == RESULT
     assert "synthetic-private-token" not in response.text
     assert SERVICE not in response.text
+
+
+@pytest.mark.parametrize(
+    "processing,expected", [(125.5, 125.5), (float("nan"), None), (True, None)]
+)
+def test_proxy_timing_is_numeric_private_and_preserves_public_contract(
+    client, speech_transport, processing, expected
+):
+    import logging
+
+    records = []
+
+    class Handler(logging.Handler):
+        def emit(self, record):
+            fields = getattr(record, "jewelai_fields", {})
+            if fields.get("event") == "speech_transcription":
+                records.append(fields)
+
+    logger = logging.getLogger("jewelai.api")
+    handler = Handler()
+    logger.addHandler(handler)
+    try:
+        speech_transport[2]["body"] = json.dumps({**RESULT, "processing_ms": processing}).encode()
+        org, _, session = create_hierarchy(client)
+        response = submit(client, session.json()["session_id"], org)
+        assert response.status_code == 200 and response.json() == RESULT
+        fields = records[-1]
+        assert fields["request_id"] == response.headers["x-request-id"]
+        assert fields["outcome"] == "transcribed" and fields["processing_ms"] == expected
+        assert all(fields[k] >= 0 for k in ("audio_read_ms", "auth_ms", "upstream_ms", "total_ms"))
+        exported = json.dumps(records)
+        assert RESULT["text"] not in exported and "synthetic-private-token" not in exported
+        assert "synthetic-audio" not in exported and SERVICE not in exported
+    finally:
+        logger.removeHandler(handler)
