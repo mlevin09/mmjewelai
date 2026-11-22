@@ -1,0 +1,57 @@
+name: Notify preprod deployment result
+
+# The observer lives on default branch and never checks out a deployed source.
+on:
+  workflow_run:
+    workflows: ["Deploy preprod"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+
+jobs:
+  notify:
+    if: >-
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'jewelai-v2' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+    steps:
+      - name: Announce verified preprod outcome on the associated merged PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
+          # The deployment-request push is ordinarily immediately after the PR merge.
+          # Associate only with a PR whose exact merge commit is its first parent.
+          parent="$(gh api "repos/$REPO/commits/$SHA" --jq '.parents[0].sha')"
+          [[ "$parent" =~ ^[0-9a-f]{40}$ ]] || exit 0
+          prs="$(gh api "repos/$REPO/commits/$parent/pulls" --jq '.[] | select(.merged_at != null and .merge_commit_sha == "'$parent'" and .base.ref == "jewelai-v2") | .number')"
+          if [[ -z "$prs" ]]; then
+            echo "No exact immediately preceding merged PR to notify."
+            exit 0
+          fi
+          jobs="$(gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100")"
+          plan="$(jq -r '[.jobs[] | select(.name == "plan")] | last | .conclusion // "missing"' <<< "$jobs")"
+          apply="$(jq -r '[.jobs[] | select(.name == "apply")] | last | .conclusion // "missing"' <<< "$jobs")"
+          if [[ "$CONCLUSION" == success && "$plan" == success && "$apply" == success ]]; then
+            status="PREPROD DEPLOYMENT SUCCESS"
+            detail="The existing preprod workflow reports successful plan, infrastructure apply, database migration job, and required HTTPS smoke checks. This integrated source is available for preprod validation."
+          else
+            status="PREPROD DEPLOYMENT NOT CONFIRMED"
+            detail="The deployment did not complete every mandatory plan/apply/HTTPS gate. Do NOT treat this source as available for testing. Inspect the linked run for the failed or skipped step."
+          fi
+          for number in $prs; do
+            body="**$status** for JewelAI V2 PR #$number.\n\nDeployment request SHA: \`$SHA\`.\nPreprod workflow: https://github.com/$REPO/actions/runs/$RUN_ID\nJob results: plan=\`$plan\`, apply=\`$apply\`, overall=\`$CONCLUSION\`.\n\n$detail\n\nProduction was not deployed by this workflow."
+            gh api --method POST "repos/$REPO/issues/$number/comments" -f body="$body" >/dev/null
+            echo "Posted deployment result to PR #$number."
+          done
