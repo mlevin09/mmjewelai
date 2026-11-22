@@ -438,7 +438,7 @@ def _state_for_target(revision: AnyDesignRevision | object, target: SchemaTarget
     )
 
 
-def _gap_state(state) -> GapState:
+def gap_state(state) -> GapState:
     if state is None:
         return GapState.ABSENT
     if isinstance(state, Unknown):
@@ -468,7 +468,7 @@ def analyze_gaps(
                 Gap(
                     target=target,
                     concrete_target=concrete_target,
-                    state=_gap_state(state),
+                    state=gap_state(state),
                     required=target in required,
                     confirmed=bool(getattr(state, "confirmed", False)),
                     locked=bool(getattr(state, "locked", False)),
@@ -964,3 +964,9 @@ def load_rules(
         dictionary=dictionary,
         questions=questions,
     )
+
+
+# Pre-public private names, kept only so existing in-package and test imports keep working.
+# Code outside this package must import the public names above (guarded by
+# tests/test_cross_package_private_imports.py).
+_gap_state = gap_state

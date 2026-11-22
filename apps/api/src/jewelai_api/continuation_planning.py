@@ -10,7 +10,7 @@ from jewelai_domain.preservation_release import (
     anchor_set_hash,
 )
 from jewelai_domain.questions import QuestionLocale
-from jewelai_prompts.final_prompt import _value_text
+from jewelai_prompts.final_prompt import value_text as _value_text
 
 
 def native_plan_view(plan):

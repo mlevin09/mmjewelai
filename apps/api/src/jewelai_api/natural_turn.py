@@ -398,10 +398,14 @@ def checked_reply(
     unseen values, false saved claims and unsupported numeric allocations fail
     closed. This bounded check is not general professional-advice qualification.
     """
-    from jewelai_parser.full_message import (
-        _parse_recorded_message,
-        _sentence_bounds,
-        _source_governance,
+    from jewelai_parser import (
+        parse_recorded_message as _parse_recorded_message,
+    )
+    from jewelai_parser import (
+        sentence_bounds as _sentence_bounds,
+    )
+    from jewelai_parser import (
+        source_governance as _source_governance,
     )
 
     from .conversation_model import UntrustedConversationDraft
@@ -624,7 +628,7 @@ def input_options(service, sid, oid, *, model_configured=False):
 
 def _evaluate_record(service, repo, sid, oid, record):
     """Replay one retained source/Matrix proof, not a model or entire chat history."""
-    from jewelai_parser.full_message import _parse_recorded_message
+    from jewelai_parser import parse_recorded_message as _parse_recorded_message
     from jewelai_persistence import EnrichmentIntegrityError
 
     p = record["input"]

@@ -11,7 +11,8 @@ from jewelai_parser import (
     CandidateCertainty,
     CandidateClassification,
 )
-from jewelai_parser.full_message import _ownership_context, _recorded_governance
+from jewelai_parser import ownership_context as _ownership_context
+from jewelai_parser import recorded_governance as _recorded_governance
 from jewelai_prompts import FinalPromptConstraintEvidence, project_revision
 
 from .clarification import _TARGET_QUESTION

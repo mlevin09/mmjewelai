@@ -10,8 +10,10 @@ from jewelai_domain.preservation import contract_hash
 from jewelai_domain.smart_defaults_candidate import (
     DefaultCandidate,
     DefaultPolicyRule,
-    _path_value,
     select_default_candidates,
+)
+from jewelai_domain.smart_defaults_candidate import (
+    path_value as _path_value,
 )
 from pydantic import AwareDatetime, Field, JsonValue, model_validator
 

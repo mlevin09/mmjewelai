@@ -37,7 +37,7 @@ from jewelai_parser import (
     build_parser_proposal,
     read_full_message_parse_result,
 )
-from jewelai_parser.full_message import _recorded_governance
+from jewelai_parser import recorded_governance as _recorded_governance
 from jewelai_parser.models import QuantityCandidate, StyleTermsCandidate, TermCandidate
 from jewelai_parser.p010_symmetry import TARGET as SYMMETRY_TARGET
 from jewelai_parser.p010_symmetry import VALUE as SYMMETRY_VALUE

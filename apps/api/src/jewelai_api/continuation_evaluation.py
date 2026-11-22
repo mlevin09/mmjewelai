@@ -12,12 +12,16 @@ from jewelai_domain.continuation import ContinuationContext
 from jewelai_domain.preservation import contract_hash
 from jewelai_domain.rules import RuleDecision
 from jewelai_domain.rules_v2 import RuleDecisionV2
-from jewelai_parser.full_message import (
+from jewelai_parser import (
     FullMessageParseResultV1_2,
     FullMessageParseResultV1_3,
-    _parse_recorded_message,
-    _source_governance,
     parse_full_message,
+)
+from jewelai_parser import (
+    parse_recorded_message as _parse_recorded_message,
+)
+from jewelai_parser import (
+    source_governance as _source_governance,
 )
 from jewelai_prompts.enrichment import (
     StructuredPromptEnrichmentResult,

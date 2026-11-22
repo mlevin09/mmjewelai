@@ -17,7 +17,8 @@ from jewelai_domain.knowledge_storage import KnowledgeArtifactStorageError
 from jewelai_domain.models import KnownValue, MessageSource
 from jewelai_domain.revisions import RevisionConflict, revise_design
 from jewelai_parser import ParserTarget, parse_full_message, same_parse_evidence
-from jewelai_parser.full_message import _parse_recorded_message, _source_governance
+from jewelai_parser import parse_recorded_message as _parse_recorded_message
+from jewelai_parser import source_governance as _source_governance
 from jewelai_persistence import (
     ClarificationDecisionConflictError,
     ClarificationDecisionIntegrityError,

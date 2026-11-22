@@ -83,7 +83,7 @@ def input_context(scope, revision, cycle_id, cycle_number, artifacts, release_pi
 
 
 def f04_enrichment(result, *, revision, context):
-    from jewelai_parser.full_message import _SOURCE_GOVERNANCE
+    from jewelai_parser import SOURCE_GOVERNANCE as _SOURCE_GOVERNANCE
 
     payload = result.model_dump(mode="json", exclude={"content_hash"})
     payload.update(

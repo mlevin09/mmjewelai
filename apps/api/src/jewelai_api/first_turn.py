@@ -137,11 +137,17 @@ class FirstTurnRead(StrictEvidenceModel):
 
 def _creation_assertion_end(text, predicate):
     """Reuse native assertion boundaries; a connector alone is not a new predicate."""
-    from jewelai_parser.full_message import (
-        _REQUEST_START,
-        _assertion_breaks,
-        _sentence_bounds,
-        _source_governance,
+    from jewelai_parser import (
+        REQUEST_START as _REQUEST_START,
+    )
+    from jewelai_parser import (
+        assertion_breaks as _assertion_breaks,
+    )
+    from jewelai_parser import (
+        sentence_bounds as _sentence_bounds,
+    )
+    from jewelai_parser import (
+        source_governance as _source_governance,
     )
 
     with _source_governance("1.3.0"):
@@ -443,7 +449,7 @@ def validate_receipt(payload):
 
 def verify_source(service, repo, sid, oid, plan, cycle, message, verified):
     """New explicit source dispatch; legacy verifier is never invoked or weakened."""
-    from jewelai_parser.full_message import _parse_recorded_message
+    from jewelai_parser import parse_recorded_message as _parse_recorded_message
 
     from .f04_planning import f04_evaluation, input_context
     from .prompt_enrichment_runtime_v2 import source_message

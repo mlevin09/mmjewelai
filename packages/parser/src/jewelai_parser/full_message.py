@@ -41,21 +41,21 @@ from .models import (
 FULL_MESSAGE_PARSE_VERSION = "1.3.0"
 # Only historical source verification may select frozen governance. Public parsing
 # always resets this context to CURRENT; no active route can request a legacy parse.
-_SOURCE_GOVERNANCE = ContextVar("jewelai_source_governance", default="1.3.0")
+SOURCE_GOVERNANCE = ContextVar("jewelai_source_governance", default="1.3.0")
 
 
 @contextmanager
-def _source_governance(version):
+def source_governance(version):
     if version not in {"1.1.0", "1.2.0", "1.3.0"}:
         raise ValueError("Unsupported source evidence version")
-    token = _SOURCE_GOVERNANCE.set(version)
+    token = SOURCE_GOVERNANCE.set(version)
     try:
         yield
     finally:
-        _SOURCE_GOVERNANCE.reset(token)
+        SOURCE_GOVERNANCE.reset(token)
 
 
-def _recorded_governance(argument, attribute=None):
+def recorded_governance(argument, attribute=None):
     """Scope downstream source proofs to their immutable parse evidence."""
 
     def decorate(function):
@@ -70,7 +70,7 @@ def _recorded_governance(argument, attribute=None):
                 else value
             )
             parsed = read_full_message_parse_result(parsed)
-            with _source_governance(parsed.parse_version):
+            with source_governance(parsed.parse_version):
                 return function(*args, **kwargs)
 
         return verify
@@ -344,7 +344,7 @@ _TENTATIVE = re.compile(
 # This neither selects competing positive facts nor accepts a later preference.
 _CONTRAST = re.compile(r"\b(?:but|however|но|однако)\b|(?<=[,—–\n])\s*а(?=\s)", re.I)
 _COORDINATION = re.compile(r",\s*(?:(?:and|и)\b\s*)?|\b(?:and|и)\b|\r?\n", re.I)
-_REQUEST_START = re.compile(
+REQUEST_START = re.compile(
     r"\b(?:(?:I|we|я|мы|мне|нам)\s+)?(?:(?:" + _NEGATED_AUXILIARY + r"|не)\s+)?"
     r"(?:want|need|choose|reject|avoid|хотим|нуж(?:ен|на|но|ны)|" + _PREFERENCE.pattern + r")\b",
     re.I,
@@ -528,11 +528,11 @@ def _special_constraint_candidates(text: str) -> tuple[list[dict], list[tuple[in
                     classification=(
                         CandidateClassification.PREFERENCE
                         if classification == CandidateClassification.REQUIREMENT
-                        and _classification_for(text, match.start(), match.end())
+                        and classification_for(text, match.start(), match.end())
                         == CandidateClassification.PREFERENCE
                         else classification
                     ),
-                    certainty=_certainty_for(text, match.start(), match.end(), certainty),
+                    certainty=certainty_for(text, match.start(), match.end(), certainty),
                     raw_value=match.group(0),
                     normalized_values=normalized_values,
                     semantic_subject=semantic_subject,
@@ -601,15 +601,15 @@ def _govern_preservation(text, candidate):
                 qualifier_context = text[:left] + " " * (start - left) + text[start:]
                 initial_certainty = CandidateCertainty.EXPLICIT
                 left = start
-    polarity = _classification_for(masked, start, end)
-    certainty = _certainty_for(qualifier_context, start, end, initial_certainty)
+    polarity = classification_for(masked, start, end)
+    certainty = certainty_for(qualifier_context, start, end, initial_certainty)
     if _AMBIGUITY.search(qualifier_context[left:right]):
         certainty = CandidateCertainty.AMBIGUOUS
     # Existing affirmative request phrasing is not itself uncertainty. Only
     # rejection changes polarity; qualifiers/disjunction are checked separately.
     if polarity == CandidateClassification.PROHIBITION:
         certainty = CandidateCertainty.UNRESOLVED
-    _, sentence_end = _sentence_bounds(text, start, end)
+    _, sentence_end = sentence_bounds(text, start, end)
     suffix = text[end:sentence_end].strip(" ,—–")
     suffix = re.sub(r"^(?:unchanged|без\s+изменений)\s*[,—–]?\s*", "", suffix, flags=re.I)
     if _PRESERVATION_TENTATIVE.search(text[left:start]) or _PRESERVATION_TENTATIVE.fullmatch(
@@ -645,19 +645,19 @@ def parse_full_message(
     text, *, locale, dictionary, knowledge_runtime=None
 ) -> FullMessageParseResultV1_3:
     """The only active entrypoint, including corrections and resumed requests."""
-    with _source_governance(FULL_MESSAGE_PARSE_VERSION):
+    with source_governance(FULL_MESSAGE_PARSE_VERSION):
         return _extract_full_message(
             text, locale=locale, dictionary=dictionary, knowledge_runtime=knowledge_runtime
         )
 
 
-def _parse_recorded_message(text, *, parse_version, locale, dictionary, knowledge_runtime=None):
+def parse_recorded_message(text, *, parse_version, locale, dictionary, knowledge_runtime=None):
     """Reverify historical source with the shared extractor and frozen read rules.
 
     This is not a write/interpretation endpoint. Callers must compare the entire
     retained evidence and its original hashes, not just the version tag.
     """
-    with _source_governance(parse_version):
+    with source_governance(parse_version):
         return _extract_full_message(
             text, locale=locale, dictionary=dictionary, knowledge_runtime=knowledge_runtime
         )
@@ -730,7 +730,7 @@ def _extract_full_message(
     recognized = [(item["evidence"]["start"], item["evidence"]["end"]) for item in candidates]
     syntax_spans = (
         tuple(match.span() for match in _FIELD_ASSERTION.finditer(text))
-        if _SOURCE_GOVERNANCE.get() == "1.3.0"
+        if SOURCE_GOVERNANCE.get() == "1.3.0"
         else ()
     )
     # Syntax excludes heading tokens only. It is never proof that a field's
@@ -771,7 +771,7 @@ def _extract_full_message(
         "1.1.0": FullMessageParseResult,
         "1.2.0": FullMessageParseResultV1_2,
         "1.3.0": FullMessageParseResultV1_3,
-    }[_SOURCE_GOVERNANCE.get()]
+    }[SOURCE_GOVERNANCE.get()]
     return result_type(
         original_text=text,
         requested_locale=locale,
@@ -938,9 +938,9 @@ def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
             ):
                 continue
             between = text[left.end : right.start]
-            if _sentence_bounds(text, left.start, left.end)[1] < right.start:
+            if sentence_bounds(text, left.start, left.end)[1] < right.start:
                 continue
-            if any(left.end <= a and b <= right.start for a, b in _assertion_breaks(text)):
+            if any(left.end <= a and b <= right.start for a, b in assertion_breaks(text)):
                 continue
             if _AMBIGUITY.search(between):
                 left_key = (
@@ -982,7 +982,7 @@ def _mark_choice_ambiguity(text: str, found: list[_Found]) -> list[_Found]:
     return result
 
 
-def _source_dictionary_material_ids(text, candidate, dictionary):
+def source_dictionary_material_ids(text, candidate, dictionary):
     """Recover lexical occurrence identity before OR grouping, using the same surface matcher.
 
     This private evidence helper neither rewrites a StructuredCandidate nor authorizes an update.
@@ -1013,7 +1013,7 @@ def _candidate_from_surface(
 ) -> dict:
     evidence = text[item.start : item.end]
     subject, owner_detail = _owner_for(text, item.start, item.end, item.surface.category)
-    certainty = _certainty_for(text, item.start, item.end, item.certainty)
+    certainty = certainty_for(text, item.start, item.end, item.certainty)
     normalized_values = item.normalized_values or (item.surface.normalized_id,)
     source = item.surface.source
     detail = None
@@ -1060,13 +1060,13 @@ def _candidate_from_surface(
             if match.candidate.mapping_mode == MappingMode.AMBIGUOUS:
                 certainty = CandidateCertainty.AMBIGUOUS
 
-    classification = _classification_for(text, item.start, item.end)
+    classification = classification_for(text, item.start, item.end)
     target = _target_for(item.surface.category, subject)
     parser_target = _parser_target(target)
     application = CandidateApplication.STRUCTURED_EVIDENCE_ONLY
     parser_update = None
 
-    owner_left, owner_right, owner_anchors = _ownership_context(text, item.start, item.end)
+    owner_left, owner_right, owner_anchors = ownership_context(text, item.start, item.end)
     component_setting = (
         item.surface.category == DictionaryCategory.STONE_SETTING
         and evidence.casefold() in {"prongs", "prong", "крапаны", "крапанах"}
@@ -1142,7 +1142,7 @@ def _candidate_from_surface(
     )
 
 
-def _classification_for(text: str, start: int, end: int) -> CandidateClassification:
+def classification_for(text: str, start: int, end: int) -> CandidateClassification:
     left, right = _intent_bounds(text, start, end)
     context = text[left:end]
     if _NEGATION.search(_TENTATIVE.sub("", context)) or _REJECTED_ASSERTION.search(text[end:right]):
@@ -1152,14 +1152,14 @@ def _classification_for(text: str, start: int, end: int) -> CandidateClassificat
     return CandidateClassification.REQUIREMENT
 
 
-def _certainty_for(text, start, end, current):
+def certainty_for(text, start, end, current):
     left, right = _intent_bounds(text, start, end)
     if _TENTATIVE.search(text[left:right]):
         return CandidateCertainty.AMBIGUOUS
     # Commas cannot close a qualifier or prove that its bare list continuation
     # is an independent assertion. A sentence or explicit contrast can.
-    sentence_start, sentence_end = _sentence_bounds(text, start, end)
-    for _, boundary_end in _assertion_breaks(text):
+    sentence_start, sentence_end = sentence_bounds(text, start, end)
+    for _, boundary_end in assertion_breaks(text):
         if sentence_start < boundary_end <= left:
             sentence_start = boundary_end
     prefix = text[sentence_start:left]
@@ -1173,7 +1173,7 @@ def _certainty_for(text, start, end, current):
     return current
 
 
-def _sentence_bounds(text: str, start: int, end: int) -> tuple[int, int]:
+def sentence_bounds(text: str, start: int, end: int) -> tuple[int, int]:
     # Reuse the existing offset-preserving, decimal-aware scope primitive.
     from .p010_symmetry import _bounds
 
@@ -1184,7 +1184,7 @@ def _intent_bounds(text: str, start: int, end: int) -> tuple[int, int]:
     from .p010_symmetry import _bounds
 
     left, right = _bounds(text, start, end, ".!?;,—–")
-    for boundary_start, boundary_end in _assertion_breaks(text):
+    for boundary_start, boundary_end in assertion_breaks(text):
         if left <= boundary_start and boundary_end <= start:
             left = boundary_end
         elif end <= boundary_start < right:
@@ -1201,7 +1201,7 @@ _FIELD_ASSERTION = re.compile(
 )
 
 
-def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
+def assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
     """Original-offset boundaries proved by a new governor, not by 'and' alone.
 
     A coordinated bare object retains its shared prefix/postfix predicate. A
@@ -1210,7 +1210,7 @@ def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
     This classifies evidence only; it cannot select a canonical conflict winner.
     """
     boundaries = [match.span() for match in _CONTRAST.finditer(text)]
-    if _SOURCE_GOVERNANCE.get() == "1.3.0":
+    if SOURCE_GOVERNANCE.get() == "1.3.0":
         # Explicit field headings establish independent assertion ownership. A
         # bare newline/object list does not: its shared negative governor remains.
         boundaries.extend(
@@ -1218,12 +1218,12 @@ def _assertion_breaks(text: str) -> tuple[tuple[int, int], ...]:
             for m in _FIELD_ASSERTION.finditer(text)
         )
     for match in _COORDINATION.finditer(text):
-        left, right = _sentence_bounds(text, match.start(), match.end())
+        left, right = sentence_bounds(text, match.start(), match.end())
         before, after = text[left : match.start()], text[match.end() : right].lstrip()
-        if _REQUEST_START.match(after) or _NEGATION.match(after) or _TENTATIVE.match(after):
+        if REQUEST_START.match(after) or _NEGATION.match(after) or _TENTATIVE.match(after):
             boundaries.append(match.span())
         elif (
-            _REQUEST_START.search(before)
+            REQUEST_START.search(before)
             and not _NEGATION.search(before)
             and _REJECTED_ASSERTION.search(after)
         ):
@@ -1250,7 +1250,7 @@ _STONE_NOUN = re.compile(
 _BODY_METAL = re.compile(r"\b(?:metal|gold|platinum|металл\w*|золот\w*|платин\w*)\b", re.I)
 
 
-def _ownership_context(text, start, end):
+def ownership_context(text, start, end):
     left, right = _intent_bounds(text, start, end)
     anchors = []
     for subject, pattern in _SUBJECT_PATTERNS.items():
@@ -1306,7 +1306,7 @@ def _ownership_context(text, start, end):
 def _owner_for(text, start, end, category):
     if category == DictionaryCategory.JEWELRY_TYPE:
         return CandidateSubject.PRODUCT, "product"
-    left, right, anchors = _ownership_context(text, start, end)
+    left, right, anchors = ownership_context(text, start, end)
     candidates = []
     stone = category in {
         DictionaryCategory.GEMSTONE_MATERIAL,
@@ -1420,7 +1420,7 @@ def _measurement_candidates(text: str) -> list[dict]:
         r"(?P<c>\d+(?:[.,]\d+)?)\s*(?:mm|мм)\b",
         re.I,
     )
-    if _SOURCE_GOVERNANCE.get() == "1.3.0":
+    if SOURCE_GOVERNANCE.get() == "1.3.0":
         dimensions_pattern = re.compile(
             r"(?<![\w.,+−-])(?P<a>(?:[+−-][ \t]*)?\d+(?:[.,]\d+)?)\s*[x×х]\s*"
             r"(?P<b>(?:[+−-][ \t]*)?\d+(?:[.,]\d+)?)\s*[x×х]\s*"
@@ -1459,7 +1459,7 @@ def _measurement_candidates(text: str) -> list[dict]:
         )
         valid_dimensions = all(math.isfinite(v) and v > 0 for v in values)
         if subject == CandidateSubject.CENTER_STONE and (
-            _SOURCE_GOVERNANCE.get() != "1.3.0" or valid_dimensions
+            SOURCE_GOVERNANCE.get() != "1.3.0" or valid_dimensions
         ):
             update = CandidateUpdate(
                 target=ParserTarget.CENTER_STONE_DIMENSIONS,
@@ -1473,7 +1473,7 @@ def _measurement_candidates(text: str) -> list[dict]:
             )
             application = CandidateApplication.PARSER_CANDIDATE_READY
             detail = None
-        if _SOURCE_GOVERNANCE.get() == "1.3.0" and not valid_dimensions:
+        if SOURCE_GOVERNANCE.get() == "1.3.0" and not valid_dimensions:
             detail = "Dimensions require three explicitly stated positive finite measurements."
         candidates.append(
             _structured_candidate(
@@ -1482,7 +1482,7 @@ def _measurement_candidates(text: str) -> list[dict]:
                 match.end(),
                 target=target,
                 subject=subject,
-                classification=_classification_for(text, match.start(), match.end()),
+                classification=classification_for(text, match.start(), match.end()),
                 certainty=CandidateCertainty.EXPLICIT,
                 raw_value=(
                     {"length": values[0], "width": values[1], "depth": values[2], "unit": "mm"}
@@ -1532,7 +1532,7 @@ def _measurement_candidates(text: str) -> list[dict]:
                 match.end(),
                 target=target,
                 subject=subject,
-                classification=_classification_for(text, match.start(), match.end()),
+                classification=classification_for(text, match.start(), match.end()),
                 certainty=CandidateCertainty.EXPLICIT,
                 raw_value={"value": value, "unit": "ct"},
                 normalization_source=NormalizationSource.DETERMINISTIC_PATTERN,
@@ -1581,7 +1581,7 @@ def _quantity_candidates(text: str) -> list[dict]:
                 match.end("number"),
                 target=StructuredTarget.SIDE_STONE_QUANTITY,
                 subject=CandidateSubject.SIDE_STONES,
-                classification=_classification_for(text, match.start(), match.end()),
+                classification=classification_for(text, match.start(), match.end()),
                 certainty=CandidateCertainty.EXPLICIT,
                 raw_value={"value": value, "scope": scope},
                 normalization_source=NormalizationSource.DETERMINISTIC_PATTERN,
@@ -1598,7 +1598,7 @@ def _aesthetic_candidates(text: str, protected: list[tuple[int, int]]) -> list[d
         if _inside_any(match.start(), match.end(), protected):
             continue
         subject = _subject_for(text, match.start(), match.end(), DictionaryCategory.STYLE)
-        classification = _classification_for(text, match.start(), match.end())
+        classification = classification_for(text, match.start(), match.end())
         candidates.append(
             _structured_candidate(
                 text,
@@ -1634,7 +1634,7 @@ def _unresolved_candidates(
     candidates = []
     for token in _tokens(text):
         normalized = normalize_knowledge_text(token.text).replace("ё", "е")
-        owner_left, owner_right, _ = _ownership_context(text, token.start, token.end)
+        owner_left, owner_right, _ = ownership_context(text, token.start, token.end)
         if (
             len(normalized) < 3
             or normalized in _UNRESOLVED_STOPWORDS
@@ -1648,9 +1648,9 @@ def _unresolved_candidates(
         ):
             continue
         start, end = token.start, token.end
-        classification = _classification_for(text, start, end)
+        classification = classification_for(text, start, end)
         if (
-            _SOURCE_GOVERNANCE.get() == "1.3.0"
+            SOURCE_GOVERNANCE.get() == "1.3.0"
             and classification == CandidateClassification.PROHIBITION
             and _OWNER_WORD.fullmatch(token.text)
         ):
@@ -1698,7 +1698,7 @@ def _structured_candidate(
     detail: str | None,
 ) -> dict:
     if certainty == CandidateCertainty.EXPLICIT:
-        certainty = _certainty_for(text, start, end, certainty)
+        certainty = certainty_for(text, start, end, certainty)
     if (
         classification
         in {CandidateClassification.PROHIBITION, CandidateClassification.PRESERVATION}
@@ -1755,3 +1755,19 @@ def _detect_language(text: str) -> MessageLanguage:
     if has_en:
         return MessageLanguage.EN
     return MessageLanguage.UNDETERMINED
+
+
+# Pre-public private names, kept only so existing in-package and test imports keep working.
+# Code outside this package must import the public names above (guarded by
+# tests/test_cross_package_private_imports.py).
+_source_governance = source_governance
+_recorded_governance = recorded_governance
+_parse_recorded_message = parse_recorded_message
+_source_dictionary_material_ids = source_dictionary_material_ids
+_classification_for = classification_for
+_certainty_for = certainty_for
+_sentence_bounds = sentence_bounds
+_assertion_breaks = assertion_breaks
+_ownership_context = ownership_context
+_REQUEST_START = REQUEST_START
+_SOURCE_GOVERNANCE = SOURCE_GOVERNANCE

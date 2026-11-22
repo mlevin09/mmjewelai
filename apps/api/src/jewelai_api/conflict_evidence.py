@@ -15,15 +15,27 @@ from jewelai_domain.clarification_state import (
 )
 from jewelai_domain.dictionary import DictionaryCategory, EntryLifecycle
 from jewelai_domain.models import DomainId, ImmutableModel
+from jewelai_parser import (
+    assertion_breaks as _assertion_breaks,
+)
+from jewelai_parser import (
+    certainty_for as _certainty_for,
+)
+from jewelai_parser import (
+    classification_for as _classification_for,
+)
+from jewelai_parser import (
+    parse_recorded_message as _parse_recorded_message,
+)
 from jewelai_parser import read_full_message_parse_result, same_parse_evidence
-from jewelai_parser.full_message import (
-    _assertion_breaks,
-    _certainty_for,
-    _classification_for,
-    _parse_recorded_message,
-    _recorded_governance,
-    _sentence_bounds,
-    _source_dictionary_material_ids,
+from jewelai_parser import (
+    recorded_governance as _recorded_governance,
+)
+from jewelai_parser import (
+    sentence_bounds as _sentence_bounds,
+)
+from jewelai_parser import (
+    source_dictionary_material_ids as _source_dictionary_material_ids,
 )
 from jewelai_parser.p010_symmetry import defer_shared_negative_candidates
 from pydantic import Field, model_validator

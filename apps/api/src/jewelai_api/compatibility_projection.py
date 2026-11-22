@@ -18,8 +18,8 @@ from jewelai_domain.compatibility import (
 from jewelai_domain.continuation import ContinuationArtifactPins, ContinuationFrameCore
 from jewelai_domain.models import Explicit, KnownValue, MessageSource, Unknown
 from jewelai_domain.preservation import contract_hash
+from jewelai_parser import parse_recorded_message as _parse_recorded_message
 from jewelai_parser import same_parse_evidence
-from jewelai_parser.full_message import _parse_recorded_message
 
 from .correction_enrichment import CorrectionReenrichmentResult
 from .f04_planning import canonical_target

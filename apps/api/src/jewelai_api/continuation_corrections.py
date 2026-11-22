@@ -24,8 +24,8 @@ from jewelai_domain.preservation_release import (
     requested_value_hash,
 )
 from jewelai_domain.revisions import revise_design
-from jewelai_parser import CandidateCertainty, CandidateClassification
-from jewelai_parser.full_message import FULL_MESSAGE_PARSE_VERSION, _source_governance
+from jewelai_parser import FULL_MESSAGE_PARSE_VERSION, CandidateCertainty, CandidateClassification
+from jewelai_parser import source_governance as _source_governance
 from jewelai_prompts.continuation import continuation_cycle
 
 from .continuation_evaluation import canonical_native_result, evaluate_continuation_message

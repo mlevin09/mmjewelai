@@ -58,7 +58,7 @@ class DefaultCandidate(ImmutableModel):
         return self
 
 
-def _path_value(design, target: str):
+def path_value(design, target: str):
     current = design
     components = target.split(".")
     for component in components:
@@ -108,7 +108,7 @@ def select_default_candidates(
         seen.add(identity)
         if rule.when_jewelry_type != kind:
             continue
-        current = _path_value(design, rule.target_path)
+        current = path_value(design, rule.target_path)
         target = tuple(rule.target_path.split("."))
         if any(
             state is not None and (state.locked or state.confirmed) and target[: len(path)] == path
@@ -147,3 +147,9 @@ def select_default_candidates(
             )
         )
     return tuple(proposals)
+
+
+# Pre-public private names, kept only so existing in-package and test imports keep working.
+# Code outside this package must import the public names above (guarded by
+# tests/test_cross_package_private_imports.py).
+_path_value = path_value

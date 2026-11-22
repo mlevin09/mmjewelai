@@ -7,7 +7,7 @@ canonical snapshots, source Messages and exact previous plan/cycle lineage.
 
 from jewelai_domain.clarification_state import AnswerReference, ResolutionReference, evidence_hash
 from jewelai_domain.models import KnownValue
-from jewelai_domain.rules import _gap_state
+from jewelai_domain.rules import gap_state as _gap_state
 
 from .clarification_v2 import AcceptedTargetEvidence, RelevantChangeReference, ResolutionAssertion
 from .f04_planning import canonical_target, target_state

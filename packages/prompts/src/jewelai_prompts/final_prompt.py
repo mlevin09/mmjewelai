@@ -752,7 +752,7 @@ def _description(snapshot, dictionary, facts, constraints, unresolved, *, _empty
     sentences = []
     jewelry_type = fact_map.get("jewelry_type")
     if jewelry_type is not None:
-        label = _value_text(jewelry_type.value, dictionary, locale)
+        label = value_text(jewelry_type.value, dictionary, locale)
         sentences.append(
             f"Current design: {label}." if snapshot.locale == "en" else f"Текущий дизайн: {label}."
         )
@@ -764,7 +764,7 @@ def _description(snapshot, dictionary, facts, constraints, unresolved, *, _empty
         sentences.append(center)
     symmetry = fact_map.get("composition.symmetry_mode")
     if symmetry is not None:
-        label = _value_text(symmetry.value, dictionary, locale, target="composition.symmetry_mode")
+        label = value_text(symmetry.value, dictionary, locale, target="composition.symmetry_mode")
         sentences.append(
             f"Composition: {label}." if snapshot.locale == "en" else f"Композиция: {label}."
         )
@@ -791,7 +791,7 @@ def _description(snapshot, dictionary, facts, constraints, unresolved, *, _empty
         if fact is not None:
             sentences.append(
                 f"{en_label if snapshot.locale == 'en' else ru_label}: "
-                f"{_value_text(fact.value, dictionary, locale, target=target)}."
+                f"{value_text(fact.value, dictionary, locale, target=target)}."
             )
     prohibitions = [item for item in constraints if item.kind == "prohibition"]
     if prohibitions:
@@ -914,7 +914,7 @@ def _component_sentence(prefix, facts, dictionary, locale, language, group_numbe
             field = target.removeprefix(prefix_dot).removeprefix("stones.")
             members.append(
                 f"{_field_label(field, language)} "
-                f"{_value_text(facts[target].value, dictionary, locale, target=target)}"
+                f"{value_text(facts[target].value, dictionary, locale, target=target)}"
             )
     if not members:
         return None
@@ -931,7 +931,7 @@ def _component_sentence(prefix, facts, dictionary, locale, language, group_numbe
     return f"{heading}: {', '.join(members)}."
 
 
-def _value_text(value, dictionary, locale, *, target=None):
+def value_text(value, dictionary, locale, *, target=None):
     if target == "composition.symmetry_mode" and value == "asymmetrical":
         return "asymmetrical" if locale == DictionaryLocale.EN else "асимметричная"
     if target == "references" and isinstance(value, list):
@@ -949,7 +949,7 @@ def _value_text(value, dictionary, locale, *, target=None):
         except KeyError:
             return value.replace("_", " ")
     if isinstance(value, list):
-        return ", ".join(_value_text(item, dictionary, locale) for item in value)
+        return ", ".join(value_text(item, dictionary, locale) for item in value)
     if isinstance(value, dict):
         if set(value) >= {"length", "width", "depth"}:
             parts = [value[name]["value"] for name in ("length", "width", "depth")]
@@ -1144,3 +1144,9 @@ def _hash(payload) -> str:
         _json(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":")
     )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+# Pre-public private names, kept only so existing in-package and test imports keep working.
+# Code outside this package must import the public names above (guarded by
+# tests/test_cross_package_private_imports.py).
+_value_text = value_text
