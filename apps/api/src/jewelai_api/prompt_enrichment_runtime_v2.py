@@ -87,7 +87,7 @@ from .f04_planning import (
     target_state,
 )
 from .parsed_enrichment import proposed_design_for_transition
-from .prompt_enrichment_runtime import (
+from .prompt_enrichment_contracts import (
     InitialEnrichmentRequestV2,
     InitialEnrichmentRuntimeResultV2,
     PersistedClarificationAnswerRequestV2,
@@ -97,7 +97,7 @@ from .prompt_enrichment_runtime import (
     _decision_lineage,
     _workflow_status,
 )
-from .prompt_enrichment_runtime import (
+from .prompt_enrichment_contracts import (
     PromptEnrichmentRuntimeErrorCode as Error,
 )
 

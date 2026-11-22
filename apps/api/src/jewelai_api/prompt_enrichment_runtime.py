@@ -10,11 +10,8 @@ import json
 from collections.abc import Callable
 from copy import copy
 from datetime import UTC, datetime
-from enum import StrEnum
-from typing import Literal
 from uuid import UUID
 
-from jewelai_domain.clarification_state import CauseState, Sha256
 from jewelai_domain.knowledge_runtime import (
     AnyActiveKnowledge,
     AnyKnowledgeStore,
@@ -25,9 +22,9 @@ from jewelai_domain.knowledge_runtime import (
 from jewelai_domain.knowledge_storage import (
     KnowledgeArtifactStorageError,
 )
-from jewelai_domain.models import ImmutableModel, MessageSource
+from jewelai_domain.models import MessageSource
 from jewelai_domain.revisions import RevisionConflict, revise_design
-from jewelai_parser import AnyFullMessageParseResult, AnyParserProposal, parse_full_message
+from jewelai_parser import parse_full_message
 from jewelai_persistence import (
     ClarificationDecisionConflictError,
     ClarificationDecisionIntegrityError,
@@ -43,16 +40,11 @@ from jewelai_persistence import (
     UserCorrectionIntegrityError,
 )
 from jewelai_prompts import (
-    CanonicalFinalPromptAssemblyV2_1 as FinalPromptAssembly,
-)
-from jewelai_prompts import (
     CanonicalInternalFinalPromptHandoffV2_1 as InternalFinalPromptHandoff,
 )
 from jewelai_prompts import (
     FinalPromptArtifactVersions,
-    FinalPromptDecisionLineage,
     FinalPromptInputError,
-    FinalPromptReadiness,
     FinalPromptSnapshot,
     InternalFinalPromptHandoffError,
     KnowledgeReleaseReference,
@@ -68,8 +60,8 @@ from jewelai_prompts.downstream_preparation import (
     preparation_hash,
     render_semantic_source,
 )
-from jewelai_prompts.final_prompt_v3 import CanonicalFinalPromptAssemblyV3
 
+from . import prompt_enrichment_runtime_v2 as _f04_workflow
 from .artifacts import (
     ArtifactConfigurationError,
     RuntimeArtifacts,
@@ -90,11 +82,6 @@ from .clarification_answers import (
     ClarificationAnswerResult,
     ClarificationDecision,
     process_clarification_answer,
-)
-from .clarification_v2 import (
-    ClarificationAnswerRequestV2,
-    ClarificationPlanV2,
-    CorrectionRequestV2,
 )
 from .constraint_evidence import ConstraintEvidenceIntegrityError, merge_constraint_evidence
 from .correction_enrichment import (
@@ -117,126 +104,54 @@ from .parametric_enrichment import select_parametric_references
 from .parsed_enrichment import (
     CandidateDispositionOutcome,
     CandidateDispositionReason,
-    ParsedCandidateEnrichmentResult,
-    ParsedCandidateEnrichmentResultV2,
     enrich_parsed_candidates_with_active_release,
     proposed_design_for_transition,
 )
-from .preparation_contracts import GenerationPreparationRequest, GenerationPreparationRequestV2
-
-
-class PromptEnrichmentRuntimeErrorCode(StrEnum):
-    SESSION_NOT_FOUND = "session_not_found"
-    STALE_REVISION = "stale_revision"
-    INVALID_KNOWLEDGE_RELEASE = "invalid_knowledge_release"
-    ARTIFACT_MISMATCH = "artifact_mismatch"
-    ENRICHMENT_CYCLE_MISMATCH = "enrichment_cycle_mismatch"
-    INVALID_HISTORY = "invalid_history"
-    CONCURRENT_CONFLICT = "concurrent_conflict"
-    FINAL_OUTPUT_BLOCKED = "final_output_blocked"
-    INVALID_CLARIFICATION_ANSWER = "invalid_clarification_answer"
-    INVALID_CLARIFICATION_DECISION = "invalid_clarification_decision"
-    INVALID_CLARIFICATION_OPTION = "invalid_clarification_option"
-    CLARIFICATION_CONFLICT = "clarification_conflict"
-    INVALID_CLARIFICATION_PLAN = "invalid_clarification_plan"
-    STALE_CLARIFICATION_PLAN = "stale_clarification_plan"
-    INVALID_CORRECTION = "invalid_correction"
-    CORRECTION_CONFLICT = "correction_conflict"
-
-
-class PromptEnrichmentRuntimeError(RuntimeError):
-    """Bounded internal workflow failure with no infrastructure detail leakage."""
-
-    def __init__(self, code: PromptEnrichmentRuntimeErrorCode, detail: str):
-        super().__init__(detail)
-        self.code = code
-
-
-class PromptEnrichmentWorkflowStatus(StrEnum):
-    ENRICHMENT_COMPLETED = "enrichment_completed"
-    CLARIFICATION_AVAILABLE = "clarification_available"
-    BLOCKING_CLARIFICATION_UNRESOLVED = "blocking_clarification_unresolved"
-    CLARIFICATION_ANSWER_RECORDED = "clarification_answer_recorded"
-    CORRECTION_APPLIED = "correction_applied"
-    CORRECTION_DEFERRED = "correction_deferred"
-    FINAL_OUTPUT_READY = "final_output_ready"
-    FINAL_OUTPUT_READY_WITH_UNRESOLVED = "final_output_ready_with_unresolved"
-    FINAL_OUTPUT_BLOCKED = "final_output_blocked"
-
-
-class InitialEnrichmentRequest(ImmutableModel):
-    session_id: UUID
-    organization_id: UUID
-    expected_revision_id: UUID
-    message_id: UUID
-
-
-class PersistedClarificationAnswerRequest(ImmutableModel):
-    session_id: UUID
-    clarification_plan_id: UUID
-    clarification_id: str
-    decision: ClarificationDecision
-    selected_option: str | None = None
-    expected_revision_id: UUID
-    answer_id: UUID
-    message_id: UUID
-
-
-class PersistedUserCorrectionRequest(ImmutableModel):
-    session_id: UUID
-    expected_revision_id: UUID
-    message_id: UUID
-
-
-class PromptEnrichmentWorkflowState(ImmutableModel):
-    session_id: UUID
-    organization_id: UUID
-    authoritative_revision_id: UUID
-    enrichment_cycle_id: UUID
-    enrichment_cycle_number: int
-    knowledge_release: KnowledgeReleaseReference
-    status: PromptEnrichmentWorkflowStatus
-    clarification_plan_id: UUID | None = None
-    clarification_plan: ClarificationPlan | None = None
-    final_output: FinalPromptAssembly | None = None
-    preparation_expectations: GenerationPreparationRequest | None = None
-    can_prepare: bool = False
-
-
-class InitialEnrichmentRuntimeResult(ImmutableModel):
-    parse_result: AnyFullMessageParseResult
-    parser_proposal: AnyParserProposal
-    enrichment: ParsedCandidateEnrichmentResult
-    workflow: PromptEnrichmentWorkflowState
-
-
-class InitialEnrichmentRequestV2(InitialEnrichmentRequest):
-    schema_version: Literal["2.0.0"]
-
-
-class PersistedClarificationAnswerRequestV2(ClarificationAnswerRequestV2):
-    session_id: UUID
-
-
-class PersistedUserCorrectionRequestV2(CorrectionRequestV2):
-    session_id: UUID
-
-
-class PromptEnrichmentWorkflowStateV2(PromptEnrichmentWorkflowState):
-    schema_version: Literal["2.0.0"]
-    contract_profile: Literal["jewelai.prompt-enrichment.f04/2.0.0"]
-    current_plan_version: Literal["2.0.0"]
-    clarification_plan: ClarificationPlanV2
-    final_output: CanonicalFinalPromptAssemblyV3
-    preparation_expectations: GenerationPreparationRequestV2 | None
-    availability_overlay_hash: Sha256
-    effective_unresolved_frontier_hash: Sha256
-    current_unresolved_causal_summaries: tuple[CauseState, ...]
-
-
-class InitialEnrichmentRuntimeResultV2(InitialEnrichmentRuntimeResult):
-    enrichment: ParsedCandidateEnrichmentResultV2
-    workflow: PromptEnrichmentWorkflowStateV2
+from .prompt_enrichment_contracts import (
+    InitialEnrichmentRequest as InitialEnrichmentRequest,
+)
+from .prompt_enrichment_contracts import (
+    InitialEnrichmentRequestV2 as InitialEnrichmentRequestV2,
+)
+from .prompt_enrichment_contracts import (
+    InitialEnrichmentRuntimeResult as InitialEnrichmentRuntimeResult,
+)
+from .prompt_enrichment_contracts import (
+    InitialEnrichmentRuntimeResultV2 as InitialEnrichmentRuntimeResultV2,
+)
+from .prompt_enrichment_contracts import (
+    PersistedClarificationAnswerRequest as PersistedClarificationAnswerRequest,
+)
+from .prompt_enrichment_contracts import (
+    PersistedClarificationAnswerRequestV2 as PersistedClarificationAnswerRequestV2,
+)
+from .prompt_enrichment_contracts import (
+    PersistedUserCorrectionRequest as PersistedUserCorrectionRequest,
+)
+from .prompt_enrichment_contracts import (
+    PersistedUserCorrectionRequestV2 as PersistedUserCorrectionRequestV2,
+)
+from .prompt_enrichment_contracts import (
+    PromptEnrichmentRuntimeError as PromptEnrichmentRuntimeError,
+)
+from .prompt_enrichment_contracts import (
+    PromptEnrichmentRuntimeErrorCode as PromptEnrichmentRuntimeErrorCode,
+)
+from .prompt_enrichment_contracts import (
+    PromptEnrichmentWorkflowState as PromptEnrichmentWorkflowState,
+)
+from .prompt_enrichment_contracts import (
+    PromptEnrichmentWorkflowStateV2 as PromptEnrichmentWorkflowStateV2,
+)
+from .prompt_enrichment_contracts import (
+    PromptEnrichmentWorkflowStatus as PromptEnrichmentWorkflowStatus,
+)
+from .prompt_enrichment_contracts import (
+    _decision_lineage as _decision_lineage,
+)
+from .prompt_enrichment_contracts import (
+    _workflow_status as _workflow_status,
+)
 
 
 class PromptEnrichmentRuntimeService:
@@ -344,9 +259,7 @@ class PromptEnrichmentRuntimeService:
             return bound.start_initial_message(request)
         self._require_request_profile(request)
         if self._is_f04:
-            from .prompt_enrichment_runtime_v2 import start_initial_message
-
-            return start_initial_message(self, request)
+            return _f04_workflow.start_initial_message(self, request)
 
         request = InitialEnrichmentRequest.model_validate(request)
         try:
@@ -482,9 +395,9 @@ class PromptEnrichmentRuntimeService:
         if bound is not self:
             return bound.build_preparation_source(repository, session_id, organization_id)
         if self._is_f04:
-            from .prompt_enrichment_runtime_v2 import build_preparation_source
-
-            return build_preparation_source(self, repository, session_id, organization_id)
+            return _f04_workflow.build_preparation_source(
+                self, repository, session_id, organization_id
+            )
         snapshot = build_final_prompt_snapshot(
             repository,
             session_id=session_id,
@@ -568,9 +481,7 @@ class PromptEnrichmentRuntimeService:
         if bound is not self:
             return bound.get_current_state(session_id, organization_id)
         if self._is_f04:
-            from .prompt_enrichment_runtime_v2 import get_current_state
-
-            return get_current_state(self, session_id, organization_id)
+            return _f04_workflow.get_current_state(self, session_id, organization_id)
 
         try:
             cycles = self.repository.list_enrichment_cycles(session_id, organization_id)
@@ -773,9 +684,7 @@ class PromptEnrichmentRuntimeService:
             return bound.apply_persisted_user_correction(organization_id, request)
         self._require_request_profile(request)
         if self._is_f04:
-            from .prompt_enrichment_runtime_v2 import apply_persisted_user_correction
-
-            return apply_persisted_user_correction(self, organization_id, request)
+            return _f04_workflow.apply_persisted_user_correction(self, organization_id, request)
         request = PersistedUserCorrectionRequest.model_validate(request)
         try:
             session = self.repository.get_design_session(request.session_id, organization_id)
@@ -1013,9 +922,9 @@ class PromptEnrichmentRuntimeService:
             return bound.record_persisted_clarification_answer(organization_id, request)
         self._require_request_profile(request)
         if self._is_f04:
-            from .prompt_enrichment_runtime_v2 import record_persisted_clarification_answer
-
-            return record_persisted_clarification_answer(self, organization_id, request)
+            return _f04_workflow.record_persisted_clarification_answer(
+                self, organization_id, request
+            )
         request = PersistedClarificationAnswerRequest.model_validate(request)
         try:
             plan = self.restore_clarification_plan(
@@ -1101,9 +1010,7 @@ class PromptEnrichmentRuntimeService:
                 session_id, organization_id, clarification_plan_id, require_current=require_current
             )
         if self._is_f04:
-            from .prompt_enrichment_runtime_v2 import restore_clarification_plan
-
-            return restore_clarification_plan(
+            return _f04_workflow.restore_clarification_plan(
                 self,
                 session_id,
                 organization_id,
@@ -1247,9 +1154,9 @@ class PromptEnrichmentRuntimeService:
                 PromptEnrichmentRuntimeErrorCode.CLARIFICATION_CONFLICT,
                 "Resume is unavailable for the retained session profile",
             )
-        from .prompt_enrichment_runtime_v2 import resume_clarification
-
-        return resume_clarification(bound, session_id, organization_id, cause_id, request)
+        return _f04_workflow.resume_clarification(
+            bound, session_id, organization_id, cause_id, request
+        )
 
     def _evaluate(self, revision, parsed, source, *, equivalent_candidate_ids=()):
         return enrich_parsed_candidates_with_active_release(
@@ -1791,74 +1698,6 @@ def _answer_discharges_question(
         and not answer.blocks_progression
         and answer.decision in {ClarificationDecision.SKIP, ClarificationDecision.UNKNOWN}
     )
-
-
-def _decision_lineage(session_id, current_revision_id, answers, corrections, correction_blocks):
-    items = []
-    for answer in answers:
-        option = answer.selected_option.value if answer.selected_option is not None else None
-        items.append(
-            FinalPromptDecisionLineage(
-                kind="clarification",
-                session_id=session_id,
-                decision_id=answer.clarification_id,
-                decision=answer.decision.value,
-                outcome=answer.outcome.value,
-                target=answer.target,
-                selected_value=option,
-                source_revision_id=answer.previous_revision_id,
-                resulting_revision_id=answer.new_revision_id,
-                applies_to_revision_id=current_revision_id,
-                knowledge_package_id=answer.knowledge_package_id,
-                knowledge_artifact_version=answer.knowledge_artifact_version,
-                knowledge_runtime_sha256=answer.knowledge_runtime_sha256,
-                knowledge_validation_report_sha256=answer.knowledge_validation_report_sha256,
-                question_artifact_version=answer.question_artifact_version,
-                rules_artifact_version=answer.rules_artifact_version,
-                blocks_progression=answer.blocks_progression,
-                content_hash=answer.content_hash,
-            )
-        )
-    for correction in corrections:
-        items.append(
-            FinalPromptDecisionLineage(
-                kind="correction",
-                session_id=session_id,
-                decision_id=str(correction.source.message_id),
-                decision="CORRECT",
-                outcome=correction.outcome.value,
-                source_revision_id=correction.previous_revision_id,
-                resulting_revision_id=correction.new_revision_id,
-                applies_to_revision_id=current_revision_id,
-                knowledge_package_id=correction.knowledge_package_id,
-                knowledge_artifact_version=correction.knowledge_artifact_version,
-                knowledge_runtime_sha256=correction.knowledge_runtime_sha256,
-                knowledge_validation_report_sha256=(correction.knowledge_validation_report_sha256),
-                blocks_progression=correction_blocks[correction.content_hash],
-                content_hash=correction.content_hash,
-            )
-        )
-    return tuple(sorted(items, key=lambda item: (item.kind, item.decision_id, item.content_hash)))
-
-
-def _workflow_status(assembly, clarification_plan):
-    readiness = assembly.internal_final_prompt.readiness
-    if clarification_plan is not None:
-        if any(
-            item.importance == ClarificationImportance.BLOCKING
-            for item in clarification_plan.questions
-        ):
-            return PromptEnrichmentWorkflowStatus.BLOCKING_CLARIFICATION_UNRESOLVED
-    if readiness == FinalPromptReadiness.BLOCKED:
-        return PromptEnrichmentWorkflowStatus.FINAL_OUTPUT_BLOCKED
-    if clarification_plan is not None:
-        if clarification_plan.questions:
-            return PromptEnrichmentWorkflowStatus.CLARIFICATION_AVAILABLE
-    if readiness == FinalPromptReadiness.READY:
-        return PromptEnrichmentWorkflowStatus.FINAL_OUTPUT_READY
-    if readiness == FinalPromptReadiness.READY_WITH_UNRESOLVED:
-        return PromptEnrichmentWorkflowStatus.FINAL_OUTPUT_READY_WITH_UNRESOLVED
-    return PromptEnrichmentWorkflowStatus.FINAL_OUTPUT_BLOCKED
 
 
 def _aware(value: datetime) -> datetime:
