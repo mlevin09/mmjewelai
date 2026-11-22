@@ -1,10 +1,13 @@
 """Bounded one-shot asset ingestion orchestration."""
 
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from hashlib import sha256
 from typing import Protocol
 from uuid import UUID
+
+from jewelai_observability import exception_diagnostics
 
 from .models import (
     ASSET_SCHEMA_VERSION,
@@ -18,6 +21,10 @@ from .models import (
     StoredObject,
 )
 from .storage import AssetStorageConflictError, AssetStorageError, PrivateObjectStore
+
+# Runtimes attach their structured JSON handler to this logger. Records carry only
+# identifiers and exception identity, never bytes, object keys or exception messages.
+LOGGER = logging.getLogger("jewelai.assets")
 
 
 class AssetIngestionError(RuntimeError):
@@ -133,7 +140,8 @@ def ingest_asset(
             content_hash=expected.content_hash,
         )
         _verify_stored_object(expected, stored)
-    except AssetStorageConflictError:
+    except AssetStorageConflictError as exc:
+        _log_ingestion_failure(logging.WARNING, "asset_storage_conflict", pending, exc)
         return repository.mark_asset_failed(
             pending.asset_id,
             pending.organization_id,
@@ -141,7 +149,8 @@ def ingest_asset(
             "Private object storage reported conflicting existing content",
             now(),
         )
-    except AssetStorageError:
+    except AssetStorageError as exc:
+        _log_ingestion_failure(logging.ERROR, "asset_storage_unavailable", pending, exc)
         return repository.mark_asset_failed(
             pending.asset_id,
             pending.organization_id,
@@ -149,7 +158,8 @@ def ingest_asset(
             "Private object storage was unavailable",
             now(),
         )
-    except Exception:
+    except Exception as exc:
+        _log_ingestion_failure(logging.ERROR, "asset_storage_unexpected_error", pending, exc)
         return repository.mark_asset_failed(
             pending.asset_id,
             pending.organization_id,
@@ -260,6 +270,21 @@ def adopt_stored_asset(
             if existing.status is AssetStatus.READY:
                 return existing
         raise
+
+
+def _log_ingestion_failure(level: int, event: str, pending: Asset, exc: BaseException) -> None:
+    LOGGER.log(
+        level,
+        event.replace("_", " "),
+        extra={
+            "jewelai_fields": {
+                "event": event,
+                "asset_id": str(pending.asset_id),
+                "organization_id": str(pending.organization_id),
+                **exception_diagnostics(exc),
+            }
+        },
+    )
 
 
 def _expected_stored_object(

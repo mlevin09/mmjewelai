@@ -1,5 +1,6 @@
 """One-shot, idempotent generation-run orchestration."""
 
+import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
 from types import MappingProxyType
@@ -33,7 +34,22 @@ from jewelai_model_gateway import (
 from jewelai_persistence import GenerationStateConflictError, PersistenceRepository
 from pydantic import BaseModel, ConfigDict
 
+from .logging import log_exception
 from .materialization import generated_asset_id
+
+# Same logger the worker runtime configures; failures are recorded where they are
+# handled, because the HTTP boundary only sees the sanitized error code.
+_LOGGER = logging.getLogger("jewelai.generation")
+
+
+def _log_handled_failure(event: str, exc: BaseException, generation_run_id: UUID) -> None:
+    log_exception(
+        _LOGGER,
+        event,
+        exc,
+        service="generation-worker",
+        generation_run_id=str(generation_run_id),
+    )
 
 
 class ExecutionOutcome(BaseModel):
@@ -93,6 +109,7 @@ def execute_generation_run(
         )
         return ExecutionOutcome(disposition="succeeded", run=completed)
     except GatewayError as exc:
+        _log_handled_failure("generation_gateway_error", exc, generation_run_id)
         return _fail(
             repository,
             claimed,
@@ -101,7 +118,8 @@ def execute_generation_run(
             exc.safe_detail,
             clock,
         )
-    except Exception:
+    except Exception as exc:
+        _log_handled_failure("generation_unexpected_error", exc, generation_run_id)
         return _fail(
             repository,
             claimed,
@@ -190,7 +208,8 @@ def execute_generation_run_with_assets(
             execution.result,
             clock(),
         )
-    except AssetStorageError:
+    except AssetStorageError as exc:
+        _log_handled_failure("generation_output_staging_failed", exc, generation_run_id)
         return _fail(
             repository,
             claimed,
@@ -200,6 +219,7 @@ def execute_generation_run_with_assets(
             clock,
         )
     except GatewayError as exc:
+        _log_handled_failure("generation_gateway_error", exc, generation_run_id)
         return _fail(
             repository,
             claimed,
@@ -208,7 +228,8 @@ def execute_generation_run_with_assets(
             exc.safe_detail,
             clock,
         )
-    except Exception:
+    except Exception as exc:
+        _log_handled_failure("generation_unexpected_error", exc, generation_run_id)
         return _fail(
             repository,
             claimed,
@@ -230,7 +251,8 @@ def execute_generation_run_with_assets(
                 clock=clock,
             )
             assets.append(asset)
-        except Exception:
+        except Exception as exc:
+            _log_handled_failure("generation_asset_materialization_failed", exc, generation_run_id)
             materialization_failed = True
     return ExecutionOutcome(
         disposition="materialization_failed" if materialization_failed else "succeeded",

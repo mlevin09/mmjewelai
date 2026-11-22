@@ -245,6 +245,16 @@
     },
     {
       "prefixes": [
+        "packages/observability"
+      ],
+      "buckets": [
+        "assets",
+        "queue",
+        "api"
+      ]
+    },
+    {
+      "prefixes": [
         "packages/generation_queue",
         "specs/generation-queue/"
       ],
@@ -628,6 +638,17 @@
         ],
         "evidence": "Complete native assets_gcs owner and its actual integration consumers.",
         "postgres": true,
+        "release": false
+      },
+      "observability": {
+        "tests": [
+          "packages/observability/tests",
+          "packages/assets/tests",
+          "workers/generation/tests",
+          "apps/api/tests/test_failure_logging.py"
+        ],
+        "evidence": "Complete native observability owner and every consumer that imports exception_diagnostics (Asset ingestion, generation worker and API STT logging).",
+        "postgres": false,
         "release": false
       },
       "generation_queue": {
@@ -1053,6 +1074,15 @@
         ]
       },
       {
+        "path": "packages/observability/src/*",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "observability"
+        ]
+      },
+      {
         "path": "packages/generation_queue/src/*",
         "declarations": [
           "*"
@@ -1461,6 +1491,30 @@
           "bootstrap"
         ],
         "evidence": "Only declares httpx>=0.28,<1 directly for the new private conversational HTTP client. This same library/range is already runtime-required by jewelai-text-understanding-google; no new library/provider or test dependency is introduced. Bootstrap/adapter/configuration and full native US-01 owners validate composition; mandatory release qualification is retained."
+      },
+      {
+        "path": "packages/observability/pyproject.toml",
+        "components": [
+          "observability"
+        ]
+      },
+      {
+        "path": "packages/observability/README.md",
+        "components": [
+          "observability"
+        ]
+      },
+      {
+        "path": "packages/assets/pyproject.toml",
+        "components": [
+          "assets"
+        ]
+      },
+      {
+        "path": "workers/generation/pyproject.toml",
+        "components": [
+          "worker"
+        ]
       }
     ],
     "test_support": {

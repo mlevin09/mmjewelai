@@ -46,6 +46,7 @@ from jewelai_domain.models_v1_1 import DesignRevisionV1_1
 from jewelai_generation_queue import GenerationTaskPublisher
 from jewelai_generation_queue_gcp import CloudTasksGenerationPublisher
 from jewelai_model_gateway import GenerationRun
+from jewelai_observability import exception_diagnostics
 from jewelai_parser import AnyParserProposal
 from jewelai_persistence import (
     EnrichmentIntegrityError,
@@ -412,6 +413,24 @@ def create_app(
             ],
         )
     api_logger = configure_json_logger("jewelai.api")
+    # Shared Asset ingestion records storage failures on its own logger.
+    configure_json_logger("jewelai.assets")
+
+    def _log_stt_failure(error_code: str, exc: BaseException, session_id: UUID) -> None:
+        api_logger.error(
+            "Speech transcription failed",
+            extra={
+                "jewelai_fields": {
+                    "service": "api",
+                    "environment": settings.environment,
+                    "event": "stt_request_failed",
+                    "error_code": error_code,
+                    "session_id": str(session_id),
+                    **exception_diagnostics(exc),
+                }
+            },
+        )
+
     app.add_middleware(RequestBodyLimitMiddleware, max_bytes=settings.http_max_request_bytes)
     app.add_middleware(
         RequestObservabilityMiddleware,
@@ -928,10 +947,13 @@ def create_app(
 
             try:
                 return await asyncio.to_thread(call_stt)
-            except requests.Timeout:
+            except requests.Timeout as exc:
+                _log_stt_failure("stt_timeout", exc, session_id)
                 return _error_response(504, "stt_timeout", "Speech service timed out")
-            except Exception:
-                # Upstream text, credentials and internal error details are never returned.
+            except Exception as exc:
+                # Upstream text, credentials and internal error details are never
+                # returned or logged; only the exception types and code location are.
+                _log_stt_failure("stt_unavailable", exc, session_id)
                 return _error_response(503, "stt_unavailable", "Speech service unavailable")
         finally:
             await audio.close()

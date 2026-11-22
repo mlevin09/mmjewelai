@@ -7,7 +7,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip && \
     python -m pip wheel --no-cache-dir --wheel-dir /wheels \
       ./packages/domain ./packages/auth ./packages/assets ./packages/assets_gcs \
       ./packages/generation_queue ./packages/model_gateway ./packages/model_gateway_google \
-      ./packages/model_gateway_openai \
+      ./packages/model_gateway_openai ./packages/observability \
       ./packages/persistence ./packages/prompts ./workers/generation
 
 FROM python:3.12.14-slim-bookworm AS runtime
