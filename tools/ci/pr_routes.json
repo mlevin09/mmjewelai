@@ -703,6 +703,31 @@
         "evidence": "Owner-approved additive US-01 schema2 source/dual-interpretation/SO/Matrix/State commit and write-once natural delivery. Complete native modules own raw text and structured/transcript sources, independent Parser1.3, conservative lexical/component proof (including missing Parser candidates), recommendations/questions, lock/source integrity, CAS/idempotency, rollback, retained reply/restart and mocked bounded private Qwen HTTP. PostgreSQL module reuses the unchanged independently verified disposable gate for migration0023, non-blocking model phases and immutability/downgrade; real model/live UI remain separate operational evidence. No Full gate or CI algorithm is weakened.",
         "postgres": true,
         "release": true
+      },
+      "prompt_enrichment_runtime": {
+        "tests": [
+          "apps/api/tests/completion/test_studio_recovery.py",
+          "apps/api/tests/test_effective_readiness.py",
+          "apps/api/tests/test_enrichment_versioned_history.py",
+          "apps/api/tests/test_f05_positive_completion.py",
+          "apps/api/tests/test_ifp_capacity_runtime.py",
+          "apps/api/tests/test_keep_atomicity.py",
+          "apps/api/tests/test_knowledge_session_binding.py",
+          "apps/api/tests/test_knowledge_session_binding_postgres.py",
+          "apps/api/tests/test_p010_symmetry_runtime.py",
+          "apps/api/tests/test_parsed_enrichment.py",
+          "apps/api/tests/test_parser12_contract.py",
+          "apps/api/tests/test_professional_knowledge_http.py",
+          "apps/api/tests/test_prompt_enrichment_composition.py",
+          "apps/api/tests/test_prompt_enrichment_http.py",
+          "apps/api/tests/test_prompt_enrichment_integration.py",
+          "apps/api/tests/test_prompt_enrichment_module_boundaries.py",
+          "apps/api/tests/test_prompt_enrichment_runtime.py",
+          "apps/api/tests/test_style_input.py"
+        ],
+        "evidence": "Every API test module that imports or drives the Prompt Enrichment runtime service, its F04 workflow or their shared contracts, including the static module-boundary guard and the PostgreSQL knowledge-binding suite.",
+        "postgres": true,
+        "release": false
       }
     },
     "sources": [
@@ -1216,6 +1241,55 @@
         "components": [
           "st01_first_turn",
           "state_safety"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_contracts.py",
+        "declarations": [
+          "*"
+        ],
+        "components": [
+          "prompt_enrichment_runtime"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime.py",
+        "declarations": [
+          "InitialEnrichmentRequest",
+          "InitialEnrichmentRequestV2",
+          "InitialEnrichmentRuntimeResult",
+          "InitialEnrichmentRuntimeResultV2",
+          "PersistedClarificationAnswerRequest",
+          "PersistedClarificationAnswerRequestV2",
+          "PersistedUserCorrectionRequest",
+          "PersistedUserCorrectionRequestV2",
+          "PromptEnrichmentRuntimeError",
+          "PromptEnrichmentRuntimeError.__init__",
+          "PromptEnrichmentRuntimeErrorCode",
+          "PromptEnrichmentRuntimeService.apply_persisted_user_correction",
+          "PromptEnrichmentRuntimeService.build_preparation_source",
+          "PromptEnrichmentRuntimeService.get_current_state",
+          "PromptEnrichmentRuntimeService.record_persisted_clarification_answer",
+          "PromptEnrichmentRuntimeService.restore_clarification_plan",
+          "PromptEnrichmentRuntimeService.resume_clarification",
+          "PromptEnrichmentRuntimeService.start_initial_message",
+          "PromptEnrichmentWorkflowState",
+          "PromptEnrichmentWorkflowStateV2",
+          "PromptEnrichmentWorkflowStatus",
+          "_decision_lineage",
+          "_workflow_status"
+        ],
+        "components": [
+          "prompt_enrichment_runtime"
+        ]
+      },
+      {
+        "path": "apps/api/src/jewelai_api/prompt_enrichment_runtime_v2.py",
+        "declarations": [
+          "@module"
+        ],
+        "components": [
+          "prompt_enrichment_runtime"
         ]
       },
       {
